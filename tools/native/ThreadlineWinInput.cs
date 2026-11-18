@@ -241,6 +241,11 @@ public static class ThreadlineWinInput
 
     public static void Chord(params int[] keys)
     {
+        Send(ChordEvents(keys));
+    }
+
+    private static Input[] ChordEvents(int[] keys)
+    {
         var events = new Input[keys.Length * 2];
         for (int index = 0; index < keys.Length; index++)
         {
@@ -249,12 +254,17 @@ public static class ThreadlineWinInput
             events[index] = Key(key, 0, flags);
             events[events.Length - index - 1] = Key(key, 0, flags | KeyUp);
         }
-        Send(events);
+        return events;
     }
 
     public static void TypeText(string text)
     {
         if (String.IsNullOrEmpty(text)) return;
+        Send(TextEvents(text));
+    }
+
+    private static Input[] TextEvents(string text)
+    {
         var events = new Input[text.Length * 2];
         for (int index = 0; index < text.Length; index++)
         {
@@ -262,6 +272,19 @@ public static class ThreadlineWinInput
             events[index * 2] = Key(0, character, 4);
             events[index * 2 + 1] = Key(0, character, 4 | KeyUp);
         }
+        return events;
+    }
+
+    public static void ReplaceFixtureText(IntPtr window, uint owner, string value)
+    {
+        if (window == IntPtr.Zero || window != TargetWindow || owner == 0 ||
+            WindowProcessId(window) != owner || !IsWindowVisible(window) || IsIconic(window))
+            throw new TargetUnavailableException("The isolated text input window is no longer visible and owned.");
+        var selectAll = ChordEvents(new[] { 0x11, 0x41 });
+        var text = TextEvents(value);
+        var events = new Input[selectAll.Length + text.Length];
+        Array.Copy(selectAll, events, selectAll.Length);
+        Array.Copy(text, 0, events, selectAll.Length, text.Length);
         Send(events);
     }
 

@@ -1,7 +1,8 @@
 function Wait-Account([string]$Description, [scriptblock]$AccountCheck) {
     return Wait-State $Description {
         param($state)
-        $null -ne $state.account_access -and !$state.account_access.busy -and (& $AccountCheck $state.account_access)
+        $account = $state.PSObject.Properties['account_access']
+        $null -ne $account -and $null -ne $account.Value -and !$account.Value.busy -and (& $AccountCheck $account.Value)
     }
 }
 
@@ -13,6 +14,7 @@ function Click-AccountControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwat
         $rect = $property.Value
         return $rect.Count -eq 4 -and $rect[2] -gt 0 -and $rect[3] -gt 0
     }
+    if ($script:UseOwnedUiAutomation -and (Invoke-OwnedFixtureControl $Window $Id $InputClock)) { return }
     $bounds = $state.bounds.PSObject.Properties[$Id].Value
     $center = To-ClientPoint ($bounds[0] + $bounds[2] / 2) ($bounds[1] + $bounds[3] / 2) $state.scale_factor
     if ($null -ne $InputClock) { $InputClock.Restart() }
@@ -33,7 +35,11 @@ function Set-AccessPhase([string]$Phase) {
 }
 
 function Open-AccountFixture {
-    [ThreadlineWinInput]::Chord(@(0x11, 0x10, 0x41))
+    if ($script:UseOwnedUiAutomation) {
+        Click-AccountControl $script:app.MainWindowHandle 'account-open'
+    } else {
+        [ThreadlineWinInput]::Chord(@(0x11, 0x10, 0x41))
+    }
     return Wait-Account 'open the native account panel' { param($account) $account.panel_open }
 }
 
@@ -46,22 +52,29 @@ function Connect-FixtureAccount([IntPtr]$Window, [switch]$FromVisibleControl) {
     } else {
         $null = Open-AccountFixture
     }
-    Click-AccountControl $Window 'account-repository'
-    $null = Wait-Account 'focus in the native repository field' {
-        param($account) $account.panel_open -and $account.fixture_route_focused
+    if (!$script:UseOwnedUiAutomation -or !(Set-OwnedFixtureRepository $Window)) {
+        if ($script:UseOwnedUiAutomation) { Set-WindowFocus $Window }
+        Click-AccountControl $Window 'account-repository'
+        $null = Wait-Account 'focus in the native repository field' {
+            param($account) $account.panel_open -and $account.fixture_route_focused
+        }
+        [ThreadlineWinInput]::ReplaceFixtureText($Window, [uint32]$script:app.Id, 'fixture-org/private')
     }
-    [ThreadlineWinInput]::Chord(@(0x11, 0x41))
-    [ThreadlineWinInput]::TypeText('fixture-org/private')
     $null = Wait-Account 'the exact synthetic repository in the native form' {
         param($account) $account.fixture_route_entered
+    }
+    if ($script:UseOwnedUiAutomation) {
+        Assert-OwnedMaskedFixtureField $Window
+        if ([ThreadlineWinInput]::GetForegroundWindow() -ne $Window) { Set-WindowFocus $Window }
+        [ThreadlineWinInput]::TargetWindow = $Window
     }
     Click-AccountControl $Window 'account-token'
     $null = Wait-Account 'focus in the masked native token field' {
         param($account) $account.panel_open -and $account.fixture_token_focused
     }
     $syntheticPat = 'threadline-test-fixture'
-    [ThreadlineWinInput]::Chord(@(0x11, 0x41))
-    [ThreadlineWinInput]::TypeText($syntheticPat)
+    if ($script:UseOwnedUiAutomation) { Assert-OwnedMaskedFixtureField $Window }
+    [ThreadlineWinInput]::ReplaceFixtureText($Window, [uint32]$script:app.Id, $syntheticPat)
     $null = Wait-Account 'the exact synthetic credential entered into the masked native form' {
         param($account) $account.fixture_route_entered -and $account.fixture_token_entered
     }
@@ -129,7 +142,7 @@ function Invoke-GitHubAccessProof([IntPtr]$Window, [string]$Profile) {
     $script:app = Start-Threadline $Profile $script:reportFile
     $script:report.restarted_pid = $script:app.Id
     $restarted = Get-ReadyWindow
-    Set-WindowFocus $restarted
+    if (!$script:UseOwnedUiAutomation) { Set-WindowFocus $restarted }
     $null = Open-AccountFixture
     $null = Wait-Account 'readable same-profile selection restored after Quit' {
         param($account) $account.active_user_id -eq 41 -and $account.selected_count -eq 1

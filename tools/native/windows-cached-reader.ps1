@@ -40,7 +40,7 @@ function Restart-Reader([string]$Profile) {
     $script:app = Start-Threadline $Profile $script:reportFile
     $script:report.restarted_pid = $script:app.Id
     $window = Get-ReadyWindow
-    Set-WindowFocus $window
+    if (!$script:UseOwnedUiAutomation) { Set-WindowFocus $window }
     $after = Get-IsolatedSqlite $Profile -Live
     if ($before.creation_time_ticks -ne $after.creation_time_ticks) {
         throw 'The isolated reader database changed identity after Quit and relaunch.'

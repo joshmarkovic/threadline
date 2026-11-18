@@ -20,6 +20,7 @@ if (@($helpers.Name | Sort-Object -Unique).Count -ne 5 -or $helpers.Count -ne 5)
 . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1')
 . (Join-Path $PSScriptRoot 'windows-sync.ps1')
 . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1')
+. (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
 
 function Read-Observation {
     if ($script:observations.Count -gt 1) { return $script:observations.Dequeue() }
@@ -27,6 +28,7 @@ function Read-Observation {
 }
 
 $script:observations = [System.Collections.Generic.Queue[object]]::new()
+$script:observations.Enqueue([pscustomobject]@{ ready = $true })
 $script:observations.Enqueue([pscustomobject]@{ account_access = $null })
 $script:observations.Enqueue([pscustomobject]@{ account_access = @{ busy = $true; active_user_id = 41 } })
 $script:observations.Enqueue([pscustomobject]@{ account_access = @{ busy = $false; active_user_id = 42 } })
@@ -41,6 +43,23 @@ $state = Wait-Account 'available active fixture account' {
 if ($state.account_access.busy -or $state.account_access.active_user_id -ne 41 -or
     ($visited -join ',') -cne '42,41') {
     throw 'Wait-Account did not reject missing, busy, and mismatched account observations.'
+}
+
+$control = [pscustomobject]@{
+    ProcessId = 41
+    AutomationId = 'reader-tab-0-0'
+    IsOffscreen = $false
+    IsEnabled = $true
+    BoundingRectangle = @{ Width = 80; Height = 24 }
+}
+if (!(Test-OwnedAutomationProperties $control 'reader-tab-0-0' 41) -or
+    (Test-OwnedAutomationProperties $control 'reader-tab-0-0' 42) -or
+    (Test-OwnedAutomationProperties $control 'reader-tab-0-1' 41)) {
+    throw 'The accessibility guard did not verify the exact native control and child process.'
+}
+$control.IsOffscreen = $true
+if (Test-OwnedAutomationProperties $control 'reader-tab-0-0' 41) {
+    throw 'The accessibility guard accepted an offscreen native control.'
 }
 
 $script:observations.Clear()

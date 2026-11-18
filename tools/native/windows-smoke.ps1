@@ -68,6 +68,7 @@ $clipboardBackup = $null
 $copiedClipboardSequence = $null
 $toastFixture = $null
 $toastSubmissionAttempted = $false
+$script:UseOwnedUiAutomation = $false
 
 function Get-FileSha256 {
     param([string]$Path)
@@ -384,8 +385,15 @@ function Assert-ClipboardContains([string]$Expected, [switch]$SelectAll) {
 }
 
 function Stop-ThroughUi {
-    [ThreadlineWinInput]::Chord(@(0x11, 0x51))
-    Wait-For 'process to exit after Ctrl+Q' { $script:app.HasExited }
+    if ($script:UseOwnedUiAutomation) {
+        $window = $script:app.MainWindowHandle
+        if (!(Test-OwnedFixtureWindow $window) -or !$script:app.CloseMainWindow()) {
+            Stop-Blocked 'The verified fixture process did not accept its native window close.'
+        }
+    } else {
+        [ThreadlineWinInput]::Chord(@(0x11, 0x51))
+    }
+    Wait-For 'process to exit after the normal native close' { $script:app.HasExited }
     if ($script:app.ExitCode -ne 0) { throw "Threadline exited with code $($script:app.ExitCode)." }
 }
 
@@ -862,6 +870,12 @@ try {
         }
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
+    if ($AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'PullRequest')) {
+        Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+        . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
+        $script:UseOwnedUiAutomation = $true
+        $report.driver = 'Windows PowerShell / owned UI Automation and guarded Win32 SendInput'
+    }
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
     if ($ReaderProof -eq 'Sync') { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
     if ($ReaderProof -eq 'PullRequest') { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
@@ -883,7 +897,7 @@ try {
     $coldMs = $clock.Elapsed.TotalMilliseconds
     $report.native_window = $window.ToInt64()
     $report.dpi = [ThreadlineWinInput]::GetDpiForWindow($window)
-    Set-WindowFocus $window
+    if (!$script:UseOwnedUiAutomation) { Set-WindowFocus $window }
     $report.loaded_modules = @($app.Modules | ForEach-Object { $_.ModuleName } | Sort-Object -Unique)
     if ($report.loaded_modules | Where-Object { $_ -match '^(lib)?(webkit|wry|electron|cef|chromium|msedgewebview2)' }) {
         throw 'The native process loaded a browser runtime module.'
