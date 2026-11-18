@@ -1,13 +1,17 @@
 function Select-FixtureRightReviewLine([IntPtr]$Window) {
-    $state = Read-Observation
-    $property = $state.bounds.PSObject.Properties['pr-0-diff']
-    if ($null -eq $property -or $property.Value.Count -ne 4) {
-        Stop-Blocked 'The visible fixture comparison has no safe native bounds.'
+    $settling = [Diagnostics.Stopwatch]::StartNew()
+    $bounds = $null
+    while ($settling.ElapsedMilliseconds -lt 5000) {
+        $state = Read-Observation
+        $property = $state.bounds.PSObject.Properties['pr-0-diff']
+        if ($null -ne $property -and $property.Value.Count -eq 4 -and
+            $property.Value[2] -ge 180 -and $property.Value[3] -ge 115) {
+            $bounds = $property.Value
+            break
+        }
+        Start-Sleep -Milliseconds 100
     }
-    $bounds = $property.Value
-    if ($bounds[2] -lt 180 -or $bounds[3] -lt 115) {
-        Stop-Blocked 'Resize the isolated fixture window so the split comparison is visible.'
-    }
+    if ($null -eq $bounds) { Stop-Blocked 'The maximized split comparison does not have a reachable native code region.' }
     Set-WindowFocus $Window
     $originX = $bounds[0] + $bounds[2] * 0.75
     # The isolated fixture comparison contains one change on line one. Probe
@@ -58,6 +62,7 @@ function Invoke-ReviewContextProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-PrReader 'the split comparison for the original fixture head' {
         param($pr) $pr.head -ceq $head -and $pr.diff_mode -ceq 'Split'
     }
+    Click-AccountControl $Window 'reader-maximize-pane'
     Select-FixtureRightReviewLine $Window
     Click-AccountControl $Window 'pr-0-review-add-inline'
     $draftReady = Wait-PrReader 'one draft anchored to the chosen native source line' {
@@ -104,6 +109,7 @@ function Invoke-ReviewContextProof([IntPtr]$Window, [string]$Profile) {
         original_head = $head; draft_retained = $true
     })
 
+    Click-AccountControl $Window 'reader-maximize-pane'
     $second = Open-FixturePr $Window 0 43 'Second fixture pull request' $otherHead 'src/second.rs'
     if ($second.cached_reader.active_item -eq $firstItem -or $second.cached_reader.tab_counts[0] -ne 2 -or
         $null -ne $second.cached_reader.pull_request.review_draft) {

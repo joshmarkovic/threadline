@@ -863,6 +863,8 @@ fn ui_008_observed_reader_controls_follow_the_visible_panes(cx: &mut TestAppCont
             .test_control_bounds(&format!("reader-tab-{hidden}-0"))
             .is_none()
     );
+    assert!(observation.test_control_bounds("reader-result-0").is_none());
+    assert!(observation.test_control_bounds("reader-maximize-pane").is_some());
     setup.runtime.block_on(writer.finish()).unwrap();
 }
 
