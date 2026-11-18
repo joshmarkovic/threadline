@@ -82,6 +82,8 @@ pub struct PullRequestSummary {
 #[derive(Clone, Default, Eq, PartialEq)]
 pub struct PullPresentation {
     pub author: Option<String>,
+    pub author_id: Option<NonZeroU64>,
+    pub locked: Option<bool>,
     pub base_ref: Option<String>,
     pub head_ref: Option<String>,
     pub draft: Option<bool>,
@@ -176,6 +178,16 @@ pub struct GitHubReader<'a> {
     session: &'a GitHubSession,
     route: RepositoryName,
     repository: RepositoryApiId,
+}
+
+impl<'a> GitHubReader<'a> {
+    pub(super) fn from_access(session: &'a GitHubSession, repository: &RepositoryAccess) -> Self {
+        Self {
+            session,
+            route: repository.route.clone(),
+            repository: repository.id,
+        }
+    }
 }
 
 /// A repository binding owns the authenticated session that verified it.

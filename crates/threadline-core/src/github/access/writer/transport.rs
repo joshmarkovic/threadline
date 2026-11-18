@@ -8,6 +8,7 @@ const ERROR_BODY_LIMIT: usize = 16_384;
 pub(super) struct Request {
     method: Method,
     path: String,
+    graph: bool,
     pub(super) status: StatusCode,
     body: Vec<u8>,
 }
@@ -27,9 +28,16 @@ impl Request {
         Ok(Self {
             method,
             path,
+            graph: false,
             status,
             body: bytes,
         })
+    }
+
+    pub(super) fn graph(body: &serde_json::Value) -> Result<Self, AccessError> {
+        let mut request = Self::new(Method::POST, "graphql".to_owned(), StatusCode::OK, body)?;
+        request.graph = true;
+        Ok(request)
     }
 }
 
@@ -59,16 +67,23 @@ impl GitHubWriter<'_> {
             return Err(unsent(cancelled()));
         }
         let session = self.session;
-        let url = self.url(&self.path(&request.path)).map_err(unsent)?;
-        let builder = session
+        let path = if request.graph {
+            request.path
+        } else {
+            self.path(&request.path)
+        };
+        let url = self.url(&path).map_err(unsent)?;
+        let mut builder = session
             .client
             .http
             .request(request.method, url)
-            .header("X-GitHub-Api-Version", GITHUB_REST_VERSION)
             .header(header::ACCEPT, "application/vnd.github+json")
             .header(header::CONTENT_TYPE, "application/json")
             .header(header::AUTHORIZATION, session.token.0.clone())
             .body(request.body);
+        if !request.graph {
+            builder = builder.header("X-GitHub-Api-Version", GITHUB_REST_VERSION);
+        }
         let mut response = tokio::select! { biased;
             _=cancel.cancelled()=>return Err(ambiguous(AccessError {
                 reachability:Reachability::NoResponse,..cancelled()
@@ -154,4 +169,18 @@ impl GitHubWriter<'_> {
         }
         Ok((bytes, headers))
     }
+}
+
+pub(super) fn request_id(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("x-github-request-id")
+        .and_then(|header| header.to_str().ok())
+        .filter(|id| {
+            !id.is_empty()
+                && id.len() <= 160
+                && id
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b':' | b'-' | b'_'))
+        })
+        .map(str::to_owned)
 }

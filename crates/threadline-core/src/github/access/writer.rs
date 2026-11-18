@@ -12,6 +12,7 @@ use super::{
 };
 
 mod model;
+pub mod review;
 mod wire;
 
 pub use model::*;
@@ -312,18 +313,8 @@ impl GitHubWriter<'_> {
                 MutationObject::Comment(comment)
             }
         };
-        let request_id = headers
-            .get("x-github-request-id")
-            .and_then(|header| header.to_str().ok())
-            .filter(|id| {
-                !id.is_empty()
-                    && id.len() <= 160
-                    && id
-                        .bytes()
-                        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b':' | b'-' | b'_'))
-            })
-            .ok_or_else(|| invalid(AccessKind::MalformedResponse))?
-            .to_owned();
+        let request_id = transport::request_id(&headers)
+            .ok_or_else(|| invalid(AccessKind::MalformedResponse))?;
         Ok(MutationResponse {
             object,
             request_id,

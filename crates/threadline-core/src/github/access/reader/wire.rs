@@ -166,6 +166,7 @@ pub(super) struct PullRequest {
     merge_commit_sha: Reported<String>,
     user: Option<Author>,
     draft: Option<bool>,
+    locked: Option<bool>,
     requested_reviewers: Option<Vec<Author>>,
     created_at: Option<String>,
     merged_at: Option<String>,
@@ -192,6 +193,8 @@ impl PullRequest {
             head_oid: oid(self.head.sha)?,
             merge_oid,
             presentation: PullPresentation {
+                author_id: self.user.as_ref().and_then(|author| author.id),
+                locked: self.locked,
                 author: self.user.map(|user| user.login),
                 base_ref: self.base.name,
                 head_ref: self.head.name,
