@@ -689,6 +689,15 @@ fn it_007_visible_subscriptions_replace_atomically_after_relaunch_without_waking
     assert!(s.next_sync_due(a, START + 2).unwrap().is_some());
     assert!(s.unsubscribe_read(a, &target, "background-watch").unwrap());
     assert_eq!(s.next_sync_due(a, START + 3).unwrap(), None);
+    s.replace_visible_read_subscriptions(a, &[visible]).unwrap();
+    let orphan = s.claim_sync_read(a, START + 2_000).unwrap().unwrap();
+    assert_eq!(
+        s.replace_visible_read_subscriptions(a, &[]).unwrap(),
+        vec![OrphanedRead {
+            target,
+            generation: orphan.generation
+        }]
+    );
 }
 
 #[test]
@@ -735,6 +744,13 @@ fn stale_visible_response_cannot_publish_another_item_or_change_cache_after_dese
     );
     assert_eq!(s.item(a, item).unwrap().unwrap().title, Change::Missing);
     let fresh = s.claim_sync_read(a, START + 1000).unwrap().unwrap();
+    let (route, remote, profile) = s.read_sync_repository(&fresh, START + 1000).unwrap();
+    assert_eq!(
+        (route.owner(), route.name(), remote.get()),
+        ("example", "selected", 10)
+    );
+    assert_eq!(profile.account, a);
+    assert!(s.read_sync_repository(&claim, START + 1000).is_err());
     assert_eq!(
         s.commit_sync_item_metadata(&fresh, row(10), &tag("a"), START + 1001, "UTC")
             .unwrap(),

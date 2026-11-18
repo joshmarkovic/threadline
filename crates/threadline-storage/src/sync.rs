@@ -47,6 +47,11 @@ pub struct VisibleRead {
     pub due_ms: i64,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OrphanedRead {
+    pub target: ReadTarget,
+    pub generation: i64,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReadClaim {
     id: i64,
     pub account: AccountId,
@@ -136,12 +141,12 @@ pub(super) fn require_claim(tx: &Transaction<'_>, claim: &ReadClaim, now: i64) -
         "SELECT EXISTS(SELECT 1 FROM scheduled_reads j JOIN eligible_sync_repositories r USING(account_id,repository_id)
          WHERE j.id=?1 AND j.account_id=?2 AND j.generation=?3 AND j.lease_until>?4
            AND j.repository_id=?5 AND j.item_id IS ?6 AND j.family=?7 AND j.revision=?8 AND j.cursor IS ?9
-           AND r.credential_generation=j.leased_generation
+           AND r.credential_generation=j.leased_generation AND r.credential_generation=?10
            AND (j.item_id IS NULL OR EXISTS(SELECT 1 FROM items i WHERE i.id=j.item_id AND i.repository_id=j.repository_id))
            AND EXISTS(SELECT 1 FROM sync_subscriptions s WHERE s.read_id=j.id
              AND (s.priority=0 OR NOT EXISTS(SELECT 1 FROM sync_settings p WHERE p.account_id=j.account_id AND p.background_paused))))",
         params![claim.id,claim.account,claim.generation,now,claim.target.repository,claim.target.item,
-            claim.target.family.name(),claim.target.revision,claim.cursor], |r|r.get(0))?;
+            claim.target.family.name(),claim.target.revision,claim.cursor,claim.credential_generation], |r|r.get(0))?;
     if !valid {
         return Err(Error::Conflict(
             "Read claim expired or lost repository authorization",
@@ -231,7 +236,7 @@ impl Store {
         &self,
         account: AccountId,
         panes: &[VisibleRead],
-    ) -> Result<()> {
+    ) -> Result<Vec<OrphanedRead>> {
         self.write(|tx| replace_panes(tx, account, panes))
     }
 
@@ -257,6 +262,33 @@ impl Store {
     }
     pub fn claim_sync_read(&self, account: AccountId, now_ms: i64) -> Result<Option<ReadClaim>> {
         self.write(|tx| claim_in(tx, account, now_ms))
+    }
+
+    pub fn read_sync_repository(
+        &self,
+        claim: &ReadClaim,
+        now_ms: i64,
+    ) -> Result<(
+        threadline_core::domain::RepositoryName,
+        threadline_core::domain::RepositoryApiId,
+        crate::access::AccessProfile,
+    )> {
+        use threadline_core::domain::{RepositoryApiId, RepositoryName};
+        self.read(|db| {
+            let snapshot=db.unchecked_transaction()?;
+            require_claim(&snapshot,claim,now_ms)?;
+            let (owner,name,id,scope):(String,String,String,String)=snapshot.query_row(
+                "SELECT r.owner,r.name,r.provider_repository_id,a.owner_scope FROM repositories r
+                 JOIN github_repository_access a ON a.repository_id=r.id AND a.account_id=r.account_id
+                 WHERE r.id=? AND r.account_id=?",params![claim.target.repository,claim.account],
+                |row|Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?)),
+            )?;
+            if !owner.eq_ignore_ascii_case(&scope) {return Err(Error::Conflict("Repository left its verified owner scope"));}
+            let route=RepositoryName::new(&owner,&name).map_err(|_|Error::Corrupt)?;
+            let remote=RepositoryApiId::try_from(id.parse::<u64>().map_err(|_|Error::Corrupt)?).map_err(|_|Error::Corrupt)?;
+            let profile=crate::access::profile(&snapshot,claim.account,&scope)?.ok_or(Error::NotFound)?;
+            Ok((route,remote,profile))
+        })
     }
 
     /// Earliest UTC deadline for the next claim. Settings, selection and transport completions also wake the worker.
@@ -464,8 +496,13 @@ fn subscribe_in(
     Ok(id)
 }
 
-fn replace_panes(tx: &Transaction<'_>, account: AccountId, panes: &[VisibleRead]) -> Result<()> {
+fn replace_panes(
+    tx: &Transaction<'_>,
+    account: AccountId,
+    panes: &[VisibleRead],
+) -> Result<Vec<OrphanedRead>> {
     let mut desired = std::collections::BTreeSet::new();
+    let mut cancelled = Vec::new();
     for pane in panes {
         if pane.subscriber.is_empty() {
             return Err(Error::InvalidInput(
@@ -500,12 +537,25 @@ fn replace_panes(tx: &Transaction<'_>, account: AccountId, panes: &[VisibleRead]
             "DELETE FROM sync_subscriptions WHERE read_id=? AND subscriber=?",
             params![id, subscriber],
         )?;
-        tx.execute(
+        let invalidated=tx.query_row(
             "UPDATE scheduled_reads SET lease_until=NULL,leased_generation=NULL WHERE id=? AND lease_until IS NOT NULL
-             AND NOT EXISTS(SELECT 1 FROM sync_subscriptions s WHERE s.read_id=scheduled_reads.id)",[id],
-        )?;
+             AND NOT EXISTS(SELECT 1 FROM sync_subscriptions s WHERE s.read_id=scheduled_reads.id)
+             RETURNING repository_id,item_id,family,revision,generation",[id],
+            |row|Ok((row.get(0)?,row.get(1)?,row.get::<_,String>(2)?,row.get(3)?,row.get(4)?)),
+        ).optional()?;
+        if let Some((repository, item, family, revision, generation)) = invalidated {
+            cancelled.push(OrphanedRead {
+                target: ReadTarget {
+                    repository,
+                    item,
+                    family: decode_family(&family)?,
+                    revision,
+                },
+                generation,
+            });
+        }
     }
-    Ok(())
+    Ok(cancelled)
 }
 
 fn target_id(db: &Connection, account: AccountId, t: &ReadTarget) -> Result<Option<i64>> {

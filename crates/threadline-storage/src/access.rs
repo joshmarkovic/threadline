@@ -120,7 +120,11 @@ const PROFILE_COLUMNS: &str =
     p.access,p.discovery,p.checked_at_ms,p.generation,p.credential_generation";
 const PROFILE_TABLES: &str = "github_access_profiles p JOIN accounts a ON p.account_id=a.id";
 
-fn profile(db: &Connection, account: AccountId, owner: &str) -> Result<Option<AccessProfile>> {
+pub(crate) fn profile(
+    db: &Connection,
+    account: AccountId,
+    owner: &str,
+) -> Result<Option<AccessProfile>> {
     Ok(db.query_row(
         &format!("SELECT {PROFILE_COLUMNS} FROM {PROFILE_TABLES} WHERE p.account_id=?1 AND p.owner_scope=?2 AND a.host=?3"),
         params![account,owner,GITHUB_HOST],
