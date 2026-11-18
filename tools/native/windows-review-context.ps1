@@ -5,7 +5,7 @@ function Select-FixtureRightReviewLine([IntPtr]$Window) {
         $state = Read-Observation
         $property = $state.bounds.PSObject.Properties['pr-0-diff']
         if ($null -ne $property -and $property.Value.Count -eq 4 -and
-            $property.Value[2] -ge 180 -and $property.Value[3] -ge 115) {
+            $property.Value[2] -ge 180 -and $property.Value[3] -ge 32) {
             $bounds = $property.Value
             break
         }
@@ -17,6 +17,7 @@ function Select-FixtureRightReviewLine([IntPtr]$Window) {
     # The isolated fixture comparison contains one change on line one. Probe
     # only its visible right-side code region, then accept the reported source.
     foreach ($offset in @(20, 33, 46, 59, 72, 85, 98)) {
+        if ($offset + 12 -gt $bounds[3]) { break }
         $state = Read-Observation
         $current = $state.bounds.PSObject.Properties['pr-0-diff']
         if ($null -eq $current -or (Compare-Object $bounds $current.Value -SyncWindow 0)) {
