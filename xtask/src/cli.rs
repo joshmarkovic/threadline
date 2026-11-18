@@ -4,7 +4,7 @@ pub const USAGE: &str =
     "cargo xtask test <unit|integration|ui> [--case ID] [--seed N] [--report-dir DIR]
 cargo xtask test e2e --suite <smoke|full> [--binary PATH] [--case ID] [--seed N] [--report-dir DIR]
 cargo xtask test install --artifact PATH [--case ID] [--report-dir DIR]
-cargo xtask test live --repo OWNER/REPO --case LIVE-001 [--credential-stdin [--allow-existing-cli-oauth]] [--report-dir DIR]
+cargo xtask test live --repo OWNER/REPO --case LIVE-001 [--credential-stdin [--allow-existing-cli-oauth]] [--first-issue-pr-page] [--report-dir DIR]
 cargo xtask measure windows [--binary PATH] [--artifact PATH] [--seed N] [--report-dir DIR]";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,6 +44,7 @@ pub struct Options {
     pub allow_live_writes: bool,
     pub credential_stdin: bool,
     pub allow_existing_cli_oauth: bool,
+    pub first_issue_pr_page: bool,
     pub suite: Option<String>,
 }
 
@@ -77,6 +78,7 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
         allow_live_writes: false,
         credential_stdin: false,
         allow_existing_cli_oauth: false,
+        first_issue_pr_page: false,
         suite: None,
     };
     let mut seen = std::collections::HashSet::new();
@@ -107,6 +109,13 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
                 return Err("--allow-existing-cli-oauth is available only for live tests.".into());
             }
             options.allow_existing_cli_oauth = true;
+            continue;
+        }
+        if flag == "--first-issue-pr-page" {
+            if lane != Lane::Live {
+                return Err("--first-issue-pr-page is available only for live tests.".into());
+            }
+            options.first_issue_pr_page = true;
             continue;
         }
         let value = remaining
@@ -259,7 +268,10 @@ fn is_value_option(option: &str) -> bool {
 fn is_switch(option: &str) -> bool {
     matches!(
         option,
-        "--allow-live-writes" | "--credential-stdin" | "--allow-existing-cli-oauth"
+        "--allow-live-writes"
+            | "--credential-stdin"
+            | "--allow-existing-cli-oauth"
+            | "--first-issue-pr-page"
     )
 }
 

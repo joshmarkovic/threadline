@@ -5,12 +5,14 @@ use std::{
     io::{self, IsTerminal, Read},
     num::NonZeroU64,
     process::ExitCode,
+    time::{SystemTime, UNIX_EPOCH},
 };
 use threadline_core::{
-    domain::{RepositoryApiId, RepositoryName},
+    domain::{ItemKind, RepositoryApiId, RepositoryName},
     github::{
         AccessError, AccessKind, CancellationToken, GitHubClient, GraphIssue, OwnerScope,
         SecretToken,
+        reader::{IssueSummary, Page},
     },
 };
 
@@ -54,12 +56,14 @@ impl Credential {
 struct Options {
     source: Source,
     allow_cli: bool,
+    first_issue_pr_page: bool,
 }
 impl Options {
     fn parse(args: impl IntoIterator<Item = String>) -> Result<Self, &'static str> {
         let mut args = args.into_iter();
         let (mut repo, mut id, mut read_only, mut source, mut allow_cli) =
             (None, None, false, None, false);
+        let mut first_issue_pr_page = false;
         while let Some(arg) = args.next() {
             match arg.as_str() {
                 "--repo" if repo.is_none() => repo = args.next(),
@@ -70,6 +74,7 @@ impl Options {
                 "--credential-stdin" if source.is_none() => source = Some(Source::Stdin),
                 "--credential-env" if source.is_none() => source = Some(Source::Environment),
                 "--allow-existing-cli-oauth" if !allow_cli => allow_cli = true,
+                "--first-issue-pr-page" if !first_issue_pr_page => first_issue_pr_page = true,
                 _ => return Err("invalid_request"),
             }
         }
@@ -80,7 +85,11 @@ impl Options {
         if allow_cli && source != Source::Stdin {
             return Err("cli_oauth_requires_explicit_pipe");
         }
-        Ok(Self { source, allow_cli })
+        Ok(Self {
+            source,
+            allow_cli,
+            first_issue_pr_page,
+        })
     }
     fn credential(&self) -> Result<(Credential, SecretToken), &'static str> {
         let mut raw = match self.source {
@@ -159,10 +168,7 @@ async fn probe(
     receipt["authenticated_user"] = json!({"matched":true,"http_status":200});
     let route = RepositoryName::new(OWNER, NAME).expect("fixed repository");
     let id = RepositoryApiId::try_from(REPO_ID).expect("fixed repository ID");
-    let repo = match session
-        .verify_private_repository(&route, Some(id), &cancel)
-        .await
-    {
+    let (repo, reader) = match session.private_reader(&route, id, &cancel).await {
         Ok(r) => r,
         Err(e) => return endpoint_error(receipt, "private_repository_read", &e, credential),
     };
@@ -187,12 +193,65 @@ async fn probe(
         return failure_code(credential);
     }
     receipt["dogfood_read"] = json!("Pass");
+    let page_failed = if options.first_issue_pr_page {
+        let observed = match reader.list(1, &cancel).await {
+            Ok(page) => page_receipt(&page, SystemTime::now()),
+            Err(error) => {
+                if error.kind == AccessKind::SsoRequired {
+                    receipt["sso_challenge"] = json!("observed");
+                }
+                json!({"status":"Fail", "page":1, "error":observed_error(&error)})
+            }
+        };
+        let failed = observed["status"] == "Fail";
+        receipt["issue_pr_page"] = observed;
+        failed
+    } else {
+        false
+    };
     if credential == Credential::ExistingCliOAuth {
         receipt["reason"] = json!("read_proven_with_cli_oauth_pat_unverified");
         BLOCKED
+    } else if page_failed {
+        receipt["reason"] = json!("issue_pr_page_failed");
+        1
     } else {
         0
     }
+}
+
+fn page_receipt(page: &Page<IssueSummary>, now: SystemTime) -> Value {
+    const MAX_PAGE: usize = 20;
+    if page.records.len() > MAX_PAGE {
+        return json!({"status":"Fail", "page":1, "error":{"kind":"MalformedResponse","http_status":200,"reachability":"ReceivedResponse"}});
+    }
+    let pull_requests = page
+        .records
+        .iter()
+        .filter(|record| record.kind == ItemKind::PullRequest)
+        .count();
+    let records = page.records.len();
+    let oldest = page
+        .records
+        .iter()
+        .filter_map(|record| record.created_at_ms)
+        .min();
+    let age_days = now
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .zip(oldest)
+        .and_then(|(now, created)| now.as_millis().checked_sub(u128::try_from(created).ok()?))
+        .and_then(|age| u64::try_from(age / 86_400_000).ok());
+    let coverage = if page.sso_limited {
+        "partial_sso"
+    } else if page.next_page.is_some() {
+        "partial_pagination"
+    } else {
+        "complete"
+    };
+    json!({"status":"Pass", "page":1, "http_status":200, "coverage":coverage,
+        "records":records, "issues":records - pull_requests, "pull_requests":pull_requests,
+        "has_next_page":page.next_page.is_some(), "oldest_age_days":age_days})
 }
 fn failure_code(credential: Credential) -> u8 {
     if credential == Credential::ExistingCliOAuth {
@@ -219,9 +278,14 @@ async fn main() -> ExitCode {
     let mut receipt = json!({"scenario":"LIVE-001","repository":REPOSITORY,"expected_github_user_id":USER_ID,
         "expected_github_repository_id":REPO_ID,"authenticated_user":"not_attempted","private_repository_read":"not_attempted",
         "graphql_repository_read":"not_attempted","credential_kind":"unverified","dogfood_read":"not_run","sso_challenge":"not_tested"});
-    let code = match Options::parse(env::args().skip(1))
-        .and_then(|options| options.credential().map(|c| (options, c)))
+    let parsed = Options::parse(env::args().skip(1));
+    if parsed
+        .as_ref()
+        .is_ok_and(|options| options.first_issue_pr_page)
     {
+        receipt["issue_pr_page"] = json!("not_attempted");
+    }
+    let code = match parsed.and_then(|options| options.credential().map(|c| (options, c))) {
         Ok((options, (credential, token))) => {
             receipt["sso_challenge"] = json!("no_explicit_challenge_observed");
             probe(options, credential, token, &mut receipt).await
@@ -259,6 +323,18 @@ mod tests {
             assert!(parse(&bad).is_err());
         }
         assert!(parse(&format!("{expected} --allow-existing-cli-oauth")).is_ok());
+        assert!(
+            parse(&format!("{expected} --first-issue-pr-page"))
+                .unwrap()
+                .first_issue_pr_page
+        );
+        assert!(
+            parse(&format!(
+                "{expected} --first-issue-pr-page --first-issue-pr-page"
+            ))
+            .is_err()
+        );
+        assert!(parse(&format!("{expected} --first-issue-pr-page --page 2")).is_err());
         assert!(
             parse(&expected.replace(
                 "--credential-stdin",

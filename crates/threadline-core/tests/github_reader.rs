@@ -89,6 +89,28 @@ async fn a_selected_public_repository_uses_the_same_id_verified_reader() {
 }
 
 #[tokio::test]
+async fn private_dogfood_reader_reuses_one_verification_and_stops_after_the_first_get_page() {
+    let sim = Simulator::start().await;
+    let session = session(&sim, 71).await;
+    let cancel = CancellationToken::new();
+    let (_, reader) = session
+        .private_reader(&route(), repo_id(), &cancel)
+        .await
+        .unwrap();
+    let only_page = format!("{LIST}&page=1");
+    let next = format!("<{LIST}&page=2>; rel=\"next\"");
+    sim.enqueue(
+        Method::GET,
+        &only_page,
+        ok(json!([issue(41, false), issue(42, true)])).header(header::LINK, next),
+    );
+    let page = reader.list(1, &cancel).await.unwrap();
+    assert_eq!(page.records.len(), 2);
+    assert_eq!(page.next_page, Some(2));
+    check_requests(&sim, 3);
+}
+
+#[tokio::test]
 async fn sync_feeds_keep_the_same_bounded_window_and_respect_conditional_headers() {
     const SINCE_MS: i64 = 1_378_429_264_333;
     const ISSUES: &str = "/repositories/71/issues?state=all&sort=updated&direction=asc&since=2013-09-06T01%3A01%3A04Z&per_page=20";

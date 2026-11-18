@@ -26,6 +26,8 @@ The read-only harness checks the designated private repository `joshmarkovic/thr
 
 With the approved PAT already provisioned in `THREADLINE_LIVE_PAT`, run the following command. A protected credential helper may instead pipe the token to `--credential-stdin`. The optional `--allow-existing-cli-oauth` flag accepts an existing piped OAuth credential for a separately labeled read observation. A successful OAuth read leaves LIVE-001 blocked. A repository owned by a personal account cannot establish that an organization's SSO challenge and authorization flow works.
 
+Add `--first-issue-pr-page` to make one all-state issue and pull request list request after repository identity checks. The receipt contains counts, coverage and the oldest reported creation age in days for that page.
+
 ```sh
 cargo run --locked -p threadline-core --example github_live_read -- \
   --read-only --repo joshmarkovic/threadline --expected-user-id 52184130 --credential-env

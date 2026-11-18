@@ -77,6 +77,9 @@ pub(crate) fn run(options: &Options, root: &Path, dir: &Path) -> CaseResult {
     if options.allow_existing_cli_oauth {
         command.arg("--allow-existing-cli-oauth");
     }
+    if options.first_issue_pr_page {
+        command.arg("--first-issue-pr-page");
+    }
     let output = match command.output() {
         Ok(output) => output,
         Err(_) => {
@@ -114,17 +117,26 @@ pub(crate) fn run(options: &Options, root: &Path, dir: &Path) -> CaseResult {
         label,
         options.allow_existing_cli_oauth,
         credential_source,
+        options.first_issue_pr_page,
     ) {
         match fs::write(dir.join(EVIDENCE), &output.stdout) {
             Ok(()) => {
-                let detail = if status == Status::Blocked
-                    && serde_json::from_slice::<Value>(&output.stdout).is_ok_and(|report| {
-                        report["credential_kind"] == "existing_cli_oauth"
-                            && report["dogfood_read"] == "Pass"
-                    }) {
+                let report =
+                    serde_json::from_slice::<Value>(&output.stdout).expect("validated report");
+                let detail = if status == Status::Blocked && {
+                    report["credential_kind"] == "existing_cli_oauth"
+                        && report["dogfood_read"] == "Pass"
+                } {
                     "Read-only metadata access passed with explicitly supplied CLI OAuth. The PAT gate remains blocked."
                 } else {
                     "Read-only GitHub adapter observations."
+                };
+                let detail = match report["issue_pr_page"]["status"].as_str() {
+                    Some("Pass") => {
+                        format!("{detail} The requested first issue/PR page was received.")
+                    }
+                    Some("Fail") => format!("{detail} The requested first issue/PR page failed."),
+                    _ => detail.into(),
                 };
                 let mut result = CaseResult::new(case, status, detail);
                 result.evidence = Some(EVIDENCE.into());
@@ -184,6 +196,7 @@ fn report_status_matches(
     label: &str,
     allow_cli: bool,
     credential_source: &str,
+    first_issue_pr_page: bool,
 ) -> bool {
     if stdout.len() > 16 * 1024 {
         return false;
@@ -200,6 +213,12 @@ fn report_status_matches(
         && report["expected_github_user_id"] == EXPECTED_USER_ID
         && report["expected_github_repository_id"] == EXPECTED_REPOSITORY_ID
         && completed_report_is_consistent(&report, label, allow_cli, credential_source)
+        && if first_issue_pr_page && report["dogfood_read"] == "Pass" {
+            report["issue_pr_page"].is_object()
+        } else {
+            !fields.contains_key("issue_pr_page")
+                || first_issue_pr_page && report["issue_pr_page"] == "not_attempted"
+        }
         && [
             "authenticated_user",
             "private_repository_read",
@@ -216,6 +235,7 @@ fn report_status_matches(
             "authenticated_user" | "private_repository_read" | "graphql_repository_read" => {
                 endpoint_report_is_safe(value)
             }
+            "issue_pr_page" => first_issue_pr_page && issue_page_is_safe(value),
             "credential_kind" => {
                 matches!(
                     value.as_str(),
@@ -243,6 +263,7 @@ fn report_status_matches(
                             | "https_client_unavailable"
                             | "expected_login_mismatch"
                             | "graphql_access_incomplete"
+                            | "issue_pr_page_failed"
                     )
                 ) || (allow_cli
                     && label == "Blocked"
@@ -262,13 +283,14 @@ fn completed_report_is_consistent(
     if !dogfood_pass {
         return label != "Pass";
     }
+    let dedicated_pat = matches!(
+        report["credential_kind"].as_str(),
+        Some("fine_grained_pat" | "classic_pat")
+    );
+    let page_failed = report["issue_pr_page"]["status"] == "Fail";
     let credential_matches = match label {
-        "Pass" => {
-            matches!(
-                report["credential_kind"].as_str(),
-                Some("fine_grained_pat" | "classic_pat")
-            ) && report["reason"].is_null()
-        }
+        "Pass" => dedicated_pat && report["reason"].is_null() && !page_failed,
+        "Fail" => dedicated_pat && report["reason"] == "issue_pr_page_failed" && page_failed,
         "Blocked" => {
             allow_cli
                 && source == "stdin_pipe"
@@ -293,6 +315,53 @@ fn completed_report_is_consistent(
         && graph["immutable_node_matched"] == true
         && graph["complete"] == true
         && graph["errors"].as_array().is_some_and(Vec::is_empty)
+}
+
+fn issue_page_is_safe(value: &Value) -> bool {
+    if value == "not_attempted" {
+        return true;
+    }
+    let Some(fields) = value.as_object() else {
+        return false;
+    };
+    if value["page"] != 1 {
+        return false;
+    }
+    match value["status"].as_str() {
+        Some("Fail") => {
+            fields.len() == 3
+                && value["error"].as_object().is_some_and(|error| {
+                    error.len() == 3
+                        && error.contains_key("kind")
+                        && error.contains_key("http_status")
+                        && error.contains_key("reachability")
+                        && endpoint_report_is_safe(&value["error"])
+                })
+        }
+        Some("Pass") => {
+            let records = value["records"].as_u64().filter(|count| *count <= 20);
+            let counted = value["issues"]
+                .as_u64()
+                .zip(value["pull_requests"].as_u64())
+                .and_then(|(issues, pull_requests)| issues.checked_add(pull_requests));
+            let has_next = value["has_next_page"].as_bool();
+            let coverage = match value["coverage"].as_str() {
+                Some("complete") => has_next == Some(false),
+                Some("partial_pagination") => has_next == Some(true),
+                Some("partial_sso") => has_next.is_some(),
+                _ => false,
+            };
+            fields.len() == 9
+                && value["http_status"] == 200
+                && coverage
+                && records.is_some()
+                && counted == records
+                && fields
+                    .get("oldest_age_days")
+                    .is_some_and(|age| age.is_null() || records != Some(0) && age.is_u64())
+        }
+        _ => false,
+    }
 }
 
 fn endpoint_report_is_safe(value: &Value) -> bool {
@@ -417,6 +486,7 @@ mod tests {
             status,
             oauth,
             "stdin_pipe",
+            false,
         )
     }
 
@@ -429,7 +499,8 @@ mod tests {
             b"not a structured report",
             "Fail",
             false,
-            "stdin_pipe"
+            "stdin_pipe",
+            false
         ));
         report["authenticated_user"] = serde_json::json!({"value":"synthetic-sensitive-output"});
         assert!(!verify(&report, "Blocked", false));
@@ -439,6 +510,23 @@ mod tests {
         assert!(!verify(&report, "Blocked", false));
         report["authenticated_user"]["kind"] = Value::from("SsoRequired");
         assert!(verify(&report, "Blocked", false));
+    }
+
+    #[test]
+    fn issue_page_receipt_bounds_counts_coverage_and_private_payload() {
+        let mut empty = serde_json::json!({"status":"Pass","page":1,"http_status":200,"coverage":"complete",
+            "records":0,"issues":0,"pull_requests":0,"has_next_page":false,"oldest_age_days":null});
+        assert!(issue_page_is_safe(&empty));
+        empty["oldest_age_days"] = 7.into();
+        assert!(!issue_page_is_safe(&empty));
+        let mut first = serde_json::json!({"status":"Pass","page":1,"http_status":200,"coverage":"partial_pagination",
+            "records":20,"issues":4,"pull_requests":16,"has_next_page":true,"oldest_age_days":400});
+        assert!(issue_page_is_safe(&first));
+        first["records"] = 21.into();
+        assert!(!issue_page_is_safe(&first));
+        first["records"] = 20.into();
+        first["body"] = "fixture private content".into();
+        assert!(!issue_page_is_safe(&first));
     }
 
     #[test]
@@ -490,7 +578,8 @@ mod tests {
             &serde_json::to_vec(&report).unwrap(),
             "Blocked",
             true,
-            "dedicated_environment"
+            "dedicated_environment",
+            false
         ));
     }
 }

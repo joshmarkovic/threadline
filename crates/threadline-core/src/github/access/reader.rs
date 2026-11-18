@@ -10,8 +10,8 @@ use std::{fmt, num::NonZeroU64, sync::Arc};
 use crate::domain::{IssueApiId, ItemKind, ItemNumber, RepositoryApiId, RepositoryName};
 
 use super::{
-    AccessError, AccessKind, CancellationToken, GitHubSession, RateLimit, RepositoryRead,
-    next_page_for, partial_sso,
+    AccessError, AccessKind, CancellationToken, GitHubSession, RateLimit, RepositoryAccess,
+    RepositoryRead, next_page_for, partial_sso,
 };
 
 const PAGE_SIZE: u32 = 20;
@@ -179,6 +179,24 @@ impl BoundRepositoryReader {
 }
 
 impl GitHubSession {
+    /// Verify the explicitly designated private repository and reuse its bound reader.
+    pub async fn private_reader(
+        &self,
+        route: &RepositoryName,
+        repository: RepositoryApiId,
+        cancel: &CancellationToken,
+    ) -> Result<(RepositoryAccess, GitHubReader<'_>), AccessError> {
+        let verified = self
+            .verify_private_repository(route, Some(repository), cancel)
+            .await?;
+        let reader = GitHubReader {
+            session: self,
+            route: verified.route.clone(),
+            repository: verified.id,
+        };
+        Ok((verified, reader))
+    }
+
     pub async fn bind_reader(
         self: &Arc<Self>,
         route: &RepositoryName,
