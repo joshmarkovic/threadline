@@ -9,6 +9,8 @@ mod palette;
 mod pane_content;
 mod reader;
 mod reader_workspace;
+mod sync_panel;
+mod sync_worker;
 mod workspace;
 
 #[cfg(windows)]

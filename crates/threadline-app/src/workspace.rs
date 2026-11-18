@@ -47,6 +47,7 @@ actions!(
         ToggleContext,
         ToggleAccounts,
         CheckAccountAccess,
+        ReloadLocalAccount,
         GrowLeft,
         ShrinkLeft,
         GrowContext,
@@ -253,7 +254,22 @@ impl Workspace {
             let service = account_service
                 .clone()
                 .map(crate::reader::ReaderService::new);
-            cx.new(|cx| ReaderWorkspace::new(store.clone(), runtime.clone(), service, window, cx))
+            let worker = account_service
+                .clone()
+                .filter(|_| !feasibility_fixture)
+                .map(|accounts| {
+                    std::sync::Arc::new(crate::sync_worker::SyncWorker::start(
+                        accounts, &runtime, seed,
+                    ))
+                });
+            cx.new(|cx| {
+                let mut reader =
+                    ReaderWorkspace::new(store.clone(), runtime.clone(), service, window, cx);
+                if let Some(worker) = worker {
+                    reader.attach_sync(worker, window, cx);
+                }
+                reader
+            })
         });
         let accounts = account_service
             .map(|service| cx.new(|cx| AccountPanel::new(service, runtime.clone(), window, cx)));
@@ -372,6 +388,12 @@ impl Workspace {
             return;
         };
         self.accounts_open = open;
+        if let Some(reader) = self.reader.as_ref() {
+            reader.update(cx, |reader, cx| {
+                reader.set_workspace_visible(!open);
+                cx.notify();
+            });
+        }
         if self.accounts_open {
             panel.update(cx, |this, cx| {
                 #[cfg(feature = "e2e")]
@@ -483,7 +505,16 @@ impl Workspace {
             }
             PlatformEvent::NotificationComActivated => self.notification_com_activations += 1,
             PlatformEvent::Quit => self.request_quit(window, cx),
-            PlatformEvent::Wake | PlatformEvent::NetworkChanged => return,
+            PlatformEvent::Wake | PlatformEvent::NetworkChanged => {
+                if let Some(reader) = self.reader.as_ref() {
+                    let trigger = if event == PlatformEvent::Wake {
+                        threadline_core::connectivity::ProbeTrigger::Wake
+                    } else {
+                        threadline_core::connectivity::ProbeTrigger::NetworkChanged
+                    };
+                    reader.read(cx).wake_sync(trigger);
+                }
+            }
             PlatformEvent::Error(error) => self.platform_status = Some(error.to_string()),
         }
         cx.notify();
@@ -1312,7 +1343,19 @@ impl gpui_kit::Render for Workspace {
                     this.toggle_accounts(window, cx)
                 }),
             )
+            .on_action(cx.listener(|this, _: &ReloadLocalAccount, _, cx| {
+                if let Some(panel) = this.accounts.as_ref() {
+                    panel.update(cx, |panel, cx| panel.reload_local_profile(cx));
+                }
+            }))
             .on_action(cx.listener(|this, _: &CheckAccountAccess, _, cx| {
+                if this.reader.as_ref().is_some_and(|reader| {
+                    reader
+                        .read(cx)
+                        .wake_sync(threadline_core::connectivity::ProbeTrigger::CheckNow)
+                }) {
+                    return;
+                }
                 if let Some(panel) = this.accounts.as_ref() {
                     panel.update(cx, |panel, cx| panel.refresh(cx));
                 }

@@ -194,11 +194,18 @@ impl AccountService {
         self.store.clone()
     }
 
-    pub(crate) async fn reader_session(
+    pub(crate) fn sync_worker_enabled(&self) -> bool {
+        !self.fixture
+            || (cfg!(feature = "e2e")
+                && std::env::var_os("THREADLINE_E2E_SYNC").is_some_and(|value| value == "1"))
+    }
+
+    pub(crate) async fn reader_session_with_guidance(
         &self,
         profile: &AccessProfile,
         cancel: &Cancellation,
-    ) -> Result<GitHubSession, crate::reader::ReaderError> {
+    ) -> Result<(GitHubSession, threadline_core::github::RateLimit), crate::reader::ReaderError>
+    {
         use crate::reader::ReaderError;
 
         let reference = credential_ref(profile).map_err(|_| ReaderError::CredentialUnavailable)?;
@@ -212,7 +219,7 @@ impl AccountService {
         let owner = OwnerScope::new(&profile.owner_scope)?;
         Ok(self
             .github
-            .authenticate(token, owner, Some(profile.user_id), cancel)
+            .authenticate_with_guidance(token, owner, Some(profile.user_id), cancel)
             .await?)
     }
 
@@ -308,9 +315,9 @@ impl AccountService {
             }
             AccountCommand::SetOffline { account, offline } => {
                 self.require_active(account)?;
-                let profile = self.store.dispatch_profile(account)?;
-                self.store
-                    .set_dispatch_controls(account, offline, profile.outbox_paused)?;
+                self.store.update_sync_settings(account, |settings| {
+                    settings.controls.work_offline = offline
+                })?;
                 Ok((None, Reachability::NotAttempted))
             }
             AccountCommand::SignOut(account) => {

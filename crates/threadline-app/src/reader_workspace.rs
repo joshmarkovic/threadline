@@ -20,6 +20,8 @@ use threadline_storage::{
 mod drafts;
 mod media;
 mod remote;
+mod scheduled;
+mod sync_bridge;
 #[cfg(all(test, feature = "e2e"))]
 mod tests;
 mod view;
@@ -63,13 +65,33 @@ pub(crate) struct ReaderObservation {
     pub active_draft_sha256: Option<String>,
     pub signed_out: bool,
     pub offline: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shared_sync: Option<SyncObservation>,
     pub outbox: Option<u64>,
+}
+
+#[cfg(feature = "e2e")]
+#[derive(serde::Serialize)]
+pub(crate) struct SyncObservation {
+    panel_open: bool,
+    schedule: Option<threadline_storage::sync::WorkSchedule>,
+    controls: Option<threadline_storage::sync::SyncControls>,
+    cache_generation: u64,
+    eligible_outbox: u64,
+    connection: String,
+    reason: Option<String>,
+    pending_reads: Option<u64>,
 }
 
 pub(crate) struct ReaderWorkspace {
     store: Arc<Store>,
     runtime: tokio::runtime::Handle,
     service: Option<crate::reader::ReaderService>,
+    workspace_visible: bool,
+    visible_subscriptions: Option<scheduled::VisibleSubscriptions>,
+    sync_worker: Option<Arc<crate::sync_worker::SyncWorker>>,
+    sync_update: Option<crate::sync_worker::SyncUpdate>,
+    sync_started: bool,
     network: Cancellation,
     network_pending: usize,
     network_started: u64,
@@ -120,6 +142,10 @@ pub(crate) struct ReaderWorkspace {
     counts: Option<SidebarCounts>,
     filters_open: bool,
     surface: Surface,
+    sync_panel: Option<Entity<crate::sync_panel::SyncPanel>>,
+    sync_watch: Option<Subscription>,
+    #[cfg(feature = "e2e")]
+    sync_render_watch: Option<Subscription>,
     cache: Option<CacheUsage>,
     queue: Vec<QueueRow>,
     drafts: HashMap<String, drafts::Editor>,
@@ -136,6 +162,7 @@ enum Surface {
     Browse,
     Outbox,
     Storage,
+    Sync,
 }
 
 struct ItemData {
@@ -154,7 +181,48 @@ struct ItemView {
     body: Option<media::CachedMarkdown>,
     notes: Vec<(String, media::CachedMarkdown)>,
     scroll: ScrollHandle,
-    _scroll_restore: u64,
+}
+
+impl ItemView {
+    fn use_cached_text(
+        data: &mut ItemData,
+        mut previous: Option<Self>,
+        cx: &mut Context<ReaderWorkspace>,
+    ) -> (
+        Option<media::CachedMarkdown>,
+        Vec<(String, media::CachedMarkdown)>,
+    ) {
+        let value = data.item.as_ref().map(|item| &item.body);
+        let body = if let Some(previous) = previous.as_mut()
+            && previous.data.item.as_ref().map(|item| &item.body) == value
+        {
+            previous.body.take()
+        } else {
+            match value {
+                Some(Change::Value(markdown)) => Some(media::CachedMarkdown::new(markdown, cx)),
+                _ => None,
+            }
+        };
+        let notes = if let Some(mut previous) = previous
+            && previous.data.discussion.state == data.discussion.state
+            && previous.data.discussion.records == data.discussion.records
+        {
+            std::mem::swap(&mut data.discussion, &mut previous.data.discussion);
+            previous.notes
+        } else {
+            data.discussion
+                .records
+                .iter()
+                .map(|record| {
+                    (
+                        record.key.clone(),
+                        media::CachedMarkdown::new(&record.body, cx),
+                    )
+                })
+                .collect()
+        };
+        (body, notes)
+    }
 }
 
 impl ReaderWorkspace {
@@ -206,6 +274,22 @@ impl ReaderWorkspace {
             }),
             signed_out: self.access == AccessState::SignedOut,
             offline: self.offline,
+            shared_sync: self.sync_update.as_ref().map(|update| {
+                let settings = self
+                    .sync_panel
+                    .as_ref()
+                    .and_then(|panel| panel.read(cx).saved_settings());
+                SyncObservation {
+                    panel_open: self.surface == Surface::Sync,
+                    schedule: settings.map(|settings| settings.schedule.clone()),
+                    controls: settings.map(|settings| settings.controls),
+                    cache_generation: update.cache_generation,
+                    eligible_outbox: update.eligible_outbox,
+                    connection: format!("{:?}", update.connection.status),
+                    reason: update.connection.reason.map(|reason| format!("{reason:?}")),
+                    pending_reads: update.status.as_ref().map(|status| status.pending),
+                }
+            }),
             outbox: self.counts.map(|counts| counts.outbox),
         }
     }
@@ -242,6 +326,11 @@ impl ReaderWorkspace {
             store,
             runtime,
             service,
+            workspace_visible: true,
+            visible_subscriptions: None,
+            sync_worker: None,
+            sync_update: None,
+            sync_started: false,
             network: Cancellation::new(),
             network_pending: 0,
             network_started: 0,
@@ -292,6 +381,10 @@ impl ReaderWorkspace {
             counts: None,
             filters_open: false,
             surface: Surface::Browse,
+            sync_panel: None,
+            sync_watch: None,
+            #[cfg(feature = "e2e")]
+            sync_render_watch: None,
             cache: None,
             queue: Vec::new(),
             drafts: HashMap::new(),
@@ -371,6 +464,8 @@ impl ReaderWorkspace {
         } = state;
         let profile = profile.as_ref();
         let changed = self.account != account;
+        let offline_changed = self.offline != offline;
+        let previous_access = self.access;
         if offline && !self.offline {
             self.network.cancel();
             self.network = Cancellation::new();
@@ -396,6 +491,7 @@ impl ReaderWorkspace {
             self.network.cancel();
             self.network = Cancellation::new();
             self.network_pending = 0;
+            self.sync_update = None;
             self.remote_search = None;
             self.remote_error = None;
             self.images.clear();
@@ -412,6 +508,12 @@ impl ReaderWorkspace {
             self.maximized = false;
             self.filter = BrowseFilter::default();
             self.surface = Surface::Browse;
+            self.sync_panel = None;
+            self.sync_watch = None;
+            #[cfg(feature = "e2e")]
+            {
+                self.sync_render_watch = None;
+            }
             self.rows.clear();
             self.queue.clear();
             self.tab_views.clear();
@@ -430,6 +532,13 @@ impl ReaderWorkspace {
             self.layout_busy = account.is_some();
         }
         self.repositories = repositories;
+        if let Some(worker) = self.sync_worker.as_ref() {
+            if changed || offline_changed {
+                worker.interrupt(None);
+            } else if scope_changed || self.access != previous_access {
+                worker.wake(None);
+            }
+        }
         if let Some(account) = account {
             if changed {
                 self.launch(
@@ -450,6 +559,7 @@ impl ReaderWorkspace {
                             }
                         }
                         this.load_visible(window, cx);
+                        this.maybe_start_sync();
                         this.restore_active_draft(window, cx);
                         this.focus_active(window);
                         this.settle_departure(window, cx);
@@ -528,9 +638,16 @@ impl ReaderWorkspace {
                 this.status = None;
                 if quit {
                     let handles = this.stop_editors();
+                    let visibility = this
+                        .visible_subscriptions
+                        .take()
+                        .map(scheduled::VisibleSubscriptions::finish);
                     cx.spawn_in(window, async move |_, cx| {
                         for handle in handles {
                             let _ = handle.await;
+                        }
+                        if let Some(visibility) = visibility {
+                            let _ = visibility.await;
                         }
                         let _ = cx.update(after);
                     })
@@ -698,6 +815,52 @@ impl ReaderWorkspace {
         cx.notify();
     }
 
+    fn show_sync(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(account) = self.account else { return };
+        if self.sync_panel.is_none() {
+            let store = Arc::clone(&self.store);
+            let runtime = self.runtime.clone();
+            let panel =
+                cx.new(|cx| crate::sync_panel::SyncPanel::new(store, runtime, account, window, cx));
+            #[cfg(feature = "e2e")]
+            if let Some(observer) = self.observer.as_ref() {
+                panel.update(cx, |panel, _| panel.set_observer(Some(observer.clone())));
+                self.sync_render_watch = Some(cx.observe(&panel, |_, _, cx| cx.notify()));
+            }
+            self.sync_watch = Some(cx.subscribe_in(
+                &panel,
+                window,
+                |this, _, change: &crate::sync_panel::SettingsChanged, window, cx| {
+                    let offline = change.current.work_offline;
+                    let offline_changed = change.previous.work_offline != offline;
+                    if offline && !this.offline {
+                        this.network.cancel();
+                        this.network = Cancellation::new();
+                    }
+                    this.offline = offline;
+                    if let Some(worker) = this.sync_worker.as_ref() {
+                        if offline_changed {
+                            worker.interrupt((!offline).then_some(
+                                threadline_core::connectivity::ProbeTrigger::NetworkChanged,
+                            ));
+                        } else if !change.previous.pause_background
+                            && change.current.pause_background
+                        {
+                            worker.interrupt(None);
+                        } else {
+                            worker.wake(None);
+                        }
+                    }
+                    window.dispatch_action(Box::new(crate::workspace::ReloadLocalAccount), cx);
+                    cx.notify();
+                },
+            ));
+            self.sync_panel = Some(panel);
+        }
+        self.surface = Surface::Sync;
+        cx.notify();
+    }
+
     fn load_visible(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let tabs: Vec<_> = self
             .layout
@@ -770,14 +933,16 @@ impl ReaderWorkspace {
                     return;
                 };
                 match result {
-                    Ok(data) => {
+                    Ok(mut data) => {
                         let old = this.tab_views.remove(&id);
                         let scroll = old
                             .as_ref()
                             .map_or_else(ScrollHandle::new, |view| view.scroll.clone());
                         if old.is_none() && tab.view.scroll_anchor.is_some() && !data.anchor_missing
                         {
-                            let discussion = 5 + usize::from(data.metadata.is_some());
+                            let discussion = 5
+                                + usize::from(data.metadata.is_some())
+                                + usize::from(data.discussion.state.error.is_some());
                             scroll.scroll_to_item(discussion);
                         } else if old.is_none() && tab.view.scroll_offset > 0 {
                             let handle = scroll.clone();
@@ -786,23 +951,7 @@ impl ReaderWorkspace {
                                     .set_offset(point(px(0.), px(-(tab.view.scroll_offset as f32))))
                             });
                         }
-                        let body = match data.item.as_ref().map(|row| &row.body) {
-                            Some(Change::Value(markdown)) => {
-                                Some(media::CachedMarkdown::new(markdown, cx))
-                            }
-                            _ => None,
-                        };
-                        let notes = data
-                            .discussion
-                            .records
-                            .iter()
-                            .map(|record| {
-                                (
-                                    record.key.clone(),
-                                    media::CachedMarkdown::new(&record.body, cx),
-                                )
-                            })
-                            .collect();
+                        let (body, notes) = ItemView::use_cached_text(&mut data, old, cx);
                         this.tab_views.insert(
                             id,
                             ItemView {
@@ -810,12 +959,13 @@ impl ReaderWorkspace {
                                 body,
                                 notes,
                                 scroll,
-                                _scroll_restore: tab.view.scroll_offset,
                             },
                         );
+                        this.trim_inactive_views();
                     }
                     Err(_) => this.status = Some("The cached item could not be loaded."),
                 }
+                this.maybe_start_sync();
             },
         );
     }

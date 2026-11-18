@@ -30,7 +30,7 @@ impl ReaderWorkspace {
         done: H,
     ) where
         D: Send + 'static,
-        F: Future<Output = Result<D, ReaderError>> + Send + 'static,
+        F: Future<Output = Result<(D, bool), ReaderError>> + Send + 'static,
         H: FnOnce(&mut Self, Option<D>, &mut Window, &mut Context<Self>) + 'static,
     {
         let (Some(service), Some(account)) = (self.service.clone(), self.account) else {
@@ -45,6 +45,10 @@ impl ReaderWorkspace {
         self.network_pending += 1;
         self.network_started += 1;
         let observation = self.network_started;
+        let shared_lease = self
+            .sync_worker
+            .as_ref()
+            .and_then(|worker| worker.begin_foreground());
         self.remote_error = None;
         let cancel = self.network.clone();
         let task = self.runtime.spawn(work(service, account, cancel));
@@ -56,12 +60,27 @@ impl ReaderWorkspace {
                 }
                 this.network_pending = this.network_pending.saturating_sub(1);
                 match result {
-                    Ok(Ok(data)) => {
-                        this.observe_contact(observation, Reachability::ReceivedResponse);
+                    Ok(Ok((data, contacted))) => {
+                        if contacted {
+                            this.observe_contact(observation, Reachability::ReceivedResponse);
+                            if let (Some(worker), Some(id)) =
+                                (this.sync_worker.as_ref(), shared_lease)
+                            {
+                                worker.record_foreground(id, Reachability::ReceivedResponse, None);
+                            }
+                        }
                         done(this, Some(data), window, cx);
                     }
                     Ok(Err(error)) => {
                         let reachability = error.reachability();
+                        if let (Some(worker), Some(id)) = (this.sync_worker.as_ref(), shared_lease)
+                        {
+                            let reason = match &error {
+                                ReaderError::Remote(remote) => Some(remote.kind),
+                                _ => None,
+                            };
+                            worker.record_foreground(id, reachability, reason);
+                        }
                         this.observe_contact(observation, reachability);
                         this.remote_error = Some(error.to_string());
                         done(this, None, window, cx);
@@ -111,7 +130,8 @@ impl ReaderWorkspace {
             window,
             cx,
             move |service, account, cancel| async move {
-                service.fetch_list_page(account, repo, &cancel).await
+                let page = service.fetch_list_page(account, repo, &cancel).await?;
+                Ok((page, page.contacted))
             },
             move |this, page, window, cx| {
                 let Some(page) = page else { return };
@@ -165,6 +185,7 @@ impl ReaderWorkspace {
                 service
                     .search_remote(account, repo, &request_query, page, &cancel)
                     .await
+                    .map(|page| (page, true))
             },
             move |this, page, _, _| {
                 let Some(page) = page else { return };
@@ -247,25 +268,21 @@ impl ReaderWorkspace {
             window,
             cx,
             move |service, account, cancel| async move {
-                let remaining = match family {
+                let result = match family {
                     RemoteFamily::Metadata => {
                         service.fetch_item(account, item, &cancel).await?;
-                        false
+                        (false, true)
                     }
                     RemoteFamily::Comments => {
-                        service
-                            .fetch_comments(account, item, &cancel)
-                            .await?
-                            .has_more
+                        let page = service.fetch_comments(account, item, &cancel).await?;
+                        (page.has_more, page.contacted)
                     }
                     RemoteFamily::Timeline => {
-                        service
-                            .fetch_timeline(account, item, &cancel)
-                            .await?
-                            .has_more
+                        let page = service.fetch_timeline(account, item, &cancel).await?;
+                        (page.has_more, page.contacted)
                     }
                 };
-                Ok(remaining)
+                Ok(result)
             },
             move |this, remaining, window, cx| {
                 if remaining == Some(true) {
@@ -309,11 +326,13 @@ impl ReaderWorkspace {
             window,
             cx,
             move |service, account, _| async move {
+                let mut contacted = false;
                 store.start_issue_download(account, item, generation)?;
                 if download.metadata.coverage != threadline_storage::resources::Coverage::Complete
                     || download.body.coverage != threadline_storage::resources::Coverage::Complete
                 {
                     service.fetch_item(account, item, &cancel).await?;
+                    contacted = true;
                 }
                 for _ in 0..50 {
                     let current = store
@@ -324,24 +343,22 @@ impl ReaderWorkspace {
                     }
                     if current.completed_families() == 3 {
                         store.finish_issue_download(account, item, generation)?;
-                        return Ok(true);
+                        return Ok((true, contacted));
                     }
-                    if !service
-                        .fetch_comments(account, item, &cancel)
-                        .await?
-                        .has_more
-                    {
+                    let page = service.fetch_comments(account, item, &cancel).await?;
+                    contacted |= page.contacted;
+                    if !page.has_more {
                         let current = store
                             .issue_download(account, item)?
                             .ok_or(threadline_storage::Error::NotFound)?;
                         if current.completed_families() == 3 {
                             store.finish_issue_download(account, item, generation)?;
-                            return Ok(true);
+                            return Ok((true, contacted));
                         }
-                        return Ok(false);
+                        return Ok((false, contacted));
                     }
                 }
-                Ok(false)
+                Ok((false, contacted))
             },
             move |this, result, window, cx| {
                 this.downloads.remove(&item);

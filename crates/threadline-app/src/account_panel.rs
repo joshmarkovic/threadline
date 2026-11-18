@@ -116,6 +116,10 @@ impl AccountPanel {
         self.loaded
     }
 
+    pub(crate) fn reload_local_profile(&mut self, cx: &mut Context<Self>) {
+        self.launch(AccountCommand::Load, cx);
+    }
+
     pub(crate) fn clear_token(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.token = password_input(window, cx);
         #[cfg(feature = "e2e")]

@@ -3,11 +3,11 @@ use std::{fmt, io::Cursor, sync::Arc};
 use threadline_core::{
     domain::{ItemKind as ProviderKind, ItemNumber, RepositoryApiId, RepositoryName},
     github::{
-        AccessError, AccessKind, GitHubSession, Reachability,
+        AccessError, AccessKind, Reachability,
         attachments::{self, ImageError},
         reader::{
-            IssueSummary, PullRequestSummary, RemoteSearchPage, RemoteSearchQuery, Reported,
-            SearchQueryError,
+            BoundRepositoryReader, IssueSummary, PullRequestSummary, RemoteSearchPage,
+            RemoteSearchQuery, Reported, SearchQueryError,
         },
     },
     sync::Cancellation,
@@ -27,13 +27,16 @@ use threadline_storage::{
         Coverage, ResourceError, ResourceFamily, ResourceKey, ResourceProgress, ResourceTarget,
         Validators, WalkMode,
     },
+    sync::ReadBudget,
 };
 
 use crate::accounts::AccountService;
+use crate::sync_worker::{blocking, hold};
 
 #[derive(Debug)]
 pub(crate) enum ReaderError {
     Offline,
+    ServerBackoff,
     ScopeChanged,
     CredentialUnavailable,
     Cancelled,
@@ -52,6 +55,9 @@ impl fmt::Display for ReaderError {
         match self {
             Self::Offline => {
                 f.write_str("Work Offline is enabled. Downloaded content remains available.")
+            }
+            Self::ServerBackoff => {
+                f.write_str("GitHub has deferred requests. Cached content remains available.")
             }
             Self::ScopeChanged => f.write_str("The selected repository or active account changed."),
             Self::CredentialUnavailable | Self::ProtectedStore(_) => f.write_str(
@@ -117,6 +123,7 @@ impl ReaderError {
         match self {
             Self::BadCursor => ResourceError::CursorExpired,
             Self::Offline => ResourceError::Transport,
+            Self::ServerBackoff => ResourceError::RateLimited,
             Self::ProtectedStore(error) => match error {
                 PlatformError::Denied => ResourceError::Forbidden,
                 _ => ResourceError::Unauthorized,
@@ -148,6 +155,7 @@ impl ReaderError {
 pub(crate) struct PageStatus {
     pub(crate) has_more: bool,
     pub(crate) complete: bool,
+    pub(crate) contacted: bool,
 }
 
 pub(crate) struct FetchedImage {
@@ -160,6 +168,7 @@ impl PageStatus {
         Self {
             has_more: false,
             complete: true,
+            contacted: false,
         }
     }
 
@@ -167,6 +176,7 @@ impl PageStatus {
         Self {
             has_more: !limited && next.is_some(),
             complete: !limited && next.is_none(),
+            contacted: true,
         }
     }
 }
@@ -205,11 +215,14 @@ impl ReaderService {
             return Ok(PageStatus::complete());
         };
         let result = async {
-            let session = self.session(&scope, cancel).await?;
-            let reader = session
-                .reader(&scope.route, scope.provider_id, cancel)
+            let binding = self.binding(&scope, cancel).await?;
+            self.admit(account, cancel).await?;
+            let page = self
+                .response(
+                    account,
+                    binding.reader().list(cursor(&progress)?, cancel).await,
+                )
                 .await?;
-            let page = reader.list(cursor(&progress)?, cancel).await?;
             self.check_scope(&scope, cancel)?;
             let next = page.next_page.map(|next| next.to_string());
             let list = RepositoryListPage {
@@ -255,17 +268,21 @@ impl ReaderService {
             .item(account, item)?
             .ok_or(ReaderError::ScopeChanged)?;
         let (scope, number) = self.item_scope(account, original.locator, cancel)?;
-        let session = self.session(&scope, cancel).await?;
-        let reader = session
-            .reader(&scope.route, scope.provider_id, cancel)
+        let binding = self.binding(&scope, cancel).await?;
+        let reader = binding.reader();
+        self.admit(account, cancel).await?;
+        let summary = self
+            .response(account, reader.issue(number, cancel).await)
             .await?;
-        let summary = reader.issue(number, cancel).await?;
         let is_pr =
             summary.kind == ProviderKind::PullRequest || original.kind == ItemKind::PullRequest;
         self.check_item(&scope, item, original.locator, cancel)?;
         self.commit_item(&scope, item, issue(summary)?)?;
         if is_pr {
-            let details = reader.pull_request(number, cancel).await?;
+            self.admit(account, cancel).await?;
+            let details = self
+                .response(account, reader.pull_request(number, cancel).await)
+                .await?;
             self.check_item(&scope, item, original.locator, cancel)?;
             self.commit_item(&scope, item, pull_request(details)?)?;
         }
@@ -293,11 +310,17 @@ impl ReaderService {
             return Ok(PageStatus::complete());
         };
         let result = async {
-            let session = self.session(&scope, cancel).await?;
-            let reader = session
-                .reader(&scope.route, scope.provider_id, cancel)
+            let binding = self.binding(&scope, cancel).await?;
+            self.admit(account, cancel).await?;
+            let page = self
+                .response(
+                    account,
+                    binding
+                        .reader()
+                        .comments(number, cursor(&progress)?, cancel)
+                        .await,
+                )
                 .await?;
-            let page = reader.comments(number, cursor(&progress)?, cancel).await?;
             self.check_item(&scope, item, locator, cancel)?;
             let next = page.next_page.map(|next| next.to_string());
             let comments = DiscussionInputPage {
@@ -360,11 +383,17 @@ impl ReaderService {
             return Ok(PageStatus::complete());
         };
         let result = async {
-            let session = self.session(&scope, cancel).await?;
-            let reader = session
-                .reader(&scope.route, scope.provider_id, cancel)
+            let binding = self.binding(&scope, cancel).await?;
+            self.admit(account, cancel).await?;
+            let page = self
+                .response(
+                    account,
+                    binding
+                        .reader()
+                        .timeline(number, cursor(&progress)?, cancel)
+                        .await,
+                )
                 .await?;
-            let page = reader.timeline(number, cursor(&progress)?, cancel).await?;
             self.check_item(&scope, item, locator, cancel)?;
             if page.sso_limited {
                 return Err(ReaderError::IncompleteAccess);
@@ -416,11 +445,11 @@ impl ReaderService {
     ) -> Result<RemoteSearchPage, ReaderError> {
         let query = RemoteSearchQuery::new(query)?;
         let scope = self.scope(account, repository, cancel)?;
-        let session = self.session(&scope, cancel).await?;
-        let reader = session
-            .reader(&scope.route, scope.provider_id, cancel)
+        let binding = self.binding(&scope, cancel).await?;
+        self.admit(account, cancel).await?;
+        let result = self
+            .response(account, binding.reader().search(&query, page, cancel).await)
             .await?;
-        let result = reader.search(&query, page, cancel).await?;
         self.check_scope(&scope, cancel)?;
         Ok(result)
     }
@@ -442,14 +471,96 @@ impl ReaderService {
         Ok(validate_image(bytes)?)
     }
 
-    async fn session(
+    async fn binding(
         &self,
         scope: &Scope,
         cancel: &Cancellation,
-    ) -> Result<GitHubSession, ReaderError> {
-        let session = self.accounts.reader_session(&scope.profile, cancel).await?;
+    ) -> Result<BoundRepositoryReader, ReaderError> {
+        let account = scope.account;
+        self.admit(account, cancel).await?;
+        let (session, rate) = match self
+            .accounts
+            .reader_session_with_guidance(&scope.profile, cancel)
+            .await
+        {
+            Err(ReaderError::Remote(error)) => {
+                return self
+                    .response::<BoundRepositoryReader>(account, Err(error))
+                    .await;
+            }
+            other => other?,
+        };
+        if self.accounts.sync_worker_enabled() {
+            hold(&self.store, account, Some(rate), None).await;
+        }
         self.check_scope(scope, cancel)?;
-        Ok(session)
+        self.admit(account, cancel).await?;
+        let session = Arc::new(session);
+        let (reader, rate) = self
+            .response(
+                account,
+                session
+                    .bind_reader(&scope.route, scope.provider_id, cancel)
+                    .await,
+            )
+            .await?;
+        if self.accounts.sync_worker_enabled() {
+            hold(&self.store, account, Some(rate), None).await;
+        }
+        Ok(reader)
+    }
+
+    async fn response<T>(
+        &self,
+        account: AccountId,
+        result: Result<T, AccessError>,
+    ) -> Result<T, ReaderError> {
+        if self.accounts.sync_worker_enabled()
+            && let Err(error) = &result
+        {
+            hold(&self.store, account, error.rate, Some(error.kind)).await;
+        }
+        result.map_err(ReaderError::from)
+    }
+
+    async fn admit(&self, account: AccountId, cancel: &Cancellation) -> Result<(), ReaderError> {
+        if !self.accounts.sync_worker_enabled() {
+            return Ok(());
+        }
+        loop {
+            if cancel.is_cancelled() {
+                return Err(ReaderError::Cancelled);
+            }
+            let (now, budget) = blocking(&self.store, move |store| {
+                if store.active_github_account()? != Some(account)
+                    || store.dispatch_profile(account)?.offline
+                {
+                    return Ok((0, None));
+                }
+                let now = UtcMillis::now()?.0;
+                Ok((now, Some(store.reserve_read_budget(account, now)?)))
+            })
+            .await?;
+            match budget {
+                None => return Err(ReaderError::Offline),
+                Some(ReadBudget::Granted) => return Ok(()),
+                Some(ReadBudget::Deferred { server: true, .. }) => {
+                    return Err(ReaderError::ServerBackoff);
+                }
+                Some(ReadBudget::Deferred {
+                    until_ms,
+                    server: false,
+                }) => {
+                    let delay = std::time::Duration::from_millis(
+                        until_ms.saturating_sub(now).clamp(1, 1000) as u64,
+                    );
+                    tokio::select! {
+                        _ = cancel.cancelled() => return Err(ReaderError::Cancelled),
+                        _ = tokio::time::sleep(delay) => {},
+                    }
+                }
+            }
+        }
     }
 
     fn scope(
@@ -606,7 +717,7 @@ fn cursor(progress: &ResourceProgress) -> Result<u32, ReaderError> {
     })
 }
 
-fn issue(summary: IssueSummary) -> Result<ListSummary, ReaderError> {
+pub(crate) fn issue(summary: IssueSummary) -> Result<ListSummary, ReaderError> {
     Ok(ListSummary {
         number: summary.number.get(),
         update: ItemUpdate {

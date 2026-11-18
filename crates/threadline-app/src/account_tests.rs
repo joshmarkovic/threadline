@@ -177,6 +177,21 @@ fn reader_reply(
             open_repo
         ])));
     }
+    if let Some(path) = target.strip_prefix("/repositories/73")
+        && path.ends_with("&per_page=20&page=1")
+    {
+        if path.starts_with("/issues?state=all&sort=updated&direction=asc&since=") {
+            let mut updated = issue.clone();
+            updated["repository_url"] = json!("https://api.github.com/repos/fixture-org/public");
+            return Some(success(json!([updated])));
+        }
+        if path.starts_with("/issues/comments?sort=updated&direction=asc&since=") {
+            let mut updated = comment(99, NEW_TIME, "Scheduled ordinary conversation");
+            updated["issue_url"] =
+                json!("https://api.github.com/repos/fixture-org/public/issues/41");
+            return Some(success(json!([updated])));
+        }
+    }
     let response = match target.strip_prefix(BASE)? {
         "" => success(open_repo),
         "/issues?state=all&sort=created&direction=desc&per_page=20&page=1" => {
@@ -208,6 +223,123 @@ fn reader_reply(
         _ => return None,
     };
     Some(response)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn sync_worker_waits_for_hydration_and_restored_offline_then_observes_both_feeds() {
+    use crate::sync_worker::SyncWorker;
+    use threadline_core::connectivity::{ConnectionStatus, ProbeTrigger};
+    use threadline_storage::{ItemLocator, resources::Coverage};
+
+    let simulator = Simulator::start_with_reader(true);
+    let dir = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open_profile(dir.path()).unwrap());
+    let service = AccountService {
+        store: store.clone(),
+        credentials: Arc::new(FixtureVault::default()),
+        github: GitHubClient::loopback(simulator.address).unwrap(),
+        fixture: true,
+    };
+    let cancel = Cancellation::new();
+    let connected = service
+        .execute(
+            AccountCommand::Connect {
+                repository: "fixture-org/private".into(),
+                pat: Pat::from_input("threadline-test-fixture".into()),
+                renew: None,
+            },
+            &cancel,
+        )
+        .await;
+    assert!(connected.github_error.is_none());
+    let account = connected.view.active.unwrap();
+    let public = connected
+        .view
+        .repositories
+        .iter()
+        .find(|row| row.name == "public")
+        .unwrap()
+        .clone();
+    let repository = public.id;
+    let selected = service
+        .execute(
+            AccountCommand::Select {
+                profile: connected.view.profiles[0].clone(),
+                repository: public,
+            },
+            &cancel,
+        )
+        .await;
+    assert!(selected.github_error.is_none());
+    for private in selected
+        .view
+        .repositories
+        .iter()
+        .filter(|row| row.selected && row.id != repository)
+    {
+        store
+            .select_github_repository(account, private.id, false)
+            .unwrap();
+    }
+    let mut settings = store.sync_settings(account).unwrap();
+    settings.schedule.timezone = Some("UTC".into());
+    settings.controls.work_offline = true;
+    store.save_sync_settings(account, &settings).unwrap();
+    let before = simulator.requests.load(Ordering::Relaxed);
+    let worker = SyncWorker::start_fixture(service, &tokio::runtime::Handle::current());
+    let mut updates = worker.watch();
+    tokio::time::timeout(
+        Duration::from_secs(3),
+        updates.wait_for(|state| {
+            state.account == Some(account) && state.connection.status == ConnectionStatus::Offline
+        }),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    worker.wake(Some(ProbeTrigger::Startup));
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(simulator.requests.load(Ordering::Relaxed), before);
+
+    settings.controls.work_offline = false;
+    store.save_sync_settings(account, &settings).unwrap();
+    worker.interrupt(Some(ProbeTrigger::CheckNow));
+    tokio::time::timeout(
+        Duration::from_secs(10),
+        updates.wait_for(|state| {
+            state.connection.status == ConnectionStatus::Reachable
+                && state.cache_generation >= 2
+                && state
+                    .status
+                    .as_ref()
+                    .is_some_and(|status| status.last_success_ms.is_some())
+        }),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let item = store
+        .resolve(
+            account,
+            ItemLocator {
+                repository,
+                number: 41,
+            },
+        )
+        .unwrap()
+        .unwrap();
+    let discussion = store.discussion_page(account, item, None, 20).unwrap();
+    assert_eq!(discussion.state.coverage, Coverage::Missing);
+    assert!(discussion.records.is_empty());
+    for family in ["issues", "comments"] {
+        assert!(
+            store
+                .load_activity_baseline(account, repository, family)
+                .unwrap()
+                .is_some()
+        );
+    }
+    assert_eq!(simulator.requests.load(Ordering::Relaxed), before + 4);
 }
 
 #[tokio::test]
@@ -502,7 +634,8 @@ async fn cache_reader_reopens_the_selected_public_repo_and_resumes_an_edited_com
         reader.fetch_comments(account, item, &cancel).await.unwrap(),
         PageStatus {
             has_more: true,
-            complete: false
+            complete: false,
+            contacted: true,
         }
     );
     let error = reader

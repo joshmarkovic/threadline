@@ -1,4 +1,5 @@
 use std::cell::{Cell, RefCell};
+use std::ffi::c_void;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::Path;
 use std::ptr::{null, null_mut};
@@ -9,9 +10,13 @@ use std::time::{Duration, Instant};
 
 use tokio::sync::mpsc::UnboundedSender;
 use windows_sys::Win32::Foundation::{
-    CloseHandle, ERROR_ALREADY_EXISTS, GetLastError, HANDLE, HWND, LPARAM, LRESULT, SetLastError,
-    WPARAM,
+    CloseHandle, ERROR_ALREADY_EXISTS, ERROR_SUCCESS, GetLastError, HANDLE, HWND, LPARAM, LRESULT,
+    SetLastError, WPARAM,
 };
+use windows_sys::Win32::NetworkManagement::IpHelper::{
+    CancelMibChangeNotify2, MIB_IPINTERFACE_ROW, MIB_NOTIFICATION_TYPE, NotifyIpInterfaceChange,
+};
+use windows_sys::Win32::Networking::WinSock::AF_UNSPEC;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::System::Threading::CreateMutexW;
 use windows_sys::Win32::UI::Shell::{
@@ -28,6 +33,7 @@ use super::{Activation, PlatformError, PlatformEvent};
 
 const COMMAND_READY: u32 = WM_APP + 1;
 const TRAY_CALLBACK: u32 = WM_APP + 2;
+const NETWORK_CHANGED: u32 = WM_APP + 3;
 const BALLOON_TIMER: usize = 1;
 const BALLOON_TIMEOUT_MS: u32 = 60_000;
 const ICON_ID: u32 = 1;
@@ -249,6 +255,7 @@ fn run_desktop(
         balloon_pending: Cell::new(false),
         balloon_shown: Cell::new(false),
         toasts: RefCell::new(toasts),
+        network_watch: RefCell::new(None),
     };
     let class = WNDCLASSW {
         lpfnWndProc: Some(window_proc),
@@ -281,6 +288,7 @@ fn run_desktop(
     if window.is_null() {
         let _ = started.send(Err(last_error("Create the desktop worker window")));
     } else if started.send(Ok(window as usize)).is_ok() {
+        *state.network_watch.borrow_mut() = NetworkWatch::register(window);
         let mut message = MSG::default();
         // Win32 writes MSG, then dispatches the message back to this same thread.
         while unsafe { GetMessageW(&mut message, null_mut(), 0, 0) } > 0 {
@@ -291,6 +299,7 @@ fn run_desktop(
         }
     }
     // Normally WM_DESTROY has run. Clean up on the start/report or message-pump error paths as well.
+    state.network_watch.borrow_mut().take();
     unsafe {
         if !window.is_null() && IsWindow(window) != 0 {
             DestroyWindow(window);
@@ -309,6 +318,45 @@ struct WindowState {
     balloon_pending: Cell<bool>,
     balloon_shown: Cell<bool>,
     toasts: RefCell<Option<Result<Toasts, PlatformError>>>,
+    network_watch: RefCell<Option<NetworkWatch>>,
+}
+
+struct NetworkWatch(HANDLE);
+
+impl NetworkWatch {
+    fn register(hwnd: HWND) -> Option<Self> {
+        let mut handle = null_mut();
+        // The context is an opaque HWND. Registration ends before that window is destroyed.
+        let result = unsafe {
+            NotifyIpInterfaceChange(
+                AF_UNSPEC,
+                Some(network_hint),
+                hwnd.cast_const(),
+                false,
+                &mut handle,
+            )
+        };
+        (result == ERROR_SUCCESS && !handle.is_null()).then_some(Self(handle))
+    }
+}
+
+impl Drop for NetworkWatch {
+    fn drop(&mut self) {
+        // This runs on the window thread. The callback only posts a message and returns.
+        unsafe {
+            CancelMibChangeNotify2(self.0);
+        }
+    }
+}
+
+unsafe extern "system" fn network_hint(
+    context: *const c_void,
+    _: *const MIB_IPINTERFACE_ROW,
+    _: MIB_NOTIFICATION_TYPE,
+) {
+    unsafe {
+        PostMessageW(context.cast_mut(), NETWORK_CHANGED, 0, 0);
+    }
 }
 
 impl WindowState {
@@ -517,6 +565,13 @@ unsafe extern "system" fn window_proc(
     match message {
         COMMAND_READY => state.process_commands(hwnd),
         TRAY_CALLBACK => state.tray_callback(hwnd, wparam, lparam),
+        NETWORK_CHANGED => {
+            state.emit(PlatformEvent::NetworkChanged);
+        }
+        WM_POWERBROADCAST if wparam == PBT_APMRESUMEAUTOMATIC as WPARAM => {
+            state.emit(PlatformEvent::Wake);
+            return 1;
+        }
         WM_TIMER if wparam == BALLOON_TIMER => {
             if state.balloon_pending.get() && !state.balloon_shown.get() {
                 state.emit(PlatformEvent::Error(PlatformError::Unavailable));
@@ -524,6 +579,7 @@ unsafe extern "system" fn window_proc(
             state.finish_balloon(hwnd);
         }
         WM_DESTROY => {
+            state.network_watch.borrow_mut().take();
             state.remove_icon(hwnd);
             // Release the notification and class registration before the sender's shutdown request returns.
             state.toasts.borrow_mut().take();

@@ -330,8 +330,18 @@ impl ReaderWorkspace {
     }
 
     pub(crate) fn connection_label(&self) -> (&'static str, gpui_kit::Hsla) {
+        use threadline_core::connectivity::ConnectionStatus;
         if self.offline {
             return ("Working offline", rgb(0xb93442).into());
+        }
+        if let Some(connection) = self.shared_connection() {
+            return match connection.status {
+                ConnectionStatus::Checking => ("Checking GitHub", rgb(0x8b785b).into()),
+                ConnectionStatus::Stale => ("Connection status stale", rgb(0x8b785b).into()),
+                ConnectionStatus::Reachable => ("GitHub reachable", rgb(0x28804a).into()),
+                ConnectionStatus::Unreachable => ("Cannot reach GitHub", rgb(0xb93442).into()),
+                ConnectionStatus::Offline => ("Working offline", rgb(0xb93442).into()),
+            };
         }
         if self.network_pending > 0 && self.reachability == Reachability::NotAttempted {
             return ("Checking GitHub", rgb(0x8b785b).into());
@@ -484,6 +494,14 @@ impl ReaderWorkspace {
             .child(
                 control("reader-storage", "Storage usage")
                     .on_click(cx.listener(|this, _, window, cx| this.show_cache(window, cx))),
+            )
+            .child(
+                self.observed_control(
+                    "reader-sync-settings",
+                    control("reader-sync-settings", "Synchronization")
+                        .on_click(cx.listener(|this, _, window, cx| this.show_sync(window, cx))),
+                    false,
+                ),
             )
     }
 
@@ -1305,10 +1323,11 @@ pub(crate) fn bind_shortcuts(cx: &mut App) {
 impl ReaderWorkspace {
     fn workspace_connection(&self, palette: Palette, cx: &mut Context<Self>) -> AnyElement {
         let (connection, color) = self.connection_label();
+        let snapshot = self.shared_connection();
         let connection_details = format!(
             "{connection}. Last check {}. Last successful contact {}.",
-            time_label(self.checked),
-            time_label(self.contact)
+            time_label(snapshot.map_or(self.checked, |state| state.last_checked_ms)),
+            time_label(snapshot.map_or(self.contact, |state| state.last_contact_ms)),
         );
 
         div()
@@ -1333,6 +1352,10 @@ impl ReaderWorkspace {
             .children(
                 (self.access == AccessState::SignedOut)
                     .then(|| div().text_sm().child("Signed out · local profile")),
+            )
+            .children(
+                self.connection_reason()
+                    .map(|reason| div().text_xs().text_color(palette.muted).child(reason)),
             )
             .child(
                 control("reader-check-now", "Check now")
@@ -1448,6 +1471,7 @@ impl ReaderWorkspace {
 
     fn workspace_upper_surface(&self, palette: Palette, cx: &mut Context<Self>) -> AnyElement {
         match self.surface {
+            Surface::Sync=>div().flex_1().min_h_0().children(self.sync_panel.clone()).into_any_element(),
             Surface::Browse=>self.browse_view(palette,cx).into_any_element(),
             Surface::Outbox=>div().p_3().flex().flex_col().gap_3().id("reader-outbox-list").overflow_y_scroll().flex_1()
                 .child(div().text_lg().child("Outbox"))
@@ -1529,6 +1553,7 @@ impl Render for ReaderWorkspace {
         let palette = Palette::current(cx);
         let compact =
             window.viewport_size().width.as_f32() < 260. + 390. * self.layout.panes.len() as f32;
+        self.publish_visible_panes(compact || self.maximized);
         div()
             .id("reader-workspace")
             .key_context("ThreadlineReader")
