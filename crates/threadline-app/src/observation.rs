@@ -133,6 +133,11 @@ impl Observer {
         self.0.borrow_mut().bounds.clear();
     }
 
+    #[cfg(test)]
+    pub(crate) fn test_control_bounds(&self, name: &str) -> Option<[f32; 4]> {
+        self.0.borrow().bounds.get(name).copied()
+    }
+
     pub(crate) fn observed_bounds(&self, name: &'static str) -> impl IntoElement {
         let observer = self.clone();
         canvas(
