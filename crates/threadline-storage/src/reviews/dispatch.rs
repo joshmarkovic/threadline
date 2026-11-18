@@ -2,22 +2,7 @@ use super::*;
 use crate::queue::dispatch as outbox;
 use crate::writes::Permission;
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ReviewRoute {
-    pub account: AccountId,
-    pub repository: RepositoryId,
-    pub item: ItemId,
-    pub actor: NonZeroU64,
-    pub repository_id: NonZeroU64,
-    pub pr_id: NonZeroU64,
-    pub number: NonZeroU64,
-    pub owner: String,
-    pub name: String,
-    pub credential_generation: i64,
-    pub base: String,
-    pub head: String,
-    pub revision_id: i64,
-}
+pub use crate::mutations::PrMutationRoute as ReviewRoute;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ReviewStep {
     CreatePending(ReviewDraft),
@@ -159,56 +144,8 @@ pub enum ReviewFailure {
     Ambiguous,
 }
 
-pub(super) fn route(db: &Connection, account: AccountId, id: &str) -> Result<ReviewRoute> {
-    let raw = db.query_row(
-        "SELECT q.item_id,r.id,a.provider_user_id,r.provider_repository_id,v.pr_api_id,i.number,
-           r.owner,r.name,p.credential_generation,b.base_oid,b.head_oid,b.id
-         FROM review_intents v JOIN operations q ON q.account_id=v.account_id AND q.id=v.operation_id
-         JOIN items i ON i.id=q.item_id AND i.account_id=q.account_id
-         JOIN pull_request_details d ON d.item_id=i.id AND d.pull_request_api_id=v.pr_api_id
-         JOIN pr_revisions b ON b.id=v.revision_id AND b.repository_id=i.repository_id
-         JOIN repositories r ON r.id=i.repository_id AND r.account_id=i.account_id
-         JOIN accounts a ON a.id=q.account_id
-         JOIN github_operation_scopes s ON s.account_id=q.account_id AND s.operation_id=q.id
-         JOIN github_access_profiles p ON p.account_id=s.account_id AND p.owner_scope=s.owner_scope
-         WHERE q.account_id=? AND q.id=? AND p.owner_scope=r.owner",
-        params![account,id],|row| Ok((
-            row.get(0)?, row.get(1)?, row.get::<_,String>(2)?, row.get::<_,String>(3)?,
-            row.get::<_,String>(4)?, row.get::<_,i64>(5)?, row.get(6)?, row.get(7)?,
-            row.get(8)?, row.get(9)?, row.get(10)?, row.get(11)?,
-        )))
-        .optional()?.ok_or(Error::Conflict("The original PR identity or owner no longer matches"))?;
-    let (
-        item,
-        repository,
-        actor,
-        repo,
-        pr,
-        number,
-        owner,
-        name,
-        credential_generation,
-        base,
-        head,
-        revision_id,
-    ) = raw;
-    Ok(ReviewRoute {
-        account,
-        item,
-        repository,
-        actor: numeric(&actor)?,
-        repository_id: numeric(&repo)?,
-        pr_id: numeric(&pr)?,
-        number: NonZeroU64::new(u64::try_from(number).map_err(|_| Error::Corrupt)?)
-            .ok_or(Error::Corrupt)?,
-        owner,
-        name,
-        credential_generation,
-        base,
-        head,
-        revision_id,
-    })
-}
+pub(super) use crate::mutations::pr_route as route;
+
 fn step(db: &Connection, claim: &Claim) -> Result<ReviewStep> {
     let intent: ReviewIntent = decode(&claim.operation.snapshot.payload)?;
     Ok(match intent {
@@ -597,25 +534,7 @@ impl Store {
                 )?;
                 return Ok(false);
             }
-            let busy:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM operations o JOIN mutation_families f
-                        ON f.account_id=o.account_id AND f.operation_id=o.id WHERE o.account_id=? AND o.state='sending')",[op.account],|r|r.get(0))?;
-            let floor = crate::writes::deadline(tx, op.account)?.unwrap_or(now);
-            if busy || floor > now {
-                finish_preflight(
-                    tx,
-                    claim,
-                    "queued",
-                    "mutation_pacing",
-                    floor.max(now.saturating_add(1_000)),
-                )?;
-                return Ok(false);
-            }
-            outbox::begin_send_in(tx, &claim.claim, claim.step.key(), now)?;
-            let next = now.saturating_add(1_000);
-            crate::sync::budget_in(tx, op.account, next)?;
-            tx.execute("INSERT INTO write_timing(account_id,not_before) VALUES(?,?)
-                        ON CONFLICT(account_id) DO UPDATE SET not_before=MAX(write_timing.not_before,excluded.not_before)",params![op.account,next])?;
-            Ok(true)
+            crate::mutations::reserve_transport(tx,&claim.claim,claim.step.key(),now)
         })
     }
 }

@@ -26,7 +26,7 @@ pub struct CommentAuthorObservation {
     pub observed_at_ms: i64,
 }
 
-fn require_profile(db: &Connection, p: &AccessProfile, r: RepositoryId) -> Result<()> {
+pub(crate) fn require_profile(db: &Connection, p: &AccessProfile, r: RepositoryId) -> Result<()> {
     let authorized: bool = db.query_row(
         "SELECT EXISTS(SELECT 1 FROM eligible_sync_repositories e
         JOIN repositories r ON e.repository_id=r.id AND r.account_id=e.account_id

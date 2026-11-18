@@ -5,6 +5,8 @@ mod identity;
 
 pub mod access;
 pub mod fixtures;
+pub mod merges;
+mod mutations;
 pub mod pr;
 pub mod queue;
 pub mod reader;

@@ -14,6 +14,7 @@ mod model;
 mod tests;
 pub use model::*;
 mod choices;
+pub(crate) use choices::require_profile as require_observation_profile;
 pub use choices::*;
 mod control;
 pub use control::*;

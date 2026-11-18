@@ -333,26 +333,7 @@ impl Store {
             if !accepted {
                 return Err(Error::Conflict("The mutation has no accepted preflight"));
             }
-            let floor = deadline(tx, claim.route.account)?;
-            let sending:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM operations o JOIN mutation_families w
-                        ON w.account_id=o.account_id AND w.operation_id=o.id WHERE o.account_id=? AND o.state='sending')",
-                        [claim.route.account],|r|r.get(0))?;
-            if sending || floor.is_some_and(|t| t > now) {
-                end_preflight(
-                    tx,
-                    claim,
-                    "queued",
-                    "mutation_pacing",
-                    floor.unwrap_or(now).max(now.saturating_add(1_000)),
-                )?;
-                return Ok(false);
-            }
-            dispatch::begin_send_in(tx, &claim.claim, claim.intent.action(), now)?;
-            let next = now.saturating_add(1_000);
-            crate::sync::budget_in(tx, claim.route.account, next)?;
-            tx.execute("INSERT INTO write_timing(account_id,not_before) VALUES(?,?) ON CONFLICT(account_id) DO UPDATE SET
-                        not_before=MAX(write_timing.not_before,excluded.not_before)",params![claim.route.account,next])?;
-            Ok(true)
+            crate::mutations::reserve_transport(tx,&claim.claim,claim.intent.action(),now)
         })
     }
 }

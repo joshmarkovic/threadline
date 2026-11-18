@@ -3,7 +3,7 @@ use crate::access::AccessProfile;
 use crate::pr::{self, PatchEvidence, PrFamily, PrRecord, PrRevision, SourceSide, StoredRecord};
 use crate::queue::{self, ActionKind, Claim, Delivery, DraftSubmission, Receipt, Submission};
 use crate::writes::{decode, encode};
-use crate::{AccountId, Error, ItemId, RepositoryId, Result, Store};
+use crate::{AccountId, Error, ItemId, Result, Store};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
