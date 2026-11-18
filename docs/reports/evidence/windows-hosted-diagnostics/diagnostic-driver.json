@@ -1,0 +1,7 @@
+{
+  "artifact_source_revision": "acd7ce73e51f3d0ba1e4ada4243779d211d21904",
+  "diagnostic_driver_revision": "2cc19e23ff1305da4f84cf7a3fae4c086cd1fdf9",
+  "evidence_class": "GitHub-hosted Windows Server notification diagnostic",
+  "artifact_source_run": "44235734818",
+  "workflow_run": "44243315426"
+}

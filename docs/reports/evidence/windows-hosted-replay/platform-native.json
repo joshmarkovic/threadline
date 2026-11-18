@@ -1,0 +1,140 @@
+{
+  "schema": 1,
+  "status": "Blocked",
+  "detail": "Windows reported the banner shown, but UI Automation could not identify its clickable title. Use the manual notification click mode on this target.",
+  "driver": "Windows PowerShell / Win32 SendInput",
+  "shell_version": "5.1.26100.33648",
+  "seed": 12345,
+  "os_version": "10.0.26100",
+  "session_id": 2,
+  "architecture": "AMD64",
+  "app_pid": 8,
+  "restarted_pid": null,
+  "native_window": 458794,
+  "dpi": 96,
+  "binary_sha256": "2d6c06948bf3273973ec448c3f78176f87ce9a1dd7c02c20b9d326ee415a7aa4",
+  "executable_bytes": 26802688,
+  "actions": [
+    {
+      "action": "Use Keep in tray to opt into native background residence",
+      "observed": true
+    },
+    {
+      "action": "Close the main window while tray is enabled",
+      "observed": {
+        "pid": 8,
+        "minimized": true
+      }
+    },
+    {
+      "action": "Open the identified Windows notification area overflow",
+      "observed": true
+    },
+    {
+      "action": "Click the actual Windows tray icon",
+      "observed": 8
+    },
+    {
+      "action": "Windows shell confirmed the test banner displayed",
+      "observed": 1
+    }
+  ],
+  "windows_product": "Microsoft Windows Server 2025 Datacenter",
+  "machine": {
+    "manufacturer": "Microsoft Corporation",
+    "model": "Virtual Machine",
+    "ram_bytes": 8584425472,
+    "processors": [
+      {
+        "Name": "AMD EPYC 9V74 80-Core Processor                ",
+        "NumberOfCores": 1,
+        "NumberOfLogicalProcessors": 2
+      }
+    ],
+    "graphics": [
+      {
+        "Name": "Microsoft Hyper-V Video",
+        "DriverVersion": "10.0.26100.1150"
+      }
+    ],
+    "storage": [
+      {
+        "Model": "Virtual_Disk NVME Premium",
+        "InterfaceType": "SCSI",
+        "MediaType": "Fixed hard disk media"
+      },
+      {
+        "Model": "Microsoft NVMe Direct Disk v2",
+        "InterfaceType": "SCSI",
+        "MediaType": "Fixed hard disk media"
+      }
+    ],
+    "display": {
+      "width": 1024,
+      "height": 768
+    }
+  },
+  "loaded_modules": [
+    "advapi32.dll",
+    "bcryptprimitives.dll",
+    "cfgmgr32.dll",
+    "clbcatq.dll",
+    "combase.dll",
+    "comctl32.dll",
+    "CoreMessaging.dll",
+    "CoreUIComponents.dll",
+    "CRYPTBASE.DLL",
+    "d3d10warp.dll",
+    "d3d11.dll",
+    "dataexchange.dll",
+    "dcomp.dll",
+    "directmanipulation.dll",
+    "directxdatabasehelper.dll",
+    "dwmapi.dll",
+    "dwrite.dll",
+    "dxcore.dll",
+    "dxgi.dll",
+    "GDI32.dll",
+    "gdi32full.dll",
+    "gdiplus.dll",
+    "icu.DLL",
+    "icuuc.dll",
+    "imm32.dll",
+    "kernel.appcore.dll",
+    "KERNEL32.DLL",
+    "KERNELBASE.dll",
+    "Microsoft.Internal.WarpPal.dll",
+    "MSCTF.dll",
+    "msvcp_win.dll",
+    "msvcrt.dll",
+    "ntdll.dll",
+    "ole32.dll",
+    "oleaut32.dll",
+    "powrprof.dll",
+    "profapi.dll",
+    "RPCRT4.dll",
+    "sechost.dll",
+    "shcore.dll",
+    "shell32.dll",
+    "shlwapi.dll",
+    "sxs.dll",
+    "textinputframework.dll",
+    "TextShaping.dll",
+    "threadline.exe",
+    "twinapi.appcore.dll",
+    "ucrtbase.dll",
+    "uiautomationcore.dll",
+    "UMPDC.dll",
+    "user32.dll",
+    "userenv.dll",
+    "uxtheme.dll",
+    "VCRUNTIME140.dll",
+    "win32u.dll",
+    "Windows.Storage.dll",
+    "Windows.UI.dll",
+    "Windows.UI.Immersive.dll",
+    "WindowsCodecs.dll",
+    "winmm.dll",
+    "wintypes.dll"
+  ]
+}

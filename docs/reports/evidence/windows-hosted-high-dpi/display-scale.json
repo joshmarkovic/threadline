@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "scope": "Opt-in hosted Windows Server high-DPI diagnostic",
+  "status": "Pass",
+  "detail": "The unchanged native smoke passed at the expected 144 DPI on the hosted desktop.",
+  "session_id": 2,
+  "windows_product": "Microsoft Windows Server 2025 Datacenter",
+  "monitor_count": 1,
+  "resolution_before": "1024x768",
+  "advertised_resolutions": [
+    "1024x768",
+    "1152x864",
+    "1280x1024",
+    "1280x720",
+    "1280x800",
+    "1366x768",
+    "1440x900",
+    "1600x1200",
+    "1600x900",
+    "1680x1050",
+    "1920x1080",
+    "640x480",
+    "800x600"
+  ],
+  "mode_enumeration_complete": true,
+  "resolution_tests": [
+    {
+      "resolution": "1920x1080",
+      "refresh_hz": 64,
+      "cds_test_code": 0
+    }
+  ],
+  "resolution_apply_code": 0,
+  "resolution_ready": "1920x1080",
+  "resolution_restore_code": 0,
+  "resolution_restored": true,
+  "monitor_dpi_before": 96,
+  "offered_percent": [
+    100,
+    125,
+    150,
+    175
+  ],
+  "selectable_percent": [
+    100,
+    125,
+    150,
+    175
+  ],
+  "option_sources": [
+    "combo"
+  ],
+  "scale_options_settled": true,
+  "owned_popup_count": 0,
+  "requested_percent": 150,
+  "monitor_dpi_ready": 144,
+  "expected_window_dpi": 144,
+  "smoke_exit_code": 0,
+  "smoke_window_dpi": 144
+}

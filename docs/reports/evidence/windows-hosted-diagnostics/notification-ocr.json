@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "status": "Blocked",
+  "detail": "Local OCR did not establish a unique fresh notification with a verified native click target.",
+  "driver": "Windows PowerShell / Win32 SendInput",
+  "shell_version": "5.1.26100.33648",
+  "seed": 12345,
+  "windows_product": "Microsoft Windows Server 2025 Datacenter",
+  "os_version": "10.0.26100",
+  "architecture": "AMD64",
+  "dpi": 96,
+  "display": {
+    "width": 1024,
+    "height": 768
+  },
+  "binary_sha256": "2d6c06948bf3273973ec448c3f78176f87ce9a1dd7c02c20b9d326ee415a7aa4",
+  "executable_bytes": 26802688,
+  "actions": [
+    {
+      "action": "Verify local OCR using only synthetic in-memory fixtures",
+      "observed": {
+        "wrapped_exact_match": true,
+        "wrong_body_rejected": true,
+        "duplicate_detected": true
+      }
+    },
+    {
+      "action": "Baseline the hosted notification corner in memory",
+      "observed": {
+        "exact_fixture_title": false,
+        "exact_fixture_body": false,
+        "pixel_width": 512,
+        "pixel_height": 300
+      }
+    },
+    {
+      "action": "Windows shell confirmed the test banner displayed",
+      "observed": 1
+    },
+    {
+      "action": "Check the bounded notification corner for a unique synthetic card and verified shell window",
+      "observed": {
+        "polls": 18,
+        "exact_fixture_pair": false,
+        "elapsed_ms": 2249
+      }
+    }
+  ]
+}

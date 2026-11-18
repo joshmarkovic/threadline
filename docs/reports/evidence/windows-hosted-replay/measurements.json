@@ -1,0 +1,191 @@
+{
+  "schema": 1,
+  "status": "Fail",
+  "detail": "One or more Windows performance budgets were exceeded.",
+  "driver": "Windows PowerShell / Win32 SendInput",
+  "shell_version": "5.1.26100.33648",
+  "seed": 12345,
+  "os_version": "10.0.26100",
+  "session_id": 2,
+  "architecture": "AMD64",
+  "app_pid": 1236,
+  "restarted_pid": null,
+  "native_window": 196964,
+  "dpi": 96,
+  "binary_sha256": "2d6c06948bf3273973ec448c3f78176f87ce9a1dd7c02c20b9d326ee415a7aa4",
+  "executable_bytes": 26802688,
+  "actions": [],
+  "windows_product": "Microsoft Windows Server 2025 Datacenter",
+  "machine": {
+    "manufacturer": "Microsoft Corporation",
+    "model": "Virtual Machine",
+    "ram_bytes": 8584425472,
+    "processors": [
+      {
+        "Name": "AMD EPYC 9V74 80-Core Processor                ",
+        "NumberOfCores": 1,
+        "NumberOfLogicalProcessors": 2
+      }
+    ],
+    "graphics": [
+      {
+        "Name": "Microsoft Hyper-V Video",
+        "DriverVersion": "10.0.26100.1150"
+      }
+    ],
+    "storage": [
+      {
+        "Model": "Virtual_Disk NVME Premium",
+        "InterfaceType": "SCSI",
+        "MediaType": "Fixed hard disk media"
+      },
+      {
+        "Model": "Microsoft NVMe Direct Disk v2",
+        "InterfaceType": "SCSI",
+        "MediaType": "Fixed hard disk media"
+      }
+    ],
+    "display": {
+      "width": 1024,
+      "height": 768
+    }
+  },
+  "loaded_modules": [
+    "advapi32.dll",
+    "bcryptprimitives.dll",
+    "cfgmgr32.dll",
+    "clbcatq.dll",
+    "combase.dll",
+    "comctl32.dll",
+    "CoreMessaging.dll",
+    "CoreUIComponents.dll",
+    "CRYPTBASE.DLL",
+    "d3d10warp.dll",
+    "d3d11.dll",
+    "dataexchange.dll",
+    "dcomp.dll",
+    "directmanipulation.dll",
+    "directxdatabasehelper.dll",
+    "dwmapi.dll",
+    "dwrite.dll",
+    "dxcore.dll",
+    "dxgi.dll",
+    "GDI32.dll",
+    "gdi32full.dll",
+    "gdiplus.dll",
+    "icu.DLL",
+    "icuuc.dll",
+    "imm32.dll",
+    "kernel.appcore.dll",
+    "KERNEL32.DLL",
+    "KERNELBASE.dll",
+    "Microsoft.Internal.WarpPal.dll",
+    "MSCTF.dll",
+    "msvcp_win.dll",
+    "msvcrt.dll",
+    "ntdll.dll",
+    "ole32.dll",
+    "oleaut32.dll",
+    "powrprof.dll",
+    "profapi.dll",
+    "RPCRT4.dll",
+    "sechost.dll",
+    "shcore.dll",
+    "shell32.dll",
+    "shlwapi.dll",
+    "sxs.dll",
+    "textinputframework.dll",
+    "TextShaping.dll",
+    "threadline.exe",
+    "twinapi.appcore.dll",
+    "ucrtbase.dll",
+    "uiautomationcore.dll",
+    "UMPDC.dll",
+    "user32.dll",
+    "userenv.dll",
+    "uxtheme.dll",
+    "VCRUNTIME140.dll",
+    "win32u.dll",
+    "Windows.Storage.dll",
+    "Windows.UI.dll",
+    "Windows.UI.Immersive.dll",
+    "WindowsCodecs.dll",
+    "winmm.dll",
+    "wintypes.dll"
+  ],
+  "measurements": {
+    "idle_working_set_bytes": 76935168,
+    "cold_start_ms": 1374.79,
+    "peak_working_set_bytes": 84938752,
+    "gpu_breakdown": {
+      "idle": {
+        "dedicated_bytes": 0,
+        "shared_bytes": 0
+      },
+      "after_scroll": {
+        "dedicated_bytes": 0,
+        "shared_bytes": 0
+      }
+    },
+    "gpu_memory_bytes": 0,
+    "scroll_breakdown": {
+      "large_diff": {
+        "sample_count": 31,
+        "p95_ms": 154.4225
+      },
+      "markdown_discussion": {
+        "sample_count": 38,
+        "p95_ms": 140.0184
+      }
+    },
+    "scroll_frame_p95_ms": 154.4225,
+    "package_bytes": null,
+    "package_sha256": null
+  },
+  "budgets": {
+    "idle_working_set_bytes": {
+      "value": 76935168,
+      "limit": 209715200,
+      "status": "Pass"
+    },
+    "peak_working_set_bytes": {
+      "value": 84938752,
+      "limit": 471859200,
+      "status": "Pass"
+    },
+    "gpu_memory_bytes": {
+      "value": 0,
+      "limit": 268435456,
+      "status": "Pass"
+    },
+    "package_bytes": {
+      "value": null,
+      "limit": 52428800,
+      "status": "Blocked"
+    },
+    "cold_start_ms": {
+      "value": 1374.79,
+      "limit": 3000,
+      "status": "Pass"
+    },
+    "scroll_frame_p95_ms": {
+      "value": 154.4225,
+      "limit": 20,
+      "status": "Fail",
+      "surfaces": {
+        "large_diff": {
+          "value": 154.4225,
+          "sample_count": 31,
+          "limit": 20,
+          "status": "Fail"
+        },
+        "markdown_discussion": {
+          "value": 140.0184,
+          "sample_count": 38,
+          "limit": 20,
+          "status": "Fail"
+        }
+      }
+    }
+  }
+}

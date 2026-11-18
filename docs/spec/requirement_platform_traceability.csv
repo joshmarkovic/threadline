@@ -35,7 +35,7 @@ PORT-04,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required
 PORT-05,windows,Windows first release,11,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Windows development shell proof: Blocked. Production packaged activation remains Sprint 11.
 PORT-05,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-05,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PORT-06,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Native keyboard, clipboard, focus and lifecycle slice. 2× geometry in-process and native 96 DPI."
+PORT-06,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Native keyboard, clipboard, focus and lifecycle slice. 2× geometry in-process. Windows 11 smoke at 96 DPI and hosted Windows Server smoke at 144 DPI. ../reports/evidence/windows-hosted-high-dpi/native.json"
 PORT-06,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,../reports/evidence/macos-native-window/macos-window-probe.json. AppKit Quit targeted and exited the verified child. Full native lifecycle and accessibility tests remain due.
 PORT-06,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-07,windows,Windows first release,13,,12,no,Not applicable,Requirement is specific to another platform release.,
@@ -470,7 +470,7 @@ DATA-09,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required
 DATA-10,windows,Windows first release,02,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DATA-10,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DATA-10,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-UX-01,windows,Windows first release,04,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Native focus and keyboard/pointer paths. Actual high-DPI desktop proof remains open.
+UX-01,windows,Windows first release,04,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Native focus and keyboard/pointer paths. Hosted Windows Server passed the 144-DPI smoke. Windows 11 high-DPI release verification remains due. ../reports/evidence/windows-hosted-high-dpi/native.json
 UX-01,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 UX-01,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 UX-02,windows,Windows first release,04,10,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,

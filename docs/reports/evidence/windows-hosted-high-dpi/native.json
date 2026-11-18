@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "status": "Pass",
+  "detail": "Exercised the native window, Markdown selection, independent focus and tabs, review input, and both splitters.",
+  "driver": "Windows PowerShell / Win32 SendInput",
+  "shell_version": "5.1.26100.33648",
+  "seed": 12345,
+  "windows_product": "Microsoft Windows Server 2025 Datacenter",
+  "os_version": "10.0.26100",
+  "session_id": 2,
+  "architecture": "AMD64",
+  "app_pid": 8768,
+  "restarted_pid": 5868,
+  "native_window": 66234,
+  "dpi": 144,
+  "binary_sha256": "2d6c06948bf3273973ec448c3f78176f87ce9a1dd7c02c20b9d326ee415a7aa4",
+  "executable_bytes": 26802688,
+  "display": {
+    "width": 1920,
+    "height": 1080
+  },
+  "original_clipboard_restored": true,
+  "actions": [
+    {
+      "action": "Launch native window",
+      "observed": {
+        "left_tab": 41,
+        "right_tab": 72,
+        "context_ratio": 0.33
+      }
+    },
+    {
+      "action": "Pointer select formatted Markdown and copy",
+      "observed": {
+        "verified": true,
+        "copy_attempts": 1
+      }
+    },
+    {
+      "action": "Type into the right review input while background preview is pending and copy its value",
+      "observed": {
+        "tab": 72,
+        "text": "native draft 72",
+        "copy_attempts": 1
+      }
+    },
+    {
+      "action": "Change the active tab and return to the same draft target",
+      "observed": {
+        "switched": 68,
+        "restored": 72,
+        "draft": "native draft 72"
+      }
+    },
+    {
+      "action": "Switch context to linked issue",
+      "observed": "issue"
+    },
+    {
+      "action": "Resize workspace panes with the pointer",
+      "observed": 0.33711538
+    },
+    {
+      "action": "Resize PR context and code with the pointer",
+      "observed": 0.38383713
+    },
+    {
+      "action": "Forward a second launch through the Windows instance channel",
+      "observed": {
+        "existing_pid": 8768,
+        "secondary_pid": 5720,
+        "right_tab": 72
+      }
+    },
+    {
+      "action": "Quit with the native keyboard shortcut",
+      "observed": 0
+    },
+    {
+      "action": "Relaunch a fresh isolated feasibility profile and quit again",
+      "observed": 5868
+    }
+  ]
+}

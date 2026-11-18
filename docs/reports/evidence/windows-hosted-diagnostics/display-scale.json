@@ -1,0 +1,18 @@
+﻿{
+    "schema":  1,
+    "scope":  "Opt-in hosted Windows Server high-DPI diagnostic",
+    "status":  "Blocked",
+    "detail":  "The Display selector did not offer a unique enabled 150% or 200% choice that changes scale.",
+    "session_id":  2,
+    "windows_product":  "Microsoft Windows Server 2025 Datacenter",
+    "monitor_count":  1,
+    "monitor_dpi_before":  96,
+    "offered_percent":  [
+
+                        ],
+    "requested_percent":  null,
+    "monitor_dpi_ready":  null,
+    "expected_window_dpi":  null,
+    "smoke_exit_code":  null,
+    "smoke_window_dpi":  null
+}

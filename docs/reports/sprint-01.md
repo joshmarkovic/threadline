@@ -2,7 +2,7 @@
 
 November 18, 2026 · Threadline 0.1.0
 
-Threadline has a runnable Rust and GPUI workspace. The virtualized build passed native Windows and isolated X11 smoke. Hosted builds and portable tests passed on all three OS families, and the hosted macOS window and AppKit Quit probe passed. Windows notification click, high-DPI desktop input, and scrolling performance remain open.
+Threadline has a runnable Rust and GPUI workspace. Native desktop smoke passed on Windows 11 at 96 DPI, hosted Windows Server 2025 at 144 DPI, and isolated X11. Hosted builds and portable tests passed on all three OS families, and the hosted macOS window and AppKit Quit probe passed. Windows 11 high-DPI and hardware-rendered checks remain open, along with notification click and the 20 ms scrolling budget.
 
 ## Delivered behavior
 
@@ -10,17 +10,17 @@ Threadline has a runnable Rust and GPUI workspace. The virtualized build passed 
 | --- | --- |
 | S01-T01 | The Rust workspace builds with Cargo.lock, GPUI Kit 0.10.0 and GPUI 0.3.12. The Windows and Linux feasibility binaries ran as native processes. |
 | S01-T02 | The portable core verifies typed repository and item identities, revisions, structured errors, cancellation and stale responses. A seeded fake, bounded Tokio scheduler and loopback HTTP simulator exercise background work. |
-| S01-T03 | The workspace has virtualized selectable Markdown, a virtualized annotated diff, two resizable panes with independently focused tabs and drafts, a branching history fixture, and a 33/67 PR context and code split. Both splitters and OS clipboard behavior passed on Windows at 96 DPI. Simulated 2× geometry passed in the GPUI harness. Native high-DPI evidence remains open. |
+| S01-T03 | The workspace has virtualized selectable Markdown, a virtualized annotated diff, two resizable panes with independently focused tabs and drafts, a branching history fixture, and a 33/67 PR context and code split. Both splitters and OS clipboard behavior passed on Windows 11 at 96 DPI and on hosted Windows Server 2025 at 144 DPI. Simulated 2× geometry passed in the GPUI harness. [Hosted 144-DPI smoke](#hosted-144-dpi-smoke) |
 | S01-T04 | Windows opted in to tray residence, minimized on Close, and restored the original process through the actual tray icon. A second launch forwarded to the active review in the original process. The shell emitted its banner-shown callback. The Windows automation could not locate the banner's native click target. |
 | S01-T05 | The native benchmark and numeric ceilings are in place. Startup and working set passed on the reference VM. Both scrolling surfaces exceeded the 20 ms budget. |
 | S01-T06 | Portable service contracts, platform ownership, a support matrix, artifact metadata and short, verified installation templates are documented. |
-| S01-T07 | Cargo commands validate selection and seed, report JSON and JUnit, and run isolated tests. The Windows and X11 input drivers exercised real windows. Windows, Apple Silicon macOS, and Ubuntu x64 hosted build and core-test jobs passed. The macOS launch and AppKit Quit probe passed. Full macOS desktop input verification remains open. |
+| S01-T07 | Cargo commands validate selection and seed, report JSON and JUnit, and run isolated tests. The Windows and X11 input drivers exercised real windows, including hosted Windows Server at 150% display scaling. Windows, Apple Silicon macOS, and Ubuntu x64 hosted build and core-test jobs passed. The macOS launch and AppKit Quit probe passed. Full macOS desktop input verification remains open. |
 
 The app opens synthetic station-labs/relay content, fixture revision `s01-feasibility-v1`. SQLite, live GitHub authentication, durable drafts and the Outbox have their own implementation sprints in the pack.
 
 ## Environment and build
 
-- **Windows** ran in Windows 11 Enterprise 23H2 x64 build 22631.7652, active Remote Desktop session 2. The VM has eight logical Xeon Platinum 8370C processors, 32 GiB RAM and a Microsoft virtual SAS disk. The latest runs observed 2544 × 1324 pixels at 96 DPI. GPUI reported Microsoft Basic Render Driver, with software emulation enabled. The process loaded Direct3D 11, DirectWrite and `d3d10warp.dll`. [Renderer and frame evidence](evidence/windows-virtualized-measure/frame-phases.json)
+- **Windows 11** ran in Windows 11 Enterprise 23H2 x64 build 22631.7652, active Remote Desktop session 2. The VM has eight logical Xeon Platinum 8370C processors, 32 GiB RAM and a Microsoft virtual SAS disk. The reference runs observed 2544 × 1324 pixels at 96 DPI. GPUI reported Microsoft Basic Render Driver, with software emulation enabled. The process loaded Direct3D 11, DirectWrite and `d3d10warp.dll`. [Renderer and frame evidence](evidence/windows-virtualized-measure/frame-phases.json)
 - **Linux** ran in Debian 13.7 x86-64 on WSL2 kernel 6.18.40.1. The latest run used an isolated Xvfb display with XTEST at 1500 × 1000 × 24 and software Vulkan through lavapipe. An earlier run used X11 through WSLg. The release target is Ubuntu 24.04 GNOME with separate tests for Wayland and X11. [Xvfb environment](evidence/linux-virtualized-e2e/environment.json)
 - **macOS** ran on a hosted Apple Silicon runner with macOS 15.8.2 build 24H232 and runner image 20261104.0514.1. The logged-in Quartz console session had one active display and an Apple Paravirtual Metal device. [Native window probe](evidence/macos-native-window/macos-window-probe.json)
 - **Toolchain** used Rust 1.98.1. Earlier Windows executables were cross-built with LLVM 19.1.7 and Microsoft SDK 10.0.26100. Debug assertions in the cross-built `gpui-pre-windows` dependency selected runtime Direct3D shader compilation with `D3DCOMPILE_SKIP_OPTIMIZATION`. The hosted native release build embedded shaders compiled by the Windows SDK with `/O3`. [GPUI Windows build source](https://docs.rs/crate/gpui-pre-windows/0.3.12/source/build.rs) · [Runtime shader source](https://docs.rs/crate/gpui-pre-windows/0.3.12/source/src/directx_renderer.rs)
@@ -41,6 +41,7 @@ Commands use deterministic seed 12345. The Windows host used the same Cargo runn
 | Windows tray and banner | `xtask.exe test e2e --suite full --case S01-WINDOWS-SHELL --binary <windows-exe> --seed 12345 --report-dir <reports>` | Blocked. The app remained in the tray after Close, restored from a click on its icon, and received `NIN_BALLOONSHOW`. UI Automation could not identify the banner click target. [Native actions](evidence/windows-shell/platform-native.json) |
 | Windows notification click diagnostic | Staged Windows PowerShell driver on the earlier optimized executable, seed 12345 | Blocked. The shell confirmed display. A bounded search took 28 polls over 2.71 seconds and found zero fresh notification nodes and zero verified click points. [Diagnostic and driver digests](evidence/windows-notification-diagnostic/platform-native.json) |
 | Windows Notification Center diagnostic | Fixture-only shell inspection on Windows 11 at 96 DPI, seed 12345 | Blocked. After the shell reported the banner shown, seven polls found no card with the exact fixture title and body. The probe restored the original closed flyout. [Diagnostic](evidence/windows-notification-center/platform-native.json) |
+| Hosted Windows shell replay | `windows-smoke.ps1 -PlatformProof` with the verified native release test executable, seed 12345 | Blocked. The window minimized into the tray, the actual tray icon restored the original process, and the shell reported the banner shown. UI Automation could not identify the banner's clickable title. [Native actions](evidence/windows-hosted-replay/platform-native.json) |
 | Linux separate process on Xvfb | `xtask test e2e --suite smoke --case E2E-001 --binary <linux-exe> --seed 12345` | Pass on the virtualized build. XTEST drove launch, Markdown copy, typing while preview loaded, tab and context switches, both pointer splitters, Quit and relaunch. [Native actions](evidence/linux-virtualized-e2e/native.json) · [JUnit](evidence/linux-virtualized-e2e/junit.xml) |
 | Earlier Linux separate process on WSLg | `cargo xtask test e2e --suite smoke --binary <linux-exe> --seed 12345 --report-dir artifacts/verification` | Pass for early WSLg X11 feasibility. Launch, selection, typing, background work, tab and context switches, both pointer splitters and Quit ran against the actual window. [Native actions](evidence/linux-e2e/native.json) · [Screenshot](evidence/linux-e2e/interaction.png) |
 | Early macOS native window | `THREADLINE_PROBE_COMMIT=$(git rev-parse HEAD) xcrun swift tools/native/macos-window-probe.swift target/debug/threadline artifacts/macos-window-probe.json` | Pass for launch and Quit. Quartz observed a 1024 × 681 on-screen window owned by the child. AppKit Quit targeted the verified child and the process exited with status 0. Text, focus, clipboard and splitters remain open. [Probe JSON](evidence/macos-native-window/macos-window-probe.json) · [Hosted macOS job](https://github.com/joshmarkovic/threadline/actions/runs/44233609666/job/134564328594) |
@@ -84,9 +85,40 @@ The rerun at `acd7ce73e51f3d0ba1e4ada4243779d211d21904` passed the three build a
 
 GPUI recorded median drawing times of 7.34 ms for the diff and 3.66 ms for the discussion. Wait time before drawing was 21.00 ms on the diff p95 frame and 55.45 ms on the discussion p95 frame. Subtracting the recorded GPUI draw time while holding the measured scheduling and submission durations fixed leaves p95s of 49.11 ms and 61.52 ms. The data identify delays outside drawing on this software-rendered session, alongside occasional paint spikes. Both surfaces still exceed budget. [Measurements](evidence/windows-virtualized-measure/measurements.json) · [Frame phases](evidence/windows-virtualized-measure/frame-phases.json) · [JUnit](evidence/windows-virtualized-measure/junit.xml)
 
-The earlier runs retain their original results. The debug run measured a worst p95 of 126.70 ms. The first optimized run measured 71.75 ms. The optimized run after moving report writes off the GUI thread measured 83.44 ms. Hardware-rendered Windows performance and native high-DPI input remain open. [Debug measurements](evidence/windows-debug-measure/measurements.json) · [First optimized measurements](evidence/windows-optimized-measure/measurements.json) · [Earlier optimized measurements after the report-writer change](evidence/windows-final-measure/measurements.json)
+The earlier runs retain their original results. The debug run measured a worst p95 of 126.70 ms. The first optimized run measured 71.75 ms. The optimized run after moving report writes off the GUI thread measured 83.44 ms. Hardware-rendered Windows performance remains open. [Debug measurements](evidence/windows-debug-measure/measurements.json) · [First optimized measurements](evidence/windows-optimized-measure/measurements.json) · [Earlier optimized measurements after the report-writer change](evidence/windows-final-measure/measurements.json)
 
 The Windows 11 benchmark attempt with the exact hosted test executable returned exit 78 during input desktop readiness. All 50 samples showed the Remote Desktop session disconnected and locked. The guard stopped before sending input. Windows 11 benchmark measurements for the native release build remain pending. [Attempt summary](evidence/windows-hosted/reference-readiness/summary.json) · [Desktop samples](evidence/windows-hosted/reference-readiness/measure-desktop.json)
+
+### Hosted Windows Server replay
+
+The replay used `build_run_id=44235734818` and seed 12345 on hosted Windows Server 2025 Datacenter x64, build 26100, at 1024 × 768 and 96 DPI. It reused the verified native release test executable with `/O3` shaders and SHA-256 `2d6c06948bf3273973ec448c3f78176f87ce9a1dd7c02c20b9d326ee415a7aa4`. GPUI named Microsoft Basic Render Driver and returned `is_software_emulated: false`. The Windows 11 cross-build and Windows Server replay ran on different machines. A same-machine comparison of shader builds remains pending. [Verified build manifest](evidence/windows-hosted/build.json) · [Replay workflow](../../.github/workflows/windows-hosted-replay.yml) · [Hosted replay and raw artifacts](https://github.com/joshmarkovic/threadline/actions/runs/44240601495)
+
+| Metric | Hosted replay | Result |
+| --- | ---: | --- |
+| Fresh process startup | 1,374.79 ms | Pass |
+| Idle working set | 76,935,168 bytes | Pass |
+| Peak working set | 84,938,752 bytes | Pass |
+| GPU process-memory counters | 0 bytes | Pass in this session |
+| Large diff scroll p95 | 154.4225 ms over 31 samples | Fail against 20 ms |
+| Long discussion scroll p95 | 140.0184 ms over 38 samples | Fail against 20 ms |
+| Candidate package | Pending | Blocked |
+
+The diff p95 frame spent 146.6351 ms in GPUI paint. The discussion p95 frame spent 137.2148 ms in platform submission. The replay preserves the per-frame timings in its workflow artifact. [Measurement results](evidence/windows-hosted-replay/measurements.json) · [Raw replay artifact](https://github.com/joshmarkovic/threadline/actions/runs/44240601495)
+
+## Additional Windows desktop evidence
+
+### Hosted notification and display diagnostics
+
+A separate hosted Windows Server run used the same verified app executable and an isolated diagnostic driver revision. [Driver and build identity](evidence/windows-hosted-diagnostics/diagnostic-driver.json) · [Hosted diagnostic run](https://github.com/joshmarkovic/threadline/actions/runs/44243315426)
+
+- **Notification click** remained Blocked. Local optical character recognition (OCR) passed synthetic checks for wrapped matches, wrong text, and duplicates. After the shell reported the banner shown, the driver made 18 reads of a 512 × 300-pixel notification corner over 2,249 ms. It found no exact fixture title-and-body pair and ended before issuing a notification click. [Notification diagnostic](evidence/windows-hosted-diagnostics/notification-ocr.json)
+- **Initial display probe** stopped at 96 DPI. The initial Display selector exposed neither a unique enabled 150% nor 200% choice to this probe. The driver left display settings as found and ended before the smoke. [Initial display diagnostic](evidence/windows-hosted-diagnostics/display-scale.json)
+
+### Hosted 144-DPI smoke
+
+On Windows Server 2025 Datacenter, the supplemental driver at `6c39407` changed the physical resolution from 1024 × 768 to 1920 × 1080. Display Settings then offered 100%, 125%, 150% and 175%. The driver selected 150%, the monitor changed from 96 to 144 DPI, and the native smoke measured 144 DPI on the actual Threadline window. GPUI reported a 1.5 scale factor. The driver restored the original resolution after the smoke. [Display diagnostic](evidence/windows-hosted-high-dpi/display-scale.json) · [GPUI observation excerpt](evidence/windows-hosted-high-dpi/ui-observation.json)
+
+The unchanged `windows-smoke.ps1` from `acd7ce7` passed all ten actions with seed 12345. It launched the window, selected and copied Markdown, typed and copied review input during a pending preview, preserved the draft across tabs, switched to linked issue context, dragged both splitters, forwarded a second launch, quit, and relaunched and quit again. It restored the clipboard. The app SHA-256 matches the verified release test artifact from run `44235734818`. The Windows 11 reference smoke remains at 96 DPI. [Native actions](evidence/windows-hosted-high-dpi/native.json) · [Verified build manifest](evidence/windows-hosted/build.json) · [Hosted run and raw artifacts](https://github.com/joshmarkovic/threadline/actions/runs/44244949417)
 
 ## Installation and traceability
 
