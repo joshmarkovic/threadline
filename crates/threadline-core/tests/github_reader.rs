@@ -8,7 +8,7 @@ use threadline_core::{
     domain::{ItemKind, ItemNumber, RepositoryApiId, RepositoryName},
     github::{
         AccessKind, CancellationToken, GitHubClient, GitHubSession, OwnerScope, SecretToken,
-        reader::{RemoteSearchQuery, Reported, SearchQueryError},
+        reader::{RemoteSearchQuery, Reported, SearchQueryError, refresh::ReadValidators},
     },
 };
 use tokio::sync::Notify;
@@ -86,6 +86,104 @@ async fn a_selected_public_repository_uses_the_same_id_verified_reader() {
         number(41)
     );
     check_requests(&sim, 3);
+}
+
+#[tokio::test]
+async fn sync_feeds_keep_the_same_bounded_window_and_respect_conditional_headers() {
+    const SINCE_MS: i64 = 1_378_429_264_333;
+    const ISSUES: &str = "/repositories/71/issues?state=all&sort=updated&direction=asc&since=2013-09-06T01%3A01%3A04Z&per_page=20";
+    const COMMENTS: &str = "/repositories/71/issues/comments?sort=updated&direction=asc&since=2013-09-06T01%3A01%3A04Z&per_page=20";
+    const LAST_MODIFIED: &str = "Fri, 06 Sep 2013 01:01:04 GMT";
+    let sim = Simulator::start().await;
+    let session = Arc::new(session(&sim, 71).await);
+    let cancel = CancellationToken::new();
+    let (bound, _) = session
+        .bind_reader(&route(), repo_id(), &cancel)
+        .await
+        .unwrap();
+    let reader = bound.reader();
+    let first_path = format!("{ISSUES}&page=1");
+    let second_path = format!("{ISSUES}&page=2");
+    let first = ok(json!([issue(12, false)]))
+        .header(header::ETAG, "W/\"first-issue-page\"")
+        .header(header::LAST_MODIFIED, LAST_MODIFIED)
+        .header(header::LINK, format!("<{second_path}>; rel=\"next\""))
+        .header(header::HeaderName::from_static("x-poll-interval"), "30");
+    sim.enqueue(Method::GET, &first_path, first);
+    sim.enqueue(Method::GET, &second_path, ok(json!([issue(900, true)])));
+    let response = reader
+        .updated_issues(SINCE_MS, 1, &ReadValidators::default(), &cancel)
+        .await
+        .unwrap();
+    assert_eq!(
+        response.rate.not_before_ms(SINCE_MS),
+        Some(SINCE_MS + 30_000)
+    );
+    let first_page = response.value.unwrap();
+    assert_eq!(first_page.records[0].number.get(), 12);
+    assert!(first_page.records[0].closed);
+    assert_eq!(first_page.next_page, Some(2));
+    let next = reader
+        .updated_issues(SINCE_MS, 2, &response.validators, &cancel)
+        .await
+        .unwrap()
+        .value
+        .unwrap();
+    assert_eq!(next.records[0].number.get(), 900);
+    assert_eq!(next.records[0].kind, ItemKind::PullRequest);
+    let mut unchanged = reply(StatusCode::NOT_MODIFIED, Value::Null);
+    unchanged.expected_etag = Some("W/\"first-issue-page\"");
+    unchanged.expected_modified = Some(LAST_MODIFIED);
+    sim.enqueue(Method::GET, &first_path, unchanged);
+    assert!(
+        reader
+            .updated_issues(SINCE_MS, 1, &response.validators, &cancel)
+            .await
+            .unwrap()
+            .value
+            .is_none()
+    );
+
+    let old_comment = json!({"id":55,"node_id":"C_55","body":"old item freshly edited", "created_at":"2012-01-01T00:00:00Z",
+        "updated_at":OLD_DATE,"issue_url":"https://api.github.com/repos/fixture-org/private/issues/12"});
+    let comments = format!("{COMMENTS}&page=1");
+    sim.enqueue(Method::GET, &comments, ok(json!([old_comment.clone()])));
+    let result = reader
+        .updated_comments(SINCE_MS, 1, &ReadValidators::default(), &cancel)
+        .await
+        .unwrap()
+        .value
+        .unwrap();
+    assert_eq!(result.records[0].issue.get(), 12);
+    assert!(result.records[0].comment.created_at_ms < result.records[0].comment.updated_at_ms);
+    assert_eq!(result.records[0].comment.id.get(), 55);
+
+    let mut transferred = old_comment;
+    transferred["issue_url"] = json!("https://api.github.com/repos/another-org/private/issues/12");
+    sim.enqueue(Method::GET, &comments, ok(json!([transferred])));
+    let wrong_owner = reader
+        .updated_comments(SINCE_MS, 1, &ReadValidators::default(), &cancel)
+        .await
+        .err()
+        .unwrap();
+    assert_eq!(wrong_owner.kind, AccessKind::IdentityMismatch);
+    let mut unavailable = reply(
+        StatusCode::SERVICE_UNAVAILABLE,
+        json!({"message":"fixture"}),
+    );
+    unavailable = unavailable.header(header::RETRY_AFTER, "Fri, 06 Sep 2013 01:03:04 GMT");
+    sim.enqueue(Method::GET, &comments, unavailable);
+    let outage = reader
+        .updated_comments(SINCE_MS, 1, &ReadValidators::default(), &cancel)
+        .await
+        .err()
+        .unwrap();
+    assert_eq!(outage.kind, AccessKind::ServiceFailure);
+    assert_eq!(
+        outage.rate.unwrap().not_before_ms(SINCE_MS),
+        Some(1_378_429_384_000)
+    );
+    check_requests(&sim, 8);
 }
 
 fn issue(number: u64, pr: bool) -> Value {

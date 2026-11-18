@@ -85,6 +85,14 @@ pub(super) struct Issue {
 }
 
 impl Issue {
+    pub(super) fn into_update(
+        self,
+        reader: &GitHubReader<'_>,
+    ) -> Result<IssueSummary, AccessError> {
+        reader.validate_named_url(self.repository_url.as_deref().ok_or_else(malformed)?, "")?;
+        self.into_summary(reader, false)
+    }
+
     pub(super) fn into_summary(
         self,
         reader: &GitHubReader<'_>,
@@ -184,6 +192,26 @@ pub(super) struct Comment {
 }
 
 impl Comment {
+    pub(super) fn into_update(
+        self,
+        reader: &GitHubReader<'_>,
+    ) -> Result<super::refresh::UpdatedComment, AccessError> {
+        let url = self.issue_url.as_deref().ok_or_else(malformed)?;
+        let parsed = reqwest::Url::parse(url).map_err(|_| malformed())?;
+        let issue = parsed
+            .path_segments()
+            .and_then(|mut path| path.next_back())
+            .and_then(|number| number.parse::<NonZeroU64>().ok())
+            .map(ItemNumber::new)
+            .ok_or_else(malformed)?;
+        let suffix = format!("issues/{}", issue.get());
+        reader.validate_named_url(url, &suffix)?;
+        Ok(super::refresh::UpdatedComment {
+            issue,
+            comment: self.into_comment(reader, &suffix)?,
+        })
+    }
+
     pub(super) fn into_comment(
         self,
         reader: &GitHubReader<'_>,

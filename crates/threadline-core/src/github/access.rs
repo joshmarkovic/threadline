@@ -226,10 +226,22 @@ impl GitHubClient {
         expected_user: Option<NonZeroU64>,
         cancel: &CancellationToken,
     ) -> Result<GitHubSession, AccessError> {
+        self.authenticate_with_guidance(token, owner, expected_user, cancel)
+            .await
+            .map(|(session, _)| session)
+    }
+
+    pub async fn authenticate_with_guidance(
+        &self,
+        token: SecretToken,
+        owner: OwnerScope,
+        expected_user: Option<NonZeroU64>,
+        cancel: &CancellationToken,
+    ) -> Result<(GitHubSession, RateLimit), AccessError> {
         if self.fixture && token.0 != "Bearer threadline-test-fixture" {
             return Err(AccessError::local(AccessKind::InvalidCredential));
         }
-        let (user, _): (GitHubUser, _) =
+        let (user, headers): (GitHubUser, _) =
             request(self, &token, &owner, "user", RequestMode::Read, cancel)
                 .await?
                 .require_body()?;
@@ -239,12 +251,13 @@ impl GitHubClient {
         if user.login.is_empty() || user.login.len() > 255 {
             return Err(AccessError::received(AccessKind::MalformedResponse, 200));
         }
-        Ok(GitHubSession {
+        let session = GitHubSession {
             client: self.clone(),
             user,
             scope: owner,
             token,
-        })
+        };
+        Ok((session, RateLimit::from_headers(&headers)))
     }
 }
 pub struct GitHubSession {
@@ -291,6 +304,18 @@ impl GitHubSession {
         previous: Option<&RepositoryValidator>,
         cancel: &CancellationToken,
     ) -> Result<RepositoryRead, AccessError> {
+        self.repository_with_guidance(route, expected, previous, cancel)
+            .await
+            .map(|(repository, _)| repository)
+    }
+
+    async fn repository_with_guidance(
+        &self,
+        route: &RepositoryName,
+        expected: Option<RepositoryApiId>,
+        previous: Option<&RepositoryValidator>,
+        cancel: &CancellationToken,
+    ) -> Result<(RepositoryRead, RateLimit), AccessError> {
         self.check_route(route)?;
         if previous.is_some_and(|v| {
             v.user != self.user.id
@@ -305,8 +330,9 @@ impl GitHubSession {
         let response =
             request::<RepoWire>(&self.client, &self.token, &self.scope, &path, mode, cancel)
                 .await?;
+        let rate = RateLimit::from_headers(&response.headers);
         let Some(wire) = response.body else {
-            return Ok(RepositoryRead::NotModified);
+            return Ok((RepositoryRead::NotModified, rate));
         };
         let repo = wire.into_repo()?;
         if !self.scope.accepts(repo.route.owner())
@@ -327,10 +353,13 @@ impl GitHubSession {
                 id: repo.id,
                 tag: tag.clone(),
             });
-        Ok(RepositoryRead::Fresh {
-            repository: repo,
-            validator,
-        })
+        Ok((
+            RepositoryRead::Fresh {
+                repository: repo,
+                validator,
+            },
+            rate,
+        ))
     }
     pub async fn verify_private_repository(
         &self,

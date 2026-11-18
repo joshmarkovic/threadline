@@ -32,8 +32,50 @@ pub enum AccessKind {
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
 pub struct RateLimit {
     pub retry_after_seconds: Option<u64>,
+    pub retry_after_unix_seconds: Option<u64>,
     pub reset_at_unix_seconds: Option<u64>,
     pub remaining: Option<u64>,
+    pub poll_after_seconds: Option<u64>,
+}
+impl RateLimit {
+    pub fn not_before_ms(self, now_ms: i64) -> Option<i64> {
+        let millis = |seconds: u64| i64::try_from(seconds.saturating_mul(1000)).unwrap_or(i64::MAX);
+        [
+            self.retry_after_seconds
+                .map(|seconds| now_ms.saturating_add(millis(seconds))),
+            self.retry_after_unix_seconds.map(millis),
+            self.reset_at_unix_seconds
+                .filter(|_| self.remaining == Some(0))
+                .map(millis),
+            self.poll_after_seconds
+                .map(|seconds| now_ms.saturating_add(millis(seconds))),
+        ]
+        .into_iter()
+        .flatten()
+        .filter(|deadline| *deadline > now_ms)
+        .max()
+    }
+
+    pub(super) fn from_headers(headers: &HeaderMap) -> Self {
+        let text = |name: &str| headers.get(name)?.to_str().ok();
+        let num = |name: &str| text(name)?.parse::<u64>().ok();
+        Self {
+            retry_after_seconds: num("retry-after"),
+            retry_after_unix_seconds: text("retry-after")
+                .and_then(http_date)
+                .and_then(|date| u64::try_from(date.timestamp()).ok()),
+            remaining: num("x-ratelimit-remaining"),
+            reset_at_unix_seconds: num("x-ratelimit-reset"),
+            poll_after_seconds: num("x-poll-interval"),
+        }
+    }
+}
+
+pub(super) fn http_date(value: &str) -> Option<chrono::DateTime<chrono::FixedOffset>> {
+    if value.len() != 29 || !value.ends_with(" GMT") {
+        return None;
+    }
+    chrono::DateTime::parse_from_rfc2822(value).ok()
 }
 /// A user-initiated external browser action. Its short-lived query must not enter routine logs.
 #[derive(Clone, Eq, PartialEq)]
@@ -131,6 +173,10 @@ impl std::error::Error for AccessError {}
 pub(super) enum RequestMode<'a> {
     Read,
     Conditional(&'a HeaderValue),
+    Revalidate {
+        etag: Option<HeaderValue>,
+        last_modified: Option<HeaderValue>,
+    },
     Graph(&'a serde_json::Value),
 }
 
@@ -167,17 +213,36 @@ pub(super) async fn request<T: DeserializeOwned>(
     {
         return Err(AccessError::local(AccessKind::WrongScope));
     }
-    let conditional = matches!(mode, RequestMode::Conditional(_));
-    let builder = match mode {
-        RequestMode::Read => client
+    let conditional = match &mode {
+        RequestMode::Conditional(_) => true,
+        RequestMode::Revalidate {
+            etag,
+            last_modified,
+        } => etag.is_some() || last_modified.is_some(),
+        _ => false,
+    };
+    let rest = || {
+        client
             .http
-            .get(url)
-            .header("X-GitHub-Api-Version", GITHUB_REST_VERSION),
-        RequestMode::Conditional(tag) => client
-            .http
-            .get(url)
+            .get(url.clone())
             .header("X-GitHub-Api-Version", GITHUB_REST_VERSION)
-            .header(header::IF_NONE_MATCH, tag),
+    };
+    let builder = match mode {
+        RequestMode::Read => rest(),
+        RequestMode::Conditional(tag) => rest().header(header::IF_NONE_MATCH, tag),
+        RequestMode::Revalidate {
+            etag,
+            last_modified,
+        } => {
+            let mut builder = rest();
+            if let Some(tag) = etag {
+                builder = builder.header(header::IF_NONE_MATCH, tag);
+            }
+            if let Some(date) = last_modified {
+                builder = builder.header(header::IF_MODIFIED_SINCE, date);
+            }
+            builder
+        }
         RequestMode::Graph(body) => client
             .http
             .post(url)
@@ -192,7 +257,14 @@ pub(super) async fn request<T: DeserializeOwned>(
     };
     let status = response.status();
     let headers = response.headers().clone();
-    let fail = |kind| AccessError::received(kind, status.as_u16());
+    let fail = |kind| {
+        let mut error = AccessError::received(kind, status.as_u16());
+        let rate = RateLimit::from_headers(&headers);
+        if rate != RateLimit::default() {
+            error.rate = Some(rate);
+        }
+        error
+    };
     if status == StatusCode::NOT_MODIFIED {
         return if conditional {
             Ok(ReadResponse {
@@ -270,12 +342,7 @@ fn map_status(
     scope: &OwnerScope,
     token: &SecretToken,
 ) -> AccessError {
-    let num = |name: &str| headers.get(name)?.to_str().ok()?.parse::<u64>().ok();
-    let rate = RateLimit {
-        retry_after_seconds: num("retry-after"),
-        remaining: num("x-ratelimit-remaining"),
-        reset_at_unix_seconds: num("x-ratelimit-reset"),
-    };
+    let rate = RateLimit::from_headers(headers);
     let message = message.unwrap_or("").to_ascii_lowercase();
     let sso = header_sso(headers);
     let kind = match status {
@@ -292,6 +359,7 @@ fn map_status(
         StatusCode::TOO_MANY_REQUESTS => AccessKind::RateLimited,
         StatusCode::FORBIDDEN
             if rate.retry_after_seconds.is_some()
+                || rate.retry_after_unix_seconds.is_some()
                 || rate.remaining == Some(0)
                 || message.contains("secondary rate limit") =>
         {
@@ -310,7 +378,7 @@ fn map_status(
         _ => AccessKind::UnexpectedStatus,
     };
     let mut error = AccessError::received(kind, status.as_u16());
-    if kind == AccessKind::RateLimited {
+    if kind == AccessKind::RateLimited || rate != RateLimit::default() {
         error.rate = Some(rate);
     }
     if kind == AccessKind::SsoRequired {

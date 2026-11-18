@@ -1,15 +1,17 @@
 //! Read-only access to one verified repository. Page cursors never select an origin or target.
 
+pub mod refresh;
 mod wire;
 
 use reqwest::{Url, header::HeaderMap};
 use serde::de::DeserializeOwned;
-use std::{fmt, num::NonZeroU64};
+use std::{fmt, num::NonZeroU64, sync::Arc};
 
 use crate::domain::{IssueApiId, ItemKind, ItemNumber, RepositoryApiId, RepositoryName};
 
 use super::{
-    AccessError, AccessKind, CancellationToken, GitHubSession, next_page_for, partial_sso,
+    AccessError, AccessKind, CancellationToken, GitHubSession, RateLimit, RepositoryRead,
+    next_page_for, partial_sso,
 };
 
 const PAGE_SIZE: u32 = 20;
@@ -159,7 +161,50 @@ pub struct GitHubReader<'a> {
     repository: RepositoryApiId,
 }
 
+/// A repository binding owns the authenticated session that verified it.
+pub struct BoundRepositoryReader {
+    session: Arc<GitHubSession>,
+    route: RepositoryName,
+    repository: RepositoryApiId,
+}
+
+impl BoundRepositoryReader {
+    pub fn reader(&self) -> GitHubReader<'_> {
+        GitHubReader {
+            session: &self.session,
+            route: self.route.clone(),
+            repository: self.repository,
+        }
+    }
+}
+
 impl GitHubSession {
+    pub async fn bind_reader(
+        self: &Arc<Self>,
+        route: &RepositoryName,
+        repository: RepositoryApiId,
+        cancel: &CancellationToken,
+    ) -> Result<(BoundRepositoryReader, RateLimit), AccessError> {
+        let (
+            RepositoryRead::Fresh {
+                repository: checked,
+                ..
+            },
+            rate,
+        ) = self
+            .repository_with_guidance(route, Some(repository), None, cancel)
+            .await?
+        else {
+            return Err(AccessError::received(AccessKind::UnexpectedStatus, 304));
+        };
+        let bound = BoundRepositoryReader {
+            session: self.clone(),
+            route: checked.route,
+            repository: checked.id,
+        };
+        Ok((bound, rate))
+    }
+
     pub async fn reader(
         &self,
         route: &RepositoryName,

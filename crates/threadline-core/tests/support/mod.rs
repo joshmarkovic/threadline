@@ -19,6 +19,7 @@ pub struct Reply {
     gate: Option<Arc<Notify>>,
     pub authenticated: bool,
     pub expected_etag: Option<&'static str>,
+    pub expected_modified: Option<&'static str>,
     pub graph_repository: Option<(&'static str, &'static str)>,
 }
 
@@ -31,6 +32,7 @@ impl Reply {
             gate: None,
             authenticated: false,
             expected_etag: None,
+            expected_modified: None,
             graph_repository: None,
         }
     }
@@ -158,6 +160,10 @@ async fn serve_reply(State(shared): State<Arc<Shared>>, request: Request) -> Res
                 .get(header::IF_NONE_MATCH)
                 .and_then(|v| v.to_str().ok())
                 == expected.expected_etag;
+            let expected_modified = headers
+                .get(header::IF_MODIFIED_SINCE)
+                .and_then(|v| v.to_str().ok())
+                == expected.expected_modified;
             let graph = expected.graph_repository.is_none_or(|(owner, name)| {
                 let Some(body) = &graph_body else {
                     return false;
@@ -172,6 +178,7 @@ async fn serve_reply(State(shared): State<Arc<Shared>>, request: Request) -> Res
             });
             authenticated
                 && expected_tag
+                && expected_modified
                 && graph
                 && headers
                     .get(header::USER_AGENT)
@@ -182,6 +189,12 @@ async fn serve_reply(State(shared): State<Arc<Shared>>, request: Request) -> Res
             "/user" => "/user",
             "/user/repos" => "/user/repos",
             "/graphql" => "/graphql",
+            p if p.starts_with("/repositories/") && p.ends_with("/issues/comments") => {
+                "/repositories/{id}/issues/comments"
+            }
+            p if p.starts_with("/repositories/") && p.ends_with("/issues") => {
+                "/repositories/{id}/issues"
+            }
             p if p.starts_with("/repos/") && p.contains("/issues/") => {
                 "/repos/{owner}/{repo}/issues/{number}"
             }
