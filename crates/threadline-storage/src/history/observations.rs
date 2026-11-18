@@ -217,9 +217,29 @@ pub(super) fn repair_moves(
         };
         for commit in added {
             let c = resources::graph_commit(tx, r, &commit)?.ok_or(Error::Corrupt)?;
-            tx.execute("INSERT INTO activity_events(account_id,event_key,repository_id,item_id,event_kind,revision,occurred_at_ms,observed_at_ms)
+            let event_key = format!("commit:{}:{}", r.0, commit.as_str());
+            let inserted = tx.execute("INSERT INTO activity_events(account_id,event_key,repository_id,item_id,event_kind,revision,occurred_at_ms,observed_at_ms)
                 VALUES(?,?,?,?,'branch_commit_observed',?,?,?) ON CONFLICT(account_id,event_key) DO NOTHING",
-                params![a,format!("commit:{}:{}",r.0,commit.as_str()),r,target,commit.as_str(),c.committed_at_ms,at])?;
+                params![a,event_key,r,target,commit.as_str(),c.committed_at_ms,at])?;
+            if inserted == 1 {
+                use crate::notifications::{self, Category, EventFacts, NotificationTarget};
+                notifications::attach_in(
+                    tx,
+                    a,
+                    &event_key,
+                    &EventFacts {
+                        target: NotificationTarget::Comparison {
+                            reference: key.clone(),
+                            base: CommitOid::parse(&old)?,
+                            head: CommitOid::parse(&new)?,
+                        },
+                        categories: [Category::BranchUpdate].into(),
+                        actor: Default::default(),
+                        involves_me: false,
+                        receipt: None,
+                    },
+                )?;
+            }
         }
     }
     Ok(())

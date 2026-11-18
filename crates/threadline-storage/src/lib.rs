@@ -3,6 +3,7 @@
 mod database;
 pub mod history;
 mod identity;
+pub mod notifications;
 
 pub mod access;
 pub mod fixtures;

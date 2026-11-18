@@ -795,3 +795,78 @@ fn foreground_admission_distinguishes_local_spacing_from_the_persisted_server_fl
         ReadBudget::Granted
     );
 }
+
+#[test]
+fn it_018_unopened_issue_comment_uses_real_feed_and_preserves_comment_off_mention_popup() {
+    use threadline_storage::notifications::*;
+    let dir = tempfile::tempdir().unwrap();
+    let s = Store::open_profile(dir.path()).unwrap();
+    let (a, r) = install(&s);
+    s.update_notification_settings(a, |n| {
+        n.fallback = DeliveryMode::Off;
+        n.categories
+            .insert(Category::DirectMention, DeliveryMode::Popup);
+    })
+    .unwrap();
+    let target = feed(r, ResourceFamily::Comments);
+    s.subscribe_read(a, &target, "activity", ReadPriority::Activity, START)
+        .unwrap();
+    let first = s.claim_sync_read(a, START).unwrap().unwrap();
+    let mut historical = comment(44, 31, 50, 50);
+    historical.comment.body = "@test, old".into();
+    s.commit_observed_page(
+        &first,
+        ObservationPage {
+            comments: vec![historical],
+            ..no_changes()
+        },
+        START + 1,
+        "UTC",
+    )
+    .unwrap();
+    assert_eq!(
+        s.process_notification_events(a, START + 2, "UTC", true, 10)
+            .unwrap(),
+        0
+    );
+    let later = START + 3_600_000;
+    let next = s.claim_sync_read(a, later).unwrap().unwrap();
+    let mut new = comment(44, 32, later - 2, later - 2);
+    new.comment.body = "Follow up @TeSt about this.".into();
+    let mut literal = comment(45, 33, later - 1, later - 1);
+    literal.comment.body = "contact mail@test or `@test`".into();
+    s.commit_observed_page(
+        &next,
+        ObservationPage {
+            comments: vec![new, literal],
+            ..no_changes()
+        },
+        later,
+        "UTC",
+    )
+    .unwrap();
+    assert_eq!(
+        s.process_notification_events(a, later + 1, "UTC", true, 10)
+            .unwrap(),
+        2
+    );
+    let popup = s
+        .claim_notification_popup(a, later + 2, "UTC", true)
+        .unwrap()
+        .unwrap();
+    assert_eq!(popup.event_count, 1);
+    let visible = s.notification_feed(a, None, 10).unwrap();
+    assert_eq!(visible.len(), 1);
+    assert_eq!(visible[0].event_kind, "comment_created");
+    assert_eq!(
+        visible[0].categories,
+        [Category::OrdinaryComment, Category::DirectMention].into()
+    );
+    assert_eq!(
+        visible[0].decision.eligible,
+        [Category::DirectMention].into()
+    );
+    assert!(
+        matches!(&popup.destination.target, NotificationTarget::Item{thread:Some(k),..} if k=="issue-comment:32")
+    );
+}

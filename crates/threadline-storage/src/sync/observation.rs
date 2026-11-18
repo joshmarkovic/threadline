@@ -251,7 +251,46 @@ fn observe_comment(
         updated: c.updated_at_ms,
         state: None,
     };
-    observe_object(tx, claim, &object, Some(baseline), now)?;
+    if let Some((key, action)) = observe_object(tx, claim, &object, Some(baseline), now)? {
+        use crate::notifications::{
+            self, Category, EventActor, EventFacts, NotificationTarget, ReceiptMatch,
+        };
+        let login: String = tx.query_row(
+            "SELECT p.login FROM github_access_profiles p JOIN github_repository_access r
+            USING(account_id,owner_scope) WHERE r.account_id=? AND r.repository_id=?",
+            params![claim.account, repo],
+            |r| r.get(0),
+        )?;
+        let actor:Option<String>=tx.query_row("SELECT author_id FROM write_comment_authors WHERE account_id=? AND item_id=? AND comment_id=?",
+            params![claim.account,item,c.provider_id.to_string()],|r|r.get(0)).optional()?;
+        let mentioned = notifications::mentions_login(&c.body, &login);
+        let mut categories = std::collections::BTreeSet::from([Category::OrdinaryComment]);
+        if mentioned {
+            categories.insert(Category::DirectMention);
+        }
+        notifications::attach_in(
+            tx,
+            claim.account,
+            &key,
+            &EventFacts {
+                target: NotificationTarget::Item {
+                    item,
+                    thread: Some(format!("issue-comment:{}", c.provider_id)),
+                },
+                categories,
+                actor: EventActor {
+                    user_id: actor.and_then(|v| v.parse().ok()),
+                    ..Default::default()
+                },
+                involves_me: mentioned,
+                receipt: Some(ReceiptMatch::Ordinary {
+                    action: action.into(),
+                    remote_id: c.provider_id.to_string(),
+                    revision: c.updated_at_ms.to_string(),
+                }),
+            },
+        )?;
+    }
     Ok(c.updated_at_ms)
 }
 
@@ -270,7 +309,7 @@ fn observe_object(
     o: &Object<'_>,
     baseline: Option<i64>,
     now: i64,
-) -> Result<()> {
+) -> Result<Option<(String, &'static str)>> {
     let id = o.id.to_string();
     let old: Option<(i64, Option<String>)> = tx
         .query_row(
@@ -281,7 +320,7 @@ fn observe_object(
         )
         .optional()?;
     if old.as_ref().is_some_and(|(time, _)| *time >= o.updated) {
-        return Ok(());
+        return Ok(None);
     }
     let action = baseline.and_then(|cutoff| {
         if old.is_none() && o.created.is_some_and(|t| t > cutoff) {
@@ -313,17 +352,21 @@ fn observe_object(
             _ => None,
         }
     });
+    let mut observed = None;
     if let Some((action, time)) = action {
         let key = format!("github:{}:{}:{action}:{time}", o.kind, o.id);
-        tx.execute("INSERT INTO activity_events(account_id,event_key,repository_id,item_id,event_kind,revision,occurred_at_ms,observed_at_ms)
+        let inserted=tx.execute("INSERT INTO activity_events(account_id,event_key,repository_id,item_id,event_kind,revision,occurred_at_ms,observed_at_ms)
             VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(account_id,event_key) DO NOTHING",
             params![claim.account,key,claim.target.repository,o.item,action,o.updated.to_string(),time,now])?;
+        if inserted == 1 {
+            observed = Some((key, action));
+        }
     }
     tx.execute("INSERT INTO feed_object_versions(account_id,repository_id,category,provider_id,updated_at,state)
         VALUES(?1,?2,?3,?4,?5,?6) ON CONFLICT(account_id,repository_id,category,provider_id) DO UPDATE
         SET updated_at=excluded.updated_at,state=COALESCE(excluded.state,feed_object_versions.state)",
         params![claim.account,claim.target.repository,o.kind,id,o.updated,o.state])?;
-    Ok(())
+    Ok(observed)
 }
 
 pub(crate) fn apply_downloaded_comment(
