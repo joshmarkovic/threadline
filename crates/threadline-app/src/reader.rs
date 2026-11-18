@@ -33,7 +33,10 @@ use threadline_storage::{
 use crate::accounts::AccountService;
 use crate::sync_worker::{blocking, hold};
 
-#[derive(Debug)]
+mod pr_reads;
+pub(crate) use pr_reads::PrSourceRequest;
+
+#[derive(Clone, Debug)]
 pub(crate) enum ReaderError {
     Offline,
     ServerBackoff,
@@ -42,10 +45,11 @@ pub(crate) enum ReaderError {
     Cancelled,
     InvalidIdentity,
     IncompleteAccess,
+    SourceUnavailable,
     BadCursor,
     Remote(AccessError),
     Query(SearchQueryError),
-    Storage(threadline_storage::Error),
+    Storage(Arc<threadline_storage::Error>),
     ProtectedStore(PlatformError),
     Image(ImageError),
 }
@@ -68,6 +72,7 @@ impl fmt::Display for ReaderError {
                 f.write_str("The item does not match the selected repository.")
             }
             Self::IncompleteAccess => f.write_str("GitHub withheld some content because of SSO."),
+            Self::SourceUnavailable => f.write_str("This source range cannot be previewed."),
             Self::BadCursor => {
                 f.write_str("The saved page cursor is invalid. Retry to restart the download.")
             }
@@ -95,7 +100,7 @@ impl From<SearchQueryError> for ReaderError {
 
 impl From<threadline_storage::Error> for ReaderError {
     fn from(error: threadline_storage::Error) -> Self {
-        Self::Storage(error)
+        Self::Storage(Arc::new(error))
     }
 }
 
@@ -186,6 +191,7 @@ impl PageStatus {
 pub(crate) struct ReaderService {
     accounts: AccountService,
     store: Arc<Store>,
+    pr_reads: Arc<pr_reads::Flights>,
 }
 
 #[derive(Eq, PartialEq)]
@@ -200,7 +206,11 @@ struct Scope {
 impl ReaderService {
     pub(crate) fn new(accounts: AccountService) -> Self {
         let store = accounts.reader_store();
-        Self { accounts, store }
+        Self {
+            accounts,
+            store,
+            pr_reads: Arc::default(),
+        }
     }
 
     pub(crate) async fn fetch_list_page(

@@ -134,12 +134,26 @@ impl GitHubReader<'_> {
         if thread.known_pull != pull.node_id || thread.known_head != pull.head_oid {
             return Err(AccessError::local(AccessKind::WrongScope));
         }
+        self.resume_pr_thread_replies(snapshot, &thread.node_id, cursor, cancel)
+            .await
+    }
+
+    /// Fulfill the cursor saved for one verified thread, checking the PR binding again in the reply.
+    pub async fn resume_pr_thread_replies(
+        &self,
+        snapshot: &PrSnapshot,
+        thread_node: &str,
+        cursor: &str,
+        cancel: &CancellationToken,
+    ) -> Result<PrGraphPage<PrInlineComment>, AccessError> {
+        let pull = self.require_snapshot(snapshot)?;
+        let thread_node = opaque_id(thread_node.to_owned())?;
         let query = format!("query ThreadlineReplies($id:ID!,$cursor:String) {{ node(id:$id) {{ ... on PullRequestReviewThread {{
             id diffSide pullRequest {{ {PR_IDENTITY} }} comments(first:20,after:$cursor) {{ {COMMENTS} }} }} }} }}");
         let data: GraphData<RepliesData> = self
-            .pr_graph(query, &thread.node_id, Some(cursor), cancel)
+            .pr_graph(query, &thread_node, Some(cursor), cancel)
             .await?;
-        if data.value.id != thread.node_id {
+        if data.value.id != thread_node {
             return Err(identity_mismatch());
         }
         data.value.pull_request.verify(pull, self)?;

@@ -171,6 +171,46 @@ fn reader_reply(
         })
     };
     let success = |data: serde_json::Value| ("200 OK", String::new(), data.to_string());
+    if target == "/repos/fixture-org/private/issues/12" {
+        return Some(success(
+            json!({"id":120,"node_id":"I_12","number":12,"title":"Linked issue","body":"Context fixture",
+            "state":"open","updated_at":TIME,"repository_url":"https://api.github.com/repos/fixture-org/private"}),
+        ));
+    }
+    if target == "/repositories/73/pulls/42" {
+        return Some(success(
+            json!({"id":420,"node_id":"P_42","number":42,"title":"Review fixture","body":"Closes fixture-org/private#12",
+            "state":"open","draft":false,"merged":false,"updated_at":if page_two { NEW_TIME } else { TIME },"changed_files":1,
+            "base":{"sha":"a".repeat(40),"ref":"main","repo":{"id":73,"node_id":"public-repo"}},
+            "head":{"sha":if page_two { "d".repeat(40) } else { "b".repeat(40) },"ref":"topic"}}),
+        ));
+    }
+    if target
+        == format!(
+            "/repositories/73/compare/{}...{}?per_page=20&page=1",
+            "a".repeat(40),
+            "b".repeat(40)
+        )
+    {
+        return Some(success(
+            json!({"base_commit":{"sha":"a".repeat(40)},"merge_base_commit":{"sha":"c".repeat(40)},
+            "total_commits":1,"commits":[{"sha":"b".repeat(40),"commit":{"message":"Fixture change"}}],"files":[{
+                "filename":"src/lib.rs","status":"modified","additions":1,"deletions":1,"patch":"@@ -1 +1 @@\n-before\n+after"}]}),
+        ));
+    }
+    if target
+        == format!(
+            "/repositories/73/contents/src/lib.rs?ref={}",
+            "c".repeat(40)
+        )
+    {
+        return Some(success(
+            json!({"path":"src/lib.rs","sha":"1".repeat(40),"type":"file","size":7,"encoding":"base64","content":"YmVmb3JlCg=="}),
+        ));
+    }
+    if target == "/repos/fixture-org/public/issues/42/comments?per_page=20&page=1" {
+        return Some(success(json!([])));
+    }
     if target.starts_with("/user/repos?") {
         return Some(success(json!([
             serde_json::from_str::<serde_json::Value>(private).unwrap(),
@@ -223,6 +263,214 @@ fn reader_reply(
         _ => return None,
     };
     Some(response)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn pr_service_commits_verified_files_context_and_cross_repository_reference() {
+    use crate::reader::{PrSourceRequest, ReaderError, ReaderService};
+    use threadline_storage::{
+        Change, IssueClassification, IssueRecord, ItemLocator, ItemRepresentation, ItemUpdate,
+        NodeId, UtcMillis,
+        pr::{PrDownloadState, PrFamily, PrInputPage, PrRecord, SourceSide, Verification},
+        resources::{Coverage, WalkMode},
+    };
+
+    let fixture = Simulator::start_with_reader(true);
+    let dir = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open_profile(dir.path()).unwrap());
+    let service = AccountService {
+        store: store.clone(),
+        credentials: Arc::new(FixtureVault::default()),
+        github: GitHubClient::loopback(fixture.address).unwrap(),
+        fixture: true,
+    };
+    let cancel = Cancellation::new();
+    let connected = service
+        .execute(
+            AccountCommand::Connect {
+                repository: "fixture-org/private".into(),
+                pat: Pat::from_input("threadline-test-fixture".into()),
+                renew: None,
+            },
+            &cancel,
+        )
+        .await;
+    assert!(connected.github_error.is_none());
+    let account = connected.view.active.unwrap();
+    let public = connected
+        .view
+        .repositories
+        .iter()
+        .find(|repo| repo.name == "public")
+        .unwrap()
+        .clone();
+    let repository = public.id;
+    let selected = service
+        .execute(
+            AccountCommand::Select {
+                profile: connected.view.profiles[0].clone(),
+                repository: public,
+            },
+            &cancel,
+        )
+        .await;
+    assert!(selected.github_error.is_none());
+    for repo in selected
+        .view
+        .repositories
+        .iter()
+        .filter(|repo| repo.id != repository && repo.selected)
+    {
+        store
+            .select_github_repository(account, repo.id, false)
+            .unwrap();
+    }
+    let pr = store
+        .ingest(
+            account,
+            ItemLocator {
+                repository,
+                number: 42,
+            },
+            ItemUpdate {
+                representation: ItemRepresentation::Issue(IssueRecord {
+                    id: 142.try_into().unwrap(),
+                    node_id: Some(NodeId::new("I_142").unwrap()),
+                    classification: IssueClassification::PullRequest,
+                }),
+                remote_updated_at: UtcMillis(1000),
+                title: Change::Value("Older summary".into()),
+                body: Change::Missing,
+                closed: Change::Value(false),
+            },
+        )
+        .unwrap();
+    let reader = ReaderService::new(service);
+    let left = reader.fetch_pr_family(account, pr, PrFamily::Files, &cancel);
+    let right = reader.fetch_pr_family(account, pr, PrFamily::Files, &cancel);
+    let before = fixture.requests.load(Ordering::Relaxed);
+    let (left, right) = tokio::join!(left, right);
+    assert!(left.unwrap().complete && right.unwrap().complete);
+    assert_eq!(fixture.requests.load(Ordering::Relaxed), before + 4);
+    let (revision, header) = store.current_pr_revision(account, pr).unwrap().unwrap();
+    assert_eq!(header.base_ref.as_deref(), Some("main"));
+    assert_eq!(
+        revision.merge_base.as_ref().unwrap().as_str(),
+        "c".repeat(40)
+    );
+    let file = store.pr_file(&revision, "src/lib.rs").unwrap();
+    assert!(matches!(
+        file,
+        Some(PrRecord::File {
+            additions: Some(1),
+            ..
+        })
+    ));
+
+    let (body_revision, refs) = store.pr_reference_set(account, pr).unwrap().unwrap();
+    reader
+        .verify_pr_reference(account, pr, &body_revision, refs[0].position, &cancel)
+        .await
+        .unwrap();
+    let linked = store
+        .pr_body_references(account, pr)
+        .unwrap()
+        .pop()
+        .unwrap();
+    assert_eq!(linked.verification, Verification::Verified);
+    assert!(linked.verified_item.is_some());
+    assert_eq!(
+        store
+            .github_repository_views(account)
+            .unwrap()
+            .iter()
+            .filter(|repo| repo.selected)
+            .count(),
+        1
+    );
+
+    let request = || PrSourceRequest {
+        revision: &revision,
+        file: "src/lib.rs",
+        side: SourceSide::Left,
+        first_line: 1,
+        lines: 1,
+    };
+    reader
+        .fetch_pr_source(account, pr, request(), &cancel)
+        .await
+        .unwrap();
+    let context = store
+        .pr_page(&revision, PrFamily::Context, None, 10)
+        .unwrap();
+    assert!(matches!(&context.rows[0].1,PrRecord::Context {text,..} if text == "before"));
+
+    for family in [
+        PrFamily::Commits,
+        PrFamily::Reviews,
+        PrFamily::Threads,
+        PrFamily::Checks,
+        PrFamily::Statuses,
+    ] {
+        let progress = store
+            .start_pr_fetch(&revision, family, WalkMode::Full)
+            .unwrap();
+        store
+            .commit_pr_page(
+                &revision,
+                family,
+                &progress,
+                PrInputPage {
+                    records: vec![],
+                    next_cursor: None,
+                    validators: None,
+                    partial: None,
+                    fetched_at_ms: UtcMillis::now().unwrap().0,
+                },
+            )
+            .unwrap();
+    }
+    let mut settings = store.sync_settings(account).unwrap();
+    settings.controls.work_offline = true;
+    store.save_sync_settings(account, &settings).unwrap();
+    let job = store
+        .request_pr_download(&revision, false, false, UtcMillis::now().unwrap().0)
+        .unwrap();
+    assert_eq!(job.state, PrDownloadState::Pending);
+    assert!(matches!(
+        reader
+            .run_pr_download(&revision, job.generation, &cancel)
+            .await,
+        Err(ReaderError::Offline)
+    ));
+    settings.controls.work_offline = false;
+    store.save_sync_settings(account, &settings).unwrap();
+    assert_eq!(
+        reader
+            .run_pr_download(&revision, job.generation, &cancel)
+            .await
+            .unwrap(),
+        PrDownloadState::Complete
+    );
+    assert_eq!(
+        store
+            .pr_page(&revision, PrFamily::Files, None, 10)
+            .unwrap()
+            .state
+            .coverage,
+        Coverage::Complete
+    );
+
+    fixture.page_two_ready.store(true, Ordering::Relaxed);
+    let before = fixture.requests.load(Ordering::Relaxed);
+    assert!(matches!(
+        reader
+            .fetch_pr_source(account, pr, request(), &cancel)
+            .await,
+        Err(ReaderError::ScopeChanged)
+    ));
+    assert_eq!(fixture.requests.load(Ordering::Relaxed), before + 3);
+    assert!(store.pr_file(&revision, "src/lib.rs").unwrap().is_some());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
