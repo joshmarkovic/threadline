@@ -3,6 +3,7 @@ use std::path::PathBuf;
 pub const USAGE: &str =
     "cargo xtask test <unit|integration|ui> [--case ID] [--seed N] [--report-dir DIR]
 cargo xtask test e2e --suite <smoke|full> [--binary PATH] [--case ID] [--seed N] [--report-dir DIR]
+cargo xtask test e2e --suite full --case E2E-014 [--binary PATH] [--artifact PATH] [--seed N] [--report-dir DIR]
 cargo xtask test e2e --suite full --case <E2E-012|E2E-018|E2E-020> --local-fixture TRUSTED_JSON [--report-dir DIR]
 cargo xtask test install --artifact PATH [--local-fixture TRUSTED_JSON] [--case ID] [--report-dir DIR]
 cargo xtask test live --repo OWNER/REPO --case LIVE-001 [--credential-stdin [--allow-existing-cli-oauth]] [--first-issue-pr-page] [--report-dir DIR]
@@ -139,7 +140,7 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
             "--binary" if matches!(lane, Lane::E2e | Lane::Measure) => {
                 options.binary = Some(value.into());
             }
-            "--artifact" if matches!(lane, Lane::Install | Lane::Measure) => {
+            "--artifact" if matches!(lane, Lane::E2e | Lane::Install | Lane::Measure) => {
                 options.artifact = Some(value.into());
             }
             "--local-fixture" if matches!(lane, Lane::Install | Lane::E2e) => {
@@ -162,6 +163,13 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
     }
 
     match lane {
+        Lane::E2e
+            if options.artifact.is_some()
+                && (options.suite.as_deref() != Some("full")
+                    || options.case.as_deref() != Some("E2E-014")) =>
+        {
+            return Err("--artifact for native tests requires --suite full --case E2E-014.".into());
+        }
         Lane::E2e
             if options.local_fixture.is_some()
                 && (!matches!(
@@ -236,7 +244,9 @@ pub fn report_arguments(args: &[String]) -> Vec<String> {
                     "--binary" if matches!(lane, Some(Lane::E2e | Lane::Measure)) => {
                         public_path(value, "<binary-path>")
                     }
-                    "--artifact" if matches!(lane, Some(Lane::Install | Lane::Measure)) => {
+                    "--artifact"
+                        if matches!(lane, Some(Lane::E2e | Lane::Install | Lane::Measure)) =>
+                    {
                         public_path(value, "<artifact-path>")
                     }
                     "--local-fixture" if matches!(lane, Some(Lane::Install | Lane::E2e)) => {
@@ -425,6 +435,42 @@ mod tests {
         assert_eq!(options.case.as_deref(), Some("UT-021"));
         assert_eq!(options.seed, 27);
         assert_eq!(options.report_dir, Some("output".into()));
+    }
+
+    #[test]
+    fn native_artifact_is_only_for_the_full_large_workspace_case() {
+        let input = |suite, case, artifact| {
+            arguments(&[
+                "test",
+                "e2e",
+                "--artifact",
+                artifact,
+                "--case",
+                case,
+                "--suite",
+                suite,
+            ])
+        };
+        let named = input("full", "E2E-014", "docs/architecture/windows-budgets.json");
+        assert_eq!(
+            parse(&named).unwrap().artifact.unwrap(),
+            PathBuf::from(&named[3])
+        );
+        assert_eq!(report_arguments(&named), named);
+        for (suite, case) in [("full", "E2E-015"), ("smoke", "E2E-014")] {
+            let invalid = input(suite, case, "private-fixtures/unnamed-test.zip");
+            assert!(parse(&invalid).is_err());
+            assert_eq!(report_arguments(&invalid)[3], "<artifact-path>");
+        }
+        let aggregate = arguments(&[
+            "test",
+            "e2e",
+            "--suite",
+            "full",
+            "--artifact",
+            "threadline.exe",
+        ]);
+        assert!(parse(&aggregate).is_err());
     }
 
     #[test]
