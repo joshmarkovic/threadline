@@ -123,3 +123,9 @@ mkdir -p artifacts
 THREADLINE_PROBE_COMMIT=$(git rev-parse HEAD) xcrun swift tools/native/macos-window-probe.swift \
   target/debug/threadline artifacts/macos-window-probe.json
 ```
+
+### Installed runtime inventory
+
+Run `cargo xtask test e2e --suite full --case E2E-020 --local-fixture <configuration.json>` in a test-owned Windows account with the local package installed and the default Threadline Data directory absent. Build the ordinary app without the E2E feature. Build the separate `notification_fixture` storage example for Windows. Supply their independently recorded SHA-256 values with the same `app_sha256`, `fixture_tool` and `fixture_sha256` keys as the installed activity cases.
+
+Add a `runtime_inventory` object with `app_source_revision` (full app build commit), `dependency_tree` (path relative to the configuration) and `dependency_sha256` (digest of those exact bytes). Produce the inventory from that app checkout with `cargo tree --locked -p threadline-app --target x86_64-pc-windows-msvc --edges normal --prefix none`. Use UTF-8 or plain ASCII. The runner checks its digest, parses regular and delayed imports from the installed executable, and records browser matches. The desktop driver opens an offline Markdown attachment, chooses a cached PR file and switches the native diff to split mode. It samples the installed process and its current descendants at three points. Only browser matches, counts and the exact tested artifact identities enter the receipt. The local test package has a separate identity from a published release.

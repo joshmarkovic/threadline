@@ -15,6 +15,7 @@ use threadline_storage::{
 };
 
 const MARKER: &str = "threadline-s11-installed-fixture-v1";
+const RUNTIME_MARKER: &str = "threadline-s12-installed-runtime-v1";
 const DRAFT: &str = "threadline-s11-draft";
 const DRAFT_BODY: &str = "Unsubmitted local fixture draft";
 const OWNER: &str = "threadline-activity-fixture";
@@ -30,7 +31,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err("Supply an existing absolute fixture directory.".into());
     }
     let result = match mode.to_str() {
-        Some("seed") => seed(root)?,
+        Some("seed") => seed(root, false)?,
+        Some("seed-runtime") => seed(root, true)?,
+        Some("inspect-runtime") => inspect_runtime(root)?,
         Some("inspect") => inspect(root)?,
         _ => return Err("Unknown activity fixture command.".into()),
     };
@@ -47,6 +50,7 @@ fn issue(
     account: AccountId,
     repository: RepositoryId,
     value: u64,
+    body: String,
 ) -> threadline_storage::Result<ItemId> {
     db.ingest(
         account,
@@ -62,21 +66,22 @@ fn issue(
             }),
             remote_updated_at: UtcMillis(10),
             title: Change::Value(format!("Activity fixture issue {value}")),
-            body: Change::Value(format!("Downloaded activity fixture issue {value}.")),
+            body: Change::Value(body),
             closed: Change::Value(false),
         },
     )
 }
 
-fn seed(root: &Path) -> Result<Value, Box<dyn Error>> {
+fn seed(root: &Path, runtime: bool) -> Result<Value, Box<dyn Error>> {
     if fs::read_dir(root)?.next().is_some() {
         return Err("The activity fixture requires an empty directory.".into());
     }
+    let marker_id = if runtime { RUNTIME_MARKER } else { MARKER };
     let mut marker = fs::OpenOptions::new()
         .create_new(true)
         .write(true)
-        .open(root.join(MARKER))?;
-    marker.write_all(MARKER.as_bytes())?;
+        .open(root.join(marker_id))?;
+    marker.write_all(marker_id.as_bytes())?;
     marker.sync_all()?;
     let store = Store::open_profile(root)?;
     let account = store.ensure_account("github.com", 817_123_456)?;
@@ -119,9 +124,26 @@ fn seed(root: &Path) -> Result<Value, Box<dyn Error>> {
     store.update_sync_settings(account, |s| {
         s.controls.pause_background = true;
         s.controls.pause_queued_actions = true;
+        s.controls.work_offline = runtime;
     })?;
-    let original = issue(&store, account, repo, 41)?;
-    let destination = issue(&store, account, repo, 42)?;
+    if runtime {
+        seed_runtime(&store, account, repo)?;
+        return inspect_runtime(root);
+    }
+    let original = issue(
+        &store,
+        account,
+        repo,
+        41,
+        "Downloaded activity fixture issue 41.".into(),
+    )?;
+    let destination = issue(
+        &store,
+        account,
+        repo,
+        42,
+        "Downloaded activity fixture issue 42.".into(),
+    )?;
     store.create_draft(
         account,
         DRAFT,
@@ -235,5 +257,116 @@ fn inspect(root: &Path) -> Result<Value, Box<dyn Error>> {
         "selected_issue":number,"draft_preserved":preserved,
         "draft_tab_preserved": layout.panes.iter().flat_map(|p| &p.tabs).any(|t|t.id=="5b86b9f9-747b-4af3-abae-8a752f9c5af1"),
         "source_events":COUNT}),
+    )
+}
+
+fn seed_runtime(
+    store: &Store,
+    account: AccountId,
+    repository: RepositoryId,
+) -> Result<(), Box<dyn Error>> {
+    use threadline_storage::pr::{PatchEvidence, PrFamily, PrHeader, PrInputPage, PrRecord};
+    use threadline_storage::resources::{CommitOid, WalkMode};
+
+    let issue = issue(store, account, repository, 41,
+        "## Offline Markdown\n\n**Native attachment**\n\n![Synthetic offline image](https://github.com/user-attachments/assets/threadline-runtime-fixture)".into())?;
+    let pr = store.ingest(
+        account,
+        ItemLocator {
+            repository,
+            number: 70,
+        },
+        ItemUpdate {
+            representation: ItemRepresentation::Issue(IssueRecord {
+                id: IssueApiId::new(number(8_070)),
+                node_id: None,
+                classification: IssueClassification::PullRequest,
+            }),
+            remote_updated_at: UtcMillis(12),
+            title: Change::Value("Runtime fixture pull".into()),
+            body: Change::Value("## Native patch comparison".into()),
+            closed: Change::Value(false),
+        },
+    )?;
+    let base = CommitOid::parse(&"a".repeat(40))?;
+    let head = CommitOid::parse(&"b".repeat(40))?;
+    let revision = store.record_pr_revision(
+        account,
+        pr,
+        &base,
+        &head,
+        Some(&base),
+        &PrHeader::default(),
+        12,
+    )?;
+    let walk = store.start_pr_fetch(&revision, PrFamily::Files, WalkMode::Full)?;
+    let files = ["first.txt", "second.txt"]
+        .into_iter()
+        .map(|path| PrRecord::File {
+            path: path.into(),
+            previous_path: None,
+            status: "modified".into(),
+            additions: Some(1),
+            deletions: Some(1),
+            patch: PatchEvidence::Text("@@ -1 +1 @@\n-old fixture line\n+new fixture line".into()),
+        })
+        .collect();
+    store.commit_pr_page(
+        &revision,
+        PrFamily::Files,
+        &walk,
+        PrInputPage {
+            records: files,
+            next_cursor: None,
+            partial: None,
+            validators: None,
+            fetched_at_ms: 13,
+        },
+    )?;
+    let tabs = [
+        ("4136d749-6aae-4481-8cec-60e7968ed541", issue),
+        ("4136d749-6aae-4481-8cec-60e7968ed570", pr),
+    ]
+    .into_iter()
+    .map(|(id, item)| Tab {
+        id: id.into(),
+        item,
+        view: TabView::default(),
+    })
+    .collect();
+    store.save_workspace(
+        account,
+        &Workspace {
+            focused_pane: 0,
+            proportions: vec![1.0],
+            panes: vec![Pane {
+                active: Some(0),
+                tabs,
+            }],
+        },
+    )?;
+    Ok(())
+}
+
+fn inspect_runtime(root: &Path) -> Result<Value, Box<dyn Error>> {
+    if fs::read(root.join(RUNTIME_MARKER))? != RUNTIME_MARKER.as_bytes() {
+        return Err("The runtime fixture ownership marker did not match.".into());
+    }
+    let connection = Connection::open_with_flags(
+        root.join("threadline.sqlite3"),
+        OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
+    connection.busy_timeout(std::time::Duration::from_secs(3))?;
+    let (raw, offline): (String,bool) = connection.query_row(
+        "SELECT w.layout, d.offline FROM workspaces w JOIN dispatch_profiles d ON d.account_id=w.account_id
+         JOIN github_access_profiles p ON p.account_id=w.account_id WHERE p.owner_scope=?",
+        [OWNER], |r| Ok((r.get(0)?,r.get(1)?)),
+    )?;
+    let layout: Workspace = serde_json::from_str(&raw)?;
+    let pane = layout.panes.first().ok_or("Missing fixture pane")?;
+    let pr = pane.tabs.get(1).and_then(|t| t.view.pr_reader.as_ref());
+    Ok(
+        json!({"fixture":RUNTIME_MARKER,"offline":offline,"tabs":pane.tabs.len(),"active":pane.active,
+        "path":pr.and_then(|v|v.selected_path.as_deref()),"mode":pr.map(|v|v.diff_mode)}),
     )
 }

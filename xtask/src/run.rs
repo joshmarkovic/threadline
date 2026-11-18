@@ -583,7 +583,7 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
     let full = options.suite.as_deref() == Some("full");
     match options.case.as_deref() {
         Some("E2E-001") => {}
-        Some(id @ ("E2E-012" | "E2E-018")) => {
+        Some(id @ ("E2E-012" | "E2E-018" | "E2E-020")) => {
             return vec![crate::activity::run(id, options, root, dir)];
         }
         Some(id) => {
@@ -624,6 +624,7 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
         for (id, name) in [
             ("E2E-012", "windows-activity-cold"),
             ("E2E-018", "windows-activity-fallback"),
+            ("E2E-020", "windows-installed-runtime"),
         ] {
             let subdir = dir.join(name);
             let mut result = match fs::create_dir(&subdir) {

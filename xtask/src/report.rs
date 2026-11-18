@@ -337,7 +337,10 @@ pub fn unix_timestamp_ms() -> u128 {
 }
 
 pub fn sha256(path: &Path) -> io::Result<String> {
-    let mut file = File::open(path)?;
+    sha256_reader(File::open(path)?)
+}
+
+pub fn sha256_reader(mut file: impl Read) -> io::Result<String> {
     let mut digest = Sha256::new();
     let mut bytes = [0; 32768];
     loop {

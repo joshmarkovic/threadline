@@ -16,6 +16,9 @@ pub fn scenario_ids() -> impl Iterator<Item = &'static str> {
 }
 
 pub fn fixture_revision(case: &str) -> Option<&'static str> {
+    if case == "E2E-020" {
+        return Some("threadline-s12-installed-runtime-v1");
+    }
     if matches!(case, "UT-019" | "IT-021") {
         return Some("s12-release-bootstrap-v1");
     }

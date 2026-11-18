@@ -10,7 +10,7 @@ use std::{
     process::Command,
 };
 
-const RECEIPT: &str = "installed-activity.json";
+mod runtime;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -18,6 +18,7 @@ struct Fixture {
     app_sha256: String,
     fixture_tool: PathBuf,
     fixture_sha256: String,
+    runtime_inventory: Option<runtime::Configuration>,
 }
 
 fn digest(value: &str) -> bool {
@@ -25,6 +26,9 @@ fn digest(value: &str) -> bool {
 }
 
 fn corroborates(id: &str, receipt: &Value) -> bool {
+    if id == "E2E-020" {
+        return runtime::corroborates(receipt);
+    }
     let last = receipt["actions"]
         .as_array()
         .and_then(|actions| actions.last());
@@ -120,6 +124,31 @@ pub fn run(id: &str, options: &Options, root: &Path, dir: &Path) -> CaseResult {
         return blocked("Inbox Windows PowerShell is unavailable.");
     };
     let mut command = Command::new(shell);
+    let (script, receipt_name) = if id == "E2E-020" {
+        let Some(inventory) = fixture.runtime_inventory.as_ref() else {
+            return blocked(
+                "Supply the matching release source and the pinned Windows dependency inventory in runtime_inventory.",
+            );
+        };
+        match runtime::inventory(
+            &exe,
+            &base.join(&inventory.dependency_tree),
+            inventory,
+            &fixture.app_sha256,
+            dir,
+        ) {
+            Ok(true) => (),
+            Ok(false) => {
+                return failed(
+                    "A browser runtime was present in the installed PE or its Windows dependency inventory. See runtime-build.json.",
+                );
+            }
+            Err(message) => return failed(message),
+        }
+        ("test-installed-runtime.ps1", "installed-runtime.json")
+    } else {
+        ("test-installed-activity.ps1", "installed-activity.json")
+    };
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt as _;
@@ -128,7 +157,7 @@ pub fn run(id: &str, options: &Options, root: &Path, dir: &Path) -> CaseResult {
     let child = command
         .env_remove("PSModulePath")
         .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-STA", "-File"])
-        .arg(root.join("tools/windows/test-installed-activity.ps1"))
+        .arg(root.join("tools/windows").join(script))
         .arg("-Case")
         .arg(id)
         .arg("-AppSha256")
@@ -143,7 +172,7 @@ pub fn run(id: &str, options: &Options, root: &Path, dir: &Path) -> CaseResult {
     let Ok(child) = child else {
         return blocked("Could not start the installed Windows activity test.");
     };
-    let receipt: Option<Value> = fs::read(dir.join(RECEIPT)).ok().and_then(|bytes| {
+    let receipt: Option<Value> = fs::read(dir.join(receipt_name)).ok().and_then(|bytes| {
         serde_json::from_slice(bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(&bytes)).ok()
     });
     let valid = receipt.as_ref().is_some_and(|r| {
@@ -159,7 +188,7 @@ pub fn run(id: &str, options: &Options, root: &Path, dir: &Path) -> CaseResult {
         Some(0) if valid => CaseResult::new(
             id,
             Status::Pass,
-            "The installed Windows activity case completed with matching native and durable-state evidence.",
+            "The installed Windows case completed with matching native and durable-state evidence.",
         ),
         Some(78)
             if receipt
@@ -173,7 +202,7 @@ pub fn run(id: &str, options: &Options, root: &Path, dir: &Path) -> CaseResult {
         _ => failed("The installed Windows activity case did not produce its required evidence."),
     };
     result.child_exit_code = child.status.code();
-    result.evidence = receipt.is_some().then(|| RECEIPT.into());
+    result.evidence = receipt.is_some().then(|| receipt_name.into());
     result
 }
 
