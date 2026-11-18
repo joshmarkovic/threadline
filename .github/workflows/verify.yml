@@ -123,6 +123,12 @@ jobs:
       - name: Drive the separate native application process
         if: ${{ !cancelled() }}
         run: cargo xtask test e2e --suite smoke
+      - name: Drive the isolated GitHub access journey
+        if: ${{ !cancelled() }}
+        run: cargo xtask test e2e --suite full --case E2E-002 --binary target/release/threadline.exe --report-dir artifacts/github-access
+      - name: Exercise the real Windows protected store
+        if: ${{ !cancelled() }}
+        run: cargo xtask test integration --case IT-020 --report-dir artifacts/github-access
       - name: Stage the compiled Windows desktop test build
         if: ${{ !cancelled() }}
         shell: pwsh
@@ -139,6 +145,7 @@ jobs:
             'tools/native/windows-smoke.ps1'
             'tools/native/ThreadlineWinInput.cs'
             'tools/native/windows-app-toast.ps1'
+            'tools/native/windows-github-access.ps1'
             'tools/native/windows-notification-focus.ps1'
             'tools/native/ThreadlineToastShortcut.cs'
             'docs/architecture/windows-budgets.json'

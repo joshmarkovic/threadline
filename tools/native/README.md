@@ -32,6 +32,10 @@ The smoke test checks the actual clipboard, pointer-driven splitters, draft inpu
 
 `S01-WINDOWS-TOAST` uses a unique Start Menu shortcut and COM registration under the current user. It submits a fixture from the running app, opens Windows Notification Center, activates the matching action in the signed shell, and verifies that one COM activation opens PR #72 in the original process. The case checks removal of its notification history, shortcut, and COM entry before reporting Pass in `toast-native.json`. The Windows full suite includes this case and the separate legacy shell case. Smoke does not create the toast fixture. Run `--case S01-WINDOWS-TOAST` when you need just the registered path.
 
+`cargo xtask test e2e --suite full --case E2E-002` uses Windows input against a fixture account and a temporary loopback GitHub API. It checks partial discovery, SSO, denied and revoked access, and the saved repository selection after restart. The account test uses a synthetic credential in memory. The endpoint trace includes only route labels, status codes and authorization matches.
+
+`cargo xtask test integration --case IT-020` exercises Windows Credential Manager and the native application paths separately. It uses fresh fixture entries, verifies the renewed value from a second process and checks removal.
+
 When source and a test-build executable are already local to Windows, use the direct driver. Supply a new evidence directory for each invocation. Use a disposable profile or provide the driver a test-owned temporary directory. The canonical Rust command automatically removes the temporary profiles it creates.
 
 ```powershell

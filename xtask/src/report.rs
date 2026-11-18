@@ -163,7 +163,7 @@ impl Report {
             cargo_lock_sha256: sha256(&root.join("Cargo.lock")).ok(),
             package_version,
             package_version_source,
-            fixture_revision: include_str!("../../fixtures/revision.txt").trim_ascii(),
+            fixture_revision: "not-applicable",
             status: Status::Fail,
             cases: Vec::new(),
             started_at_unix_ms: command.started_at_unix_ms,
@@ -175,6 +175,7 @@ impl Report {
 
     pub fn finish(mut self, dir: &Path) -> io::Result<Status> {
         self.status = combined_status(&self.cases);
+        self.fixture_revision = report_fixture_revision(&self.cases);
         self.exit_code = self.status.exit_code();
         self.finished_at_unix_ms = Some(unix_timestamp_ms());
         let report_path = dir.join("result.json");
@@ -228,6 +229,15 @@ impl Report {
         }
         xml.push_str("</testsuite>\n");
         xml
+    }
+}
+
+fn report_fixture_revision(cases: &[CaseResult]) -> &'static str {
+    let mut revisions = cases.iter().filter_map(|case| case.fixture_revision);
+    match revisions.next() {
+        Some(first) if revisions.all(|revision| revision == first) => first,
+        Some(_) => "mixed",
+        None => "not-applicable",
     }
 }
 
@@ -353,6 +363,22 @@ fn combined_status(cases: &[CaseResult]) -> Status {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reports_the_selected_fixture_or_a_mixed_lane() {
+        let native = CaseResult::new("E2E-002", Status::Pass, "synthetic account");
+        let live = CaseResult::new("LIVE-001", Status::Blocked, "PAT unavailable");
+        assert_eq!(
+            report_fixture_revision(std::slice::from_ref(&native)),
+            "s03-github-access-v1"
+        );
+        assert_eq!(
+            report_fixture_revision(std::slice::from_ref(&live)),
+            "s03-live-read-allowlist-v1"
+        );
+        assert_eq!(report_fixture_revision(&[native, live]), "mixed");
+        assert_eq!(report_fixture_revision(&[]), "not-applicable");
+    }
 
     #[test]
     fn empty_blocked_and_failed_runs_cannot_pass() {

@@ -16,6 +16,25 @@ pub fn scenario_ids() -> impl Iterator<Item = &'static str> {
 }
 
 pub fn fixture_revision(case: &str) -> Option<&'static str> {
+    if case == "LIVE-001" {
+        return Some("s03-live-read-allowlist-v1");
+    }
+    if case.starts_with("S01-") || matches!(case, "UT-021" | "E2E-001") {
+        return Some(include_str!("../../fixtures/revision.txt").trim_ascii());
+    }
+    if matches!(
+        case,
+        "UT-010"
+            | "UT-020"
+            | "IT-004"
+            | "IT-005"
+            | "IT-020"
+            | "E2E-002"
+            | "S03-ACCOUNT-PROFILES"
+            | "S03-ACCESS-STORAGE"
+    ) {
+        return Some(include_str!("../../fixtures/github-access-revision.txt").trim_ascii());
+    }
     matches!(
         case,
         "UT-001"
@@ -26,6 +45,7 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
             | "IT-002"
             | "S02-RESOURCE-CONTRACTS"
             | "S02-DURABILITY"
+            | "S02-DISK-FULL"
             | "S02-FIXTURES"
     )
     .then(|| include_str!("../../fixtures/storage-revision.txt").trim_ascii())
@@ -51,6 +71,12 @@ pub fn associations(case: &str) -> Associations {
             "AC-10;AC-68;AC-73;AC-74;AC-92",
         ),
         "S02-FIXTURES" => ("TEST-02;TEST-03;TEST-05", "AC-35;AC-90"),
+        "S02-DISK-FULL" => ("OUTBOX-01;OUTBOX-10;TEST-03;TEST-05", "AC-58;AC-92"),
+        "S03-ACCOUNT-PROFILES" => (
+            "AUTH-04;AUTH-05;AUTH-06;AUTH-11;TEST-03",
+            "AC-01;AC-02;AC-03;AC-90",
+        ),
+        "S03-ACCESS-STORAGE" => ("AUTH-06;AUTH-11;CACHE-08;OUTBOX-09;TEST-03", "AC-67;AC-90"),
         _ => catalog_associations(case).unwrap_or_default(),
     };
     Associations {

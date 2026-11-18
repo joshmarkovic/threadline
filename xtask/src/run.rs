@@ -8,6 +8,7 @@ use std::{
 use serde_json::{Value, json};
 
 use crate::{
+    access_fixture::AccessFixture,
     cli::{Lane, Options, catalog_cases, public_path},
     report::{CaseResult, Status, sha256},
 };
@@ -46,6 +47,14 @@ const UNIT: &[CargoTest] = &[
         id: "UT-009",
         arguments: &["-p", "threadline-storage", "--lib", "ut_009"],
     },
+    CargoTest {
+        id: "UT-010",
+        arguments: &["-p", "threadline-core", "--lib", "ut_010"],
+    },
+    CargoTest {
+        id: "UT-020",
+        arguments: &["-p", "threadline-core", "--lib", "ut_020"],
+    },
 ];
 const INTEGRATION: &[CargoTest] = &[
     CargoTest {
@@ -79,18 +88,66 @@ const INTEGRATION: &[CargoTest] = &[
         arguments: &["-p", "threadline-storage", "--test", "durability"],
     },
     CargoTest {
+        id: "S02-DISK-FULL",
+        arguments: &[
+            "-p",
+            "threadline-storage",
+            "--lib",
+            "disk_full_rolls_back_enqueue_and_keeps_the_saved_editor",
+        ],
+    },
+    CargoTest {
         id: "S02-FIXTURES",
         arguments: &["-p", "threadline-storage", "--test", "fixtures"],
+    },
+    CargoTest {
+        id: "IT-004",
+        arguments: &["-p", "threadline-core", "--test", "github_access", "it_004"],
+    },
+    CargoTest {
+        id: "IT-005",
+        arguments: &["-p", "threadline-core", "--test", "github_access", "it_005"],
+    },
+    CargoTest {
+        id: "S03-ACCOUNT-PROFILES",
+        arguments: &["-p", "threadline-app", "--lib", "accounts::tests::"],
+    },
+    CargoTest {
+        id: "S03-ACCESS-STORAGE",
+        arguments: &["-p", "threadline-storage", "--test", "access"],
     },
 ];
 const UI: &[CargoTest] = &[CargoTest {
     id: "S01-GPUI",
     arguments: &["-p", "threadline-app", "--test", "feasibility_ui"],
 }];
+const WINDOWS_CREDENTIALS: CargoTest = CargoTest {
+    id: "IT-020",
+    arguments: &[
+        "-p",
+        "threadline-platform",
+        "--lib",
+        "credentials::windows::tests::native_synthetic_protected_store_round_trip",
+        "--",
+        "--ignored",
+        "--exact",
+    ],
+};
 
 pub fn execute(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
     match options.lane {
         Lane::Unit => run_cargo_tests(UNIT, options, root, dir),
+        Lane::Integration if options.case.as_deref() == Some("IT-020") => {
+            vec![if cfg!(windows) {
+                run_cargo_test(&WINDOWS_CREDENTIALS, options.seed, root, dir)
+            } else {
+                CaseResult::new(
+                    "IT-020",
+                    Status::Blocked,
+                    "The native protected-store fixture requires Windows.",
+                )
+            }]
+        }
         Lane::Integration => run_cargo_tests(INTEGRATION, options, root, dir),
         Lane::Ui => run_cargo_tests(UI, options, root, dir),
         Lane::E2e => run_e2e(options, root, dir),
@@ -117,6 +174,11 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
             "S01-WINDOWS-TOAST",
             NativeMode::WindowsToast,
             "windows-toast",
+        ),
+        (
+            "E2E-002",
+            NativeMode::WindowsGitHubAccess,
+            "windows-github-access",
         ),
     ];
     let full = options.suite.as_deref() == Some("full");
@@ -189,13 +251,17 @@ fn cargo(root: &Path) -> Command {
 }
 
 fn run_cargo_test(test: &CargoTest, seed: u64, root: &Path, dir: &Path) -> CaseResult {
-    let output = match cargo(root)
+    let mut command = cargo(root);
+    command
         .args(["test", "--locked"])
         .args(test.arguments)
         .env("CARGO_TERM_COLOR", "never")
         .env("THREADLINE_TEST_SEED", seed.to_string())
-        .output()
-    {
+        .env_remove("THREADLINE_HTTP_TRACE_DIR");
+    if matches!(test.id, "IT-004" | "IT-005") {
+        command.env("THREADLINE_HTTP_TRACE_DIR", dir);
+    }
+    let output = match command.output() {
         Ok(output) => output,
         Err(error) => return CaseResult::new(test.id, Status::Blocked, error.to_string()),
     };
@@ -263,6 +329,7 @@ enum NativeMode {
     Measure,
     WindowsShell,
     WindowsToast,
+    WindowsGitHubAccess,
 }
 
 fn run_native(
@@ -317,6 +384,13 @@ fn native_driver(
         .prefix("threadline-e2e-")
         .tempdir()
         .map_err(|error| NativeError::Blocked(error.to_string()))?;
+    let access_fixture = if mode == NativeMode::WindowsGitHubAccess {
+        Some(AccessFixture::start(isolated.path()).map_err(|_| {
+            NativeError::Blocked("The isolated loopback server could not bind.".into())
+        })?)
+    } else {
+        None
+    };
     let mut driver = if os == "windows" {
         let mut cmd = Command::new("powershell.exe");
         #[cfg(windows)]
@@ -356,6 +430,13 @@ fn native_driver(
         if mode == NativeMode::WindowsToast {
             cmd.arg("-ToastProof");
         }
+        if let Some(fixture) = &access_fixture {
+            cmd.arg("-AccessProof")
+                .arg("-AccessAddress")
+                .arg(fixture.address().to_string())
+                .arg("-AccessPhaseFile")
+                .arg(fixture.phase_file());
+        }
         cmd
     } else {
         let mut cmd = Command::new("bash");
@@ -370,6 +451,12 @@ fn native_driver(
     let output = driver.output().map_err(|error| {
         NativeError::Blocked(format!("Cannot start {os} native driver: {error}"))
     })?;
+    if mode == NativeMode::WindowsGitHubAccess && access_output_disclosed_credential(dir, &output)?
+    {
+        return Err(NativeError::Failed(
+            "The access fixture credential entered routine diagnostics.".into(),
+        ));
+    }
     let log = save_output(dir, "native-driver", &output)
         .map_err(|error| NativeError::Failed(error.to_string()))?;
     let driver_report = match mode {
@@ -377,6 +464,7 @@ fn native_driver(
         NativeMode::Measure => "measurements.json",
         NativeMode::WindowsShell => "platform-native.json",
         NativeMode::WindowsToast => "toast-native.json",
+        NativeMode::WindowsGitHubAccess => "github-access-native.json",
     };
     let details = fs::read(dir.join(driver_report))
         .ok()
@@ -405,7 +493,34 @@ fn native_driver(
     } else {
         log
     });
+    if let Some(fixture) = access_fixture
+        && fixture.finish(dir, status == Status::Pass).is_err()
+    {
+        result.status = Status::Fail;
+        result.detail = "Could not verify the isolated GitHub access trace.".into();
+    }
     Ok(result)
+}
+
+fn access_output_disclosed_credential(dir: &Path, output: &Output) -> Result<bool, NativeError> {
+    let has_credential = crate::access_fixture::contains_fixture_credential;
+    let mut leaked = has_credential(&output.stdout) || has_credential(&output.stderr);
+    for name in [
+        "github-access-native.json",
+        "ui-observation.json",
+        "github-access-restart-observation.json",
+    ] {
+        let path = dir.join(name);
+        if let Ok(bytes) = fs::read(&path)
+            && has_credential(&bytes)
+        {
+            leaked = true;
+            fs::remove_file(path).map_err(|_| {
+                NativeError::Failed("Could not remove an unsafe test observation.".into())
+            })?;
+        }
+    }
+    Ok(leaked)
 }
 
 fn executable(options: &Options, root: &Path, dir: &Path) -> Result<PathBuf, NativeError> {

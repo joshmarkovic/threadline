@@ -1,3 +1,4 @@
+mod access_fixture;
 mod catalog;
 mod cli;
 mod live;

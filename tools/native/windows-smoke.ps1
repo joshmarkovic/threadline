@@ -7,6 +7,9 @@ param(
     [switch]$Measure,
     [switch]$PlatformProof,
     [switch]$ToastProof,
+    [switch]$AccessProof,
+    [string]$AccessAddress,
+    [string]$AccessPhaseFile,
     [switch]$ManualTrayClick,
     [switch]$ManualNotificationClick,
     [string]$Artifact,
@@ -22,6 +25,8 @@ $reportName = if ($Measure) {
     'platform-native.json'
 } elseif ($ToastProof) {
     'toast-native.json'
+} elseif ($AccessProof) {
+    'github-access-native.json'
 } else {
     'native.json'
 }
@@ -172,8 +177,12 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     $info.EnvironmentVariables['THREADLINE_PROFILE_DIR'] = $Profile
     $info.EnvironmentVariables['THREADLINE_TEST_SEED'] = $Seed.ToString([Globalization.CultureInfo]::InvariantCulture)
     $info.EnvironmentVariables.Remove('THREADLINE_TEST_TOAST_TOKEN')
+    $info.EnvironmentVariables.Remove('THREADLINE_E2E_GITHUB_ADDR')
     if ($ToastProof -and $null -ne $script:toastFixture) {
         $info.EnvironmentVariables['THREADLINE_TEST_TOAST_TOKEN'] = $script:toastFixture.Token
+    }
+    if ($AccessProof) {
+        $info.EnvironmentVariables['THREADLINE_E2E_GITHUB_ADDR'] = $script:AccessAddress
     }
     return [Diagnostics.Process]::Start($info)
 }
@@ -824,6 +833,16 @@ try {
     if (!$ProfileDir) {
         $ProfileDir = Join-Path ([IO.Path]::GetTempPath()) ('threadline-e2e-' + [guid]::NewGuid().ToString('N'))
     }
+    if ($AccessProof) {
+        $fixtureAddress = [regex]::Match($AccessAddress, '^127\.0\.0\.1:([1-9][0-9]{0,4})$')
+        if ($Measure -or $PlatformProof -or $ToastProof -or
+            !$fixtureAddress.Success -or [int]$fixtureAddress.Groups[1].Value -gt 65535 -or !$AccessPhaseFile -or
+            [IO.Path]::GetFullPath($AccessPhaseFile) -ine [IO.Path]::GetFullPath((Join-Path $ProfileDir 'access-fixture-phase.txt')) -or
+            !(Test-Path -LiteralPath $AccessPhaseFile -PathType Leaf)) {
+            throw 'Use the canonical runner with an isolated loopback GitHub fixture.'
+        }
+        . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
+    }
     $firstProfile = Join-Path $ProfileDir ('initial-' + [guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $firstProfile -Force
     if ($ToastProof) {
@@ -856,6 +875,9 @@ try {
     } elseif ($PlatformProof) {
         Invoke-PlatformProof $window
         $report.detail = 'Observed native tray behavior, shell notification delivery and notification click into the existing process.'
+    } elseif ($AccessProof) {
+        Invoke-GitHubAccessProof $window $firstProfile
+        $report.detail = 'Native account controls verified the synthetic GitHub access and SSO journey and restored repository selection after restart.'
     } else {
         try {
             $clipboardBackup = [Windows.Forms.Clipboard]::GetDataObject()
@@ -887,10 +909,14 @@ try {
     }
     $report.status = 'Pass'
 } catch {
+    if ($AccessProof -and $app -and !$app.HasExited -and
+        $_.Exception.InnerException -is [ThreadlineWinInput+TargetUnavailableException]) {
+        $blocked = $true
+    }
     $report.status = if ($blocked) { 'Blocked' } else { 'Fail' }
     $report.detail = $_.Exception.Message
-    $report.driver_location = $_.InvocationInfo.PositionMessage
-    if (!$ToastProof -and $app -and !$app.HasExited -and $app.MainWindowHandle -ne [IntPtr]::Zero) {
+    $report.driver_location = if ($AccessProof) { $_.InvocationInfo.ScriptLineNumber } else { $_.InvocationInfo.PositionMessage }
+    if (!$ToastProof -and !$AccessProof -and $app -and !$app.HasExited -and $app.MainWindowHandle -ne [IntPtr]::Zero) {
         try {
             if ([ThreadlineWinInput]::GetForegroundWindow() -eq $app.MainWindowHandle) {
                 Crop-Screenshot $app.MainWindowHandle 'failure.png'
