@@ -4,7 +4,7 @@ pub const USAGE: &str =
     "cargo xtask test <unit|integration|ui> [--case ID] [--seed N] [--report-dir DIR]
 cargo xtask test e2e --suite <smoke|full> [--binary PATH] [--case ID] [--seed N] [--report-dir DIR]
 cargo xtask test install --artifact PATH [--case ID] [--report-dir DIR]
-cargo xtask test live --repo OWNER/REPO [--allow-live-writes] [--case ID] [--report-dir DIR]
+cargo xtask test live --repo OWNER/REPO --case LIVE-001 [--credential-stdin [--allow-existing-cli-oauth]] [--report-dir DIR]
 cargo xtask measure windows [--binary PATH] [--artifact PATH] [--seed N] [--report-dir DIR]";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -42,6 +42,8 @@ pub struct Options {
     pub artifact: Option<PathBuf>,
     pub repo: Option<String>,
     pub allow_live_writes: bool,
+    pub credential_stdin: bool,
+    pub allow_existing_cli_oauth: bool,
     pub suite: Option<String>,
 }
 
@@ -73,12 +75,14 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
         artifact: None,
         repo: None,
         allow_live_writes: false,
+        credential_stdin: false,
+        allow_existing_cli_oauth: false,
         suite: None,
     };
     let mut seen = std::collections::HashSet::new();
     let mut remaining = args[2..].iter();
     while let Some(flag) = remaining.next() {
-        if !is_value_option(flag) && flag != "--allow-live-writes" {
+        if !is_value_option(flag) && !is_switch(flag) {
             return Err("Unknown runner option.".into());
         }
         if !seen.insert(flag.as_str()) {
@@ -89,6 +93,20 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
                 return Err("--allow-live-writes is available only for live tests.".into());
             }
             options.allow_live_writes = true;
+            continue;
+        }
+        if flag == "--credential-stdin" {
+            if lane != Lane::Live {
+                return Err("--credential-stdin is available only for live tests.".into());
+            }
+            options.credential_stdin = true;
+            continue;
+        }
+        if flag == "--allow-existing-cli-oauth" {
+            if lane != Lane::Live {
+                return Err("--allow-existing-cli-oauth is available only for live tests.".into());
+            }
+            options.allow_existing_cli_oauth = true;
             continue;
         }
         let value = remaining
@@ -155,7 +173,7 @@ pub fn report_arguments(args: &[String]) -> Vec<String> {
     }
     let mut remaining = args.iter().skip(2).peekable();
     while let Some(option) = remaining.next() {
-        if option == "--allow-live-writes" {
+        if is_switch(option) {
             public.push(option);
         } else if is_value_option(option) {
             public.push(option);
@@ -235,6 +253,13 @@ fn is_value_option(option: &str) -> bool {
     matches!(
         option,
         "--case" | "--seed" | "--report-dir" | "--binary" | "--artifact" | "--repo" | "--suite"
+    )
+}
+
+fn is_switch(option: &str) -> bool {
+    matches!(
+        option,
+        "--allow-live-writes" | "--credential-stdin" | "--allow-existing-cli-oauth"
     )
 }
 

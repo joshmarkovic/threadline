@@ -1,5 +1,6 @@
 mod catalog;
 mod cli;
+mod live;
 mod report;
 mod run;
 

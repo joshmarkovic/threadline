@@ -102,7 +102,7 @@ pub fn execute(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
             dir,
         )],
         Lane::Install => run_install(options, dir),
-        Lane::Live => run_live(options),
+        Lane::Live => vec![crate::live::run(options, root, dir)],
     }
 }
 
@@ -558,57 +558,6 @@ fn blocked_install_case(id: &str) -> CaseResult {
     result
 }
 
-fn live_authorization(
-    options: &Options,
-    read_repo: Option<&str>,
-    write_repo: Option<&str>,
-    profile: Option<&str>,
-) -> Result<(), &'static str> {
-    let Some(repository) = options.repo.as_deref() else {
-        return Err("An explicit repository is required.");
-    };
-    let mutation_selected = options.case.as_deref().is_some_and(|id| id != "LIVE-001");
-    if mutation_selected && !options.allow_live_writes {
-        return Err(
-            "The selected mutation requires dedicated authorization and --allow-live-writes.",
-        );
-    }
-    if read_repo != Some(repository) || profile.is_none_or(str::is_empty) {
-        return Err(
-            "An explicitly configured authorized repository and credential profile are required.",
-        );
-    }
-    if options.allow_live_writes && write_repo != Some(repository) {
-        return Err(
-            "Writes require an explicitly authorized disposable repository matching --repo.",
-        );
-    }
-    Ok(())
-}
-
-fn run_live(options: &Options) -> Vec<CaseResult> {
-    let read_repo = std::env::var("THREADLINE_LIVE_READ_REPO").ok();
-    let write_repo = std::env::var("THREADLINE_LIVE_WRITE_REPO").ok();
-    let profile = std::env::var("THREADLINE_LIVE_PROFILE").ok();
-    let detail = live_authorization(
-        options,
-        read_repo.as_deref(),
-        write_repo.as_deref(),
-        profile.as_deref(),
-    )
-    .err()
-    .unwrap_or("No live provider cases are implemented in Sprint 01. No credentials or GitHub endpoints were accessed.");
-    let cases: Vec<&str> = match options.case.as_deref() {
-        Some(id) => vec![id],
-        None if options.allow_live_writes => catalog_cases(Lane::Live).collect(),
-        None => vec!["LIVE-001"],
-    };
-    cases
-        .into_iter()
-        .map(|id| CaseResult::new(id, Status::Blocked, detail))
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -701,21 +650,5 @@ mod tests {
         assert_eq!(outcomes[0].case, "S01-WINDOWS-TOAST");
         assert_eq!(outcomes[0].status, Status::Blocked);
         assert!(outcomes[0].evidence.is_none());
-    }
-
-    #[test]
-    fn writes_need_more_than_the_flag_and_do_not_match_arbitrary_repositories() {
-        let options = crate::cli::parse(&[
-            "test".into(),
-            "live".into(),
-            "--repo".into(),
-            "test-organization/disposable".into(),
-            "--allow-live-writes".into(),
-        ])
-        .unwrap();
-        let repo = options.repo.as_deref();
-        assert!(live_authorization(&options, None, None, None).is_err());
-        assert!(live_authorization(&options, repo, Some("someone/else"), Some("profile")).is_err());
-        assert!(live_authorization(&options, repo, repo, Some("profile")).is_ok());
     }
 }
