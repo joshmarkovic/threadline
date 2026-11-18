@@ -185,6 +185,7 @@ pub struct Workspace {
     notification_com_activations: u32,
     activations: u32,
     focused: Pane,
+    shell_focus: FocusHandle,
     focus: [FocusHandle; 2],
     divider_focus: [FocusHandle; 2],
     selected_tab: [usize; 2],
@@ -222,6 +223,7 @@ impl Workspace {
         feasibility_fixture: bool,
     ) -> Self {
         let focus = [cx.focus_handle(), cx.focus_handle()];
+        let shell_focus = cx.focus_handle();
         let inputs = std::array::from_fn(|_| {
             std::array::from_fn(|_| {
                 cx.new(|cx| InputState::new(window, cx).placeholder("Write a local draft…"))
@@ -279,7 +281,11 @@ impl Workspace {
                 cx.notify();
             }));
         }
-        let initial_focus = focus[focused.index()].clone();
+        let initial_focus = if feasibility_fixture {
+            focus[focused.index()].clone()
+        } else {
+            shell_focus.clone()
+        };
         window.defer(cx, move |window, cx| initial_focus.focus(window, cx));
         let reviews = std::array::from_fn(|index| {
             let diff = cx.new(|cx| DiffState::new([], cx).with_context_lines(None));
@@ -311,6 +317,7 @@ impl Workspace {
             notification_com_activations: 0,
             activations: 0,
             focused,
+            shell_focus,
             focus,
             divider_focus: [cx.focus_handle(), cx.focus_handle()],
             selected_tab: [0, 0],
@@ -379,8 +386,10 @@ impl Workspace {
                 .filter(|reader| reader.read(cx).has_account())
             {
                 reader.read(cx).focus_active(window);
-            } else {
+            } else if self.feasibility_fixture {
                 self.focus[self.focused.index()].focus(window, cx);
+            } else {
+                self.shell_focus.focus(window, cx);
             }
         }
         cx.notify();
@@ -1254,6 +1263,8 @@ impl gpui_kit::Render for Workspace {
         }
         let window_content = div()
             .id("threadline")
+            .track_focus(&self.shell_focus)
+            .tab_stop(!self.feasibility_fixture)
             .key_context(if self.feasibility_fixture {
                 "Threadline ThreadlineFixture"
             } else {
@@ -1586,3 +1597,7 @@ fn history(palette: Palette) -> impl IntoElement {
                 })),
         )
 }
+
+#[cfg(all(test, feature = "e2e"))]
+#[path = "workspace_focus_tests.rs"]
+mod focus_tests;
