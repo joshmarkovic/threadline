@@ -8,6 +8,7 @@ mod observation;
 mod palette;
 mod pane_content;
 mod reader;
+mod reader_workspace;
 mod workspace;
 
 #[cfg(windows)]
@@ -32,6 +33,7 @@ pub struct Options {
     pub e2e_report: Option<PathBuf>,
     pub profile: Option<PathBuf>,
     pub measure: bool,
+    pub feasibility_fixture: bool,
 }
 
 struct ProfileStore(Arc<Store>);
@@ -106,6 +108,14 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
     if options.e2e_report.is_some() && options.profile.is_none() {
         return Err("Native test reports require an isolated profile directory".into());
     }
+    if options.feasibility_fixture
+        && (!cfg!(feature = "e2e") || options.e2e_report.is_none() || options.profile.is_none())
+    {
+        return Err(
+            "The Sprint 01 fixture requires an instrumented app and an isolated native report"
+                .into(),
+        );
+    }
     let activation = if options.open_review {
         Activation::OpenReview
     } else {
@@ -129,8 +139,10 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
     let startup_error = storage.as_ref().err().cloned();
     let seed = options.seed;
     let large = options.measure;
+    let feasibility_fixture = options.feasibility_fixture;
     let open_review = options.open_review;
-    let patches = runtime.spawn_blocking(move || fixtures::patches(seed, large));
+    let patches =
+        feasibility_fixture.then(|| runtime.spawn_blocking(move || fixtures::patches(seed, large)));
     let handle = runtime.handle().clone();
     #[cfg(feature = "e2e")]
     let (observer, report_writer) = options
@@ -145,6 +157,7 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
             cx.set_quit_mode(QuitMode::LastWindowClosed);
             gpui_kit::init(cx);
             bind_shortcuts(cx);
+            reader_workspace::bind_shortcuts(cx);
             cx.activate(true);
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
@@ -172,21 +185,24 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
             }
             if let Err(error) = gpui_kit::open_window(options, cx, |window, cx| {
                 cx.new(|cx| {
-                    let mut workspace = Workspace::new(window, cx, seed, handle, open_review);
+                    let mut workspace =
+                        Workspace::new(window, cx, seed, handle, open_review, feasibility_fixture);
                     #[cfg(feature = "e2e")]
                     {
                         workspace.observer = observer;
                     }
                     workspace.connect_platform(controls, events, window, cx);
-                    cx.spawn_in(window, async move |view, cx| match patches.await {
-                        Ok(patches) => {
-                            let _ = view.update(cx, |view, cx| view.load_patch(patches, cx));
-                        }
-                        Err(error) => {
-                            eprintln!("Could not prepare the native diff: {error}");
-                        }
-                    })
-                    .detach();
+                    if let Some(patches) = patches {
+                        cx.spawn_in(window, async move |view, cx| match patches.await {
+                            Ok(patches) => {
+                                let _ = view.update(cx, |view, cx| view.load_patch(patches, cx));
+                            }
+                            Err(error) => {
+                                eprintln!("Could not prepare the native diff: {error}");
+                            }
+                        })
+                        .detach();
+                    }
                     workspace
                 })
             }) {

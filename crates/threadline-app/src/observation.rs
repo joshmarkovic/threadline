@@ -80,6 +80,8 @@ pub(crate) struct Snapshot {
     pub activations: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub account_access: Option<crate::account_panel::AccountObservation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cached_reader: Option<crate::reader_workspace::ReaderObservation>,
 }
 
 #[derive(Serialize)]

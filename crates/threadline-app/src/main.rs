@@ -5,7 +5,18 @@ use std::time::Instant;
 
 use threadline_app::Options;
 
+#[cfg(feature = "e2e")]
+mod reader_fixture;
+
 fn main() {
+    #[cfg(feature = "e2e")]
+    if let Some(result) = reader_fixture::run() {
+        if let Err(error) = result {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     #[cfg(windows)]
     if threadline_app::handle_notification_command() {
         return;
@@ -44,6 +55,7 @@ fn parse_args() -> Result<Options, String> {
                 options.e2e_report = Some(path);
             }
             Some("--measure") if cfg!(feature = "e2e") => options.measure = true,
+            Some("--fixture-s01") if cfg!(feature = "e2e") => options.feasibility_fixture = true,
             _ => return Err(format!("Unknown argument: {}", argument.to_string_lossy())),
         }
     }

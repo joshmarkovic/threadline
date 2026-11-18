@@ -41,6 +41,7 @@ pub(crate) struct AccountPanel {
     renew: Option<AccessProfile>,
     view: AccountView,
     busy: bool,
+    loaded: bool,
     message: Option<&'static str>,
     github_error: Option<AccessError>,
     reachability: Reachability,
@@ -50,6 +51,12 @@ pub(crate) struct AccountPanel {
 }
 
 impl AccountPanel {
+    pub(crate) fn local_reader_state(
+        &self,
+    ) -> (&AccountView, Option<&AccessProfile>, Reachability) {
+        (&self.view, self.current_profile(), self.reachability)
+    }
+
     pub(crate) fn new(
         service: AccountService,
         runtime: tokio::runtime::Handle,
@@ -66,6 +73,7 @@ impl AccountPanel {
             renew: None,
             view: AccountView::default(),
             busy: false,
+            loaded: false,
             message: None,
             github_error: None,
             reachability: Reachability::NotAttempted,
@@ -79,6 +87,10 @@ impl AccountPanel {
 
     pub(crate) fn focus_form(&self, window: &mut Window, cx: &mut App) {
         self.route.focus_handle(cx).focus(window, cx);
+    }
+
+    pub(crate) fn loaded(&self) -> bool {
+        self.loaded
     }
 
     pub(crate) fn clear_token(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -148,6 +160,7 @@ impl AccountPanel {
             let result = work.await;
             let _ = panel.update(cx, |panel, cx| {
                 panel.busy = false;
+                panel.loaded = true;
                 panel.cancel = Cancellation::new();
                 match result {
                     Ok(AccountReply {
@@ -204,7 +217,7 @@ impl AccountPanel {
             .find(|profile| Some(profile.account) == self.view.active)
     }
 
-    fn refresh(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn refresh(&mut self, cx: &mut Context<Self>) {
         let Some(profile) = self.current_profile().cloned() else {
             return;
         };

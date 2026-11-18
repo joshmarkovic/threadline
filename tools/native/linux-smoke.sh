@@ -144,7 +144,7 @@ launch() {
     local profile=$1
     mkdir -p "$profile"
     env -u WAYLAND_DISPLAY THREADLINE_PROFILE_DIR="$profile" THREADLINE_TEST_SEED="$seed" \
-        "$binary" --e2e-report "$observation" > "$report_dir/app-$2.log" 2>&1 &
+        "$binary" --fixture-s01 --e2e-report "$observation" > "$report_dir/app-$2.log" 2>&1 &
     pid=$!
     window=''
     wait_for 'fixture and real X11 window' 20 window_ready || fail 'The application did not present a real X11 window.'

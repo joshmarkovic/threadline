@@ -30,7 +30,7 @@ fn open(
         };
         gpui_kit::open_window(options, cx, |window, cx| {
             cx.new(|cx| {
-                let mut workspace = Workspace::new(window, cx, 42, runtime.handle().clone(), false);
+                let mut workspace = Workspace::new(window, cx, 42, runtime.handle().clone(), false,true);
                 workspace.load_patch(
                     [
                         DiffFile::parse(

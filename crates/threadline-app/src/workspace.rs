@@ -30,6 +30,7 @@ use crate::{
     account_panel::AccountPanel,
     accounts::AccountService,
     fixtures::{HISTORY, LINKED_BODIES, PR_BODIES, PRIMARY_PR, SECONDARY_PR},
+    reader_workspace::{ReaderAccount, ReaderWorkspace},
 };
 
 const GUTTER: f32 = 8.;
@@ -45,6 +46,7 @@ actions!(
         CycleTab,
         ToggleContext,
         ToggleAccounts,
+        CheckAccountAccess,
         GrowLeft,
         ShrinkLeft,
         GrowContext,
@@ -60,6 +62,9 @@ actions!(threadline, [SendTestNotification]);
 pub fn bind_shortcuts(cx: &mut App) {
     let context =
         Rc::new(KeyBindingContextPredicate::parse("Threadline").expect("valid workspace context"));
+    let demo = Rc::new(
+        KeyBindingContextPredicate::parse("ThreadlineFixture").expect("valid fixture context"),
+    );
     let shortcuts: [(&str, Box<dyn Action>); 12] = [
         ("secondary-1", Box::new(FocusLeft)),
         ("secondary-2", Box::new(FocusRight)),
@@ -77,7 +82,11 @@ pub fn bind_shortcuts(cx: &mut App) {
     let bindings: Vec<_> = shortcuts
         .into_iter()
         .map(|(keys, action)| {
-            KeyBinding::load(keys, action, Some(Rc::clone(&context)), false, None, cx)
+            let predicate = match keys {
+                "secondary-shift-a" | "secondary-q" => context.clone(),
+                _ => demo.clone(),
+            };
+            KeyBinding::load(keys, action, Some(predicate), false, None, cx)
                 .expect("valid workspace shortcut")
         })
         .collect();
@@ -87,7 +96,7 @@ pub fn bind_shortcuts(cx: &mut App) {
         let notification_test = KeyBinding::load(
             "ctrl-shift-f9",
             Box::new(SendTestNotification),
-            Some(context),
+            Some(demo),
             false,
             None,
             cx,
@@ -165,7 +174,9 @@ pub struct Workspace {
     seed: u64,
     runtime: tokio::runtime::Handle,
     accounts: Option<Entity<AccountPanel>>,
+    reader: Option<Entity<ReaderWorkspace>>,
     accounts_open: bool,
+    feasibility_fixture: bool,
     platform: Option<PlatformControls>,
     tray_enabled: bool,
     platform_status: Option<String>,
@@ -196,6 +207,7 @@ impl Workspace {
         seed: u64,
         runtime: tokio::runtime::Handle,
         open_review: bool,
+        feasibility_fixture: bool,
     ) -> Self {
         let focus = [cx.focus_handle(), cx.focus_handle()];
         let inputs = std::array::from_fn(|_| {
@@ -221,15 +233,38 @@ impl Workspace {
             }));
         }
         let focused = if open_review { Pane::Right } else { Pane::Left };
-        let accounts = crate::profile_store(cx)
-            .and_then(AccountService::new)
+        let store = crate::profile_store(cx);
+        let account_service = store.clone().and_then(AccountService::new);
+        let reader = store.as_ref().map(|store| {
+            let service = account_service
+                .clone()
+                .map(crate::reader::ReaderService::new);
+            cx.new(|cx| ReaderWorkspace::new(store.clone(), runtime.clone(), service, window, cx))
+        });
+        let accounts = account_service
             .map(|service| cx.new(|cx| AccountPanel::new(service, runtime.clone(), window, cx)));
         #[cfg(feature = "e2e")]
-        if let Some(panel) = accounts.as_ref() {
-            subscriptions.push(cx.observe(panel, |this, _, cx| {
-                if this.observer.is_some() {
+        if let Some(reader) = reader.as_ref() {
+            subscriptions.push(cx.observe(reader, |workspace, _, cx| {
+                if workspace.observer.is_some() {
                     cx.notify();
                 }
+            }));
+        }
+        if let Some(panel) = accounts.as_ref() {
+            subscriptions.push(cx.observe_in(panel, window, |this, panel, window, cx| {
+                if let Some(reader) = &this.reader {
+                    let (view, profile, reachability) = panel.read(cx).local_reader_state();
+                    let state = ReaderAccount {
+                        account: view.active,
+                        offline: view.offline,
+                        repositories: view.repositories.clone(),
+                        profile: profile.cloned(),
+                        reachability,
+                    };
+                    reader.update(cx, |reader, cx| reader.set_account(state, window, cx));
+                }
+                cx.notify();
             }));
         }
         let initial_focus = focus[focused.index()].clone();
@@ -253,7 +288,9 @@ impl Workspace {
             seed,
             runtime,
             accounts,
+            reader,
             accounts_open: false,
+            feasibility_fixture,
             platform: None,
             tray_enabled: false,
             platform_status: None,
@@ -287,10 +324,35 @@ impl Workspace {
     }
 
     fn toggle_accounts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.accounts_open
+            && let Some(reader) = self
+                .reader
+                .as_ref()
+                .filter(|reader| reader.read(cx).has_account())
+        {
+            let this = cx.weak_entity();
+            reader.update(cx, |reader, cx| {
+                reader.request_departure(
+                    false,
+                    move |window, cx| {
+                        let _ = this.update(cx, |workspace, cx| {
+                            workspace.set_accounts_open(true, window, cx)
+                        });
+                    },
+                    window,
+                    cx,
+                )
+            });
+            return;
+        }
+        self.set_accounts_open(!self.accounts_open, window, cx);
+    }
+
+    fn set_accounts_open(&mut self, open: bool, window: &mut Window, cx: &mut Context<Self>) {
         let Some(panel) = self.accounts.as_ref() else {
             return;
         };
-        self.accounts_open = !self.accounts_open;
+        self.accounts_open = open;
         if self.accounts_open {
             panel.update(cx, |this, cx| {
                 #[cfg(feature = "e2e")]
@@ -299,9 +361,31 @@ impl Workspace {
             });
         } else {
             panel.update(cx, |panel, cx| panel.clear_token(window, cx));
-            self.focus[self.focused.index()].focus(window, cx);
+            if let Some(reader) = self
+                .reader
+                .as_ref()
+                .filter(|reader| reader.read(cx).has_account())
+            {
+                reader.read(cx).focus_active(window);
+            } else {
+                self.focus[self.focused.index()].focus(window, cx);
+            }
         }
         cx.notify();
+    }
+
+    fn request_quit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(reader) = self
+            .reader
+            .as_ref()
+            .filter(|reader| reader.read(cx).has_account())
+        {
+            reader.update(cx, |reader, cx| {
+                reader.request_departure(true, |_, cx| cx.quit(), window, cx)
+            });
+        } else {
+            cx.quit();
+        }
     }
 
     pub fn connect_platform(
@@ -314,11 +398,20 @@ impl Workspace {
         self.platform = Some(controls);
         let view = cx.weak_entity();
         window.on_window_should_close(cx, move |window, cx| {
-            if view
-                .upgrade()
-                .is_some_and(|view| view.read(cx).tray_enabled)
-            {
+            let Some(view) = view.upgrade() else {
+                return true;
+            };
+            if view.read(cx).tray_enabled {
                 window.minimize_window();
+                return false;
+            }
+            if view
+                .read(cx)
+                .reader
+                .as_ref()
+                .is_some_and(|reader| reader.read(cx).has_account())
+            {
+                view.update(cx, |workspace, cx| workspace.request_quit(window, cx));
                 return false;
             }
             true
@@ -368,7 +461,7 @@ impl Workspace {
                 self.platform_status = Some("Submitted the test notification to Windows.".into());
             }
             PlatformEvent::NotificationComActivated => self.notification_com_activations += 1,
-            PlatformEvent::Quit => cx.quit(),
+            PlatformEvent::Quit => self.request_quit(window, cx),
             PlatformEvent::Wake | PlatformEvent::NetworkChanged => return,
             PlatformEvent::Error(error) => self.platform_status = Some(error.to_string()),
         }
@@ -566,7 +659,54 @@ impl Workspace {
         }
     }
 
-    fn toolbar(&self, palette: Palette, cx: &mut Context<Self>) -> impl IntoElement {
+    fn toolbar(&self, palette: Palette, cached: bool, cx: &mut Context<Self>) -> AnyElement {
+        if cached {
+            let (name, label) = if self.accounts_open {
+                ("account-close", "Close accounts")
+            } else {
+                ("account-open", "Accounts")
+            };
+            let connection = self
+                .reader
+                .as_ref()
+                .filter(|reader| reader.read(cx).has_account())
+                .map(|reader| reader.read(cx).connection_label());
+            return div()
+                .flex()
+                .items_center()
+                .justify_between()
+                .px_4()
+                .h(px(54.))
+                .flex_shrink_0()
+                .border_b_1()
+                .border_color(palette.border)
+                .bg(palette.panel)
+                .child(div().text_lg().child("Threadline"))
+                .children(connection.map(|(label, color)| {
+                    div()
+                        .id("reader-toolbar-status")
+                        .role(Role::Status)
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .child(div().size(px(9.)).rounded_full().bg(color))
+                        .child(label)
+                }))
+                .child(
+                    div()
+                        .relative()
+                        .child(button(name, label).accessibility_id(name).on_click(
+                            cx.listener(|this, _, window, cx| this.toggle_accounts(window, cx)),
+                        ))
+                        .children(self.observed_bounds(name)),
+                )
+                .child(
+                    button("quit", "Quit")
+                        .accessibility_id("quit")
+                        .on_click(cx.listener(|this, _, window, cx| this.request_quit(window, cx))),
+                )
+                .into_any_element();
+        }
         let capabilities = self.platform.as_ref().map(PlatformControls::capabilities);
         let can_notify = capabilities
             .as_ref()
@@ -686,12 +826,11 @@ impl Workspace {
                             )
                             .children(self.observed_bounds("tray-toggle")),
                     )
-                    .child(
-                        button("quit", "Quit")
-                            .accessibility_id("quit")
-                            .on_click(|_, _, cx| cx.quit()),
-                    ),
+                    .child(button("quit", "Quit").accessibility_id("quit").on_click(
+                        cx.listener(|this, _, window, cx| this.request_quit(window, cx)),
+                    )),
             )
+            .into_any_element()
     }
 
     fn status_bar(&self, palette: Palette) -> impl IntoElement {
@@ -1090,6 +1229,12 @@ impl Workspace {
 impl gpui_kit::Render for Workspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let palette = Palette::current(cx);
+        let cached_reader = self
+            .reader
+            .as_ref()
+            .filter(|reader| reader.read(cx).has_account())
+            .cloned();
+        let cached = cached_reader.is_some();
         let compact = window.viewport_size().width.as_f32() < COMPACT_REVIEW_WIDTH;
         #[cfg(feature = "e2e")]
         if let Some(observer) = &self.observer {
@@ -1097,7 +1242,11 @@ impl gpui_kit::Render for Workspace {
         }
         let window_content = div()
             .id("threadline")
-            .key_context("Threadline")
+            .key_context(if self.feasibility_fixture {
+                "Threadline ThreadlineFixture"
+            } else {
+                "Threadline"
+            })
             .size_full()
             .min_w_0()
             .min_h_0()
@@ -1140,6 +1289,11 @@ impl gpui_kit::Render for Workspace {
                     this.toggle_accounts(window, cx)
                 }),
             )
+            .on_action(cx.listener(|this, _: &CheckAccountAccess, _, cx| {
+                if let Some(panel) = this.accounts.as_ref() {
+                    panel.update(cx, |panel, cx| panel.refresh(cx));
+                }
+            }))
             .on_action(
                 cx.listener(|this, _: &ShrinkLeft, _, cx| {
                     this.nudge(Divider::Workspace, -0.03, cx)
@@ -1159,7 +1313,7 @@ impl gpui_kit::Render for Workspace {
             .on_action(
                 cx.listener(|this, _: &LoadPreview, window, cx| this.request_preview(window, cx)),
             )
-            .on_action(cx.listener(|_, _: &Quit, _, cx| cx.quit()))
+            .on_action(cx.listener(|this, _: &Quit, window, cx| this.request_quit(window, cx)))
             .on_mouse_move(
                 cx.listener(|this, event: &gpui_kit::MouseMoveEvent, _, cx| {
                     if event.pressed_button == Some(MouseButton::Left) {
@@ -1187,29 +1341,71 @@ impl gpui_kit::Render for Workspace {
             .when_some(self.observer.as_ref(), |content, observer| {
                 content.child(observer.scroll_input())
             });
+        let loading = self
+            .accounts
+            .as_ref()
+            .is_some_and(|panel| !panel.read(cx).loaded());
         let window_content = window_content
-            .child(self.toolbar(palette, cx))
+            .child(self.toolbar(palette, !self.feasibility_fixture, cx))
             .when(self.accounts_open, |content| {
                 content.child(div().flex_1().min_h_0().children(self.accounts.clone()))
             })
-            .when(!self.accounts_open, |content| {
-                content.child(
-                    div()
-                        .flex_1()
-                        .flex()
-                        .min_h_0()
-                        .min_w_0()
-                        .p(px(WORKSPACE_INSET))
-                        .child(self.pane(Pane::Left, compact, palette, cx))
-                        .child(self.divider(Divider::Workspace, palette, cx))
-                        .child(self.pane(Pane::Right, compact, palette, cx)),
-                )
+            .when(!self.accounts_open && cached, |content| {
+                content.child(div().flex_1().min_h_0().min_w_0().children(cached_reader))
             })
-            .child(self.status_bar(palette));
+            .when(
+                !self.accounts_open && !cached && self.feasibility_fixture,
+                |content| {
+                    content.child(
+                        div()
+                            .flex_1()
+                            .flex()
+                            .min_h_0()
+                            .min_w_0()
+                            .p(px(WORKSPACE_INSET))
+                            .child(self.pane(Pane::Left, compact, palette, cx))
+                            .child(self.divider(Divider::Workspace, palette, cx))
+                            .child(self.pane(Pane::Right, compact, palette, cx)),
+                    )
+                },
+            )
+            .when(
+                !self.accounts_open && !cached && !self.feasibility_fixture,
+                |content| {
+                    content.child(
+                        div()
+                            .id("reader-welcome")
+                            .role(Role::Status)
+                            .flex_1()
+                            .min_h_0()
+                            .flex()
+                            .flex_col()
+                            .items_center()
+                            .justify_center()
+                            .gap_3()
+                            .child(div().text_lg().child(if loading {
+                                "Opening local profile…"
+                            } else {
+                                "Connect your GitHub account"
+                            }))
+                            .children((!loading && self.accounts.is_some()).then(|| {
+                                button("reader-connect-account", "Open accounts")
+                                    .accessibility_id("reader-connect-account")
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.set_accounts_open(true, window, cx)
+                                    }))
+                            })),
+                    )
+                },
+            )
+            .when(self.feasibility_fixture, |content| {
+                content.child(self.status_bar(palette))
+            });
         #[cfg(feature = "e2e")]
         let window_content =
             window_content.when_some(self.observer.clone(), |content, observer| {
-                let discussion = (self.selected_tab[0] == 0).then(|| self.discussion.clone());
+                let discussion = (self.feasibility_fixture && self.selected_tab[0] == 0)
+                    .then(|| self.discussion.clone());
                 content.child(observer.frame_report(self.snapshot(cx), discussion))
             });
         window_content
@@ -1221,7 +1417,13 @@ impl Workspace {
     fn snapshot(&self, cx: &App) -> Snapshot {
         let tab = &self.reviews[self.selected_tab[1]];
         Snapshot {
-            ready: self.diff_loaded,
+            ready: if self.feasibility_fixture {
+                self.diff_loaded
+            } else {
+                self.accounts
+                    .as_ref()
+                    .is_some_and(|panel| panel.read(cx).loaded())
+            },
             seed: self.seed,
             fixture_revision: crate::fixtures::REVISION,
             focused_pane: if self.focused == Pane::Left {
@@ -1255,6 +1457,15 @@ impl Workspace {
                 .accounts
                 .as_ref()
                 .and_then(|panel| panel.read(cx).observation(self.accounts_open)),
+            cached_reader: self
+                .accounts
+                .as_ref()
+                .and_then(|panel| panel.read(cx).observation(self.accounts_open))
+                .and_then(|_| {
+                    self.reader
+                        .as_ref()
+                        .map(|reader| reader.read(cx).observation(cx))
+                }),
         }
     }
 }
