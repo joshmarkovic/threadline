@@ -1788,6 +1788,7 @@ fn rail(
         .small()
         .w_full()
         .accessibility_id(id)
+        .accessibility_label(description.clone())
         .tooltip(description.clone())
         .on_click(listener)
         .child(
@@ -1802,6 +1803,8 @@ fn rail(
                     let number = count.to_string();
                     let size = (13. + number.len() as f32 * 7.).max(23.);
                     div()
+                        .id(format!("{id}-badge"))
+                        .test_support()
                         .size(px(size))
                         .rounded_full()
                         .flex_shrink_0()

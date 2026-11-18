@@ -575,6 +575,9 @@ impl ReaderWorkspace {
             editor.capture(cx);
         }
         if self.pending_draft.is_some()
+            || tab_ids
+                .iter()
+                .any(|id| self.merge_views.get(id).is_some_and(|merge| merge.busy))
             || self.drafts.values().any(|editor| {
                 tab_ids.contains(&editor.tab_id) && (!editor.saved() || editor.submitting)
             })

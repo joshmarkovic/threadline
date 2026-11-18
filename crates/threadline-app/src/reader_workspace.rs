@@ -22,6 +22,7 @@ use threadline_storage::{
 
 mod drafts;
 mod media;
+mod merge_view;
 mod outbox;
 mod pr;
 mod pr_view;
@@ -122,6 +123,7 @@ pub(crate) struct ReaderWorkspace {
     downloads: HashMap<ItemId, Cancellation>,
     pr_reads: std::collections::HashSet<pr_view::PrReadKey>,
     pr_resume_attempts: std::collections::HashSet<(i64, i64)>,
+    merge_views: HashMap<String, merge_view::MergeView>,
     account: Option<AccountId>,
     login: String,
     actor: Option<std::num::NonZeroU64>,
@@ -384,6 +386,7 @@ impl ReaderWorkspace {
             downloads: HashMap::new(),
             pr_reads: std::collections::HashSet::new(),
             pr_resume_attempts: std::collections::HashSet::new(),
+            merge_views: HashMap::new(),
             account: None,
             login: String::new(),
             actor: None,
@@ -561,6 +564,7 @@ impl ReaderWorkspace {
             self.images.clear();
             self.downloads.clear();
             self.pr_reads.clear();
+            self.merge_views.clear();
             self.release_drafts();
             self.review_editors.clear();
             self.review_pending.clear();
@@ -670,6 +674,7 @@ impl ReaderWorkspace {
             || self.layout_busy
             || self.pending_draft.is_some()
             || !self.review_pending.is_empty()
+            || self.merge_views.values().any(|merge| merge.busy)
         {
             return;
         }
@@ -1185,6 +1190,12 @@ impl ReaderWorkspace {
                             .collect::<Vec<_>>();
                         this.layout = layout;
                         this.tab_views.retain(|id, _| {
+                            this.layout
+                                .panes
+                                .iter()
+                                .any(|pane| pane.tabs.iter().any(|tab| tab.id == *id))
+                        });
+                        this.merge_views.retain(|id, _| {
                             this.layout
                                 .panes
                                 .iter()

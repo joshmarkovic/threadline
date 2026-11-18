@@ -105,6 +105,15 @@ pub struct CachedMergePolicy {
     pub observed_at_ms: i64,
     pub policy: MergePolicy,
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MergeStatus {
+    pub revision_id: i64,
+    pub head: CommitOid,
+    pub method: MergeMethod,
+    pub state: queue::State,
+    pub reason: Option<String>,
+}
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MergeObservation {
     pub actor: NonZeroU64,
@@ -268,6 +277,34 @@ fn finish(tx: &Transaction<'_>, c: &Claim, state: &str, reason: &str, due: i64) 
 impl Store {
     pub fn merge_policy(&self, rev: &PrRevision) -> Result<Option<CachedMergePolicy>> {
         self.read(|db| cached(db, rev))
+    }
+
+    pub fn merge_statuses(&self, account: AccountId, pr: ItemId) -> Result<Vec<MergeStatus>> {
+        self.read(|db| {
+            let mut statement = db.prepare(
+                "SELECT m.operation_id,m.revision_id FROM merge_intents m
+                 JOIN operations o ON o.account_id=m.account_id AND o.id=m.operation_id
+                 WHERE m.account_id=? AND m.item_id=? ORDER BY o.sequence DESC LIMIT 8",
+            )?;
+            let identities = statement.query_map(params![account, pr], |row| {
+                Ok((row.get::<_, String>(0)?, row.get(1)?))
+            })?;
+            identities
+                .map(|identity| {
+                    let (id, revision_id) = identity?;
+                    let operation =
+                        queue::read_operation(db, account, &id)?.ok_or(Error::Corrupt)?;
+                    let (method, _) = decode::<StoredIntent>(&operation.snapshot.payload)?.parts();
+                    Ok(MergeStatus {
+                        revision_id,
+                        head: CommitOid::parse(&operation.snapshot.base)?,
+                        method,
+                        state: operation.state,
+                        reason: operation.reason,
+                    })
+                })
+                .collect()
+        })
     }
     pub fn record_merge_policy(
         &self,

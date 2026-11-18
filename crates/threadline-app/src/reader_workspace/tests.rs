@@ -1285,3 +1285,215 @@ fn ui_006_registered_native_commands_offer_edits_and_comments_without_issue_crea
         })
     );
 }
+
+#[gpui_kit::test]
+fn ui_005_offline_merge_targets_the_confirmed_pane_and_updates_the_outbox_badge(
+    cx: &mut TestAppContext,
+) {
+    use threadline_storage::{
+        access::{AccessState, DiscoveryState, RepositoryObservation, RepositoryObservationSource},
+        merges::{Gate, MergeMethod, MergePolicy, QueueRequirement},
+        pr::PrHeader,
+        queue::{ActionKind, State},
+        resources::CommitOid,
+        writes::Permission,
+    };
+    let setup = ReaderHarness::seeded();
+    let store = &setup.store;
+    let fixture = &setup.fixture;
+    let account = fixture.account;
+    let pr = fixture.reviewed_pr;
+    let now = now_ms();
+    let original = store.github_access_profiles().unwrap().remove(0);
+    let profile = store
+        .reserve_access_profile_credential(
+            account,
+            original.user_id,
+            &original.login,
+            &original.owner_scope,
+            original.kind,
+            Some(&original),
+        )
+        .unwrap();
+    store
+        .install_current_credential(&profile, || Ok::<_, ()>(()))
+        .unwrap()
+        .unwrap();
+    store
+        .record_access_result(
+            &profile,
+            original.kind,
+            AccessState::Readable,
+            DiscoveryState::Complete,
+            now,
+        )
+        .unwrap();
+    let repository = store
+        .github_repository_views(account)
+        .unwrap()
+        .into_iter()
+        .find(|repo| repo.id == fixture.repository)
+        .unwrap();
+    store
+        .observe_github_repository(
+            &profile,
+            &RepositoryObservation {
+                provider_id: repository.provider_id,
+                owner: &repository.owner,
+                name: &repository.name,
+                private: true,
+                source: RepositoryObservationSource::Direct,
+            },
+            now,
+        )
+        .unwrap();
+    let oid = |byte: &str| CommitOid::parse(&byte.repeat(40)).unwrap();
+    let revision = store
+        .record_pr_revision(
+            account,
+            pr,
+            &oid("a"),
+            &oid("b"),
+            Some(&oid("c")),
+            &PrHeader::default(),
+            now,
+        )
+        .unwrap();
+    let policy = MergePolicy {
+        allowed_methods: Some([MergeMethod::Squash].into_iter().collect()),
+        viewer_permission: Permission::Allowed,
+        open: Some(true),
+        draft: Some(false),
+        merged: Some(false),
+        mergeable: Some(true),
+        queue: QueueRequirement::NotRequired,
+        checks: Gate::Satisfied,
+        reviews: Gate::Satisfied,
+        branch_rules: Gate::Satisfied,
+    };
+    store.set_dispatch_controls(account, false, false).unwrap();
+    let observed = store
+        .github_access_profile(account, &profile.owner_scope)
+        .unwrap()
+        .unwrap();
+    store
+        .record_merge_policy(&observed, &revision, &policy, now)
+        .unwrap();
+    store.sign_out_github_account(account, now + 1).unwrap();
+    store.set_dispatch_controls(account, true, false).unwrap();
+    let tabs = [
+        Tab {
+            id: "merge-bound-pr".into(),
+            item: pr,
+            view: TabView::default(),
+        },
+        Tab {
+            id: "other-pane-issue".into(),
+            item: fixture.long_discussion,
+            view: TabView::default(),
+        },
+    ];
+    store
+        .save_workspace(
+            account,
+            &Workspace {
+                focused_pane: 0,
+                proportions: vec![0.5, 0.5],
+                panes: tabs
+                    .iter()
+                    .cloned()
+                    .map(|tab| Pane {
+                        active: Some(0),
+                        tabs: vec![tab],
+                    })
+                    .collect(),
+            },
+        )
+        .unwrap();
+
+    let before = store
+        .sidebar_counts(account, ReaderScope::Selected)
+        .unwrap()
+        .outbox;
+    let (window, reader) = setup.open(cx);
+    click(cx, window, "pr-0-merge-open");
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.try_find("pr-0-merge-merge").is_none());
+        assert!(window.try_find("pr-0-merge-rebase").is_none());
+        assert!(window.try_find("pr-1-merge-open").is_none());
+        assert!(window.try_find("pr-0-merge-confirm").is_none());
+    })
+    .unwrap();
+    click(cx, window, "pr-0-merge-squash");
+    click(cx, window, "reader-tab-1-0");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let state = reader.read(cx);
+            !state.layout_busy && state.layout.focused_pane == 1
+        })
+    });
+    click(cx, window, "pr-0-merge-confirm");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            reader
+                .read(cx)
+                .counts
+                .is_some_and(|counts| counts.outbox == before + 1)
+        })
+    });
+    let statuses = store.merge_statuses(account, pr).unwrap();
+    assert_eq!(statuses.len(), 1);
+    assert_eq!(statuses[0].state, State::Queued);
+    assert_eq!(statuses[0].method, MergeMethod::Squash);
+    assert_eq!(statuses[0].head, revision.head);
+    assert_eq!(statuses[0].revision_id, revision.id);
+    assert!(
+        store
+            .merge_statuses(account, fixture.long_discussion)
+            .unwrap()
+            .is_empty()
+    );
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        let bounds = window.find("reader-outbox-badge").bounds();
+        assert_eq!(bounds.size.width, bounds.size.height);
+        assert!(bounds.size.width > px(23.));
+    })
+    .unwrap();
+    let page = store.queue_page(account, 0, 100).unwrap();
+    let (index, row) = page
+        .iter()
+        .enumerate()
+        .find(|(_, row)| row.kind == ActionKind::Merge && row.item == pr)
+        .unwrap();
+    click(cx, window, "reader-outbox");
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).queue.iter().any(|q| q.id == row.id))
+    });
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        window.click(format!("reader-outbox-action-{index}"), cx);
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).outbox.selected_state().as_deref() == Some("Queued"))
+    });
+    click(cx, window, "reader-outbox-cancel");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            reader
+                .read(cx)
+                .counts
+                .is_some_and(|counts| counts.outbox == before)
+        })
+    });
+    assert_eq!(
+        store.merge_statuses(account, pr).unwrap()[0].state,
+        State::Cancelled
+    );
+    assert_ne!(
+        store.item(account, pr).unwrap().unwrap().closed,
+        Change::Value(true)
+    );
+}

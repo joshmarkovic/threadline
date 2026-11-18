@@ -319,7 +319,8 @@ impl ReaderWorkspace {
                     time_label(h.created_at_ms),
                     time_label(h.merged_at_ms)
                 )))
-                .child(self.pr_download_header(pane, tab, pr, palette, cx));
+                .child(self.pr_download_header(pane, tab, pr, palette, cx))
+                .child(self.merge_view(pane, tab, pr, palette, cx));
         } else {
             header = header.child(div().text_xs().text_color(palette.muted).child(state));
         }

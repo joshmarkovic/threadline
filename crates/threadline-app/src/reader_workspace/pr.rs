@@ -22,6 +22,8 @@ pub(super) struct PullRequestData {
     pub files: Option<FilePage>,
     pub pages: Vec<(PrFamily, PrPage)>,
     pub download: Option<PrDownload>,
+    pub merge_policy: Option<threadline_storage::merges::CachedMergePolicy>,
+    pub merge_status: Vec<threadline_storage::merges::MergeStatus>,
 }
 
 pub(super) struct LinkedIssue {
@@ -109,6 +111,8 @@ impl PullRequestData {
             .then(|| FilePage::read(store, &revision, view.selected_path.as_deref(), None))
             .transpose()?;
         let download = store.pr_download(&revision)?;
+        let merge_policy = store.merge_policy(&revision)?;
+        let merge_status = store.merge_statuses(account, tab.item)?;
         Ok(Some(Self {
             revision,
             header,
@@ -119,6 +123,8 @@ impl PullRequestData {
             files,
             pages,
             download,
+            merge_policy,
+            merge_status,
         }))
     }
 }
