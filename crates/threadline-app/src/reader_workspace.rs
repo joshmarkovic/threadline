@@ -21,6 +21,7 @@ use threadline_storage::{
 };
 
 mod drafts;
+mod history_view;
 mod media;
 mod merge_view;
 mod outbox;
@@ -168,6 +169,7 @@ pub(crate) struct ReaderWorkspace {
     counts: Option<SidebarCounts>,
     filters_open: bool,
     surface: Surface,
+    history: history_view::HistoryState,
     sync_panel: Option<Entity<crate::sync_panel::SyncPanel>>,
     sync_watch: Option<Subscription>,
     #[cfg(feature = "e2e")]
@@ -192,6 +194,7 @@ enum Surface {
     Outbox,
     Storage,
     Sync,
+    History,
 }
 
 struct ItemData {
@@ -431,6 +434,7 @@ impl ReaderWorkspace {
             counts: None,
             filters_open: false,
             surface: Surface::Browse,
+            history: history_view::HistoryState::default(),
             sync_panel: None,
             sync_watch: None,
             #[cfg(feature = "e2e")]
@@ -579,6 +583,7 @@ impl ReaderWorkspace {
             self.maximized = false;
             self.filter = BrowseFilter::default();
             self.surface = Surface::Browse;
+            self.history = history_view::HistoryState::default();
             self.sync_panel = None;
             self.sync_watch = None;
             #[cfg(feature = "e2e")]
@@ -666,6 +671,7 @@ impl ReaderWorkspace {
             quit,
             after: Box::new(after),
         });
+        self.capture_history_scroll(window, cx);
         self.settle_departure(window, cx);
     }
 
@@ -675,6 +681,7 @@ impl ReaderWorkspace {
             || self.pending_draft.is_some()
             || !self.review_pending.is_empty()
             || self.merge_views.values().any(|merge| merge.busy)
+            || self.history.busy
         {
             return;
         }

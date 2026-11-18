@@ -200,7 +200,7 @@ fn file_parts(record: PrRecord, viewed: &[String]) -> Option<(FileSummary, Patch
     ))
 }
 
-fn parse_patch(
+pub(super) fn parse_patch(
     summary: &FileSummary,
     evidence: &PatchEvidence,
 ) -> (Option<DiffFile>, Option<&'static str>) {

@@ -44,7 +44,7 @@ impl HistoryRef {
         }
         Ok(format!("{prefix}/{name}"))
     }
-    fn from_key(key: &str) -> Option<Self> {
+    pub fn from_key(key: &str) -> Option<Self> {
         if let Some(s) = key.strip_prefix("refs/heads/") {
             return Some(Self::Branch(s.into()));
         }
@@ -585,6 +585,26 @@ impl Store {
                     _ => return Err(Error::Corrupt),
                 },
             })
+        })
+    }
+
+    pub fn history_ordinal(
+        &self,
+        account: AccountId,
+        repository: RepositoryId,
+        tip: &CommitOid,
+        oid: &CommitOid,
+    ) -> Result<Option<i64>> {
+        self.read(|db| {
+            resources::require_repository(db, account, repository)?;
+            Ok(db
+                .query_row(
+                    "SELECT r.ordinal FROM history_rows r JOIN history_series s ON s.id=r.series_id
+                 WHERE s.account_id=? AND s.repository_id=? AND s.tip=? AND r.oid=?",
+                    params![account, repository, tip.as_str(), oid.as_str()],
+                    |row| row.get(0),
+                )
+                .optional()?)
         })
     }
 }

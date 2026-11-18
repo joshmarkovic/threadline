@@ -1497,3 +1497,186 @@ fn ui_005_offline_merge_targets_the_confirmed_pane_and_updates_the_outbox_badge(
         Change::Value(true)
     );
 }
+
+#[gpui_kit::test]
+fn history_view_selects_exact_parents_and_restores_an_offline_comparison(cx: &mut TestAppContext) {
+    use threadline_storage::{
+        access::{AccessState, DiscoveryState, RepositoryObservation, RepositoryObservationSource},
+        history::{HistoryComparison, HistoryEntry, HistoryRef},
+        resources::{CommitOid, GraphCommit},
+    };
+    let setup = ReaderHarness::seeded();
+    let store = &setup.store;
+    let account = setup.fixture.account;
+    let repository = setup.fixture.repository;
+    let reference = HistoryRef::Branch("main".into());
+    let now = now_ms();
+    let original = store.github_access_profiles().unwrap().remove(0);
+    let reserved = store
+        .reserve_access_profile_credential(
+            account,
+            original.user_id,
+            &original.login,
+            &original.owner_scope,
+            original.kind,
+            Some(&original),
+        )
+        .unwrap();
+    store
+        .install_current_credential(&reserved, || Ok::<_, ()>(()))
+        .unwrap()
+        .unwrap();
+    store
+        .record_access_result(
+            &reserved,
+            original.kind,
+            AccessState::Readable,
+            DiscoveryState::Complete,
+            now,
+        )
+        .unwrap();
+    let repo = store
+        .github_repository_views(account)
+        .unwrap()
+        .into_iter()
+        .find(|repo| repo.id == repository)
+        .unwrap();
+    store
+        .observe_github_repository(
+            &reserved,
+            &RepositoryObservation {
+                provider_id: repo.provider_id,
+                owner: &repo.owner,
+                name: &repo.name,
+                private: true,
+                source: RepositoryObservationSource::Direct,
+            },
+            now,
+        )
+        .unwrap();
+    store.set_dispatch_controls(account, false, false).unwrap();
+    let profile = store
+        .github_access_profile(account, &reserved.owner_scope)
+        .unwrap()
+        .unwrap();
+    let oid = |digit: char| CommitOid::parse(&digit.to_string().repeat(40)).unwrap();
+    let commit = |digit, parents: &[char]| HistoryEntry {
+        commit: GraphCommit {
+            oid: oid(digit),
+            title: format!("Fixture commit {digit}"),
+            committed_at_ms: now,
+            parents: parents.iter().map(|&digit| oid(digit)).collect(),
+        },
+        message: format!("Fixture commit {digit}"),
+        author: Some("Fixture author".into()),
+        authored_at_ms: Some(now),
+    };
+    store
+        .observe_history_ref(&profile, repository, &reference, Some(&oid('f')), now)
+        .unwrap();
+    let walk = store
+        .begin_history_page(&profile, repository, &reference)
+        .unwrap()
+        .unwrap();
+    store
+        .commit_history_page(
+            &walk,
+            &[commit('f', &['d', 'e']), commit('d', &[]), commit('e', &[])],
+            None,
+            true,
+            now + 1,
+        )
+        .unwrap();
+    store.sign_out_github_account(account, now + 2).unwrap();
+    store.set_dispatch_controls(account, true, false).unwrap();
+
+    let (window, reader) = setup.open(cx);
+    click(cx, window, "reader-history");
+    let repository_index = store
+        .github_repository_views(account)
+        .unwrap()
+        .iter()
+        .filter(|repo| repo.selected)
+        .position(|repo| repo.id == repository)
+        .unwrap();
+    if repository_index != 0 {
+        until(cx, |cx| cx.read(|cx| !reader.read(cx).history.busy));
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            window.click(format!("history-repository-{repository_index}"), cx);
+        })
+        .unwrap();
+    }
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).history.cached_graph_rows() == 3)
+    });
+    click(cx, window, "history-commit-0");
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).history.plan().is_some())
+    });
+    click(cx, window, "history-parent-1");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            matches!(
+                reader.read(cx).history.plan(),
+                Some(HistoryComparison::Parent {
+                    parent_index: 1,
+                    ..
+                })
+            )
+        })
+    });
+    assert_eq!(
+        store
+            .history_view(account, repository, "reader-commit-history")
+            .unwrap()
+            .unwrap()
+            .state
+            .parent,
+        Some(oid('e'))
+    );
+    let graph = store
+        .history_page(account, repository, &oid('f'), None, 48)
+        .unwrap();
+    let base = graph
+        .rows
+        .iter()
+        .find(|row| row.entry.commit.oid == oid('d'))
+        .unwrap();
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        window.click(format!("history-compare-{}", base.ordinal), cx);
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| {
+            matches!(reader.read(cx).history.plan(),
+        Some(HistoryComparison::Pair { key }) if key.base == oid('d') && key.head == oid('f'))
+        })
+    });
+    let state = store
+        .history_view(account, repository, "reader-commit-history")
+        .unwrap()
+        .unwrap()
+        .state;
+    assert_eq!(state.selected, Some(oid('f')));
+    assert_eq!(state.second, Some(oid('d')));
+    assert!(state.parent.is_none());
+
+    let (reopened, restored) = setup.open(cx);
+    click(cx, reopened, "reader-history");
+    if repository_index != 0 {
+        until(cx, |cx| cx.read(|cx| !restored.read(cx).history.busy));
+        cx.update_window(reopened, |_, window, cx| {
+            window.render_frame(cx);
+            window.click(format!("history-repository-{repository_index}"), cx);
+        })
+        .unwrap();
+    }
+    until(cx, |cx| {
+        cx.read(|cx| {
+            matches!(restored.read(cx).history.plan(),
+        Some(HistoryComparison::Pair { key }) if key.base == oid('d') && key.head == oid('f'))
+        })
+    });
+}
