@@ -29,7 +29,7 @@ function Invoke-MergeProof([IntPtr]$Window) {
     $first = Open-FixturePr $Window 0 42 'First fixture pull request' $firstHead 'src/first.rs'
     if ($first.cached_reader.outbox -ne 0) { throw 'The isolated merge profile already has pending work.' }
     Queue-FixtureDirectMerge $Window $firstHead
-    Inspect-WriteFixtureAction $Window 0 'Queued'
+    Inspect-WriteFixtureAction $Window 0 'Queued' 'Merge pull request'
     Add-Evidence 'Queue a native squash merge for the exact original head while offline' ([ordered]@{
         expected_head = $firstHead; merged_before_send = $false; outbox = 'Queued'
     })
@@ -38,7 +38,7 @@ function Invoke-MergeProof([IntPtr]$Window) {
     Set-WriteFixtureOffline $Window $false
     Click-AccountControl $Window 'reader-outbox'
     Click-AccountControl $Window 'reader-outbox-filter-history'
-    Inspect-WriteFixtureAction $Window 0 'Confirmed'
+    Inspect-WriteFixtureAction $Window 0 'Confirmed' 'Merge pull request'
     Click-AccountControl $Window 'reader-outbox-open'
     $null = Wait-PrReader 'the original PR becomes merged only after authoritative provider readback' {
         param($pr, $reader) $reader.active_number -eq 42 -and $pr.head -ceq $firstHead -and $pr.merged -eq $true
@@ -51,12 +51,12 @@ function Invoke-MergeProof([IntPtr]$Window) {
     Click-AccountControl $Window 'reader-repository-1'
     $null = Open-FixturePr $Window 0 43 'Second fixture pull request' $secondHead 'src/second.rs'
     Queue-FixtureDirectMerge $Window $secondHead
-    Inspect-WriteFixtureAction $Window 1 'Queued'
+    Inspect-WriteFixtureAction $Window 1 'Queued' 'Merge pull request'
     Set-AccessPhase 'merge-wrong-head'
     Set-WriteFixtureOffline $Window $false
     Click-AccountControl $Window 'reader-outbox'
     Click-AccountControl $Window 'reader-outbox-filter-attention'
-    Inspect-WriteFixtureAction $Window 1 'NeedsAttention'
+    Inspect-WriteFixtureAction $Window 1 'NeedsAttention' 'Merge pull request'
     Click-AccountControl $Window 'reader-outbox-open'
     $null = Wait-PrReader 'the held second merge retains the original item and has no merged claim' {
         param($pr, $reader) $reader.active_number -eq 43 -and $pr.merged -eq $false

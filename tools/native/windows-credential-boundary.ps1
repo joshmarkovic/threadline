@@ -103,7 +103,7 @@ function Invoke-CredentialBoundaryProof([IntPtr]$Window, [string]$Profile) {
     Click-AccountControl $ready 'account-close'
     Click-AccountControl $ready 'reader-outbox'
     Click-AccountControl $ready 'reader-outbox-filter-history'
-    Inspect-WriteFixtureAction $ready 0 'Confirmed'
+    Inspect-WriteFixtureAction $ready 0 'Confirmed' 'Comment'
     Click-AccountControl $ready 'reader-outbox-open'
     $null = Wait-Reader 'the confirmed action returns to the original cached item' {
         param($reader) $reader.active_item -eq $item -and $reader.outbox -eq 0

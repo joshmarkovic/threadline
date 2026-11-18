@@ -219,7 +219,7 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
     }
     Click-AccountControl $restarted 'reader-outbox'
     Click-AccountControl $restarted 'reader-outbox-filter-history'
-    Inspect-WriteFixtureAction $restarted 0 'Confirmed'
+    Inspect-WriteFixtureAction $restarted 0 'Confirmed' 'Comment'
     $null = Wait-Reader 'the original eligible fixture action left the pending count after acknowledgement' {
         param($reader) $reader.outbox -eq 0 -and !$reader.offline
     }

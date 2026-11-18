@@ -71,8 +71,23 @@ function Queue-WriteFixtureDraft([IntPtr]$Window, [long]$Item, [int]$Expected) {
     }
 }
 
-function Inspect-WriteFixtureAction([IntPtr]$Window, [int]$Index, [string]$Expected) {
-    Click-AccountControl $Window "reader-outbox-action-$Index"
+function Inspect-WriteFixtureAction([IntPtr]$Window, [int]$Index, [string]$Expected, [string]$ActionLabel) {
+    $id = "reader-outbox-action-$Index"
+    if ($ActionLabel) {
+        if ($ActionLabel -cnotin @('Comment', 'Merge pull request', 'Review')) { throw 'Unknown fixture action label.' }
+        $displayState = switch -CaseSensitive ($Expected) {
+            'Queued' { 'Queued' }
+            'Confirmed' { 'Confirmed' }
+            'NeedsAttention' { 'Needs attention' }
+            default { throw 'Unknown fixture action state.' }
+        }
+        $label = $ActionLabel + ' ' + [char]0x00b7 + ' ' + $displayState
+        Wait-For 'the exact visible native fixture Outbox row' {
+            Invoke-OwnedFixtureControl $Window $id $null $label
+        }
+    } else {
+        Click-AccountControl $Window $id
+    }
     $null = Wait-Reader 'the selected action has the expected durable state' {
         param($reader) $reader.outbox_visible -and $reader.outbox_action_state -ceq $Expected
     }
