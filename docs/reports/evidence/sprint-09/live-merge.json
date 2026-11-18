@@ -1,0 +1,97 @@
+{
+  "cases": [
+    {
+      "run": "live-1795041485642-2043304",
+      "source": "8649422e151433cede259fb77fa4712d99b0e689",
+      "source_dirty": false,
+      "exit_code": 1,
+      "result": "Fail",
+      "provider_sha256": "e8fa6cfb1b81fbbe95083149cf357ed25fa1e759563a27791baeff3c315ea32b",
+      "provider": {
+        "scenario": "LIVE-004",
+        "status": "Fail",
+        "user_id": 52184130,
+        "repository_id": 1462273296,
+        "pull_number": 3,
+        "base": "4f1e2087d726c7208f937fd6510ea346c5471198",
+        "head": "501a4528e98d07e413c6f56bac76a50a9f5d61b5",
+        "method": "merge",
+        "credential_kind": "existing_cli_oauth",
+        "evidence": {
+          "dispatch": "acknowledged",
+          "eligibility": "eligible",
+          "merge_oid": "a69379f832db973789668ea97d0d3122e46e900b",
+          "own_action": false,
+          "provider_status": 200,
+          "read_back": false,
+          "readback_only": false,
+          "reason": "merge_readback_not_confirmed",
+          "target_verified": true,
+          "verified_optional_contexts": 10
+        }
+      }
+    },
+    {
+      "run": "live-1795041571038-2048674",
+      "source": "8649422e151433cede259fb77fa4712d99b0e689",
+      "source_dirty": false,
+      "exit_code": 1,
+      "result": "Fail",
+      "provider_sha256": "ee840ac32e5839fb395342dea3bd0c096a073cf54e808074f9c856047e11d385",
+      "provider": {
+        "scenario": "LIVE-004",
+        "status": "Fail",
+        "user_id": 52184130,
+        "repository_id": 1462273296,
+        "pull_number": 3,
+        "base": "4f1e2087d726c7208f937fd6510ea346c5471198",
+        "head": "501a4528e98d07e413c6f56bac76a50a9f5d61b5",
+        "method": "merge",
+        "credential_kind": "existing_cli_oauth",
+        "evidence": {
+          "dispatch": "not_sent",
+          "eligibility": null,
+          "merge_oid": "a69379f832db973789668ea97d0d3122e46e900b",
+          "own_action": false,
+          "provider_status": null,
+          "read_back": false,
+          "readback_only": true,
+          "reason": "merge_readback_not_confirmed",
+          "target_verified": true,
+          "verified_optional_contexts": null
+        }
+      }
+    },
+    {
+      "run": "live-1795041968793-2063961",
+      "source": "7e7f60276e468e3c7aec4cc06cf591fe5596c5c0",
+      "source_dirty": false,
+      "exit_code": 0,
+      "result": "Pass",
+      "provider_sha256": "ca0b5fc6d742df812ef734abecaa9136075ccc906dacfd520ac86c642645f745",
+      "provider": {
+        "scenario": "LIVE-004",
+        "status": "Pass",
+        "user_id": 52184130,
+        "repository_id": 1462273296,
+        "pull_number": 3,
+        "base": "4f1e2087d726c7208f937fd6510ea346c5471198",
+        "head": "501a4528e98d07e413c6f56bac76a50a9f5d61b5",
+        "method": "merge",
+        "credential_kind": "existing_cli_oauth",
+        "evidence": {
+          "dispatch": "not_sent",
+          "eligibility": null,
+          "merge_oid": "a69379f832db973789668ea97d0d3122e46e900b",
+          "own_action": true,
+          "provider_status": null,
+          "read_back": true,
+          "readback_only": true,
+          "reason": null,
+          "target_verified": true,
+          "verified_optional_contexts": null
+        }
+      }
+    }
+  ]
+}

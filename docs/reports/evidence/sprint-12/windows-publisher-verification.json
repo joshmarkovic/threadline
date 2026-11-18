@@ -1,0 +1,12 @@
+{
+  "platform": "Windows 11 x64",
+  "publisher_verifier_sha256": "692618b1c90daa1df54415e31fe498d2112e7273814754d6b8d94a3cb0d87bb2",
+  "fixture": "Microsoft Windows SDK signtool.exe",
+  "fixture_sha256": "0d0189af3356554a462c2a60d0d59f6006b68d743f5c0cc93c530b083706f075",
+  "verification": {
+    "sdk_signature": "Valid",
+    "publisher_pin": "f2540c63525e9566ffbbe630b860674a115ce2ce14dd8399ed53c376c920912f",
+    "native_matching_pin_exit": 0,
+    "native_wrong_pin_exit": 2
+  }
+}
