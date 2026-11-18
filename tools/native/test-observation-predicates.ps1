@@ -26,6 +26,11 @@ $notLoaded = '{"connection":"Reachable","cache_generation":2,"panel_open":false,
 if (Test-NotificationSyncReady $notLoaded) { throw 'Reachable fixture transport did not prove saved Sync controls had loaded.' }
 $loaded = '{"connection":"Reachable","cache_generation":2,"panel_open":true,"controls":{"work_offline":false,"pause_background":false,"pause_queued_actions":false,"notification_quiet":false}}' | ConvertFrom-Json
 if (!(Test-NotificationSyncReady $loaded)) { throw 'The observed loaded Sync controls did not permit the quiet-hours journey.' }
+$quietChoice = 'Enable quiet hours ' + [char]0x00b7 + ' '
+if ((Get-NotificationChoiceName 'Enable quiet hours' $false) -cne ($quietChoice + 'Unselected') -or
+    (Get-NotificationChoiceName 'Enable quiet hours' $true) -cne ($quietChoice + 'Selected')) {
+    throw 'The notification driver did not request the product accessibility name for the current setting state.'
+}
 
 function Read-Observation {
     if ($script:observations.Count -gt 1) { return $script:observations.Dequeue() }

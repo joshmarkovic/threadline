@@ -109,6 +109,11 @@ function Test-NotificationSyncReady($Snapshot) {
         !$controls.pause_queued_actions -and !$controls.notification_quiet
 }
 
+function Get-NotificationChoiceName([string]$Label, [bool]$Selected) {
+    $state = if ($Selected) { 'Selected' } else { 'Unselected' }
+    return $Label + ' ' + [char]0x00b7 + ' ' + $state
+}
+
 function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
     Wait-SeededFixtureAccount
     Open-SyncSettings $Window
@@ -117,7 +122,7 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
     }
     Open-NotificationSchedule $Window
     Wait-For 'the native Enable quiet hours control' {
-        Invoke-OwnedFixtureControl $Window 'notifications-quiet' $null 'Enable quiet hours'
+        Invoke-OwnedFixtureControl $Window 'notifications-quiet' $null (Get-NotificationChoiceName 'Enable quiet hours' $false)
     }
     # Choose a bounded UTC window containing this entire isolated test.
     $now = [DateTime]::UtcNow
@@ -145,7 +150,7 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
     }
     Add-Evidence 'Save independent notification quiet hours using native fields' $saved.cached_reader.notification.quiet_hours
     Wait-For 'the native feed and popup default' {
-        Invoke-OwnedFixtureControl $Window 'notifications-default-2' $null 'Feed and popup'
+        Invoke-OwnedFixtureControl $Window 'notifications-default-2' $null (Get-NotificationChoiceName 'Feed and popup' $false)
     }
     $null = Wait-Reader 'popup normally allowed while the current quiet schedule is active' {
         param($reader) $reader.notification.saved -and $reader.notification.popup_default
@@ -204,13 +209,13 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
     Open-NotificationSchedule $restarted
     $null = Wait-FixtureQuietSchedule $startMinute $endMinute
     Wait-For 'restore the native feed-only delivery default' {
-        Invoke-OwnedFixtureControl $restarted 'notifications-default-1' $null 'Feed only'
+        Invoke-OwnedFixtureControl $restarted 'notifications-default-1' $null (Get-NotificationChoiceName 'Feed only' $false)
     }
     $null = Wait-Reader 'future fixture events use the safe feed-only default' {
         param($reader) $reader.notification.saved -and !$reader.notification.popup_default
     }
     Wait-For 'the exact account quiet-hours toggle' {
-        Invoke-OwnedFixtureControl $restarted 'notifications-quiet' $null 'Enable quiet hours'
+        Invoke-OwnedFixtureControl $restarted 'notifications-quiet' $null (Get-NotificationChoiceName 'Enable quiet hours' $true)
     }
     $null = Wait-Reader 'removing quiet hours keeps both other pauses and online mode' {
         param($reader)
