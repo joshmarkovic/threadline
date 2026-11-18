@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory)][string]$FixtureTool,
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-fA-F]{64}$')][string]$FixtureSha256,
     [Parameter(Mandatory)][string]$ReportDir,
-    [ValidateSet('E2E-012','E2E-018')][string]$Case = 'E2E-012'
+    [ValidateSet('E2E-012','E2E-018')][string]$Case = 'E2E-012',
+    [ValidateSet('ColdOpen','WarmOpen','MarkRead','Snooze')][string]$CallbackProbe
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -12,6 +13,10 @@ Add-Type -AssemblyName System.Windows.Forms, UIAutomationClient, UIAutomationTyp
 $native = Join-Path (Split-Path -Parent $PSScriptRoot) native
 Add-Type -Path (Join-Path $native 'ThreadlineWinInput.cs')
 Add-Type -Path (Join-Path $native 'ThreadlineToastShortcut.cs')
+if ($CallbackProbe) {
+    if ($PSBoundParameters.ContainsKey('Case')) { throw 'Choose a canonical case or a direct callback probe.' }
+    Add-Type -Path (Join-Path $native 'ThreadlineInstalledCallback.cs')
+}
 . (Join-Path $PSScriptRoot 'installed-controls.ps1')
 . (Join-Path $native 'windows-notification-focus.ps1')
 
@@ -44,6 +49,10 @@ $fixtureSenderGuard = {
 $actions = New-Object 'System.Collections.Generic.List[object]'
 $report = [ordered]@{ status='Fail'; case=$Case; session_id=[Diagnostics.Process]::GetCurrentProcess().SessionId
     app_sha256=$AppSha256.ToLowerInvariant(); fixture_sha256=$FixtureSha256.ToLowerInvariant(); actions=$actions }
+if ($CallbackProbe) {
+    $report.case = 'S11-REGISTERED-CALLBACK'
+    $report.callback_probe = $CallbackProbe
+}
 $blocked = $false
 $owned = $false
 $child = $null
@@ -81,7 +90,7 @@ function Close-Installed($Process) {
         throw 'The verified installed window did not quit normally.'
     }
 }
-function Get-ExactHistory {
+function Get-ExactHistory([string]$Action) {
     $items = @($toastHistory.GetHistory($identity) | Where-Object {
         $_.Tag -ceq $group.Substring(0,16) -and $_.Group -ceq $group.Substring(16)
     })
@@ -93,7 +102,19 @@ function Get-ExactHistory {
         @($xml.toast.actions.action | Where-Object { $_.arguments -ceq ('activity1.'+$group+'.snooze') }).Count -ne 1) {
         throw 'The Windows app-scoped history did not contain the exact action payloads and event count.'
     }
+    if ($Action -ceq 'open') { return [string]$xml.toast.launch }
+    if ($Action -in @('read','snooze')) {
+        $element = @($xml.toast.actions.action | Where-Object { $_.arguments -ceq ('activity1.'+$group+'.'+$Action) })
+        return [string]$element[0].arguments
+    }
     return $true
+}
+
+function Test-CallbackResult($State) {
+    if (!$State.activated -or $State.pending_opens -ne 0 -or !$State.draft_preserved -or !$State.draft_tab_preserved) { return $false }
+    if ($CallbackProbe -ceq 'MarkRead') { return $State.selected_issue -eq 41 -and $State.read_count -eq 37 -and $State.snoozed_targets -eq 0 }
+    if ($CallbackProbe -ceq 'Snooze') { return $State.selected_issue -eq 41 -and $State.read_count -eq 0 -and $State.snoozed_targets -eq 1 }
+    return $State.selected_issue -eq 42 -and $State.read_count -eq 37 -and $State.snoozed_targets -eq 0
 }
 
 try {
@@ -101,6 +122,12 @@ try {
     $registration = Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Threadline.InstallTest'
     $link = Join-Path ([Environment]::GetFolderPath('Programs')) 'Threadline Installer Test.lnk'
     $localServer = Get-Item -LiteralPath ("HKCU:\Software\Classes\CLSID\$clsid\LocalServer32")
+    if ($CallbackProbe) {
+        $mergedServer = Get-Item -LiteralPath ("Registry::HKEY_CLASSES_ROOT\CLSID\$clsid\LocalServer32")
+        if ($mergedServer.GetValue('') -ine ('"'+$exe+'" --notification-com-server')) {
+            Stop-Blocked 'The merged COM registration points outside the local test installation.'
+        }
+    }
     if ($registration.InstallLocation -ine $install -or $localServer.GetValue('') -ine ('"'+$exe+'" --notification-com-server') -or
         !( [ThreadlineToastShortcut]::LinkMatches($link,$identity,$exe) -and [ThreadlineToastShortcut]::LinkHasActivator($link,[guid]$clsid) ) -or
         (Get-FileHash -LiteralPath $exe).Hash -ine $AppSha256 -or (Get-FileHash -LiteralPath $FixtureTool).Hash -ine $FixtureSha256) {
@@ -162,34 +189,71 @@ try {
         $group = $delivered.native_id
         $null = Wait-Activity 'the exact app-scoped history record' { Get-ExactHistory }
         Add-Evidence 'Verify Windows history, opaque Open/Snooze/Mark read payloads and the delivered journal' $delivered
-        Close-Installed $child
-        $child.Dispose(); $child = $null
-        if (@(Get-InstalledProcesses).Count -ne 0 -or !(Get-ExactHistory)) { throw 'The exact submitted card did not survive full application exit.' }
-        $focusForm = New-Object Windows.Forms.Form
-        $focusForm.Text = 'Threadline notification test'
-        $focusForm.Width = 320; $focusForm.Height = 100
-        $focusForm.Show(); $focusForm.Activate()
-        [Windows.Forms.Application]::DoEvents()
-        if ([ThreadlineWinInput]::GetForegroundWindow() -ne $focusForm.Handle) { Stop-Blocked 'Windows did not grant focus to the fixture window.' }
-        [ThreadlineWinInput]::TargetWindow = $focusForm.Handle
-        if (!(Invoke-FixtureCenterClick $focusForm.Handle)) { Stop-Blocked 'Windows did not expose the scoped fixture card in Notification Center.' }
-        $child = Wait-Activity 'the cold installed COM process' {
-            $found = @(Get-InstalledProcesses)
-            if ($found.Count -eq 1 -and $found[0].Id -ne $report.initial_pid -and (Get-OwnedWindow $found[0])) { return $found[0] }
+        if ($CallbackProbe) {
+            $cold = $CallbackProbe -ceq 'ColdOpen'
+            if ($cold) {
+                Close-Installed $child
+                $child.Dispose(); $child = $null
+                if (@(Get-InstalledProcesses).Count -ne 0) { throw 'The installed app remained open before the cold callback.' }
+            }
+            $action = switch ($CallbackProbe) { 'MarkRead' { 'read' }; 'Snooze' { 'snooze' }; default { 'open' } }
+            $payload = Get-ExactHistory $action
+            if (!$payload) { throw 'The fixture action was missing from Windows notification history.' }
+            [ThreadlineInstalledCallback]::Invoke($group, $payload)
+            $recipient = Wait-Activity 'one registered callback recipient in the test session' {
+                $found = @(Get-InstalledProcesses)
+                if ($found.Count -eq 1 -and ($cold -eq ($found[0].Id -ne $report.initial_pid)) -and (Get-OwnedWindow $found[0])) { return $found[0] }
+            }
+            if ($cold) { $child = $recipient } else { $recipient.Dispose() }
+            $report.recipient_pid = $child.Id
+            $after = Wait-Activity 'the expected durable fixture action' {
+                $state = Read-Fixture inspect
+                if (Test-CallbackResult $state) { return $state }
+            }
+            if ($action -ceq 'open') {
+                $null = Wait-Activity 'the active destination alongside the saved draft tab' {
+                    $root = Get-OwnedWindow $child
+                    $first = Find-OwnedId $root $child.Id 'reader-tab-0-0'
+                    $next = Find-OwnedId $root $child.Id 'reader-tab-0-1'
+                    $null -ne $first -and $null -ne $next -and $first.Current.Name -match '#41(\s|$)' -and
+                        $next.Current.Name -match '#42(\s|$)' -and $next.Current.Name.EndsWith(' · Active tab')
+                }
+            }
+            if (@(Get-InstalledProcesses).Count -ne 1) { throw 'The callback left multiple installed processes.' }
+            Close-Installed $child
+            $after = Read-Fixture inspect
+            if (!(Test-CallbackResult $after)) { throw 'The callback result did not survive a normal exit.' }
+            Add-Evidence 'Invoke the registered Windows COM server using its exact fixture action and verify the closed profile' $after
+        } else {
+            Close-Installed $child
+            $child.Dispose(); $child = $null
+            if (@(Get-InstalledProcesses).Count -ne 0 -or !(Get-ExactHistory)) { throw 'The exact submitted card did not survive full application exit.' }
+            $focusForm = New-Object Windows.Forms.Form
+            $focusForm.Text = 'Threadline notification test'
+            $focusForm.Width = 320; $focusForm.Height = 100
+            $focusForm.Show(); $focusForm.Activate()
+            [Windows.Forms.Application]::DoEvents()
+            if ([ThreadlineWinInput]::GetForegroundWindow() -ne $focusForm.Handle) { Stop-Blocked 'Windows did not grant focus to the fixture window.' }
+            [ThreadlineWinInput]::TargetWindow = $focusForm.Handle
+            if (!(Invoke-FixtureCenterClick $focusForm.Handle)) { Stop-Blocked 'Windows did not expose the scoped fixture card in Notification Center.' }
+            $child = Wait-Activity 'the cold installed COM process' {
+                $found = @(Get-InstalledProcesses)
+                if ($found.Count -eq 1 -and $found[0].Id -ne $report.initial_pid -and (Get-OwnedWindow $found[0])) { return $found[0] }
+            }
+            $report.cold_pid = $child.Id
+            $null = Wait-Activity 'the selected issue 42 and retained draft tab in the installed window' {
+                $root = Get-OwnedWindow $child
+                $first = Find-OwnedId $root $child.Id 'reader-tab-0-0'
+                $next = Find-OwnedId $root $child.Id 'reader-tab-0-1'
+                $null -ne $first -and $null -ne $next -and $first.Current.Name -match '#41(\s|$)' -and
+                    $next.Current.Name -match '#42(\s|$)' -and $next.Current.Name.EndsWith(' · Active tab')
+            }
+            Close-Installed $child
+            $after = Read-Fixture inspect
+            if (!$after.activated -or $after.pending_opens -ne 0 -or $after.selected_issue -ne 42 -or !$after.draft_preserved -or
+                !$after.draft_tab_preserved -or $after.read_count -ne 37) { throw 'The cold route, consumed payload or unrelated draft was not retained.' }
+            Add-Evidence 'Open the exact cached issue in the new process and retain the unrelated draft and original tab' $after
         }
-        $report.cold_pid = $child.Id
-        $null = Wait-Activity 'the selected issue 42 and retained draft tab in the installed window' {
-            $root = Get-OwnedWindow $child
-            $first = Find-OwnedId $root $child.Id 'reader-tab-0-0'
-            $next = Find-OwnedId $root $child.Id 'reader-tab-0-1'
-            $null -ne $first -and $null -ne $next -and $first.Current.Name -match '#41(\s|$)' -and
-                $next.Current.Name -match '#42(\s|$)' -and $next.Current.Name.EndsWith(' · Active tab')
-        }
-        Close-Installed $child
-        $after = Read-Fixture inspect
-        if (!$after.activated -or $after.pending_opens -ne 0 -or $after.selected_issue -ne 42 -or !$after.draft_preserved -or
-            !$after.draft_tab_preserved -or $after.read_count -ne 37) { throw 'The cold route, consumed payload or unrelated draft was not retained.' }
-        Add-Evidence 'Open the exact cached issue in the new process and retain the unrelated draft and original tab' $after
     }
     $report.status = 'Pass'
 } catch {
@@ -197,6 +261,10 @@ try {
     $report.detail = $_.Exception.Message
 } finally {
     if ($focusForm) { $focusForm.Close(); $focusForm.Dispose() }
+    if ($CallbackProbe -and $owned -and !$child -and (Test-Path -LiteralPath (Join-Path $data $marker) -PathType Leaf)) {
+        $recipients = @(Get-InstalledProcesses)
+        if ($recipients.Count -eq 1) { $child = $recipients[0] }
+    }
     if ($child) {
         if (!$child.HasExited) { try { Close-Installed $child } catch { $report.cleanup_detail = 'The owned window remained open.' } }
         $child.Dispose()
@@ -215,6 +283,11 @@ try {
             Move-Item -LiteralPath $data -Destination $archive -ErrorAction Stop
             $report.synthetic_profile_archived = $true
         }
+    }
+    if ($CallbackProbe -and $report.status -ceq 'Pass' -and
+        (!$report.Contains('synthetic_profile_archived') -or $report.Contains('history_cleanup_error'))) {
+        $report.status = 'Fail'
+        $report.detail = 'The test-owned notification or synthetic profile did not finish cleanup.'
     }
     $report | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath $reportPath -Encoding UTF8
     Write-Output $report.status
