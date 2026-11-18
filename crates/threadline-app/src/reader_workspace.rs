@@ -71,6 +71,7 @@ pub(crate) struct ReaderObservation {
     pub shared_sync: Option<SyncObservation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pull_request: Option<pr_view::PrObservation>,
+    pub pending_pr_reads: usize,
     pub outbox: Option<u64>,
 }
 
@@ -300,6 +301,7 @@ impl ReaderWorkspace {
                 }
             }),
             pull_request: active.and_then(|tab| self.pr_observation(tab, cx)),
+            pending_pr_reads: self.pr_reads.len(),
             outbox: self.counts.map(|counts| counts.outbox),
         }
     }
