@@ -103,10 +103,30 @@ impl PullRequestData {
             PrSection::Files => &[PrFamily::Context, PrFamily::Threads],
             PrSection::Checks => &[PrFamily::Checks, PrFamily::Statuses],
         };
-        let pages = families
+        let mut pages: Vec<(PrFamily, PrPage)> = families
             .iter()
             .map(|family| Ok((*family, store.pr_page(&revision, *family, None, PAGE)?)))
             .collect::<Outcome<_>>()?;
+        if let Some(key) = tab
+            .view
+            .scroll_anchor
+            .as_deref()
+            .filter(|key| key.starts_with("thread:"))
+            && let Some((_, threads)) = pages
+                .iter_mut()
+                .find(|(family, _)| *family == PrFamily::Threads)
+        {
+            if let Some(index) = threads
+                .rows
+                .iter()
+                .position(|(existing, _)| existing == key)
+            {
+                let target = threads.rows.remove(index);
+                threads.rows.insert(0, target);
+            } else if let Some(target) = store.pr_record(&revision, PrFamily::Threads, key)? {
+                threads.rows.insert(0, (key.to_owned(), target));
+            }
+        }
         let files = (view.section == PrSection::Files)
             .then(|| FilePage::read(store, &revision, view.selected_path.as_deref(), None))
             .transpose()?;

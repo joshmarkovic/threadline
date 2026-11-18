@@ -20,6 +20,7 @@ use threadline_storage::{
     },
 };
 
+mod activity_view;
 mod drafts;
 mod history_view;
 mod media;
@@ -170,6 +171,7 @@ pub(crate) struct ReaderWorkspace {
     filters_open: bool,
     surface: Surface,
     history: history_view::HistoryState,
+    activity: activity_view::ActivityState,
     sync_panel: Option<Entity<crate::sync_panel::SyncPanel>>,
     sync_watch: Option<Subscription>,
     #[cfg(feature = "e2e")]
@@ -191,6 +193,8 @@ pub(crate) struct ReaderWorkspace {
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum Surface {
     Browse,
+    Activity,
+    NotificationSettings,
     Outbox,
     Storage,
     Sync,
@@ -435,6 +439,7 @@ impl ReaderWorkspace {
             filters_open: false,
             surface: Surface::Browse,
             history: history_view::HistoryState::default(),
+            activity: activity_view::ActivityState::default(),
             sync_panel: None,
             sync_watch: None,
             #[cfg(feature = "e2e")]
@@ -453,6 +458,12 @@ impl ReaderWorkspace {
             status: None,
         };
         reader.ensure_focus_handles(MAX_PANES, window, cx);
+        reader.focus_events.push(
+            cx.observe_global_in::<crate::activity_delivery::ActivityInbox>(
+                window,
+                |reader, window, cx| reader.drain_notification_inbox(window, cx),
+            ),
+        );
         reader.focus_events.push(cx.subscribe_in(
             &reader.search,
             window,
@@ -584,6 +595,7 @@ impl ReaderWorkspace {
             self.filter = BrowseFilter::default();
             self.surface = Surface::Browse;
             self.history = history_view::HistoryState::default();
+            self.activity = activity_view::ActivityState::default();
             self.sync_panel = None;
             self.sync_watch = None;
             #[cfg(feature = "e2e")]
@@ -640,6 +652,7 @@ impl ReaderWorkspace {
                         this.maybe_start_sync();
                         this.restore_active_draft(window, cx);
                         this.focus_active(window);
+                        this.drain_notification_inbox(window, cx);
                         this.settle_departure(window, cx);
                     },
                 );
@@ -682,6 +695,7 @@ impl ReaderWorkspace {
             || !self.review_pending.is_empty()
             || self.merge_views.values().any(|merge| merge.busy)
             || self.history.busy
+            || self.activity.busy
         {
             return;
         }
@@ -1010,7 +1024,12 @@ impl ReaderWorkspace {
             window,
             cx,
             move |store| {
-                let (discussion, anchor_missing) = match tab.view.scroll_anchor.as_deref() {
+                let (discussion, anchor_missing) = match tab
+                    .view
+                    .scroll_anchor
+                    .as_deref()
+                    .filter(|key| !key.starts_with("thread:"))
+                {
                     Some(anchor) => match store.discussion_page_at(account, item, anchor, PAGE) {
                         Ok(page) => (page, false),
                         Err(threadline_storage::Error::NotFound) => {
@@ -1225,6 +1244,7 @@ impl ReaderWorkspace {
                         }
                         this.load_visible(window, cx);
                         this.restore_active_draft(window, cx);
+                        this.finish_notification_item(window, cx);
                         if let Some(editor) = editor_to_focus.and_then(|id| this.drafts.get(&id)) {
                             let focus = editor.view.focus_handle(cx);
                             window.on_next_frame(move |window, cx| focus.focus(window, cx));

@@ -407,6 +407,17 @@ const UI: &[CargoTest] = &[
             "ui_008_",
         ],
     },
+    CargoTest {
+        id: "UI-007",
+        arguments: &[
+            "-p",
+            "threadline-app",
+            "--features",
+            "e2e",
+            "--lib",
+            "ui_007_",
+        ],
+    },
 ];
 const WINDOWS_CREDENTIALS: CargoTest = CargoTest {
     id: "IT-020",

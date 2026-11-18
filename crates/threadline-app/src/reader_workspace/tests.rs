@@ -1680,3 +1680,90 @@ fn history_view_selects_exact_parents_and_restores_an_offline_comparison(cx: &mu
         })
     });
 }
+
+#[gpui_kit::test]
+fn ui_007_notification_categories_actor_rules_and_repository_settings_are_independent(
+    cx: &mut TestAppContext,
+) {
+    use threadline_storage::notifications::{Category, DeliveryMode, RuleActor, RuleScope};
+    let setup = ReaderHarness::seeded();
+    let account = setup.fixture.account;
+    let repo = setup.fixture.repository;
+    let item = setup.fixture.reviewed_pr;
+    let cached = setup.store.item(account, item).unwrap().unwrap().title;
+    let (window, reader) = setup.open(cx);
+    click(cx, window, "reader-activity");
+    click(cx, window, "activity-toggle-settings");
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).activity.scope_is_ready(None))
+    });
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(
+            window.find("notification-settings").role(),
+            Some(gpui_kit::Role::Group)
+        );
+        assert_eq!(
+            window.find("notification-settings").label(),
+            Some("Notification rules")
+        );
+    })
+    .unwrap();
+    click(cx, window, "notifications-automated-reviews");
+    until(cx, |_| {
+        setup
+            .store
+            .notification_settings(account)
+            .unwrap()
+            .actor_rules
+            .len()
+            == 1
+    });
+    click(cx, window, "notifications-category-1-2");
+    until(cx, |_| {
+        setup
+            .store
+            .notification_settings(account)
+            .unwrap()
+            .categories
+            .get(&Category::OrdinaryComment)
+            == Some(&DeliveryMode::Popup)
+    });
+    let defaults = setup.store.notification_settings(account).unwrap();
+    assert_eq!(defaults.actor_rules[0].actor, RuleActor::KnownAutomation);
+    assert_eq!(defaults.actor_rules[0].scope, RuleScope::ReviewsAndInline);
+    assert!(!defaults.sound);
+    assert!(!defaults.categories.contains_key(&Category::InlineComment));
+    let index = setup
+        .store
+        .github_repository_views(account)
+        .unwrap()
+        .into_iter()
+        .filter(|candidate| candidate.selected)
+        .position(|candidate| candidate.id == repo)
+        .unwrap();
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        window.click(format!("notifications-repository-{index}"), cx);
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).activity.scope_is_ready(Some(repo)))
+    });
+    click(cx, window, "notifications-mute");
+    until(cx, |_| {
+        setup
+            .store
+            .repository_notification_rules(account, repo)
+            .unwrap()
+            .muted
+    });
+    assert_eq!(
+        setup.store.notification_settings(account).unwrap(),
+        defaults
+    );
+    assert_eq!(
+        setup.store.item(account, item).unwrap().unwrap().title,
+        cached
+    );
+}

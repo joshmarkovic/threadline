@@ -207,6 +207,80 @@ fn ref_name(reference: &HistoryRef) -> String {
 }
 
 impl ReaderWorkspace {
+    pub(super) fn open_activity_comparison(
+        &mut self,
+        repository: RepositoryId,
+        reference: String,
+        base: CommitOid,
+        head: CommitOid,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let Some(account) = self.account.filter(|_| !self.history.busy) else {
+            return false;
+        };
+        if !self
+            .repositories
+            .iter()
+            .any(|entry| entry.id == repository && entry.selected)
+        {
+            return false;
+        }
+        let Some(reference) = HistoryRef::from_key(&reference)
+            .filter(|candidate| candidate.key().is_ok_and(|key| key == reference))
+        else {
+            return false;
+        };
+        self.surface = Surface::History;
+        self.history.repository = Some(repository);
+        self.history.request += 1;
+        let generation = self.history.request;
+        self.history.busy = true;
+        self.history.data = None;
+        self.history.diff = None;
+        self.launch(
+            window,
+            cx,
+            move |store| {
+                let view_generation = store
+                    .history_view(account, repository, VIEW_ID)?
+                    .map(|saved| saved.generation);
+                let mut view = new_view(reference, head.clone());
+                view.selected = Some(head);
+                view.second = Some(base);
+                HistoryData::load(
+                    store,
+                    account,
+                    repository,
+                    Some((view_generation, view, None)),
+                )
+            },
+            move |this, result, window, cx| {
+                if this.history.request != generation || this.history.repository != Some(repository)
+                {
+                    return;
+                }
+                this.history.busy = false;
+                match result {
+                    Ok(data) => {
+                        this.set_history_diff(&data, cx);
+                        this.history.data = Some(data);
+                        this.history.scroll.set_offset(point(px(0.), px(0.)));
+                    }
+                    Err(_) => {
+                        this.show_activity(false, window, cx);
+                        this.status = Some(
+                            "The notification comparison is unavailable for the saved commit pair.",
+                        );
+                    }
+                }
+                this.complete_notification_open(window, cx);
+                this.settle_departure(window, cx);
+            },
+        );
+        true
+    }
+
     pub(super) fn show_history(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.surface = Surface::History;
         let selected = match self.scope {
@@ -277,6 +351,7 @@ impl ReaderWorkspace {
                 Err(_) => this.status = Some("History could not be loaded or saved. The previous view remains available."),
             }
             this.settle_departure(window, cx);
+            this.drain_notification_inbox(window, cx);
             cx.notify();
         });
         cx.notify();

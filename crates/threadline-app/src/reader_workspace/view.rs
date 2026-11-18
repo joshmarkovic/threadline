@@ -546,6 +546,13 @@ impl ReaderWorkspace {
                     })
                     .collect::<Vec<_>>(),
             )
+            .child(self.observed_control(
+                "reader-activity",
+                control("reader-activity", "Activity").on_click(
+                    cx.listener(|this, _, window, cx| this.show_activity(false, window, cx)),
+                ),
+                false,
+            ))
             .child(
                 self.observed_control(
                     "reader-history",
@@ -1616,6 +1623,7 @@ impl ReaderWorkspace {
             Surface::Browse=>self.browse_view(palette,cx).into_any_element(),
             Surface::Outbox=>self.outbox_view(palette,cx),
             Surface::History=>self.history_surface(palette,cx),
+            Surface::Activity|Surface::NotificationSettings=>self.activity_surface(palette,cx),
             Surface::Storage=>div().id("reader-storage-usage").flex().flex_col().gap_3().p_4()
                 .child(div().text_lg().child("Downloaded content"))
                 .children(self.cache.map(|cache|div().child(format!("{} summaries · {} discussion records · {} text bytes · {} offline downloads",
