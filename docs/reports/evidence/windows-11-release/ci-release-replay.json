@@ -1,0 +1,268 @@
+{
+  "build_manifest": {
+    "purpose": "Development executable for Windows reference desktop tests",
+    "build": "release with e2e feature",
+    "source_revision": "ce7ccd27eecc54fdd9b19b46ef4a6df0ec118a8c",
+    "cargo_lock_sha256": "b11581719d2e53d78f08a18a63658476772d14b88add6c762c8f79bf3151a239",
+    "workflow_run": "44332176477",
+    "target": "x86_64-pc-windows-msvc",
+    "executable_sha256": "06ff91ff81fd51288f7af423df7c67c51b2d5d2d0c351a7fbe79949ca773e4a9",
+    "executable_bytes": 26887680
+  },
+  "build_manifest_sha256": "f376bf009c268c19f08f3fc97cc64f743706827743f1e823879d5b6205411a96",
+  "artifact_id": 14442821169,
+  "driver_revision": "b992e45ad26693737376f09ee64c4540773bd37f",
+  "source_dirty": false,
+  "driver_files_sha256": {
+    "windows-smoke.ps1": "e9c5bdc1679b2f5896105bb9d1a7b59c55ce861bc06e452da10c29a135796852",
+    "ThreadlineWinInput.cs": "3fe1b7f2696eff0ca22d77d8e8ed2352a7a30f6946a66b2ce99fa8daa07be0a4",
+    "windows-app-toast.ps1": "06d91f784fd37def2c73d342b9253a77c50d4f531596e5620bb8a5abeff937f8",
+    "windows-notification-focus.ps1": "793bb9a37b8e5e22ba1b7f7d23b521250815193b302a531000de3903eaa47695",
+    "ThreadlineToastShortcut.cs": "57d493b22fa39895bdfa015d7d1f5f2d4d71949aafdb38f0f56df6d04bacb379"
+  },
+  "fixture_revision": "s01-feasibility-v1",
+  "seed": 12345,
+  "os": "Microsoft Windows 11 Enterprise",
+  "windows_build": "22631.7652",
+  "architecture": "AMD64",
+  "machine": {
+    "manufacturer": "Microsoft Corporation",
+    "model": "Virtual Machine",
+    "ram_bytes": 34358562816,
+    "processors": [
+      {
+        "Name": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+        "NumberOfCores": 4,
+        "NumberOfLogicalProcessors": 8
+      }
+    ],
+    "graphics": [
+      {
+        "Name": "Microsoft Hyper-V Video",
+        "DriverVersion": "10.0.22621.1"
+      },
+      {
+        "Name": "Microsoft Remote Display Adapter",
+        "DriverVersion": "10.0.22621.7649"
+      }
+    ],
+    "storage": [
+      {
+        "Model": "Microsoft Virtual Disk",
+        "InterfaceType": "SCSI",
+        "MediaType": "Fixed hard disk media"
+      }
+    ],
+    "display": {
+      "width": 3840,
+      "height": 2160
+    }
+  },
+  "window_dpi": 144,
+  "gpui_scale_factor": 1.5,
+  "renderer": {
+    "is_software_emulated": true,
+    "device_name": "Microsoft Basic Render Driver",
+    "driver_name": "Unknown Vendor (ID: 0x1414)",
+    "driver_info": "10.0.22621.7649"
+  },
+  "smoke": {
+    "case": "E2E-001",
+    "suite": "smoke",
+    "lane": "e2e",
+    "status": "Pass",
+    "junit": {
+      "tests": 1,
+      "failures": 0,
+      "skipped": 0
+    },
+    "source_files_sha256": {
+      "result.json": "bb2ff2f42102644bc301349f4ac2bd1dea4f64197082dc43eefa84d8b98e4c02",
+      "native.json": "f7524b8cb0d67bd4bcfef7bbed11bfe4b8d09b40492c53e4f80fc53bb2d60482",
+      "ui-observation.json": "e9381d1fde2f11895d81630fb2f4fba25b47a0aa8f1d0da4e68a6937ebdc47da",
+      "binary.json": "2e695e0a1ee41b79016747a406d1ba699496bdbd6b544a54b609aee1f1d66fe7",
+      "junit.xml": "3ac6a85f6879e98ae64aa12a8f802f4ce577625648a21a2af053940164754fd6"
+    },
+    "verified_actions": [
+      "Launch native window",
+      "Pointer select formatted Markdown and copy",
+      "Type into the right review input while background preview is pending and copy its value",
+      "Change the active tab and return to the same draft target",
+      "Switch context to linked issue",
+      "Resize workspace panes with the pointer",
+      "Resize PR context and code with the pointer",
+      "Forward a second launch through the Windows instance channel",
+      "Quit with the native keyboard shortcut",
+      "Relaunch a fresh isolated feasibility profile and quit again"
+    ],
+    "original_clipboard_restored": true,
+    "outer_ratio_after_drag": 0.33875778,
+    "context_ratio_after_drag": 0.38227642,
+    "forwarded_to_pid": 12448,
+    "forwarded_to_pr": 72,
+    "quit_exit_code": 0,
+    "relaunched_pid": 35696
+  },
+  "registered_notification": {
+    "case": "S01-WINDOWS-TOAST",
+    "suite": "full",
+    "lane": "e2e",
+    "status": "Pass",
+    "junit": {
+      "tests": 1,
+      "failures": 0,
+      "skipped": 0
+    },
+    "source_files_sha256": {
+      "result.json": "7b9ded7f05716a558b9ad55c33ff35915455676a16425bd844f53985f347f521",
+      "toast-native.json": "b06fd473c9dd82f18159f8d956dffae04ca661c06e4fc6fe593d07b709b65cde",
+      "ui-observation.json": "8d10554f13ca20358b1c7307a1c1ce8049839d312f5f41846c2ad10df737a650",
+      "binary.json": "2e695e0a1ee41b79016747a406d1ba699496bdbd6b544a54b609aee1f1d66fe7",
+      "junit.xml": "64d5935811779250f154ae8ff856f841a34e8bfadb660d9327136d16bc66f450"
+    },
+    "before": {
+      "pid": 45032,
+      "right_tab": 68
+    },
+    "after": {
+      "pid": 45032,
+      "right_tab": 72,
+      "com_activations_before": 0,
+      "com_activations_after": 1
+    },
+    "submissions": 1,
+    "card_role": "ControlType.ListItem",
+    "card_action": "UI Automation default Invoke",
+    "search": {
+      "polls": 3,
+      "elapsed_ms": 1312,
+      "title_matches": 1,
+      "body_matches": 1,
+      "verified_card_reads": 2,
+      "default_invoke_reads": 2,
+      "click_attempts": 0,
+      "invoke_attempts": 1
+    },
+    "quit_exit_code": 0,
+    "notification_center_closed": true,
+    "empty_fixture_history": true,
+    "removed": {
+      "shortcut": true,
+      "class_registration": true
+    }
+  },
+  "measurement": {
+    "case": "S01-WINDOWS-BASELINE",
+    "suite": null,
+    "lane": "measure-windows",
+    "status": "Fail",
+    "junit": {
+      "tests": 1,
+      "failures": 1,
+      "skipped": 0
+    },
+    "source_files_sha256": {
+      "result.json": "c26f5c9f979c3b2e3872aa329cd740c6174c8a334a2cd2ad9cdbc3c5d7651031",
+      "measurements.json": "d0ac692076a94b214b3279b6c94284f359b86634dbb8008004bd119dd4e5c82b",
+      "ui-observation.json": "4614789d4e42db91e5110a665883fbc26bb82a0bca7894c65131501333a707ba",
+      "binary.json": "2e695e0a1ee41b79016747a406d1ba699496bdbd6b544a54b609aee1f1d66fe7",
+      "junit.xml": "d27544f3796e03f04e797d37665f99b4242d76a6ea5c33538a988ffbf1dc03fa"
+    },
+    "budgets": {
+      "idle_working_set_bytes": {
+        "value": 103657472,
+        "limit": 209715200,
+        "status": "Pass"
+      },
+      "peak_working_set_bytes": {
+        "value": 105590784,
+        "limit": 471859200,
+        "status": "Pass"
+      },
+      "gpu_memory_bytes": {
+        "value": 0,
+        "sample_count": 2,
+        "limit": 268435456,
+        "status": "Pass"
+      },
+      "package_bytes": {
+        "value": null,
+        "limit": 52428800,
+        "status": "Blocked"
+      },
+      "cold_start_ms": {
+        "value": 2407.44,
+        "limit": 3000,
+        "status": "Pass"
+      },
+      "scroll_frame_p95_ms": {
+        "value": 205.1414,
+        "limit": 20,
+        "status": "Fail",
+        "surfaces": {
+          "large_diff": {
+            "value": 139.95430000000002,
+            "sample_count": 36,
+            "limit": 20,
+            "status": "Fail"
+          },
+          "markdown_discussion": {
+            "value": 205.1414,
+            "sample_count": 34,
+            "limit": 20,
+            "status": "Fail"
+          }
+        }
+      }
+    },
+    "wheel_input": {
+      "diff": {
+        "calibrated": true,
+        "accepted_down": 25,
+        "accepted_up": 25,
+        "physical_target_readbacks": 50,
+        "repositioned_strokes": 1,
+        "interrupted_stroke": null,
+        "first_missed_readback": null,
+        "mean_gap_ms": 132.43,
+        "longest_gap_ms": 406.6
+      },
+      "markdown_copy": {
+        "calibrated": true,
+        "accepted_down": 25,
+        "accepted_up": 25,
+        "physical_target_readbacks": 50,
+        "repositioned_strokes": 0,
+        "interrupted_stroke": null,
+        "first_missed_readback": null,
+        "mean_gap_ms": 110.1,
+        "longest_gap_ms": 304.34
+      }
+    },
+    "gpu_process_memory": {
+      "idle": {
+        "dedicated_bytes": 0,
+        "shared_bytes": 0
+      },
+      "after_scroll": {
+        "dedicated_bytes": 0,
+        "shared_bytes": 0
+      }
+    },
+    "frame_evidence": "ci-release-replay-frames.json"
+  },
+  "earlier_instrumented_smoke": {
+    "status": "Pass",
+    "source_dirty": true,
+    "driver_base": "9a96c4526b88ff695c50f7842205fc3ee26134c6",
+    "binary_sha256": "53a1596fa68ed95e71bce54d16722641c28029e0e4abb49054f690b30b7060c3",
+    "verified_smoke_actions": 10,
+    "source_files_sha256": {
+      "result.json": "2c8f3d0675dd08587f9310c20f8d2cb806c92bb638b3c17b88f125f0df30b18e",
+      "native.json": "19c9c70cdd3ed417c7168eecd2d275657e9ba9939c3d455d4562147b905fda92",
+      "ui-observation.json": "53188f454de88d8a4476dda11955afa92ec796355bdbfe4e49d19300035686fd",
+      "binary.json": "2484222ab14ebe04f8c61fac6e8e767b5c36869d3d580071732e2672764fd4b3",
+      "junit.xml": "3ac6a85f6879e98ae64aa12a8f802f4ce577625648a21a2af053940164754fd6"
+    }
+  }
+}
