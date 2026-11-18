@@ -33,6 +33,7 @@ Var ResultCode
 Var PriorBuild
 Var PendingBuild
 Var PriorVersion
+Var PriorLocation
 Var PriorApp
 Var PriorUninstaller
 Var AppReplaced
@@ -125,6 +126,23 @@ Var RollbackFailed
   ${EndIf}
 !macroend
 
+!macro RefuseLockedExecutable
+  ${If} ${FileExists} "$INSTDIR\threadline.exe"
+    # Request delete access so a process denying replacement is detected before staging.
+    System::Call 'kernel32::CreateFileW(w "$INSTDIR\threadline.exe", i 65536, i 7, p 0, i 3, i 128, p 0) p.r0 ?e'
+    Pop $1
+    IntOp $2 $0 + 0
+    ${If} $2 == -1
+      ${If} $1 == 32
+      ${OrIf} $1 == 33
+        !insertmacro MessageAndStop 14 "Release the installed application's open file and rerun."
+      ${EndIf}
+      !insertmacro MessageAndStop 16 "Setup cannot replace the installed application's file. Check permissions and rerun."
+    ${EndIf}
+    System::Call 'kernel32::CloseHandle(p r0)'
+  ${EndIf}
+!macroend
+
 Function .onInit
   ${IfNot} ${IsNativeAMD64}
   ${OrIfNot} ${AtLeastWin11}
@@ -135,12 +153,12 @@ Function .onInit
   StrCpy $INSTDIR "$LOCALAPPDATA\Programs\${Product}"
   !insertmacro LockInstaller
   !insertmacro CheckPaths
-  ReadRegStr $0 HKCU "${Registration}" "InstallLocation"
-  ${If} $0 != ""
-  ${AndIf} $0 != $INSTDIR
+  ReadRegStr $PriorLocation HKCU "${Registration}" "InstallLocation"
+  ${If} $PriorLocation != ""
+  ${AndIf} $PriorLocation != $INSTDIR
     !insertmacro MessageAndStop 17 "The registered location differs from the supported per-user path. The existing installation was preserved."
   ${EndIf}
-  ${If} $0 == ""
+  ${If} $PriorLocation == ""
     IfFileExists "$INSTDIR\threadline.exe" 0 no_unregistered_binary
       !insertmacro MessageAndStop 17 "An executable already exists in the fixture folder without a matching installation record. Its files were preserved."
     no_unregistered_binary:
@@ -170,6 +188,7 @@ Function .onInit
     !insertmacro MessageAndStop 12 "A newer setup was interrupted. Use its installer again to recover the installation."
   ${EndIf}
   !insertmacro RefuseRunningApp
+  !insertmacro RefuseLockedExecutable
 FunctionEnd
 
 Function VerifyCandidate
@@ -224,7 +243,6 @@ Section "Install Threadline" SEC_INSTALL
   ClearErrors
   WriteRegStr HKCU "${Registration}" "InstallLocation" "$INSTDIR"
   WriteRegDWORD HKCU "${Registration}" "PendingBuild" ${PACKAGE_BUILD}
-  WriteRegDWORD HKCU "${History}" "HighestBuild" ${PACKAGE_BUILD}
   IfErrors commit_failure
   SetOutPath "$INSTDIR"
   CreateShortCut "$SMPROGRAMS\${Product}.lnk" "$INSTDIR\threadline.exe"
@@ -246,6 +264,8 @@ Section "Install Threadline" SEC_INSTALL
   WriteRegDWORD HKCU "${Registration}" "NoRepair" 1
   IfErrors commit_failure
   WriteRegDWORD HKCU "${Registration}" "InstalledBuild" ${PACKAGE_BUILD}
+  IfErrors commit_failure
+  WriteRegDWORD HKCU "${History}" "HighestBuild" ${PACKAGE_BUILD}
   IfErrors commit_failure
   DeleteRegValue HKCU "${Registration}" "PendingBuild"
   Delete "$INSTDIR\${Stage}\previous.exe"
@@ -280,7 +300,11 @@ Function Rollback
         StrCpy $RollbackFailed 1
       ${EndIf}
     ${Else}
+      ClearErrors
       Delete "$INSTDIR\threadline.exe"
+      ${If} ${Errors}
+        StrCpy $RollbackFailed 1
+      ${EndIf}
     ${EndIf}
   ${EndIf}
   ${If} $UninstallerReplaced == 1
@@ -290,16 +314,36 @@ Function Rollback
         StrCpy $RollbackFailed 1
       ${EndIf}
     ${Else}
+      ClearErrors
       Delete "$INSTDIR\Uninstall.exe"
+      ${If} ${Errors}
+        StrCpy $RollbackFailed 1
+      ${EndIf}
     ${EndIf}
   ${EndIf}
   ${If} $RollbackFailed == 1
     !insertmacro MessageAndStop 19 "A file prevented rolling back the complete update. Setup kept its replacement files. Quit the application and rerun this exact installer to recover."
   ${EndIf}
-  ${If} $PriorBuild == ""
-    Delete "$SMPROGRAMS\${Product}.lnk"
+  ClearErrors
+  ${If} $PriorLocation == ""
+    IfFileExists "$SMPROGRAMS\${Product}.lnk" 0 +2
+      Delete "$SMPROGRAMS\${Product}.lnk"
+    DeleteRegKey HKCU "${Registration}"
   ${Else}
     WriteRegStr HKCU "${Registration}" "DisplayVersion" "$PriorVersion"
+    ${If} $PriorBuild == ""
+      DeleteRegValue HKCU "${Registration}" "InstalledBuild"
+    ${Else}
+      WriteRegDWORD HKCU "${Registration}" "InstalledBuild" $PriorBuild
+    ${EndIf}
+    ${If} $PendingBuild == ""
+      DeleteRegValue HKCU "${Registration}" "PendingBuild"
+    ${Else}
+      WriteRegDWORD HKCU "${Registration}" "PendingBuild" $PendingBuild
+    ${EndIf}
+  ${EndIf}
+  ${If} ${Errors}
+    !insertmacro MessageAndStop 19 "Setup could not restore the previous registration. Rerun this exact installer to recover."
   ${EndIf}
 FunctionEnd
 
@@ -314,6 +358,7 @@ Function un.onInit
   !insertmacro LockInstaller
   !insertmacro CheckPaths
   !insertmacro RefuseRunningApp
+  !insertmacro RefuseLockedExecutable
 FunctionEnd
 
 Section "Uninstall"

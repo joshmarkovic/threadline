@@ -63,11 +63,11 @@ function Wait-Installed([string]$Description, [scriptblock]$Check, [int]$Millise
     while ($watch.ElapsedMilliseconds -lt $Milliseconds) {
         if ($child.HasExited) { throw "The installed process exited before $Description." }
         try {
-            if (& $Check) { return }
+            if (& $Check) { return $true }
         } catch [Windows.Automation.ElementNotAvailableException] { }
         Start-Sleep -Milliseconds 100
     }
-    throw "Timed out waiting for $Description."
+    return $false
 }
 
 function Read-TabSelection([Diagnostics.Process]$Process, [string]$Id) {
@@ -82,9 +82,9 @@ function Read-TabSelection([Diagnostics.Process]$Process, [string]$Id) {
     if ($value.TryGetCurrentPattern([Windows.Automation.TogglePattern]::Pattern, [ref]$toggle)) {
         return $toggle.Current.ToggleState -eq [Windows.Automation.ToggleState]::On
     }
-    # A saved but unloaded tab has a local ID as its label. Its issue number is
-    # published only after the invoked tab loads. Read the exact synthetic number.
-    return $ExpectedIssueNumber -ne 0 -and $value.Current.Name -match ("#" + $ExpectedIssueNumber + "(\s|$)")
+    $name = $value.Current.Name
+    if ($ExpectedIssueNumber -eq 0) { return $name.EndsWith(' · Active tab') }
+    return $name -match ("#" + $ExpectedIssueNumber + "(\s|$)")
 }
 
 $child = $null
@@ -92,7 +92,9 @@ $ownedWindow = $false
 $invoked = $false
 $selected = $false
 $openBefore = $false
+$closeRequested = $false
 $closedNormally = $false
+$attempts = 0
 try {
     $start = [Diagnostics.ProcessStartInfo]::new()
     $start.FileName = $exe
@@ -102,35 +104,45 @@ try {
         if ($name -like 'THREADLINE_*') { $start.EnvironmentVariables.Remove($name) }
     }
     $child = [Diagnostics.Process]::Start($start)
-    Wait-Installed 'a visible owned reader window and preseeded tab' {
+    $ownedWindow = Wait-Installed 'a visible owned reader window and preseeded tab' {
         $root = Get-OwnedWindow $child
         $null -ne (Find-OwnedId $root $child.Id $TabId)
     }
-    $ownedWindow = $true
+    if (!$ownedWindow) { throw 'Timed out waiting for the owned reader and preseeded tab.' }
     $openBefore = Read-TabSelection $child $TabId
     if (!$openBefore) {
         $invoked = Invoke-OwnedId $child $TabId
-        if ($invoked) {
-            Wait-Installed 'the selected preseeded tab' { Read-TabSelection $child $TabId }
-            $selected = $true
+        if (!$invoked) { throw 'The exact preseeded tab did not support native activation.' }
+        $attempts = 1
+        $selected = Wait-Installed 'the selected preseeded tab' { Read-TabSelection $child $TabId } 3000
+        # Older builds can commit pane focus before they accept the tab action.
+        if (!$selected -and (Invoke-OwnedId $child $TabId)) {
+            $attempts = 2
+            $selected = Wait-Installed 'the selected preseeded tab' { Read-TabSelection $child $TabId }
         }
+        if (!$selected) { throw 'Timed out waiting for evidence that the preseeded tab opened.' }
     }
-    if (!(Invoke-OwnedId $child 'quit')) {
-        if ($null -eq (Get-OwnedWindow $child) -or !$child.CloseMainWindow()) {
-            throw 'The verified installed window did not accept an orderly close.'
-        }
+    $closeRequested = Invoke-OwnedId $child 'quit'
+    if (!$closeRequested -and $null -ne (Get-OwnedWindow $child)) {
+        $closeRequested = $child.CloseMainWindow()
     }
+    if (!$closeRequested) { throw 'The verified installed window did not accept an orderly close.' }
     if (!$child.WaitForExit(10000) -or $child.ExitCode -ne 0) {
         throw 'The verified installed application did not exit normally.'
     }
     $closedNormally = $true
 } finally {
     if ($null -ne $child) {
-        if (!$child.HasExited -and $null -ne (Get-OwnedWindow $child)) {
-            [void]$child.CloseMainWindow()
-            [void]$child.WaitForExit(3000)
+        try {
+            if (!$child.HasExited -and $null -ne (Get-OwnedWindow $child)) {
+                $closeRequested = $child.CloseMainWindow() -or $closeRequested
+            }
+            if ($closeRequested -and $child.WaitForExit(10000)) {
+                $closedNormally = $child.ExitCode -eq 0
+            }
+        } finally {
+            $child.Dispose()
         }
-        $child.Dispose()
     }
     [ordered]@{
         installed_executable_sha256 = $ExpectedExecutableSha256.ToLowerInvariant()
@@ -138,6 +150,7 @@ try {
         tab_automation_id = $TabId
         selected_before_invocation = $openBefore
         tab_invoke_supported = $invoked
+        tab_invoke_attempts = $attempts
         tab_activated = $selected
         orderly_exit = $closedNormally
     } | ConvertTo-Json -Compress
