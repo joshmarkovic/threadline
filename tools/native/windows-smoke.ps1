@@ -193,7 +193,7 @@ function Invoke-ToolbarClick([IntPtr]$Window, [string]$Control) {
     [ThreadlineWinInput]::Click($point)
 }
 
-function Find-ShellControl([string]$Name) {
+function Find-ShellControl([string]$Name, [switch]$TrayArea) {
     $knownShells = @(Get-Process -Name explorer, ShellExperienceHost, ShellHost -ErrorAction SilentlyContinue)
     $shellIds = @($knownShells | ForEach-Object { $_.Id })
     $nameCondition = New-Object Windows.Automation.PropertyCondition ([Windows.Automation.AutomationElement]::NameProperty), $Name
@@ -201,13 +201,34 @@ function Find-ShellControl([string]$Name) {
         [Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition)
     foreach ($element in $topLevel) {
         try {
-            if ($element.Current.ProcessId -notin $shellIds) { continue }
-            if ($element.Current.Name -eq $Name) { return $element }
-            $target = $element.FindFirst([Windows.Automation.TreeScope]::Descendants, $nameCondition)
-            if ($null -ne $target -and !$target.Current.IsOffscreen) { return $target }
+            $root = $element.Current
+            if ($root.ProcessId -notin $shellIds -or $root.ClassName -in @('CabinetWClass', 'Progman', 'WorkerW')) { continue }
+            if ($TrayArea -and $root.ClassName -notin @(
+                'Shell_TrayWnd', 'Shell_SecondaryTrayWnd', 'TopLevelWindowForOverflowXamlIsland', 'NotifyIconOverflowWindow'
+            )) { continue }
+            if (!$TrayArea -and $root.Name -ceq $Name -and !$root.IsOffscreen) { return $element }
+            foreach ($target in $element.FindAll([Windows.Automation.TreeScope]::Descendants, $nameCondition)) {
+                $control = $target.Current
+                if ($control.IsOffscreen -or $control.ProcessId -notin $shellIds -or $control.Name -cne $Name) { continue }
+                if ($TrayArea -and !$control.ClassName.StartsWith('SystemTray.') -and $root.ClassName -ne 'NotifyIconOverflowWindow') { continue }
+                if ($Name -ceq 'Show Hidden Icons' -and (
+                    $control.ControlType -ne [Windows.Automation.ControlType]::Button -or $control.AutomationId -ne 'SystemTrayIcon'
+                )) { continue }
+                return $target
+            }
         } catch [Windows.Automation.ElementNotAvailableException] {
             continue
         }
+    }
+    return $null
+}
+
+function Wait-ShellControl([string]$Name, [int]$Timeout = 2500, [switch]$TrayArea) {
+    $wait = [Diagnostics.Stopwatch]::StartNew()
+    while ($wait.ElapsedMilliseconds -lt $Timeout) {
+        $control = Find-ShellControl $Name -TrayArea:$TrayArea
+        if ($null -ne $control) { return $control }
+        Start-Sleep -Milliseconds 90
     }
     return $null
 }
@@ -221,22 +242,59 @@ function Invoke-ShellClick($Element) {
     [ThreadlineWinInput]::ClickShellControl($point, $Element.Current.ProcessId)
 }
 
-function Get-CopiedText([uint32]$Before) {
-    Wait-For 'native clipboard copy' {
-        if ([ThreadlineWinInput]::GetClipboardSequenceNumber() -eq $Before) { return $false }
-        try { [Windows.Forms.Clipboard]::ContainsText() } catch { $false }
+function Invoke-TrayIconClick {
+    try {
+        $icon = Wait-ShellControl 'Threadline' 700 -TrayArea
+        if ($null -eq $icon) {
+            $overflow = Wait-ShellControl 'Show Hidden Icons' 700 -TrayArea
+            if ($null -ne $overflow) {
+                Invoke-ShellClick $overflow
+                Add-Evidence 'Open the identified Windows notification area overflow' $true
+                $icon = Wait-ShellControl 'Threadline' 2200 -TrayArea
+            }
+        }
+        if ($null -eq $icon) { return $false }
+        Invoke-ShellClick $icon
+        return $true
+    } catch {
+        Add-Evidence 'Find and click the exact Windows notification area icon' 'No verified, clickable shell target was available'
+        return $false
     }
-    return [Windows.Forms.Clipboard]::GetText()
 }
 
-function Assert-ClipboardContains([string]$Expected) {
-    $before = [ThreadlineWinInput]::GetClipboardSequenceNumber()
-    [ThreadlineWinInput]::Chord(@(0x11, 0x43))
-    $text = Get-CopiedText $before
-    if (!$text.Contains($Expected)) {
-        throw "Native clipboard did not contain the expected synthetic token '$Expected'."
+function Wait-CopiedText([uint32]$Before, [string]$Expected) {
+    $wait = [Diagnostics.Stopwatch]::StartNew()
+    while ($wait.ElapsedMilliseconds -lt 1600) {
+        $sequence = [ThreadlineWinInput]::GetClipboardSequenceNumber()
+        if ($sequence -ne $Before) {
+            try {
+                $text = [Windows.Forms.Clipboard]::GetText()
+                if ([ThreadlineWinInput]::GetClipboardSequenceNumber() -eq $sequence -and
+                    $text.IndexOf($Expected, [StringComparison]::Ordinal) -ge 0) {
+                    return $sequence
+                }
+            } catch {
+                # The app or the desktop clipboard service can briefly hold the clipboard open.
+            }
+        }
+        Start-Sleep -Milliseconds 45
     }
-    $script:copiedClipboardSequence = [ThreadlineWinInput]::GetClipboardSequenceNumber()
+    return $null
+}
+
+function Assert-ClipboardContains([string]$Expected, [switch]$SelectAll) {
+    $before = [ThreadlineWinInput]::GetClipboardSequenceNumber()
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        if ($SelectAll) { [ThreadlineWinInput]::Chord(@(0x11, 0x41)) }
+        Start-Sleep -Milliseconds 80
+        [ThreadlineWinInput]::Chord(@(0x11, 0x43))
+        $sequence = Wait-CopiedText $before $Expected
+        if ($null -ne $sequence) {
+            $script:copiedClipboardSequence = $sequence
+            return $attempt
+        }
+    }
+    throw "Native clipboard did not change to the expected synthetic token '$Expected' after three attempts."
 }
 
 function Stop-ThroughUi {
@@ -263,8 +321,8 @@ function Invoke-Smoke([IntPtr]$Window) {
     $origin = To-ScreenPoint $Window ($markdown[0] + 1) ($markdown[1] + $markdown[3] * 0.5) $left.scale_factor
     $end = To-ScreenPoint $Window ($markdown[0] + $markdown[2] - 1) ($markdown[1] + $markdown[3] * 0.5) $left.scale_factor
     [ThreadlineWinInput]::Drag($origin, $end)
-    Assert-ClipboardContains 'Offline review'
-    Add-Evidence 'Pointer select formatted Markdown and copy' 'Synthetic Markdown token arrived on Windows clipboard'
+    $markdownAttempts = Assert-ClipboardContains 'Offline review'
+    Add-Evidence 'Pointer select formatted Markdown and copy' ([ordered]@{ verified = $true; copy_attempts = $markdownAttempts })
 
     [ThreadlineWinInput]::Chord(@(0x11, 0x32))
     $null = Wait-State 'right pane focus' { param($state) $state.focused_pane -eq 'right' }
@@ -275,9 +333,8 @@ function Invoke-Smoke([IntPtr]$Window) {
     $draft = Wait-State 'text typed into PR review input' { param($state) $state.right_input -eq 'native draft 72' -and $state.left_input -eq '' }
     if ($draft.preview_state -ne 'loading') { throw 'Review input was not observed before planned background completion.' }
     $null = Wait-State 'background preview completes' { param($state) $state.preview_state -eq 'ready' }
-    [ThreadlineWinInput]::Chord(@(0x11, 0x41))
-    Assert-ClipboardContains 'native draft 72'
-    Add-Evidence 'Type into the right review input while background preview is pending and copy its value' ([ordered]@{ tab = $draft.right_tab; text = $draft.right_input })
+    $draftAttempts = Assert-ClipboardContains 'native draft 72' -SelectAll
+    Add-Evidence 'Type into the right review input while background preview is pending and copy its value' ([ordered]@{ tab = $draft.right_tab; text = $draft.right_input; copy_attempts = $draftAttempts })
 
     [ThreadlineWinInput]::Chord(@(0x11, 0x09))
     $switched = Wait-State 'next PR tab without changing the other pane' { param($state) $state.right_tab -eq 68 -and $state.left_tab -eq 41 }
@@ -399,7 +456,7 @@ function Get-ScrollBudget($Breakdown, $Worst, [double]$Limit) {
 }
 
 function Invoke-PlatformProof([IntPtr]$Window) {
-    Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+    Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, WindowsBase
     $initial = Read-Observation
     if ($initial.tray_enabled) { throw 'The tray preference was unexpectedly enabled in the fresh profile.' }
     Invoke-ToolbarClick $Window 'tray-toggle'
@@ -413,8 +470,12 @@ function Invoke-PlatformProof([IntPtr]$Window) {
     $trayOpened = $false
     if ($ManualTrayClick) {
         Write-Host 'Open the Windows notification area overflow if needed and click the Threadline tray icon.'
+    }
+    if ($ManualTrayClick -or (Invoke-TrayIconClick)) {
         try {
-            $null = Wait-State 'system tray restores the existing app' { param($state) $state.activations -gt $beforeRestore.activations }
+            $null = Wait-State 'system tray restores the existing app' {
+                param($state) $state.activations -gt $beforeRestore.activations -and $state.pid -eq $script:app.Id
+            }
             $trayOpened = $true
             Add-Evidence 'Click the actual Windows tray icon' $script:app.Id
         } catch {
@@ -450,7 +511,7 @@ function Invoke-PlatformProof([IntPtr]$Window) {
     if ($ManualNotificationClick) {
         Write-Host 'Click the visible Threadline review banner while it remains displayed.'
     } else {
-        $banner = Find-ShellControl 'Threadline review'
+        $banner = Wait-ShellControl 'Threadline review'
         if ($null -eq $banner) {
             Stop-Blocked 'Windows reported the banner shown, but UI Automation could not identify its clickable title. Use the manual notification click mode on this target.'
         }

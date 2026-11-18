@@ -1,12 +1,17 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::io;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use gpui_kit::profiler::{FrameEvent, FrameTimingCollector, set_trace_enabled};
 use gpui_kit::{IntoElement, ScrollEvent, Styled, Window, canvas};
 use serde::Serialize;
+use tokio::runtime::Handle;
+use tokio::sync::watch;
+use tokio::task::JoinHandle;
 
 #[derive(Clone)]
 pub(crate) struct Observer(Rc<RefCell<Recorder>>);
@@ -14,10 +19,20 @@ pub(crate) struct Observer(Rc<RefCell<Recorder>>);
 struct Recorder {
     started: Instant,
     startup_ms: Option<f64>,
-    path: PathBuf,
     bounds: BTreeMap<&'static str, [f32; 4]>,
-    previous_report: Vec<u8>,
     measurement: Option<Measurement>,
+    reports: watch::Sender<PendingReport>,
+}
+
+#[derive(Clone, Default)]
+struct PendingReport {
+    bytes: Option<Arc<Vec<u8>>>,
+    closing: bool,
+}
+
+pub(crate) struct ReportWriter {
+    reports: watch::Sender<PendingReport>,
+    task: JoinHandle<io::Result<()>>,
 }
 
 struct Measurement {
@@ -58,7 +73,12 @@ struct Report<'a> {
 }
 
 impl Observer {
-    pub(crate) fn new(path: PathBuf, started: Instant, measure: bool) -> Self {
+    pub(crate) fn new(
+        path: PathBuf,
+        started: Instant,
+        measure: bool,
+        runtime: &Handle,
+    ) -> (Self, ReportWriter) {
         let measurement = measure.then(|| {
             set_trace_enabled(true);
             Measurement {
@@ -68,14 +88,15 @@ impl Observer {
                 frame_times: Vec::new(),
             }
         });
-        Self(Rc::new(RefCell::new(Recorder {
+        let writer = ReportWriter::new(path, runtime);
+        let observer = Self(Rc::new(RefCell::new(Recorder {
             started,
             startup_ms: None,
-            path,
             bounds: BTreeMap::new(),
-            previous_report: Vec::new(),
             measurement,
-        })))
+            reports: writer.reports.clone(),
+        })));
+        (observer, writer)
     }
 
     pub(crate) fn begin_frame(&self) {
@@ -168,17 +189,62 @@ impl Observer {
         let Ok(json) = serde_json::to_vec(&report) else {
             return;
         };
-        if json == recorder.previous_report {
-            return;
-        }
-        let temporary = recorder.path.with_extension("json.pending");
-        let result = std::fs::write(&temporary, &json)
-            .and_then(|()| std::fs::rename(temporary, &recorder.path));
-        match result {
-            Ok(()) => recorder.previous_report = json,
-            Err(error) => eprintln!("Could not write native test observations: {error}"),
+        recorder.reports.send_if_modified(move |pending| {
+            if pending.closing || pending.bytes.as_deref() == Some(&json) {
+                return false;
+            }
+            pending.bytes = Some(Arc::new(json));
+            true
+        });
+    }
+}
+
+impl ReportWriter {
+    fn new(path: PathBuf, runtime: &Handle) -> Self {
+        let (reports, receiver) = watch::channel(PendingReport::default());
+        Self {
+            reports,
+            task: runtime.spawn(write_reports(path, receiver)),
         }
     }
+
+    pub(crate) async fn finish(self) -> io::Result<()> {
+        self.reports.send_modify(|pending| pending.closing = true);
+        self.task.await?
+    }
+}
+
+async fn write_reports(
+    path: PathBuf,
+    mut receiver: watch::Receiver<PendingReport>,
+) -> io::Result<()> {
+    let path: Arc<Path> = path.into();
+    let mut written = None;
+    while receiver.changed().await.is_ok() {
+        let PendingReport { bytes, closing } = receiver.borrow_and_update().clone();
+        if let Some(bytes) = bytes
+            && !written
+                .as_ref()
+                .is_some_and(|last| Arc::ptr_eq(last, &bytes))
+        {
+            let contents = Arc::clone(&bytes);
+            let destination = Arc::clone(&path);
+            match tokio::task::spawn_blocking(move || save_report(&destination, &contents)).await? {
+                Ok(()) => written = Some(bytes),
+                Err(error) if closing => return Err(error),
+                Err(error) => eprintln!("Could not write native test observations: {error}"),
+            }
+        }
+        if closing {
+            break;
+        }
+    }
+    Ok(())
+}
+
+fn save_report(path: &Path, contents: &[u8]) -> io::Result<()> {
+    let temporary = path.with_extension("json.pending");
+    std::fs::write(&temporary, contents).and_then(|()| std::fs::rename(temporary, path))
 }
 
 impl Measurement {
@@ -210,5 +276,48 @@ impl Measurement {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finishing_the_writer_persists_the_latest_pending_snapshot() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "threadline-observer-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&root).unwrap();
+        let path = root.join("observation.json");
+        std::fs::write(&path, b"{}").unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        let writer = ReportWriter::new(path.clone(), runtime.handle());
+        writer.reports.send_modify(|pending| {
+            pending.bytes = Some(Arc::new(br#"{"seed":42,"ready":false}"#.to_vec()));
+        });
+        let latest = br#"{"seed":42,"ready":true}"#;
+        writer.reports.send_modify(|pending| {
+            pending.bytes = Some(Arc::new(latest.to_vec()));
+        });
+        let result = runtime.block_on(writer.finish());
+        let written = std::fs::read(&path);
+        let temporary = path.with_extension("json.pending");
+        let temporary_exists = temporary.exists();
+        if temporary_exists {
+            std::fs::remove_file(temporary).unwrap();
+        }
+        std::fs::remove_file(path).unwrap();
+        std::fs::remove_dir(root).unwrap();
+        result.unwrap();
+        assert_eq!(written.unwrap(), latest);
+        assert!(!temporary_exists);
     }
 }

@@ -47,9 +47,10 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
     let patches = runtime.spawn_blocking(move || fixtures::patches(seed, large));
     let handle = runtime.handle().clone();
     #[cfg(feature = "e2e")]
-    let observer = options
+    let (observer, report_writer) = options
         .e2e_report
-        .map(|path| observation::Observer::new(path, started, options.measure));
+        .map(|path| observation::Observer::new(path, started, options.measure, &handle))
+        .unzip();
     #[cfg(not(feature = "e2e"))]
     let _ = started;
     gpui_kit::application()
@@ -96,5 +97,9 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
                 std::process::exit(1);
             }
         });
+    #[cfg(feature = "e2e")]
+    if let Some(report_writer) = report_writer {
+        runtime.block_on(report_writer.finish())?;
+    }
     Ok(())
 }
