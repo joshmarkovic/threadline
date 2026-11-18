@@ -4,7 +4,7 @@ use crate::{
     AccountId, Error, ItemId, RepositoryId, Result, Store,
     queue::{
         DraftContent, DraftKind, Pane, PrContext, ReferenceCandidate, Tab, TabView, Workspace,
-        load_benchmark_outbox,
+        load_fixture_outbox,
     },
     resources::{
         CommitOid, ComparisonFile, ComparisonKey, ComparisonMode, GraphCommit, GraphRef,
@@ -49,6 +49,16 @@ impl Scale {
 /// Populate a fresh synthetic database. Fixture writes use bounded transactions.
 /// Callers own the temporary database and can remove it if generation fails.
 pub fn populate(store: &Store, seed: u64, scale: Scale) -> Result<Fixture> {
+    populate_profile(store, seed, scale, false)
+}
+
+/// Build a signed-out synthetic GitHub profile for the actual offline reader.
+/// The selected repositories contain only generated data. No token is installed.
+pub fn populate_reader(store: &Store, seed: u64, scale: Scale) -> Result<Fixture> {
+    populate_profile(store, seed, scale, true)
+}
+
+fn populate_profile(store: &Store, seed: u64, scale: Scale, reader: bool) -> Result<Fixture> {
     let empty: bool = store.read(|db| {
         Ok(
             db.query_row("SELECT NOT EXISTS(SELECT 1 FROM accounts)", [], |r| {
@@ -62,7 +72,14 @@ pub fn populate(store: &Store, seed: u64, scale: Scale) -> Result<Fixture> {
         ));
     }
 
-    let account = store.ensure_account("fixtures.invalid", seed.max(1))?;
+    let account = store.ensure_account(
+        if reader {
+            "github.com"
+        } else {
+            "fixtures.invalid"
+        },
+        seed.max(1),
+    )?;
     let repository = store.ensure_repository(account, 1, "fixture", "relay")?;
     let (item_count, comments_per_item, files, history_count) = scale.workload();
     let long_extra = if scale == Scale::Section16 { 5_000 } else { 10 };
@@ -290,15 +307,20 @@ pub fn populate(store: &Store, seed: u64, scale: Scale) -> Result<Fixture> {
         },
     )?;
 
-    let outbox_count = if scale == Scale::Section16 {
-        store.write(|tx| load_benchmark_outbox(tx, account.0, &issue_targets, seed))?;
-        1_000
-    } else {
-        0
+    let outbox_count = match (scale, reader) {
+        (Scale::Section16, _) => 1000,
+        (Scale::Small, true) => 10,
+        _ => 0,
     };
+    if outbox_count > 0 {
+        store.write(|tx| load_fixture_outbox(tx, account.0, &issue_targets, seed, outbox_count))?;
+    }
+    if reader {
+        enroll_reader(store, account, repository, seed, item_count)?;
+    }
 
     Ok(Fixture {
-        revision: REVISION,
+        revision: if reader { "s04-reader-v1" } else { REVISION },
         account,
         repository,
         long_discussion: discussion,
@@ -314,4 +336,77 @@ pub fn populate(store: &Store, seed: u64, scale: Scale) -> Result<Fixture> {
 
 fn fixture_oid(seed: u64, index: usize) -> Result<CommitOid> {
     CommitOid::parse(&format!("{seed:016x}{index:024x}"))
+}
+
+fn enroll_reader(
+    store: &Store,
+    account: AccountId,
+    primary: RepositoryId,
+    seed: u64,
+    items: usize,
+) -> Result<()> {
+    use crate::{
+        IssueApiId, ItemLocator, TransferEvidence, TransferOutcome, reader::repository_list_key,
+    };
+    let secondary = store.ensure_repository(account, 2, "fixture", "archive")?;
+    let from = ItemLocator {
+        repository: primary,
+        number: 2,
+    };
+    let to = ItemLocator {
+        repository: secondary,
+        number: 2,
+    };
+    let evidence = TransferEvidence::VerifiedIssueId(IssueApiId::try_from(2).expect("fixture ID"));
+    if !matches!(
+        store.transfer_issue(account, from, to, evidence)?,
+        TransferOutcome::Moved(_)
+    ) {
+        return Err(Error::Conflict(
+            "Reader fixture transfer did not establish its second repository",
+        ));
+    }
+    store.write(|db| {
+        db.execute(
+            "INSERT INTO github_access_profiles(account_id,owner_scope,login,credential_ref,credential_kind,access,checked_at_ms)
+            VALUES(?1,'fixture','fixture-reader',?2,0,2,?3)",
+            params![account, format!("{seed:032x}"), FIXTURE_TIME_MS],
+        )?;
+        db.execute("INSERT INTO active_profile(singleton,account_id) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET account_id=excluded.account_id", [account])?;
+        db.execute("INSERT INTO dispatch_profiles(account_id,authorized,offline) VALUES(?,0,1)
+            ON CONFLICT(account_id) DO UPDATE SET authorized=0,offline=1", [account])?;
+        for repository in [primary, secondary] {
+            db.execute("INSERT INTO github_repository_access(repository_id,account_id,owner_scope,selected,private,access,checked_at_ms,last_success_at_ms)
+                VALUES(?1,?2,'fixture',1,1,2,?3,?3)", params![repository, account, FIXTURE_TIME_MS])?;
+            let id = ensure_resource(db, repository_list_key(account, repository))?;
+            db.execute("UPDATE cached_resources SET coverage=2,last_page_at_ms=?2,last_fetch_at_ms=?2,last_validation_at_ms=?2 WHERE id=?1", params![id, FIXTURE_TIME_MS])?;
+        }
+        Ok(())
+    })?;
+    for first in (0..items).step_by(500) {
+        let lo = first as i64 + 1;
+        let hi = (first + 500).min(items) as i64;
+        store.write(|db| {
+            db.execute("INSERT INTO cached_resource_records(resource_id,record_key,body)
+                SELECT c.id,cast(i.id AS TEXT),'' FROM items i JOIN cached_resources c ON c.repository_id=i.repository_id AND c.family='repository-items'
+                WHERE i.account_id=?1 AND i.number BETWEEN ?2 AND ?3", params![account, lo, hi])?;
+            db.execute("INSERT INTO cached_resources(account_id,item_id,family,coverage,last_fetch_at_ms,last_validation_at_ms)
+                SELECT i.account_id,i.id,k.column1,2,?4,?4 FROM items i JOIN (VALUES('metadata'),('body'),('timeline')) k
+                WHERE i.account_id=?1 AND i.number BETWEEN ?2 AND ?3", params![account, lo, hi, FIXTURE_TIME_MS])?;
+            db.execute("INSERT INTO cached_resource_records(resource_id,record_key,body)
+                SELECT c.id,'fixture-opened',json_object('remote_key','fixture-opened','event','opened','actor','fixture-author','occurred_at_ms',?4)
+                FROM items i JOIN cached_resources c ON c.item_id=i.id AND c.family='timeline'
+                WHERE i.account_id=?1 AND i.number BETWEEN ?2 AND ?3", params![account, lo, hi, FIXTURE_TIME_MS])?;
+            db.execute("INSERT INTO reader_facets(item_id,category,observed_at)
+                SELECT i.id,k.column1,?4 FROM items i JOIN (VALUES('assignee'),('reviewer'),('author'),('label')) k
+                WHERE i.account_id=?1 AND i.number BETWEEN ?2 AND ?3", params![account, lo, hi, FIXTURE_TIME_MS])?;
+            db.execute("INSERT INTO reader_facet_values(item_id,category,value)
+                SELECT f.item_id,f.category,CASE f.category WHEN 'label' THEN 'offline' WHEN 'author' THEN 'fixture-author' ELSE 'fixture-reader' END
+                FROM reader_facets f JOIN items i ON i.id=f.item_id WHERE i.account_id=?1 AND i.number BETWEEN ?2 AND ?3
+                AND (f.category IN ('label','author') OR (f.category='assignee' AND i.number%7=0)
+                OR (f.category='reviewer' AND i.kind='pull_request' AND i.number%9=0))", params![account, lo, hi])?;
+            Ok(())
+        })?;
+    }
+    Ok(())
 }

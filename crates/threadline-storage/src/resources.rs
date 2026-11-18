@@ -22,6 +22,8 @@ macro_rules! stored_enum {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ResourceFamily {
+    RepositoryItems,
+    Timeline,
     Metadata,
     Body,
     Comments,
@@ -36,6 +38,8 @@ pub enum ResourceFamily {
 impl ResourceFamily {
     fn name(self) -> &'static str {
         match self {
+            Self::Timeline => "timeline",
+            Self::RepositoryItems => "repository-items",
             Self::Metadata => "metadata",
             Self::Body => "body",
             Self::Comments => "comments",
@@ -143,8 +147,8 @@ impl ResourceState {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResourceProgress {
-    resource_id: i64,
-    generation: i64,
+    pub(crate) resource_id: i64,
+    pub(crate) generation: i64,
     pub cursor: Option<String>,
     pub mode: WalkMode,
 }
@@ -213,6 +217,17 @@ pub(crate) fn ensure_resource(conn: &Connection, key: ResourceKey) -> Result<i64
     }
 }
 
+pub(crate) fn state_in(conn: &Connection, key: ResourceKey) -> Result<ResourceState> {
+    let Some(id) = resource_id(conn, key)? else {
+        return Ok(missing_state());
+    };
+    Ok(conn.query_row(
+        "SELECT coverage,fetch,error,last_page_at_ms,last_fetch_at_ms,last_validation_at_ms,
+                 etag,last_modified,revision FROM cached_resources WHERE id=?1",
+        [id],
+        read_state,
+    )?)
+}
 fn read_state(row: &Row<'_>) -> rusqlite::Result<ResourceState> {
     Ok(ResourceState {
         coverage: row.get(0)?,
@@ -262,17 +277,7 @@ fn require_walk(
 
 impl Store {
     pub fn resource_state(&self, key: ResourceKey) -> Result<ResourceState> {
-        self.read(|conn| {
-            let Some(id) = resource_id(conn, key)? else {
-                return Ok(missing_state());
-            };
-            Ok(conn.query_row(
-                "SELECT coverage,fetch,error,last_page_at_ms,last_fetch_at_ms,last_validation_at_ms,
-                 etag,last_modified,revision FROM cached_resources WHERE id=?1",
-                [id],
-                read_state,
-            )?)
-        })
+        self.read(|conn| state_in(conn, key))
     }
 
     pub fn resource_records(&self, key: ResourceKey) -> Result<Vec<ResourceRecord>> {
@@ -343,58 +348,20 @@ impl Store {
         expected: &ResourceProgress,
         page: ResourcePage<'_>,
     ) -> Result<Option<ResourceProgress>> {
-        if page.next_cursor == Some("")
-            || (page.next_cursor.is_some() && page.completed_validators.is_some())
-        {
-            return Err(Error::InvalidInput("invalid resource page metadata"));
-        }
+        self.write(|tx| commit_page_in(tx, key, expected, page, None))
+    }
+
+    /// A server can withhold part of a result without providing any next cursor.
+    pub fn commit_resource_partial_page(
+        &self,
+        key: ResourceKey,
+        expected: &ResourceProgress,
+        page: ResourcePage<'_>,
+        reason: ResourceError,
+    ) -> Result<()> {
         self.write(|tx| {
-            let (id, _) = require_walk(tx, key, expected)?;
-            if let Some(cursor) = page.next_cursor {
-                let fresh = tx.execute(
-                    "INSERT INTO cached_resource_cursors(resource_id,cursor) VALUES (?1,?2) ON CONFLICT DO NOTHING",
-                    params![id, cursor],
-                )?;
-                if fresh == 0 {
-                    return Err(Error::Conflict("resource page repeated a continuation cursor"));
-                }
-            }
-            let coverage: Coverage = tx.query_row("SELECT coverage FROM cached_resources WHERE id=?1", [id], |row| row.get(0))?;
-            let show_partial = page.next_cursor.is_some() && coverage != Coverage::Complete;
-            let mut write = tx.prepare_cached(
-                "INSERT INTO cached_resource_pending(resource_id,record_key,body) VALUES (?1,?2,?3)
-                 ON CONFLICT(resource_id,record_key) DO UPDATE SET body=excluded.body",
-            )?;
-            let mut write_visible = tx.prepare_cached(
-                "INSERT INTO cached_resource_records(resource_id,record_key,body) VALUES (?1,?2,?3)
-                 ON CONFLICT(resource_id,record_key) DO UPDATE SET body=excluded.body",
-            )?;
-            for record in page.records {
-                require_label(&record.key)?;
-                write.execute(params![id, record.key, record.body])?;
-                if show_partial { write_visible.execute(params![id,record.key,record.body])?; }
-            }
-            if let Some(cursor) = page.next_cursor {
-                tx.execute(
-                    "UPDATE cached_resources SET coverage=MAX(coverage,1),has_page=1,continuation=?2,
-                     last_page_at_ms=?3 WHERE id=?1",
-                    params![id,cursor,page.fetched_at_ms],
-                )?;
-                return Ok(Some(ResourceProgress { cursor: Some(cursor.into()), ..expected.clone() }));
-            }
-            if expected.mode == WalkMode::Full {
-                tx.execute("DELETE FROM cached_resource_records WHERE resource_id=?1", [id])?;
-            }
-            publish_pending_records(tx, id)?;
-            let validators = page.completed_validators.cloned().unwrap_or_default();
-            tx.execute(
-                "UPDATE cached_resources SET coverage=2,fetch=0,error=NULL,has_page=0,continuation=NULL,
-                 last_page_at_ms=?2,last_fetch_at_ms=?2,last_validation_at_ms=?2,etag=?3,last_modified=?4,revision=?5
-                 WHERE id=?1",
-                params![id,page.fetched_at_ms,validators.etag,validators.last_modified,validators.revision],
-            )?;
-            discard_walk(tx, id)?;
-            Ok(None)
+            commit_page_in(tx, key, expected, page, Some(reason))?;
+            Ok(())
         })
     }
 
@@ -439,6 +406,89 @@ impl Store {
     }
 }
 
+pub(crate) fn commit_page_in(
+    tx: &Transaction<'_>,
+    key: ResourceKey,
+    expected: &ResourceProgress,
+    page: ResourcePage<'_>,
+    terminal_error: Option<ResourceError>,
+) -> Result<Option<ResourceProgress>> {
+    if terminal_error.is_some()
+        && (page.next_cursor.is_some() || page.completed_validators.is_some())
+        || page.next_cursor == Some("")
+        || (page.next_cursor.is_some() && page.completed_validators.is_some())
+    {
+        return Err(Error::InvalidInput("invalid resource page metadata"));
+    }
+
+    let (id, _) = require_walk(tx, key, expected)?;
+    if let Some(cursor) = page.next_cursor {
+        let fresh = tx.execute(
+                    "INSERT INTO cached_resource_cursors(resource_id,cursor) VALUES (?1,?2) ON CONFLICT DO NOTHING",
+                    params![id, cursor],
+                )?;
+        if fresh == 0 {
+            return Err(Error::Conflict(
+                "resource page repeated a continuation cursor",
+            ));
+        }
+    }
+    let coverage: Coverage = tx.query_row(
+        "SELECT coverage FROM cached_resources WHERE id=?1",
+        [id],
+        |row| row.get(0),
+    )?;
+    let show_partial = page.next_cursor.is_some() && coverage != Coverage::Complete;
+    let mut write = tx.prepare_cached(
+        "INSERT INTO cached_resource_pending(resource_id,record_key,body) VALUES (?1,?2,?3)
+                 ON CONFLICT(resource_id,record_key) DO UPDATE SET body=excluded.body",
+    )?;
+    let mut write_visible = tx.prepare_cached(
+        "INSERT INTO cached_resource_records(resource_id,record_key,body) VALUES (?1,?2,?3)
+                 ON CONFLICT(resource_id,record_key) DO UPDATE SET body=excluded.body",
+    )?;
+    for record in page.records {
+        require_label(&record.key)?;
+        write.execute(params![id, record.key, record.body])?;
+        if show_partial {
+            write_visible.execute(params![id, record.key, record.body])?;
+        }
+    }
+    if let Some(cursor) = page.next_cursor {
+        tx.execute(
+            "UPDATE cached_resources SET coverage=MAX(coverage,1),has_page=1,continuation=?2,
+                     last_page_at_ms=?3 WHERE id=?1",
+            params![id, cursor, page.fetched_at_ms],
+        )?;
+        return Ok(Some(ResourceProgress {
+            cursor: Some(cursor.into()),
+            ..expected.clone()
+        }));
+    }
+    if let Some(reason) = terminal_error {
+        publish_pending_records(tx, id)?;
+        tx.execute("UPDATE cached_resources SET coverage=1,fetch=?2,error=?3,has_page=0,continuation=NULL,last_page_at_ms=?4 WHERE id=?1",
+            params![id,reason.fetch_state() as i64,reason as i64,page.fetched_at_ms])?;
+        discard_walk(tx, id)?;
+        return Ok(None);
+    }
+    if expected.mode == WalkMode::Full {
+        tx.execute(
+            "DELETE FROM cached_resource_records WHERE resource_id=?1",
+            [id],
+        )?;
+    }
+    publish_pending_records(tx, id)?;
+    let validators = page.completed_validators.cloned().unwrap_or_default();
+    tx.execute(
+                "UPDATE cached_resources SET coverage=2,fetch=0,error=NULL,has_page=0,continuation=NULL,
+                 last_page_at_ms=?2,last_fetch_at_ms=?2,last_validation_at_ms=?2,etag=?3,last_modified=?4,revision=?5
+                 WHERE id=?1",
+                params![id,page.fetched_at_ms,validators.etag,validators.last_modified,validators.revision],
+            )?;
+    discard_walk(tx, id)?;
+    Ok(None)
+}
 fn publish_pending_records(tx: &Transaction<'_>, id: i64) -> Result<()> {
     tx.execute(
         "INSERT INTO cached_resource_records(resource_id,record_key,body)
@@ -1026,13 +1076,15 @@ pub(crate) fn clear_resource_cache(tx: &Transaction<'_>, account: AccountId) -> 
     // Mid-walk records and cursors form one checkpoint. Keep them together.
     tx.execute(
         "DELETE FROM cached_resource_records WHERE resource_id IN (
-        SELECT id FROM cached_resources WHERE account_id=?1 AND has_page=0)",
+        SELECT id FROM cached_resources WHERE account_id=?1 AND has_page=0 AND NOT EXISTS(
+        SELECT 1 FROM issue_downloads d WHERE d.item_id=cached_resources.item_id AND d.state IN ('pending','active','complete')))",
         [account.0],
     )?;
     tx.execute(
         "UPDATE cached_resources SET coverage=0,fetch=0,error=NULL,generation=generation+1,
         continuation=NULL,last_page_at_ms=NULL,last_fetch_at_ms=NULL,last_validation_at_ms=NULL,
-        etag=NULL,last_modified=NULL,revision=NULL WHERE account_id=?1 AND has_page=0",
+        etag=NULL,last_modified=NULL,revision=NULL WHERE account_id=?1 AND has_page=0 AND NOT EXISTS(
+        SELECT 1 FROM issue_downloads d WHERE d.item_id=cached_resources.item_id AND d.state IN ('pending','active','complete'))",
         [account.0],
     )?;
     tx.execute("DELETE FROM cached_revision_states WHERE item_id IN (

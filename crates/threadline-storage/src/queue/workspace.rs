@@ -139,6 +139,41 @@ pub(crate) fn write_workspace(
     workspace: &Workspace,
 ) -> Result<()> {
     validate_workspace(tx, account, workspace)?;
+    let previous: Option<String> = tx
+        .query_row(
+            "SELECT layout FROM workspaces WHERE account_id=?",
+            [account],
+            |r| r.get(0),
+        )
+        .optional()?;
+    if let Some(previous) = previous {
+        let previous: Workspace = parse(&previous)?;
+        let open: std::collections::HashSet<&str> = workspace
+            .panes
+            .iter()
+            .flat_map(|p| p.tabs.iter().map(|t| t.id.as_str()))
+            .collect();
+        for (pi, pane) in previous.panes.iter().enumerate() {
+            for (ti, tab) in pane
+                .tabs
+                .iter()
+                .enumerate()
+                .filter(|(_, t)| !open.contains(t.id.as_str()))
+            {
+                tx.execute(
+                    "DELETE FROM reader_closed_tabs WHERE account_id=? AND tab_id=?",
+                    params![account, tab.id],
+                )?;
+                tx.execute("INSERT INTO reader_closed_tabs(account_id,item_id,tab_id,pane_index,tab_index,view) VALUES(?,?,?,?,?,?)",
+                    params![account,tab.item,tab.id,i64::try_from(pi).map_err(|_|Error::Corrupt)?,i64::try_from(ti).map_err(|_|Error::Corrupt)?,json(&tab.view)?])?;
+            }
+        }
+        let mut forget =
+            tx.prepare_cached("DELETE FROM reader_closed_tabs WHERE account_id=? AND tab_id=?")?;
+        for id in open {
+            forget.execute(params![account, id])?;
+        }
+    }
     tx.execute(
         "INSERT INTO workspaces(account_id,layout) VALUES(?1,?2)
         ON CONFLICT(account_id) DO UPDATE SET layout=excluded.layout",
@@ -168,6 +203,67 @@ impl Store {
                 })
                 .transpose()
         })
+    }
+    /// Restore the most recently closed view and its location in one transaction.
+    pub fn reopen_last_tab(
+        &self,
+        account: AccountId,
+        target_pane: Option<usize>,
+    ) -> Result<Option<Tab>> {
+        self.write(|tx| {
+        let Some(layout) = tx
+            .query_row("SELECT layout FROM workspaces WHERE account_id=?", [account], |r| r.get::<_, String>(0))
+            .optional()?
+        else {
+            return Ok(None);
+        };
+        let mut ws: Workspace = parse(&layout)?;
+        validate_workspace(tx, account, &ws)?;
+        let row: Option<(ItemId, String, i64, i64, String)> = tx
+            .query_row("SELECT item_id,tab_id,pane_index,tab_index,view FROM reader_closed_tabs
+               WHERE account_id=? ORDER BY sequence DESC LIMIT 1", [account], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+            })
+            .optional()?;
+        let Some((item, id, old_pane, old_index, view)) = row else {
+            return Ok(None);
+        };
+        let old_pane = usize::try_from(old_pane).map_err(|_| Error::Corrupt)?;
+        let old_index = usize::try_from(old_index).map_err(|_| Error::Corrupt)?;
+        let mut view: TabView = parse(&view)?;
+        if let Some(context) = view.context.as_mut()
+            && context.selected_issue.is_some()
+                && !tx.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM pr_reference_sets s JOIN pr_reference_candidates c ON c.account_id=s.account_id AND c.pr_id=s.pr_id WHERE s.account_id=? AND s.pr_id=? AND s.body_revision=? AND c.verified_issue=? AND c.provenance=?)",
+                    params![
+                        account,
+                        item,
+                        context.body_revision,
+                        context.selected_issue,
+                        context.provenance
+                    ],
+                    |r| r.get::<_, bool>(0),
+                )?
+            {
+            context.selected_issue = None;
+        }
+        let tab = Tab { id, item, view };
+        let position = target_pane.unwrap_or(if old_pane < ws.panes.len() {
+            old_pane
+        } else {
+            ws.focused_pane
+        });
+        let pane = ws
+            .panes
+            .get_mut(position)
+            .ok_or(Error::InvalidInput("Invalid target pane"))?;
+        let index = old_index.min(pane.tabs.len());
+        pane.tabs.insert(index, tab.clone());
+        pane.active = Some(index);
+        ws.focused_pane = position;
+        write_workspace(tx, account, &ws)?;
+        Ok(Some(tab))
+    })
     }
     pub fn set_preference(&self, account: AccountId, name: &str, value: &str) -> Result<()> {
         if name.is_empty() {

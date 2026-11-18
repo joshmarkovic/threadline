@@ -300,34 +300,7 @@ impl Store {
         locator: ItemLocator,
         update: ItemUpdate,
     ) -> Result<ItemId> {
-        locator.sql_number()?;
-        self.write(|tx| {
-            require_repository(tx, account, locator.repository)?;
-            // Retired locators cannot be used to change the current item. The
-            // caller must first resolve a fresh locator through provider evidence.
-            let id = match current_at(tx, account, locator)? {
-                Some(id) => id,
-                None if alias_at(tx, account, locator)?.is_some() => {
-                    return Err(Error::Conflict("Item locator has moved"));
-                }
-                None => insert_placeholder(tx, account, locator)?,
-            };
-            match update.representation {
-                ItemRepresentation::Issue(record) => ingest_issue(tx, id, record)?,
-                ItemRepresentation::PullRequest(record) => {
-                    ingest_pull_request(tx, account, id, record, update.remote_updated_at)?
-                }
-            }
-            update_summary(
-                tx,
-                id,
-                update.remote_updated_at,
-                update.title,
-                update.body,
-                update.closed,
-            )?;
-            Ok(id)
-        })
+        self.write(|tx| ingest_in(tx, account, locator, update))
     }
 
     /// Resolve a current locator, then a confirmed historical alias in the same account.
@@ -429,9 +402,16 @@ impl Store {
     pub fn clear_cache(&self, account: AccountId) -> Result<()> {
         self.write(|tx| {
             clear_resource_cache(tx, account)?;
+            tx.execute("DELETE FROM cached_images WHERE account_id=?", [account])?;
+            tx.execute("DELETE FROM reader_facets WHERE item_id IN (SELECT id FROM items WHERE account_id=?1)
+                AND item_id NOT IN (SELECT item_id FROM issue_downloads WHERE account_id=?1 AND state IN ('pending','active','complete'))
+                AND item_id NOT IN (SELECT i.id FROM items i JOIN cached_resources c ON c.repository_id=i.repository_id
+                    WHERE i.account_id=?1 AND c.family='repository-items' AND c.has_page=1)",[account])?;
             tx.execute(
                 "UPDATE items SET title = NULL, title_at = NULL, body = NULL, body_at = NULL,
-                    closed = NULL, closed_at = NULL WHERE account_id = ?1",
+                    closed = NULL, closed_at = NULL WHERE account_id = ?1 AND NOT EXISTS(
+                        SELECT 1 FROM issue_downloads d WHERE d.item_id=items.id AND d.state IN ('pending','active','complete')) AND NOT EXISTS(
+                        SELECT 1 FROM cached_resources c WHERE c.repository_id=items.repository_id AND c.family='repository-items' AND c.has_page=1)",
                 [account],
             )?;
             Ok(())
@@ -458,6 +438,39 @@ pub(crate) fn ensure_repository_in(
         params![account, provider_repository_id, name.owner(), name.name()],
         |row| row.get(0),
     )?)
+}
+pub(crate) fn ingest_in(
+    tx: &Transaction<'_>,
+    account: AccountId,
+    locator: ItemLocator,
+    update: ItemUpdate,
+) -> Result<ItemId> {
+    locator.sql_number()?;
+    require_repository(tx, account, locator.repository)?;
+    // Retired locators cannot be used to change the current item. The
+    // caller must first resolve a fresh locator through provider evidence.
+    let id = match current_at(tx, account, locator)? {
+        Some(id) => id,
+        None if alias_at(tx, account, locator)?.is_some() => {
+            return Err(Error::Conflict("Item locator has moved"));
+        }
+        None => insert_placeholder(tx, account, locator)?,
+    };
+    match update.representation {
+        ItemRepresentation::Issue(record) => ingest_issue(tx, id, record)?,
+        ItemRepresentation::PullRequest(record) => {
+            ingest_pull_request(tx, account, id, record, update.remote_updated_at)?
+        }
+    }
+    update_summary(
+        tx,
+        id,
+        update.remote_updated_at,
+        update.title,
+        update.body,
+        update.closed,
+    )?;
+    Ok(id)
 }
 
 fn provider_number(value: u64) -> Result<String> {
@@ -708,7 +721,7 @@ fn map_item(row: &Row<'_>) -> rusqlite::Result<Item> {
     })
 }
 
-fn kind(row: &Row<'_>, index: usize) -> rusqlite::Result<ItemKind> {
+pub(crate) fn kind(row: &Row<'_>, index: usize) -> rusqlite::Result<ItemKind> {
     match row.get_ref(index)?.as_str()? {
         "unknown" => Ok(ItemKind::Unknown),
         "issue" => Ok(ItemKind::Issue),

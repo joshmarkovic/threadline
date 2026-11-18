@@ -412,18 +412,19 @@ impl Store {
 }
 
 /// Used inside the large synthetic fixture's single database transaction.
-pub(crate) fn load_benchmark_outbox(
+pub(crate) fn load_fixture_outbox(
     tx: &Transaction<'_>,
     account: i64,
     targets: &[i64],
     seed: u64,
+    count: usize,
 ) -> Result<()> {
     let account = AccountId(account);
     if targets.is_empty() {
         return Err(Error::InvalidInput("outbox fixture needs issue targets"));
     }
     let mut previous = String::new();
-    for i in 0..1000 {
+    for i in 0..count {
         let id = format!("00000000-0000-4000-8000-{i:012x}");
         let inherited = [previous.as_str()];
         let deps: &[&str] = if i % 10 == 1 { &inherited } else { &[] };
