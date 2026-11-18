@@ -94,6 +94,46 @@ jobs:
       - name: Drive the separate native application process
         if: ${{ !cancelled() }}
         run: cargo xtask test e2e --suite smoke
+      - name: Stage the compiled Windows desktop test build
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $identity = Get-ChildItem -Path 'artifacts/xtask/e2e-*/binary.json' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (!$identity) { return }
+          $build = Get-Content -LiteralPath $identity.FullName -Raw | ConvertFrom-Json
+          if ($build.build -ne 'release with e2e feature') { return }
+          $resultPath = Join-Path $identity.DirectoryName 'result.json'
+          if (!(Test-Path -LiteralPath $resultPath -PathType Leaf)) { return }
+          $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+          $files = @(
+            $build.binary
+            'tools/native/windows-smoke.ps1'
+            'tools/native/ThreadlineWinInput.cs'
+            'docs/architecture/windows-budgets.json'
+            'tools/native/README.md'
+          )
+          foreach ($file in $files) {
+            if (!(Test-Path -LiteralPath $file -PathType Leaf)) { return }
+          }
+          $bundle = Join-Path $env:RUNNER_TEMP 'threadline-windows-reference-test-build'
+          $null = New-Item -ItemType Directory -Path $bundle
+          Copy-Item -LiteralPath $files -Destination $bundle
+          [ordered]@{
+            purpose = 'Development executable for Windows reference desktop tests'
+            build = $build.build
+            source_revision = $result.source_revision
+            cargo_lock_sha256 = $result.cargo_lock_sha256
+            workflow_run = $env:GITHUB_RUN_ID
+            target = 'x86_64-pc-windows-msvc'
+            executable_sha256 = $build.sha256
+            executable_bytes = $build.size_bytes
+          } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $bundle 'build.json') -Encoding utf8
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: windows-reference-test-build
+          path: ${{ runner.temp }}/threadline-windows-reference-test-build/
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         if: always()
         with:

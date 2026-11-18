@@ -37,6 +37,47 @@ powershell.exe -NoProfile -Sta -File .\tools\native\windows-smoke.ps1 -Binary $b
 
 For the manual shell checkpoints, open the notification area overflow if needed and click the Threadline icon after the driver closes the window. When the driver requests a notification click, click the visible **Threadline review** banner. The driver observes the Windows shell display callback, checks that the click selects PR #72 in the same process, then disables the tray and verifies that close exits. Capture a redacted screenshot of the actual banner and tray icon where permitted. If Windows suppresses the banner, record the active session and notification setting. Report an unavailable or unobserved click as Blocked.
 
+### Hosted Windows development build
+
+Download `windows-reference-test-build` from the trusted private Windows GUI workflow run. From the unpacked directory, verify the run ID, checked-out commit, and executable digest before launching it. Take the expected run ID and commit from the workflow run.
+
+```powershell
+$expectedRun = '<workflow run ID>'
+$expectedCommit = '<full commit SHA>'
+$build = Get-Content -LiteralPath .\build.json -Raw | ConvertFrom-Json
+if ([string]$build.workflow_run -cne $expectedRun -or $build.source_revision -cne $expectedCommit) {
+    throw 'The build manifest does not match the selected workflow run.'
+}
+$binary = (Resolve-Path -LiteralPath .\threadline.exe).Path
+$sha = [Security.Cryptography.SHA256]::Create()
+try {
+    $stream = [IO.File]::OpenRead($binary)
+    try { $digest = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant() }
+    finally { $stream.Dispose() }
+} finally { $sha.Dispose() }
+if ($digest -cne $build.executable_sha256) { throw 'The executable digest does not match the build manifest.' }
+$driver = (Resolve-Path -LiteralPath .\windows-smoke.ps1).Path
+```
+
+If RemoteSigned or another local policy blocks the downloaded script, use the driver from a trusted local checkout of the same commit when policy permits it.
+
+```powershell
+$checkout = 'C:\src\threadline'
+if ((git -C $checkout rev-parse HEAD) -cne $expectedCommit) { throw 'Use the build manifest commit.' }
+git -C $checkout diff --quiet HEAD -- tools/native/windows-smoke.ps1 tools/native/ThreadlineWinInput.cs
+if ($LASTEXITCODE -ne 0) { throw 'Review the checked-out driver files.' }
+$driver = Join-Path $checkout 'tools\native\windows-smoke.ps1'
+```
+
+Run the selected driver on an unlocked Windows 11 x64 desktop.
+
+```powershell
+$evidence = Join-Path ([IO.Path]::GetTempPath()) ('threadline-reference-' + [Guid]::NewGuid())
+powershell.exe -NoProfile -Sta -File $driver -Binary $binary -ReportDir $evidence
+```
+
+This artifact is for development tests. Keep the completed report with `build.json`. The included `windows-budgets.json` supplies the budget for a separate run with `-Measure -BudgetFile .\windows-budgets.json`.
+
 ## Windows measurements
 
 ```powershell

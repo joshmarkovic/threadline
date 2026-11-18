@@ -268,7 +268,9 @@ fn native_driver(
         .map_err(|error| NativeError::Blocked(error.to_string()))?;
     let mut driver = if os == "windows" {
         let mut cmd = Command::new("powershell.exe");
-        cmd.args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Sta", "-File"])
+        // Windows PowerShell must resolve its own inbox modules when launched through Cargo from PowerShell 7.
+        cmd.env_remove("PSModulePath")
+            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Sta", "-File"])
             .arg(root.join("tools/native/windows-smoke.ps1"))
             .arg("-Binary")
             .arg(&binary)

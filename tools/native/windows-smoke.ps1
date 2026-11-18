@@ -45,6 +45,23 @@ $blocked = $false
 $clipboardBackup = $null
 $copiedClipboardSequence = $null
 
+function Get-FileSha256 {
+    param([string]$Path)
+
+    $stream = [IO.File]::OpenRead($Path)
+    try {
+        $algorithm = [Security.Cryptography.SHA256]::Create()
+        try {
+            $digest = $algorithm.ComputeHash($stream)
+            return [BitConverter]::ToString($digest).Replace('-', '').ToLowerInvariant()
+        } finally {
+            $algorithm.Dispose()
+        }
+    } finally {
+        $stream.Dispose()
+    }
+}
+
 function Add-Evidence([string]$Action, $Observed) {
     $events.Add([ordered]@{ action = $Action; observed = $Observed })
 }
@@ -559,7 +576,7 @@ function Invoke-Measurement([IntPtr]$Window, [double]$ColdMs) {
         [Math]::Max($diffScroll.p95_ms, $markdownScroll.p95_ms)
     } else { $null }
     $measurement.package_bytes = if ($Artifact) { (Get-Item -LiteralPath $Artifact).Length } else { $null }
-    $measurement.package_sha256 = if ($Artifact) { (Get-FileHash -LiteralPath $Artifact -Algorithm SHA256).Hash.ToLowerInvariant() } else { $null }
+    $measurement.package_sha256 = if ($Artifact) { Get-FileSha256 $Artifact } else { $null }
     Crop-Screenshot $Window 'measurement.png'
     Stop-ThroughUi
 
@@ -599,7 +616,7 @@ try {
     $ReportDir = (Resolve-Path -LiteralPath $ReportDir).Path
     $reportPath = Join-Path $ReportDir $reportName
     $reportFile = Join-Path $ReportDir 'ui-observation.json'
-    $report.binary_sha256 = (Get-FileHash -LiteralPath $Binary -Algorithm SHA256).Hash.ToLowerInvariant()
+    $report.binary_sha256 = Get-FileSha256 $Binary
     $report.executable_bytes = (Get-Item -LiteralPath $Binary).Length
     $operatingSystem = Get-CimInstance Win32_OperatingSystem
     $report.windows_product = $operatingSystem.Caption
