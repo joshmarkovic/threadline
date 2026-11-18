@@ -183,6 +183,8 @@ impl ReaderWorkspace {
             || draft_id.starts_with(&format!("comment-edit-{}-", tab.item.0))
         {
             DraftKind::Comment
+        } else if draft_id.starts_with(&format!("review-reply-{}-", tab.item.0)) {
+            DraftKind::Reply
         } else {
             return;
         };
@@ -273,6 +275,32 @@ impl ReaderWorkspace {
         );
     }
 
+    pub(super) fn edit_review_reply(
+        &mut self,
+        tab: Tab,
+        base: WriteBase,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let WriteBase::ReviewReply {
+            root_comment_id, ..
+        } = &base
+        else {
+            return;
+        };
+        self.edit_draft(
+            tab.clone(),
+            DraftEditorRequest {
+                kind: DraftKind::Reply,
+                id: format!("review-reply-{}-{root_comment_id}", tab.item.0),
+                initial: Some(base),
+                restore_only: false,
+            },
+            window,
+            cx,
+        );
+    }
+
     fn edit_draft(
         &mut self,
         tab: Tab,
@@ -320,17 +348,23 @@ impl ReaderWorkspace {
                     if restore_only {
                         return Err(threadline_storage::Error::NotFound);
                     }
-                    let content = if let Some(initial @ WriteBase::Comment { .. }) = initial {
-                        let WriteBase::Comment { body, .. } = &initial else {
-                            unreachable!()
-                        };
-                        DraftContent {
-                            body: body.clone(),
-                            base: initial.encode()?,
-                            anchor: String::new(),
+                    let content = match initial {
+                        Some(base @ WriteBase::Comment { .. }) => {
+                            let WriteBase::Comment { body, .. } = &base else {
+                                unreachable!()
+                            };
+                            DraftContent {
+                                body: body.clone(),
+                                base: base.encode()?,
+                                anchor: String::new(),
+                            }
                         }
-                    } else {
-                        draft_base(store, account, item, kind)?
+                        Some(base @ WriteBase::ReviewReply { .. }) => DraftContent {
+                            body: String::new(),
+                            base: base.encode()?,
+                            anchor: String::new(),
+                        },
+                        _ => draft_base(store, account, item, kind)?,
                     };
                     store.create_draft(account, &draft_id, item, kind, &content)?;
                 }
@@ -532,6 +566,7 @@ impl ReaderWorkspace {
     }
 
     pub(super) fn may_close(&mut self, tab_ids: &[String], cx: &gpui_kit::App) -> bool {
+        self.capture_review_editors(cx);
         for editor in self
             .drafts
             .values_mut()
@@ -542,6 +577,10 @@ impl ReaderWorkspace {
         if self.pending_draft.is_some()
             || self.drafts.values().any(|editor| {
                 tab_ids.contains(&editor.tab_id) && (!editor.saved() || editor.submitting)
+            })
+            || !self.review_pending.is_empty()
+            || self.review_editors.values().any(|editor| {
+                tab_ids.contains(&editor.tab_id) && (!editor.saved() || editor.sending)
             })
         {
             self.status = Some("The draft is still saving. Its editor remains open.");

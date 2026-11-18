@@ -63,6 +63,7 @@ pub(crate) struct PrObservation {
     linked_issue: Option<i64>,
     verified_targets: usize,
     download_state: Option<String>,
+    review_draft: Option<super::review_editor::ReviewObservation>,
 }
 
 #[cfg(feature = "e2e")]
@@ -132,6 +133,10 @@ impl ReaderWorkspace {
                 download_state: pr
                     .and_then(|pr| pr.data.download.as_ref())
                     .map(|job| format!("{:?}", job.state)),
+                review_draft: self
+                    .review_editors
+                    .get(&tab.item)
+                    .map(|editor| editor.observation(tab)),
             }
         })
     }
@@ -205,6 +210,9 @@ impl ReaderWorkspace {
                 )
                 .into_any_element();
         };
+        if settings.section != PrSection::Files {
+            panel = panel.child(self.review_view(pane, tab, pr, palette, cx));
+        }
         panel = panel.child(match settings.section {
             PrSection::Conversation => div()
                 .flex()
@@ -451,8 +459,17 @@ impl ReaderWorkspace {
                 palette,
                 cx,
             ));
-            for (_, record) in &page.rows {
+            for (index, (_, record)) in page.rows.iter().enumerate() {
                 viewport = viewport.child(pr_record(record, palette));
+                if let Some(thread) = super::review_threads::Thread::from_record(record) {
+                    viewport = viewport.child(self.thread_controls(
+                        (pane, index),
+                        tab,
+                        &pr.data.revision,
+                        thread,
+                        cx,
+                    ));
+                }
             }
         }
         viewport.into_any_element()
@@ -952,6 +969,7 @@ impl ReaderWorkspace {
             .flex_1()
             .min_h_0()
             .min_w_0()
+            .child(self.review_view(pane, tab, pr, palette, cx))
             .child(div().p_1().flex_shrink_0().child(self.pr_family_bar(
                 pane,
                 tab,
@@ -961,6 +979,7 @@ impl ReaderWorkspace {
                 palette,
                 cx,
             )))
+            .children(self.unresolved_thread_control(pane, tab, pr, cx))
             .child(
                 div()
                     .flex()
@@ -1058,6 +1077,11 @@ impl ReaderWorkspace {
                     .child(format!("{title} · {}", file_counts(&file.summary))),
             )
             .child(self.pr_diff_toolbar(pane, tab, pr, file, palette, cx));
+        if pr.diff.is_some() {
+            panel = panel.child(div().p_1().text_xs().text_color(palette.muted).child(
+                "Whitespace filtering is unavailable. Review anchors use the full source patch.",
+            ));
+        }
         if let Some(problem) = file.problem {
             panel = panel.child(
                 div()
@@ -1079,28 +1103,45 @@ impl ReaderWorkspace {
                 .into_any_element();
         }
         if let Some(diff) = &pr.diff {
+            let annotations = self.review_annotations(tab, pr, &file.summary.path);
             let tab = tab.clone();
             let revision = pr.data.revision.clone();
             let entity = cx.weak_entity();
+            let annotate = cx.weak_entity();
+            let annotation_tab = tab.clone();
             let comparison = div()
                 .id(format!("pr-{pane}-diff"))
                 .relative()
                 .flex_1()
                 .min_h_0()
                 .min_w_0()
-                .child(Diff::new(diff).size_full().on_line_click(
-                    move |position, _, window, cx| {
-                        let _ = entity.update(cx, |this, cx| {
-                            this.code_selection(
-                                tab.clone(),
-                                &revision,
-                                position.clone(),
-                                window,
-                                cx,
-                            )
-                        });
-                    },
-                ));
+                .child(
+                    Diff::new(diff)
+                        .size_full()
+                        .annotations(annotations.rows)
+                        .render_annotation(move |annotation, _, _| {
+                            div()
+                                .p_1()
+                                .text_xs()
+                                .children(annotations.labels.get(annotation.id()).cloned())
+                        })
+                        .on_line_click(move |position, _, window, cx| {
+                            let _ = entity.update(cx, |this, cx| {
+                                this.code_selection(
+                                    tab.clone(),
+                                    &revision,
+                                    position.clone(),
+                                    window,
+                                    cx,
+                                )
+                            });
+                        })
+                        .on_add_annotation(move |range, window, cx| {
+                            let _ = annotate.update(cx, |this, cx| {
+                                this.begin_inline(annotation_tab.clone(), range, window, cx);
+                            });
+                        }),
+                );
             #[cfg(feature = "e2e")]
             let comparison = comparison.children(
                 self.observer
@@ -1132,7 +1173,25 @@ impl ReaderWorkspace {
             .map_or("merge base unavailable", |oid| oid.as_str());
         let mut buttons = div().flex().flex_wrap().items_center().gap_1();
         let path = file.summary.path.clone();
-        if pr.diff.is_some() {
+        if let Some(diff) = &pr.diff {
+            let id = format!("pr-{pane}-review-add-inline");
+            let diff = diff.clone();
+            let target = tab.clone();
+            let note = control(id.clone(), "Comment on selected source lines")
+                .disabled(self.review_controls_busy(tab.item))
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    if let Some(range) = diff.read(cx).selected_lines() {
+                        this.begin_inline(target.clone(), &range, window, cx);
+                    } else {
+                        this.status = Some("Select one or more source lines in the diff first.");
+                        cx.notify();
+                    }
+                }));
+            buttons = buttons.child(
+                div()
+                    .keep_text_selection(format!("pr-{pane}-review-add-control"))
+                    .child(self.observed_control(id, note, false)),
+            );
             for (mode, label) in [
                 (PrDiffMode::Unified, "Unified"),
                 (PrDiffMode::Split, "Split"),

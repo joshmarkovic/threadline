@@ -28,6 +28,11 @@ pub(super) enum WriteBase {
         target: CommentTarget,
         body: String,
     },
+    ReviewReply {
+        revision_id: i64,
+        thread_id: String,
+        root_comment_id: NonZeroU64,
+    },
 }
 
 #[derive(Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -156,6 +161,7 @@ impl drafts::Editor {
             Some(WriteBase::Comment { body, .. }) => {
                 &self.body != body && !self.body.trim().is_empty()
             }
+            Some(WriteBase::ReviewReply { .. }) => false,
             None => !self.issue_draft && !self.comment_edit && !self.body.trim().is_empty(),
         }
     }
@@ -182,6 +188,7 @@ impl drafts::Editor {
                 target: target.clone(),
                 body: changed(Some(body), Some(&self.body))?,
             },
+            Some(WriteBase::ReviewReply { .. }) => return None,
             None if !self.issue_draft && !self.comment_edit => WriteIntent::CreateComment {
                 body: self.body.clone(),
             },

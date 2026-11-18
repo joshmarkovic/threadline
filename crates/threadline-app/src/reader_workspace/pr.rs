@@ -98,7 +98,7 @@ impl PullRequestData {
         let families: &[PrFamily] = match view.section {
             PrSection::Conversation => &[PrFamily::Reviews, PrFamily::Threads],
             PrSection::Commits => &[PrFamily::Commits],
-            PrSection::Files => &[PrFamily::Context],
+            PrSection::Files => &[PrFamily::Context, PrFamily::Threads],
             PrSection::Checks => &[PrFamily::Checks, PrFamily::Statuses],
         };
         let pages = families

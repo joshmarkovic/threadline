@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use gpui_kit::base::text::TextViewState;
 use gpui_kit::component::input::{InputEvent, InputState};
@@ -23,6 +26,9 @@ mod outbox;
 mod pr;
 mod pr_view;
 mod remote;
+mod review_editor;
+mod review_threads;
+mod review_view;
 mod scheduled;
 mod sync_bridge;
 #[cfg(all(test, feature = "e2e"))]
@@ -169,6 +175,8 @@ pub(crate) struct ReaderWorkspace {
     outbox: outbox::OutboxState,
     drafts: HashMap<String, drafts::Editor>,
     pending_draft: Option<String>,
+    review_editors: HashMap<ItemId, review_editor::ReviewEditor>,
+    review_pending: HashSet<ItemId>,
     editor_to_focus: Option<String>,
     departure: Option<Departure>,
     #[cfg(feature = "e2e")]
@@ -429,6 +437,8 @@ impl ReaderWorkspace {
             outbox: outbox::OutboxState::default(),
             drafts: HashMap::new(),
             pending_draft: None,
+            review_editors: HashMap::new(),
+            review_pending: HashSet::new(),
             editor_to_focus: None,
             departure: None,
             #[cfg(feature = "e2e")]
@@ -552,6 +562,8 @@ impl ReaderWorkspace {
             self.downloads.clear();
             self.pr_reads.clear();
             self.release_drafts();
+            self.review_editors.clear();
+            self.review_pending.clear();
             self.account = account;
             self.generation += 1;
             self.contact = if reachability == Reachability::ReceivedResponse {
@@ -645,6 +657,7 @@ impl ReaderWorkspace {
             return;
         }
         self.capture_drafts(cx);
+        self.capture_review_editors(cx);
         self.departure = Some(Departure {
             quit,
             after: Box::new(after),
@@ -653,10 +666,16 @@ impl ReaderWorkspace {
     }
 
     fn settle_departure(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.departure.is_none() || self.layout_busy || self.pending_draft.is_some() {
+        if self.departure.is_none()
+            || self.layout_busy
+            || self.pending_draft.is_some()
+            || !self.review_pending.is_empty()
+        {
             return;
         }
-        if self.drafts.values().any(|editor| editor.failed) {
+        if self.drafts.values().any(|editor| editor.failed)
+            || self.review_editors.values().any(|editor| editor.failed)
+        {
             self.departure.take();
             self.status = Some("A draft could not be saved. Your text is still in its editor.");
             cx.notify();
@@ -666,6 +685,10 @@ impl ReaderWorkspace {
             .drafts
             .values()
             .any(|editor| !editor.saved() || editor.submitting)
+            || self
+                .review_editors
+                .values()
+                .any(|editor| !editor.saved() || editor.sending)
         {
             self.status = Some("Saving drafts before leaving the workspace…");
             cx.notify();
@@ -689,7 +712,13 @@ impl ReaderWorkspace {
                     return;
                 }
                 this.capture_drafts(cx);
-                if this.drafts.values().any(|editor| !editor.saved()) {
+                this.capture_review_editors(cx);
+                if this.drafts.values().any(|editor| !editor.saved())
+                    || this
+                        .review_editors
+                        .values()
+                        .any(|editor| !editor.saved() || editor.sending)
+                {
                     this.settle_departure(window, cx);
                     return;
                 }
@@ -698,7 +727,8 @@ impl ReaderWorkspace {
                 };
                 this.status = None;
                 if quit {
-                    let handles = this.stop_editors();
+                    let mut handles = this.stop_editors();
+                    handles.extend(this.close_review_editors());
                     let visibility = this
                         .visible_subscriptions
                         .take()
@@ -1086,6 +1116,7 @@ impl ReaderWorkspace {
                             },
                         );
                         this.trim_inactive_views();
+                        this.restore_review(tab, window, cx);
                         this.resume_visible_pr_downloads(window, cx);
                     }
                     Err(_) => this.status = Some("The cached item could not be loaded."),
@@ -1160,6 +1191,12 @@ impl ReaderWorkspace {
                                 .any(|pane| pane.tabs.iter().any(|tab| tab.id == *id))
                         });
                         this.drafts.retain(|_, editor| {
+                            this.layout
+                                .panes
+                                .iter()
+                                .any(|pane| pane.tabs.iter().any(|tab| tab.id == editor.tab_id))
+                        });
+                        this.review_editors.retain(|_, editor| {
                             this.layout
                                 .panes
                                 .iter()

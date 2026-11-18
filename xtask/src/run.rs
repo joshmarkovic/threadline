@@ -327,6 +327,17 @@ const INTEGRATION: &[CargoTest] = &[
 ];
 const UI: &[CargoTest] = &[
     CargoTest {
+        id: "UI-004",
+        arguments: &[
+            "-p",
+            "threadline-app",
+            "--features",
+            "e2e",
+            "--lib",
+            "ui_004_",
+        ],
+    },
+    CargoTest {
         id: "S01-GPUI",
         arguments: &["-p", "threadline-app", "--test", "feasibility_ui"],
     },

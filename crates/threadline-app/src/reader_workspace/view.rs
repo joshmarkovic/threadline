@@ -1129,6 +1129,12 @@ impl ReaderWorkspace {
             .draft
             .as_ref()
             .and_then(|id| self.drafts.get(id))
+            .filter(|editor| {
+                !matches!(
+                    editor.write_base,
+                    Some(super::write_composer::WriteBase::ReviewReply { .. })
+                )
+            })
             .filter(|editor| editor.tab_id == tab.id);
         let content = div()
             .id(format!("reader-conversation-{pane}"))

@@ -701,6 +701,17 @@ fn ui_008_observed_reader_controls_follow_the_visible_panes(cx: &mut TestAppCont
 fn ui_001_pr_context_changes_keep_the_immutable_native_diff_and_each_tabs_state(
     cx: &mut TestAppContext,
 ) {
+    exercise_pr_context(cx, false);
+}
+
+#[gpui_kit::test]
+fn ui_004_anchored_review_draft_survives_pr_context_changes_and_queues_the_original_head(
+    cx: &mut TestAppContext,
+) {
+    exercise_pr_context(cx, true);
+}
+
+fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
     use gpui_kit::component::diff::{DiffLineRange, DiffMode, DiffSide};
     use std::num::NonZeroU64;
     use threadline_storage::{
@@ -916,6 +927,58 @@ fn ui_001_pr_context_changes_keep_the_immutable_native_diff_and_each_tabs_state(
         })
         .unwrap();
     until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+    let draft_id = format!("review-{}", pr.0);
+    let original_review = if review {
+        click(cx, window, "pr-0-review-add-inline");
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let reader = reader.read(cx);
+                !reader.layout_busy
+                    && reader
+                        .review_editors
+                        .get(&pr)
+                        .is_some_and(|editor| editor.inline.len() == 1)
+            })
+        });
+        cx.update_window(window, |_, window, cx| {
+            window.simulate_next_frame(cx);
+            window.render_frame(cx);
+            let editor = &reader.read(cx).review_editors[&pr];
+            assert!(editor.inline[0].input.focus_handle(cx).is_focused(window));
+            window.input("One anchored review note", cx);
+        })
+        .unwrap();
+        until(cx, |cx| {
+            cx.read(|cx| reader.read(cx).review_editors[&pr].saved())
+        });
+        let saved = store.review_draft(account, &draft_id).unwrap().unwrap();
+        assert_eq!(saved.revision_id, revision.id);
+        let inline = &saved.draft.comments[0];
+        assert_eq!(inline.body, "One anchored review note");
+        assert_eq!(
+            inline.anchor.side,
+            threadline_storage::pr::SourceSide::Right
+        );
+        assert_eq!(inline.anchor.path, filenames[1]);
+        assert_eq!(inline.anchor.first_line, 21);
+        assert_eq!(inline.anchor.last_line, 21);
+        assert_eq!(inline.anchor.source_oid, revision.head.as_str());
+        cx.update_window(window, |_, _, cx| {
+            diff.update(cx, |state, cx| {
+                state.set_selected_lines(
+                    Some(DiffLineRange::new(filenames[1], DiffSide::Modified, 21, 21)),
+                    cx,
+                );
+            });
+            assert!(diff.read(cx).selected_text(cx).contains("new line"));
+        })
+        .unwrap();
+        click(cx, window, "pr-0-context-more");
+        until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+        Some(saved)
+    } else {
+        None
+    };
     click(cx, window, "pr-0-context-issue");
     until(cx, |cx| {
         cx.read(|cx| {
@@ -979,6 +1042,57 @@ fn ui_001_pr_context_changes_keep_the_immutable_native_diff_and_each_tabs_state(
         duplicate.pr_reader.as_ref().unwrap().section,
         PrSection::Conversation
     );
+    if let Some(original_review) = original_review {
+        assert_eq!(
+            reopened.review_draft(account, &draft_id).unwrap(),
+            Some(original_review.clone())
+        );
+        cx.read(|cx| {
+            let reader = reader.read(cx);
+            assert_eq!(reader.review_editors.len(), 1);
+            assert_eq!(reader.review_editors[&pr].id(), draft_id);
+        });
+        click(cx, window, "pr-1-review-open");
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let reader = reader.read(cx);
+                !reader.layout_busy && reader.layout.focused_pane == 0
+            })
+        });
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            assert_eq!(
+                reader.read(cx).review_editors[&pr].tab_id,
+                tab.id,
+                "the other view never becomes the editor owner",
+            );
+        })
+        .unwrap();
+        click(cx, window, "reader-maximize-pane");
+        until(cx, |cx| {
+            cx.read(|cx| reader.read(cx).maximized && !reader.read(cx).layout_busy)
+        });
+        let operations_before = store.queue_page(account, 0, 100).unwrap().len();
+        click(cx, window, "pr-0-review-submit");
+        until(cx, |cx| {
+            cx.read(|cx| reader.read(cx).review_editors[&pr].submitted.is_some())
+        });
+        let operations = store.queue_page(account, 0, 100).unwrap();
+        assert_eq!(operations.len(), operations_before + 1);
+        let operation = store
+            .operation(account, &operations.last().unwrap().id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(operation.item, pr);
+        assert_eq!(operation.state, threadline_storage::queue::State::Queued);
+        let intent: threadline_storage::reviews::ReviewIntent =
+            serde_json::from_str(&operation.snapshot.payload).unwrap();
+        assert_eq!(
+            intent,
+            threadline_storage::reviews::ReviewIntent::Review(original_review.draft)
+        );
+        assert_eq!(operation.snapshot.base, revision.head.as_str());
+    }
 }
 
 #[gpui_kit::test]
