@@ -326,7 +326,7 @@ fn observe_object(
     Ok(())
 }
 
-fn apply_downloaded_comment(
+pub(crate) fn apply_downloaded_comment(
     tx: &Transaction<'_>,
     item: ItemId,
     c: &DiscussionComment,

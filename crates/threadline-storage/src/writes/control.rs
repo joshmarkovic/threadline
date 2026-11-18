@@ -1,0 +1,249 @@
+use super::*;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReconciliationTarget {
+    pub operation_id: String,
+    pub attempt: i64,
+    pub route: WriteRoute,
+    pub comment_id: NonZeroU64,
+}
+
+impl Store {
+    /// Earliest queued attempt or expiring lease for the worker. Paused and unselected work supplies no demand.
+    pub fn next_write_due(&self, account: AccountId, now: i64) -> Result<Option<i64>> {
+        self.read(|db| {
+            let tx = db.unchecked_transaction()?;
+            let earliest=tx.query_row("SELECT MIN(q.retry_at) FROM operations q JOIN write_intents w
+                        ON w.account_id=q.account_id AND w.operation_id=q.id JOIN operation_gates g USING(account_id,id)
+                        WHERE q.account_id=? AND q.state='queued' AND NOT q.cancel_requested AND g.hold IS NULL",
+                        [account],|r|r.get::<_,Option<i64>>(0))?;
+            let floor = deadline(&tx, account)?.unwrap_or(now).max(now);
+            let work = earliest.map(|t| t.max(floor));
+            let lease=tx.query_row("SELECT MIN(q.lease_until) FROM operations q JOIN write_intents w
+                        ON w.account_id=q.account_id AND w.operation_id=q.id WHERE q.account_id=? AND q.state IN ('validating','sending')",
+                        [account],|r|r.get::<_,Option<i64>>(0))?.map(|t|t.max(now));
+            Ok(work.into_iter().chain(lease).min())
+        })
+    }
+
+    /// User retry affects only a queued, definitely unsent action. Shared server floors still apply.
+    pub fn retry_write_now(&self, account: AccountId, id: &str, now: i64) -> Result<bool> {
+        self.write(|tx| {
+            let floor = deadline(tx, account)?.unwrap_or(now).max(now);
+            Ok(tx.execute("UPDATE operations SET retry_at=?3,reason='explicit_retry' WHERE account_id=?1 AND id=?2
+                        AND state='queued' AND cancel_requested=0 AND EXISTS(SELECT 1 FROM write_intents w
+                            WHERE w.account_id=?1 AND w.operation_id=?2)
+                        AND EXISTS(SELECT 1 FROM operation_gates g WHERE g.account_id=?1 AND g.id=?2 AND g.hold IS NULL)",
+                        params![account,id,floor])?==1)
+        })
+    }
+
+    /// Coalesce a reconnect/wake signal. A changed owner or user cannot release held work.
+    pub fn resume_writes(&self, account: AccountId, now: i64) -> Result<usize> {
+        self.write(|tx| {
+            let floor = deadline(tx, account)?.unwrap_or(now).max(now);
+            let changed=tx.execute("UPDATE operations AS q SET state='queued',retry_at=?2,reason='eligible_after_recovery'
+                        WHERE q.account_id=?1 AND q.cancel_requested=0 AND EXISTS(
+                            SELECT 1 FROM write_intents w JOIN operation_gates g ON g.account_id=w.account_id AND g.id=w.operation_id
+                            WHERE w.account_id=q.account_id AND w.operation_id=q.id AND g.hold IS NULL)
+                        AND ((q.state='queued' AND q.reason='retry_burst_exhausted') OR
+                             (q.state='attention' AND q.reason IN ('mutation_access_rejected','write_permission_unavailable') AND EXISTS(
+                                SELECT 1 FROM write_evidence e JOIN github_operation_scopes sc USING(account_id,operation_id)
+                                JOIN github_access_profiles p ON p.account_id=sc.account_id AND p.owner_scope=sc.owner_scope
+                                WHERE e.account_id=q.account_id AND e.operation_id=q.id AND e.attempt=q.attempt
+                                AND p.credential_generation>e.credential_generation)))",params![account,floor])?;
+            if changed > 0 {
+                tx.execute("INSERT INTO write_timing(account_id,not_before,retry_epoch) VALUES(?,0,?)
+                            ON CONFLICT(account_id) DO UPDATE SET retry_epoch=MAX(write_timing.retry_epoch,excluded.retry_epoch)",params![account,now])?;
+            }
+            Ok(changed)
+        })
+    }
+
+    /// Read-only reconciliation can resume an accepted create after restart, including after cancellation.
+    pub fn write_reconciliations(
+        &self,
+        account: AccountId,
+        limit: u16,
+    ) -> Result<Vec<ReconciliationTarget>> {
+        if !(1..=100).contains(&limit) {
+            return Err(Error::InvalidInput("Invalid reconciliation page size"));
+        }
+        self.read(|db| {
+            let tx = db.unchecked_transaction()?;
+            let mut query=tx.prepare("SELECT a.operation_id,a.attempt,a.remote_id,e.route FROM write_accepted_objects a
+                        JOIN operations o ON o.account_id=a.account_id AND o.id=a.operation_id AND o.attempt=a.attempt
+                        JOIN write_evidence e USING(account_id,operation_id,attempt) JOIN operation_gates g ON g.account_id=o.account_id AND g.id=o.id
+                        WHERE a.account_id=? AND a.kind='comment' AND o.state IN ('waiting','unknown') AND g.hold IS NULL
+                        ORDER BY o.sequence LIMIT ?")?;
+            let rows = query.query_map(params![account, i64::from(limit)], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, i64>(1)?,
+                    r.get::<_, String>(2)?,
+                    r.get::<_, String>(3)?,
+                ))
+            })?;
+            let mut result = Vec::new();
+            for row in rows {
+                let (operation_id, attempt, remote, raw) = row?;
+                result.push(ReconciliationTarget {
+                    operation_id,
+                    attempt,
+                    route: decode(&raw)?,
+                    comment_id: numeric(&remote)?,
+                });
+            }
+            Ok(result)
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WritePreflightFailure {
+    Transient,
+    Throttled { not_before_ms: i64 },
+    Unauthorized,
+    Forbidden,
+    Missing,
+    InvalidResponse,
+}
+
+fn validating(db: &Connection, claim: &WriteClaim, now: i64) -> Result<bool> {
+    Ok(db.query_row(
+        "SELECT EXISTS(SELECT 1 FROM operations o JOIN operation_gates g USING(account_id,id)
+           WHERE o.account_id=? AND o.id=? AND o.attempt=? AND o.state='validating'
+             AND o.lease_until>? AND o.cancel_requested=0 AND g.hold IS NULL)",
+        params![
+            claim.route.account,
+            claim.operation_id(),
+            claim.attempt(),
+            now
+        ],
+        |r| r.get(0),
+    )?)
+}
+
+impl Store {
+    /// Bind the live credential lookup to this eligible, original preflight and owner.
+    pub fn write_profile(
+        &self,
+        claim: &WriteClaim,
+        now: i64,
+    ) -> Result<crate::access::AccessProfile> {
+        self.read(|db| {
+            let snapshot = db.unchecked_transaction()?;
+            if !validating(&snapshot, claim, now)?
+                || load_route(&snapshot, claim.route.account, claim.operation_id())? != claim.route
+            {
+                return Err(Error::Conflict(
+                    "The write target or credential generation changed",
+                ));
+            }
+            crate::access::profile(&snapshot, claim.route.account, &claim.route.owner)?
+                .ok_or(Error::NotFound)
+        })
+    }
+
+    pub fn fail_write_preflight(
+        &self,
+        claim: &WriteClaim,
+        why: WritePreflightFailure,
+        now: i64,
+    ) -> Result<()> {
+        self.write(|tx| {
+            if !validating(tx, claim, now)?
+                || load_route(tx, claim.route.account, claim.operation_id())? != claim.route
+            {
+                return Err(Error::Conflict(
+                    "The preflight result no longer belongs to the active credential or target",
+                ));
+            }
+            let (state, mut reason, floor) = match why {
+                WritePreflightFailure::Transient => ("queued", "temporary_preflight", None),
+                WritePreflightFailure::Throttled { not_before_ms } => {
+                    crate::sync::server_floor_in(tx, claim.route.account, not_before_ms)?;
+                    ("queued", "preflight_throttled", Some(not_before_ms))
+                }
+                WritePreflightFailure::Unauthorized | WritePreflightFailure::Forbidden => {
+                    ("attention", "write_permission_unavailable", None)
+                }
+                WritePreflightFailure::Missing => ("attention", "verified_target_unavailable", None),
+                WritePreflightFailure::InvalidResponse => ("attention", "invalid_preflight_response", None),
+            };
+            let due = if state == "queued" {
+                let burst:u32=tx.query_row("SELECT COUNT(*) FROM operation_attempts WHERE account_id=?1 AND operation_id=?2
+                            AND claimed_at >= COALESCE((SELECT retry_epoch FROM write_timing WHERE account_id=?1),0)",
+                            params![claim.route.account,claim.operation_id()],|r|r.get(0))?;
+                let step = threadline_core::sync::policy::retry_delay(burst, std::time::Duration::ZERO);
+                if step.is_none() {
+                    reason = "retry_burst_exhausted";
+                }
+                let jitter = claim
+                    .operation_id()
+                    .bytes()
+                    .fold(claim.attempt() as u64, |v, b| {
+                        v.wrapping_mul(31).wrapping_add(b.into())
+                    })
+                    % 501;
+                let delay = step
+                    .unwrap_or(std::time::Duration::from_secs(15 * 60))
+                    .as_millis() as i64
+                    + jitter as i64;
+                now.saturating_add(delay).max(floor.unwrap_or(now))
+            } else {
+                0
+            };
+            tx.execute("INSERT INTO write_evidence(account_id,operation_id,attempt,credential_generation,observed_at,current_fields,result,route)
+                        VALUES(?1,?2,?3,?4,?5,'null',?6,?7)",params![claim.route.account,claim.operation_id(),claim.attempt(),
+                            claim.route.credential_generation,now,reason,encode(&claim.route)?])?;
+            end_preflight(tx, claim, state, reason, due)
+        })
+    }
+
+    /// Atomically reserve this mutation once. The provider starts HTTP only after this returns true.
+    pub fn start_write_transport(&self, ticket: &MutationTicket, now: i64) -> Result<bool> {
+        let claim = ticket.claim();
+        self.write(|tx| {
+            if !validating(tx, claim, now)? {
+                return Ok(false);
+            }
+            if load_route(tx, claim.route.account, claim.operation_id())? != claim.route {
+                end_preflight(
+                    tx,
+                    claim,
+                    "queued",
+                    "credential_changed_before_transport",
+                    now,
+                )?;
+                return Ok(false);
+            }
+            let accepted:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM write_evidence WHERE account_id=?
+                        AND operation_id=? AND attempt=? AND result='validated' AND credential_generation=?)",
+                        params![claim.route.account,claim.operation_id(),claim.attempt(),claim.route.credential_generation],|r|r.get(0))?;
+            if !accepted {
+                return Err(Error::Conflict("The mutation has no accepted preflight"));
+            }
+            let floor = deadline(tx, claim.route.account)?;
+            let sending:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM operations o JOIN write_intents w
+                        ON w.account_id=o.account_id AND w.operation_id=o.id WHERE o.account_id=? AND o.state='sending')",
+                        [claim.route.account],|r|r.get(0))?;
+            if sending || floor.is_some_and(|t| t > now) {
+                end_preflight(
+                    tx,
+                    claim,
+                    "queued",
+                    "mutation_pacing",
+                    floor.unwrap_or(now).max(now.saturating_add(1_000)),
+                )?;
+                return Ok(false);
+            }
+            dispatch::begin_send_in(tx, &claim.claim, claim.intent.action(), now)?;
+            let next = now.saturating_add(1_000);
+            crate::sync::budget_in(tx, claim.route.account, next)?;
+            tx.execute("INSERT INTO write_timing(account_id,not_before) VALUES(?,?) ON CONFLICT(account_id) DO UPDATE SET
+                        not_before=MAX(write_timing.not_before,excluded.not_before)",params![claim.route.account,next])?;
+            Ok(true)
+        })
+    }
+}

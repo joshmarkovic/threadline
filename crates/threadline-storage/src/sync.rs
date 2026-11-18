@@ -625,20 +625,20 @@ fn target_id(db: &Connection, account: AccountId, t: &ReadTarget) -> Result<Opti
         )
         .optional()?)
 }
-fn server_floor(db: &Connection, account: AccountId) -> Result<Option<i64>> {
+pub(crate) fn server_floor(db: &Connection, account: AccountId) -> Result<Option<i64>> {
     let text:Option<String>=db.query_row("SELECT value FROM local_preferences WHERE account_id=? AND name='sync.server_not_before_ms'",
         [account],|row|row.get(0)).optional()?;
     text.map(|s| s.parse().map_err(|_| Error::Corrupt))
         .transpose()
 }
-fn server_floor_in(tx: &Transaction<'_>, account: AccountId, floor: i64) -> Result<()> {
+pub(crate) fn server_floor_in(tx: &Transaction<'_>, account: AccountId, floor: i64) -> Result<()> {
     if server_floor(tx, account)?.is_none_or(|old| floor > old) {
         tx.execute("INSERT INTO local_preferences(account_id,name,value) VALUES(?1,'sync.server_not_before_ms',?2)
             ON CONFLICT(account_id,name) DO UPDATE SET value=excluded.value",params![account,floor.to_string()])?;
     }
     budget_in(tx, account, floor)
 }
-fn budget_in(tx: &Transaction<'_>, account: AccountId, floor: i64) -> Result<()> {
+pub(crate) fn budget_in(tx: &Transaction<'_>, account: AccountId, floor: i64) -> Result<()> {
     tx.execute(
         "INSERT INTO sync_budgets(account_id,not_before) VALUES(?1,?2) ON CONFLICT(account_id)
         DO UPDATE SET not_before=MAX(sync_budgets.not_before,excluded.not_before)",

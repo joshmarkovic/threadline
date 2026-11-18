@@ -10,6 +10,7 @@ pub mod queue;
 pub mod reader;
 pub mod resources;
 pub mod sync;
+pub mod writes;
 
 pub use threadline_core::domain::IssueApiId;
 

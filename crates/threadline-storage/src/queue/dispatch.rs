@@ -166,23 +166,7 @@ impl Store {
         if lease_until <= now {
             return Err(Error::InvalidInput("claim lease must end after start"));
         }
-        self.write(|tx| {
-            let id: Option<String> = tx
-                .query_row("SELECT q.id FROM operations q JOIN operation_gates g USING(account_id,id)
-                WHERE q.account_id=? AND q.state='queued' AND q.cancel_requested=0 AND q.retry_at<=? AND g.hold IS NULL ORDER BY q.sequence LIMIT 1", params![account, now], |r| r.get(0))
-                .optional()?;
-            let Some(id) = id else { return Ok(None) };
-            let number = tx.query_row("UPDATE operations SET state='validating',reason=NULL,attempt=attempt+1,lease_until=? WHERE account_id=? AND id=? RETURNING attempt", params![lease_until, account, id], |r| {
-                r.get(0)
-            })?;
-            tx.execute("INSERT INTO operation_attempts(account_id,operation_id,attempt,claimed_at,claimed_repository,claimed_number)
-                SELECT ?1,?2,?3,?4,i.repository_id,i.number FROM operations o JOIN items i ON i.id=o.item_id
-                WHERE o.account_id=?1 AND o.id=?2", params![account, id, number, now])?;
-            Ok(Some(Claim {
-                operation: read_operation(tx, account, &id)?.ok_or(Error::NotFound)?,
-                number,
-            }))
-        })
+        self.write(|tx| claim_in(tx, account, now, lease_until, false))
     }
     pub fn finish_validation(&self, claim: &Claim, outcome: Validation<'_>) -> Result<()> {
         let (state, reason, at) = match outcome {
@@ -210,25 +194,8 @@ impl Store {
             return Err(Error::InvalidInput("missing step identifier"));
         }
         self.write(|tx| {
-            let op = &claim.operation;
-            let changed = tx.execute(
-                "UPDATE operations SET state='sending' WHERE account_id=?1 AND id=?2 AND attempt=?3 AND state='validating'
-                AND cancel_requested=0 AND lease_until>?5 AND EXISTS(SELECT 1 FROM operation_gates WHERE account_id=?1 AND id=?2 AND hold IS NULL)
-                AND EXISTS(SELECT 1 FROM operation_attempts a JOIN items i ON i.id=operations.item_id AND i.account_id=a.account_id
-                    WHERE a.account_id=?1 AND a.operation_id=?2 AND a.attempt=?3 AND a.claimed_repository=i.repository_id AND a.claimed_number=i.number)
-                AND NOT EXISTS(SELECT 1 FROM step_receipts WHERE account_id=?1 AND operation_id=?2 AND step=?4)",
-                params![op.account, op.id, claim.number, step, now],
-            )?;
-            if changed != 1 {
-                return Err(Error::Conflict(
-                    "dispatch held, expired, cancelled or step already confirmed",
-                ));
-            }
-            tx.execute(
-                "UPDATE operation_attempts SET sending_at=?4,step=?5 WHERE account_id=?1 AND operation_id=?2 AND attempt=?3",
-                params![op.account, op.id, claim.number, now, step],
-            )?;
-            Ok(())
+            reject_typed(tx, claim.operation.account, &claim.operation.id)?;
+            begin_send_in(tx, claim, step, now)
         })
     }
     pub fn cancel_operation(&self, account: AccountId, id: &str) -> Result<CancelResult> {
@@ -277,63 +244,8 @@ impl Store {
         outcome: Delivery<'_>,
     ) -> Result<()> {
         self.write(|tx| {
-            let op = read_operation(tx, account, id)?.ok_or(Error::NotFound)?;
-            let quarantined: bool =
-                tx.query_row("SELECT EXISTS(SELECT 1 FROM restored_operations WHERE account_id=? AND operation_id=? AND decision IS NULL)", params![account, id], |r| r.get(0))?;
-            if quarantined
-                || op.attempt != attempt
-                || !matches!(
-                    op.state,
-                    State::Sending | State::OutcomeUnknown | State::Waiting
-                )
-            {
-                return Err(Error::Conflict("no dispatched attempt awaiting evidence"));
-            }
-            let step: String =
-                tx.query_row("SELECT step FROM operation_attempts WHERE account_id=? AND operation_id=? AND attempt=? AND sending_at IS NOT NULL", params![account, id, attempt], |r| r.get(0))?;
-            let (state, reason, evidence, retry_at) = match outcome {
-                Delivery::Step(r) | Delivery::Confirmed(r) => {
-                    if r.step != step
-                        || r.remote_id.is_empty()
-                        || r.object_kind.is_empty()
-                        || r.evidence.is_empty()
-                    {
-                        return Err(Error::InvalidInput("invalid remote step receipt"));
-                    }
-                    tx.execute(
-                        "INSERT INTO step_receipts VALUES(?,?,?,?,?,?)",
-                        params![account, id, step, r.object_kind, r.remote_id, r.evidence],
-                    )?;
-                    let next = if matches!(outcome, Delivery::Confirmed(_)) {
-                        "confirmed"
-                    } else if op.cancel_requested {
-                        "cancelled"
-                    } else {
-                        "queued"
-                    };
-                    (next, "confirmed_step", r.evidence.as_str(), 0)
-                }
-                Delivery::Waiting(proof) => ("waiting", "accepted_by_remote", proof, 0),
-                Delivery::Unknown(proof) => ("unknown", "outcome_unknown", proof, 0),
-                Delivery::NotApplied { proof, retry_at } => (
-                    if op.cancel_requested {
-                        "cancelled"
-                    } else {
-                        "queued"
-                    },
-                    "proven_not_applied",
-                    proof,
-                    retry_at,
-                ),
-            };
-            if evidence.is_empty() {
-                return Err(Error::InvalidInput("delivery evidence is required"));
-            }
-            tx.execute(
-                "UPDATE operations SET state=?3,reason=?4,retry_at=?5,lease_until=NULL WHERE account_id=?1 AND id=?2",
-                params![account, id, state, reason, retry_at],
-            )?;
-            end_attempt(tx, account, id, attempt, state, evidence)
+            reject_typed(tx, account, id)?;
+            record_delivery_in(tx, account, id, attempt, outcome)
         })
     }
     pub fn receipts(&self, account: AccountId, id: &str) -> Result<Vec<Receipt>> {
@@ -396,7 +308,7 @@ fn cancel_decision(state: State) -> CancelResult {
     }
 }
 
-fn end_attempt(
+pub(crate) fn end_attempt(
     tx: &Transaction<'_>,
     account: AccountId,
     id: &str,
@@ -415,6 +327,134 @@ fn end_attempt(
     Ok(())
 }
 
+fn reject_typed(tx: &Transaction<'_>, account: AccountId, id: &str) -> Result<()> {
+    let typed: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM write_intents WHERE account_id=? AND operation_id=?)",
+        params![account, id],
+        |row| row.get(0),
+    )?;
+    if typed {
+        return Err(Error::Conflict(
+            "Submitted issue and comment writes require typed preflight and response evidence",
+        ));
+    }
+    Ok(())
+}
+pub(crate) fn claim_in(
+    tx: &Transaction<'_>,
+    account: AccountId,
+    now: i64,
+    lease_until: i64,
+    typed: bool,
+) -> Result<Option<Claim>> {
+    let id: Option<String> = tx
+                .query_row("SELECT q.id FROM operations q JOIN operation_gates g USING(account_id,id)
+                WHERE q.account_id=? AND q.state='queued' AND q.cancel_requested=0 AND q.retry_at<=?2 AND g.hold IS NULL
+                AND EXISTS(SELECT 1 FROM write_intents w WHERE w.account_id=q.account_id AND w.operation_id=q.id)=?3 ORDER BY q.sequence LIMIT 1", params![account, now, typed], |r| r.get(0))
+                .optional()?;
+    let Some(id) = id else { return Ok(None) };
+    let number = tx.query_row("UPDATE operations SET state='validating',reason=NULL,attempt=attempt+1,lease_until=? WHERE account_id=? AND id=? RETURNING attempt", params![lease_until, account, id], |r| {
+                r.get(0)
+            })?;
+    tx.execute("INSERT INTO operation_attempts(account_id,operation_id,attempt,claimed_at,claimed_repository,claimed_number)
+                SELECT ?1,?2,?3,?4,i.repository_id,i.number FROM operations o JOIN items i ON i.id=o.item_id
+                WHERE o.account_id=?1 AND o.id=?2", params![account, id, number, now])?;
+    Ok(Some(Claim {
+        operation: read_operation(tx, account, &id)?.ok_or(Error::NotFound)?,
+        number,
+    }))
+}
+pub(crate) fn begin_send_in(
+    tx: &Transaction<'_>,
+    claim: &Claim,
+    step: &str,
+    now: i64,
+) -> Result<()> {
+    let op = &claim.operation;
+    let changed = tx.execute(
+                "UPDATE operations SET state='sending' WHERE account_id=?1 AND id=?2 AND attempt=?3 AND state='validating'
+                AND cancel_requested=0 AND lease_until>?5 AND EXISTS(SELECT 1 FROM operation_gates WHERE account_id=?1 AND id=?2 AND hold IS NULL)
+                AND EXISTS(SELECT 1 FROM operation_attempts a JOIN items i ON i.id=operations.item_id AND i.account_id=a.account_id
+                    WHERE a.account_id=?1 AND a.operation_id=?2 AND a.attempt=?3 AND a.claimed_repository=i.repository_id AND a.claimed_number=i.number)
+                AND NOT EXISTS(SELECT 1 FROM step_receipts WHERE account_id=?1 AND operation_id=?2 AND step=?4)",
+                params![op.account, op.id, claim.number, step, now],
+            )?;
+    if changed != 1 {
+        return Err(Error::Conflict(
+            "dispatch held, expired, cancelled or step already confirmed",
+        ));
+    }
+    tx.execute(
+                "UPDATE operation_attempts SET sending_at=?4,step=?5 WHERE account_id=?1 AND operation_id=?2 AND attempt=?3",
+                params![op.account, op.id, claim.number, now, step],
+            )?;
+    Ok(())
+}
+pub(crate) fn record_delivery_in(
+    tx: &Transaction<'_>,
+    account: AccountId,
+    id: &str,
+    attempt: i64,
+    outcome: Delivery<'_>,
+) -> Result<()> {
+    let op = read_operation(tx, account, id)?.ok_or(Error::NotFound)?;
+    let quarantined: bool =
+                tx.query_row("SELECT EXISTS(SELECT 1 FROM restored_operations WHERE account_id=? AND operation_id=? AND decision IS NULL)", params![account, id], |r| r.get(0))?;
+    if quarantined
+        || op.attempt != attempt
+        || !matches!(
+            op.state,
+            State::Sending | State::OutcomeUnknown | State::Waiting
+        )
+    {
+        return Err(Error::Conflict("no dispatched attempt awaiting evidence"));
+    }
+    let step: String =
+                tx.query_row("SELECT step FROM operation_attempts WHERE account_id=? AND operation_id=? AND attempt=? AND sending_at IS NOT NULL", params![account, id, attempt], |r| r.get(0))?;
+    let (state, reason, evidence, retry_at) = match outcome {
+        Delivery::Step(r) | Delivery::Confirmed(r) => {
+            if r.step != step
+                || r.remote_id.is_empty()
+                || r.object_kind.is_empty()
+                || r.evidence.is_empty()
+            {
+                return Err(Error::InvalidInput("invalid remote step receipt"));
+            }
+            tx.execute(
+                "INSERT INTO step_receipts VALUES(?,?,?,?,?,?)",
+                params![account, id, step, r.object_kind, r.remote_id, r.evidence],
+            )?;
+            let next = if matches!(outcome, Delivery::Confirmed(_)) {
+                "confirmed"
+            } else if op.cancel_requested {
+                "cancelled"
+            } else {
+                "queued"
+            };
+            (next, "confirmed_step", r.evidence.as_str(), 0)
+        }
+        Delivery::Waiting(proof) => ("waiting", "accepted_by_remote", proof, 0),
+        Delivery::Unknown(proof) => ("unknown", "outcome_unknown", proof, 0),
+        Delivery::NotApplied { proof, retry_at } => (
+            if op.cancel_requested {
+                "cancelled"
+            } else {
+                "queued"
+            },
+            "proven_not_applied",
+            proof,
+            retry_at,
+        ),
+    };
+    if evidence.is_empty() {
+        return Err(Error::InvalidInput("delivery evidence is required"));
+    }
+    tx.execute(
+                "UPDATE operations SET state=?3,reason=?4,retry_at=?5,lease_until=NULL WHERE account_id=?1 AND id=?2",
+                params![account, id, state, reason, retry_at],
+            )?;
+    end_attempt(tx, account, id, attempt, state, evidence)
+}
 #[cfg(test)]
 mod tests {
     use super::*;

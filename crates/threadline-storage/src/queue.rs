@@ -1,5 +1,5 @@
 //! Durable local authoring and submitted operations. No method makes network requests.
-mod dispatch;
+pub(crate) mod dispatch;
 mod reconciliation;
 mod workspace;
 use crate::{AccountId, Error, ItemId, RepositoryId, Result, Store};
@@ -184,7 +184,11 @@ fn dependencies(db: &Connection, account: AccountId, id: &str) -> Result<Vec<Str
     Ok(q.query_map(params![account, id], |r| r.get(0))?
         .collect::<rusqlite::Result<_>>()?)
 }
-fn read_operation(db: &Connection, account: AccountId, id: &str) -> Result<Option<Operation>> {
+pub(crate) fn read_operation(
+    db: &Connection,
+    account: AccountId,
+    id: &str,
+) -> Result<Option<Operation>> {
     let row=db.query_row("SELECT original_repository,item_id,kind,payload_version,snapshot,state,reason,retry_at,cancel_requested,attempt,projection,draft_id,draft_revision,original_number
         FROM operations WHERE account_id=? AND id=?",params![account,id],|r|
         Ok((r.get(0)?,r.get(1)?,r.get::<_,String>(2)?,r.get(3)?,r.get::<_,String>(4)?,r.get::<_,String>(5)?,r.get(6)?,r.get(7)?,r.get(8)?,r.get(9)?,r.get(10)?,r.get::<_,Option<String>>(11)?.zip(r.get(12)?), r.get::<_,i64>(13)?))).optional()?;
@@ -235,7 +239,11 @@ fn uuid(text: &str) -> bool {
             }
         })
 }
-fn enqueue_tx(tx: &Transaction<'_>, account: AccountId, input: Submission<'_>) -> Result<()> {
+pub(crate) fn enqueue_tx(
+    tx: &Transaction<'_>,
+    account: AccountId,
+    input: Submission<'_>,
+) -> Result<()> {
     if !uuid(input.id) {
         return Err(Error::InvalidInput(
             "operation identity must be a lowercase UUID",
