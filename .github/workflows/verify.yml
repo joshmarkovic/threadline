@@ -1,0 +1,105 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      windows_reference:
+        description: Run native smoke on the registered interactive Windows 11 reference desktop
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_PROFILE_TEST_DEBUG: 0
+  RUSTUP_TOOLCHAIN: 1.98.1
+
+jobs:
+  build-core:
+    name: Build and core tests (${{ matrix.host }})
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [windows-2025, macos-15, ubuntu-24.04]
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt,clippy
+      - name: Install Linux build prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake libfontconfig-dev libwayland-dev libxkbcommon-x11-dev libx11-xcb-dev libssl-dev libzstd-dev libvulkan1
+      - name: Record build and runner identity
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          rustc -vV | tee artifacts/rustc.txt
+          cargo -V
+          git rev-parse HEAD
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Build the native application
+        run: cargo build --locked -p threadline-app
+      - name: Run portable unit tests
+        run: cargo xtask test unit
+      - name: Run isolated integration tests
+        run: cargo xtask test integration
+      - name: Inspect the runtime dependency features
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo tree --locked -p threadline-app -e normal -f '{p} {f}' | tee artifacts/runtime-dependencies.txt
+          if rg -i '\b(webview|wry|webview2-com|tao-webview|webkit2gtk|electron|cef)\b' artifacts/runtime-dependencies.txt; then
+            echo 'A browser runtime feature or dependency is present.'
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-core-${{ matrix.host }}
+          path: artifacts/
+
+  windows-gui:
+    name: Windows GUI integration and process smoke
+    runs-on: windows-2025
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.98.1 --profile minimal
+      - name: Run the in-process GPUI suite
+        run: cargo xtask test ui
+      - name: Drive the separate native application process
+        if: ${{ !cancelled() }}
+        run: cargo xtask test e2e --suite smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-gui
+          path: artifacts/
+
+  windows-reference:
+    name: Windows 11 reference desktop
+    if: github.event_name == 'workflow_dispatch' && inputs.windows_reference && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Windows, X64, threadline-interactive]
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.98.1 --profile minimal
+      - name: Drive the reference desktop
+        run: cargo xtask test e2e --suite smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-reference
+          path: artifacts/

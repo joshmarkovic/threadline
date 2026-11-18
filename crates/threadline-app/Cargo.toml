@@ -1,0 +1,23 @@
+[package]
+name = "threadline-app"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "threadline"
+path = "src/main.rs"
+
+[features]
+e2e = ["dep:serde", "dep:serde_json", "gpui-kit/profiler"]
+
+[dependencies]
+gpui-kit = "=0.10.0"
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+threadline-core = { path = "../threadline-core" }
+threadline-platform = { path = "../threadline-platform" }
+tokio = { version = "1", features = ["rt-multi-thread", "time", "sync"] }
+
+[dev-dependencies]
+gpui-kit = { version = "=0.10.0", features = ["test-support"] }

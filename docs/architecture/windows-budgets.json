@@ -1,0 +1,8 @@
+{
+  "idle_working_set_bytes": 209715200,
+  "peak_working_set_bytes": 471859200,
+  "gpu_memory_bytes": 268435456,
+  "package_bytes": 52428800,
+  "cold_start_ms": 3000,
+  "scroll_frame_p95_ms": 20
+}

@@ -1,0 +1,17 @@
+[package]
+name = "threadline-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt", "sync", "time"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+
+[dev-dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["net", "test-util"] }
