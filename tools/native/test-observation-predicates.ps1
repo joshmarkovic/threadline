@@ -19,6 +19,7 @@ if (@($helpers.Name | Sort-Object -Unique).Count -ne 5 -or $helpers.Count -ne 5)
 . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
 . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1')
 . (Join-Path $PSScriptRoot 'windows-sync.ps1')
+. (Join-Path $PSScriptRoot 'windows-pr-reader.ps1')
 
 function Read-Observation {
     if ($script:observations.Count -gt 1) { return $script:observations.Dequeue() }
@@ -56,6 +57,21 @@ $state = Wait-Reader 'cached content for the expected item' {
 if (!$state.cached_reader.cached_content_ready -or $state.cached_reader.active_item -ne 44 -or
     ($visited -join ',') -cne '43,44,44') {
     throw 'Wait-Reader did not reject missing, mismatched, and loading reader states.'
+}
+
+$script:observations.Clear()
+$script:observations.Enqueue([pscustomobject]@{ cached_reader = $null })
+$script:observations.Enqueue([pscustomobject]@{ cached_reader = @{ pull_request = $null } })
+$script:observations.Enqueue([pscustomobject]@{ cached_reader = @{ active_item = 1; pull_request = @{ head = 'old' } } })
+$script:observations.Enqueue([pscustomobject]@{ cached_reader = @{ active_item = 2; pull_request = @{ head = 'current' } } })
+$visited.Clear()
+$state = Wait-PrReader 'isolated pull request observation' {
+    param($pr, $reader)
+    $visited.Add($reader.active_item)
+    $reader.active_item -eq 2 -and $pr.head -ceq 'current'
+}
+if ($state.cached_reader.active_item -ne 2 -or ($visited -join ',') -cne '1,2') {
+    throw 'Wait-PrReader did not verify its exact nested predicate.'
 }
 
 $script:observations.Clear()

@@ -19,7 +19,10 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == "LIVE-001" {
         return Some("s03-live-read-allowlist-v1");
     }
-    if matches!(case, "UT-011" | "UT-012" | "IT-006" | "IT-016" | "IT-017") {
+    if matches!(
+        case,
+        "UT-011" | "UT-012" | "IT-006" | "IT-016" | "IT-017" | "E2E-005"
+    ) {
         return Some(include_str!("../../fixtures/pr-reading-revision.txt").trim_ascii());
     }
     if matches!(

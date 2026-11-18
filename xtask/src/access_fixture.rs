@@ -14,6 +14,8 @@ use std::{
 use serde::Serialize;
 use serde_json::{Value, json};
 
+mod pr;
+
 const MAX_REQUEST: u64 = 16 * 1024;
 const FIXTURE_AUTHORIZATION: &str = "Bearer threadline-test-fixture";
 
@@ -56,6 +58,9 @@ enum Phase {
     SyncService,
     SyncThrottle,
     SyncTransport,
+    PrLoad,
+    PrDelay,
+    PrRelease,
 }
 
 impl Phase {
@@ -73,6 +78,9 @@ impl Phase {
             "sync-service" => Ok(Self::SyncService),
             "sync-throttle" => Ok(Self::SyncThrottle),
             "sync-transport" => Ok(Self::SyncTransport),
+            "pr-load" => Ok(Self::PrLoad),
+            "pr-delay" => Ok(Self::PrDelay),
+            "pr-release" => Ok(Self::PrRelease),
             _ => Err(io::Error::other("invalid access fixture phase")),
         }
     }
@@ -92,6 +100,10 @@ enum Route {
     Timeline,
     UpdatedItems,
     UpdatedComments,
+    PullA,
+    PullB,
+    CompareA,
+    CompareB,
     Unexpected,
 }
 
@@ -116,6 +128,7 @@ pub enum TraceCheck {
     OfflineReader,
     ReaderResume,
     SyncJourney,
+    PullRequestJourney,
 }
 
 impl AccessFixture {
@@ -159,6 +172,7 @@ impl AccessFixture {
             TraceCheck::OfflineReader => records.is_empty(),
             TraceCheck::ReaderResume => complete_reader_resume(&records),
             TraceCheck::SyncJourney => complete_sync_journey(&records),
+            TraceCheck::PullRequestJourney => pr::trace(&records),
         };
         if !valid {
             return Err(io::Error::other(
@@ -255,7 +269,7 @@ fn serve(
                     return Err(io::Error::other("too many requests to the access fixture"));
                 }
                 let phase = Phase::read(phase_file)?;
-                evidence.push(answer(&mut socket, phase)?);
+                evidence.push(answer(&mut socket, phase, phase_file, stopping)?);
             }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
                 thread::sleep(Duration::from_millis(12));
@@ -266,12 +280,20 @@ fn serve(
     Ok(evidence)
 }
 
-fn answer(socket: &mut TcpStream, phase: Phase) -> io::Result<RequestEvidence> {
+fn answer(
+    socket: &mut TcpStream,
+    phase: Phase,
+    phase_file: &Path,
+    stopping: &AtomicBool,
+) -> io::Result<RequestEvidence> {
     let timeout = Some(Duration::from_secs(2));
     socket.set_nonblocking(false)?;
     socket.set_read_timeout(timeout)?;
     socket.set_write_timeout(timeout)?;
     let (route, authorized) = read_request(socket)?;
+    if phase == Phase::PrDelay && route == Route::Item && authorized {
+        pr::wait_for_release(phase_file, stopping)?;
+    }
     if phase == Phase::SyncTransport && route == Route::User && authorized {
         return Ok(RequestEvidence {
             phase,
@@ -333,6 +355,9 @@ fn read_request(socket: &TcpStream) -> io::Result<(Route, bool)> {
             Route::UpdatedComments
         }
         (Some("POST"), Some("/graphql"), Some("HTTP/1.1")) => Route::Graphql,
+        (Some("GET"), Some(target), Some("HTTP/1.1")) => {
+            pr::route(target).unwrap_or(Route::Unexpected)
+        }
         _ => Route::Unexpected,
     };
     let mut authorized = false;
@@ -413,6 +438,9 @@ fn response(phase: Phase, route: Route, authorized: bool) -> Response {
     };
     if !authorized || phase == Phase::Revoked {
         return result(401, "Unauthorized", json!({"message":"Bad credentials"}));
+    }
+    if let Some(pr) = pr::response(phase, route) {
+        return pr;
     }
     let repository = json!({
         "id":71, "node_id":"R_71", "name":"private", "owner":{"login":"fixture-org"},

@@ -34,6 +34,8 @@ The smoke test checks the actual clipboard, pointer-driven splitters, draft inpu
 
 `cargo xtask test e2e --suite full --case E2E-002` uses Windows input against a fixture account and a temporary loopback GitHub API. It checks partial discovery, SSO, denied and revoked access, and the saved repository selection after restart. The account test uses a synthetic credential in memory. The endpoint trace includes only route labels, status codes and authorization matches.
 
+`cargo xtask test e2e --suite full --case E2E-005` opens two pull requests from that local simulator in independent native tabs. The simulator holds a verified linked-issue response while the second tab becomes active. The case checks that each tab keeps its own comparison and that the first linked issue appears only in its original tab.
+
 `cargo xtask test integration --case IT-020` exercises Windows Credential Manager and the native application paths separately. It uses fresh fixture entries, verifies the renewed value from a second process and checks removal.
 
 When source and a test-build executable are already local to Windows, use the direct driver. Supply a new evidence directory for each invocation. Use a disposable profile or provide the driver a test-owned temporary directory. The canonical Rust command automatically removes the temporary profiles it creates.

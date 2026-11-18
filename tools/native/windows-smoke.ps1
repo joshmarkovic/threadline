@@ -8,7 +8,7 @@ param(
     [switch]$PlatformProof,
     [switch]$ToastProof,
     [switch]$AccessProof,
-    [ValidateSet('Offline', 'Resume', 'Performance', 'Sync')][string]$ReaderProof,
+    [ValidateSet('Offline', 'Resume', 'Performance', 'Sync', 'PullRequest')][string]$ReaderProof,
     [string]$AccessAddress,
     [string]$AccessPhaseFile,
     [switch]$ManualTrayClick,
@@ -32,6 +32,8 @@ $reportName = if ($Measure) {
     'reader-performance.json'
 } elseif ($ReaderProof -eq 'Sync') {
     'sync-native.json'
+} elseif ($ReaderProof -eq 'PullRequest') {
+    'pr-native.json'
 } elseif ($ReaderProof) {
     'reader-native.json'
 } else {
@@ -862,6 +864,7 @@ try {
     }
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
     if ($ReaderProof -eq 'Sync') { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
+    if ($ReaderProof -eq 'PullRequest') { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
     $firstProfile = Join-Path $ProfileDir ('initial-' + [guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $firstProfile -Force
     if ($ReaderProof -eq 'Offline') { Initialize-ReaderProfile $firstProfile 'small' }
@@ -905,6 +908,7 @@ try {
             Resume { Invoke-ReaderResumeProof $window $firstProfile }
             Performance { Invoke-ReaderPerformance $window }
             Sync { Invoke-SyncProof $window $firstProfile }
+            PullRequest { Invoke-PrReaderProof $window }
         }
     } else {
         try {

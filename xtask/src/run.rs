@@ -346,6 +346,7 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
             "windows-reader-resume",
         ),
         ("S05-WINDOWS-SYNC", NativeMode::WindowsSync, "windows-sync"),
+        ("E2E-005", NativeMode::WindowsPullRequest, "windows-pr"),
     ];
     let full = options.suite.as_deref() == Some("full");
     match options.case.as_deref() {
@@ -508,6 +509,7 @@ enum NativeMode {
     WindowsReaderResume,
     WindowsReaderPerformance,
     WindowsSync,
+    WindowsPullRequest,
 }
 
 fn run_native(
@@ -567,6 +569,7 @@ fn native_driver(
         NativeMode::WindowsReaderResume => Some("Resume"),
         NativeMode::WindowsReaderPerformance => Some("Performance"),
         NativeMode::WindowsSync => Some("Sync"),
+        NativeMode::WindowsPullRequest => Some("PullRequest"),
         _ => None,
     };
     let access_fixture = if mode == NativeMode::WindowsGitHubAccess || reader_proof.is_some() {
@@ -656,6 +659,7 @@ fn native_driver(
         NativeMode::WindowsReaderOffline | NativeMode::WindowsReaderResume => "reader-native.json",
         NativeMode::WindowsReaderPerformance => "reader-performance.json",
         NativeMode::WindowsSync => "sync-native.json",
+        NativeMode::WindowsPullRequest => "pr-native.json",
     };
     let details = fs::read(dir.join(driver_report))
         .ok()
@@ -693,6 +697,7 @@ fn native_driver(
             ) => TraceCheck::OfflineReader,
             (Status::Pass, NativeMode::WindowsReaderResume) => TraceCheck::ReaderResume,
             (Status::Pass, NativeMode::WindowsSync) => TraceCheck::SyncJourney,
+            (Status::Pass, NativeMode::WindowsPullRequest) => TraceCheck::PullRequestJourney,
             _ => TraceCheck::Observe,
         };
         if fixture.finish(dir, check).is_err() {
@@ -714,6 +719,7 @@ fn access_output_disclosed_credential(dir: &Path, output: &Output) -> Result<boo
         "reader-performance.json",
         "reader-restart-observation.json",
         "sync-native.json",
+        "pr-native.json",
     ] {
         let path = dir.join(name);
         if let Ok(bytes) = fs::read(&path)
