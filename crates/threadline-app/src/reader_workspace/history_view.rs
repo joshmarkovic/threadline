@@ -10,14 +10,15 @@ use gpui_kit::{
     component::{
         Disableable, Selectable,
         diff::{Diff, DiffState},
+        input::Input,
     },
     div,
 };
 use threadline_storage::{
     RepositoryId,
     history::{
-        ComparisonOptions, HistoryComparison, HistoryCoverage, HistoryDiffPage, HistoryPage,
-        HistoryRef, HistoryRefState, HistoryRow, HistoryView,
+        ComparisonOptions, HistoryComparison, HistoryCoverage, HistoryDiffPage, HistoryMonitoring,
+        HistoryPage, HistoryRef, HistoryRefState, HistoryRow, HistoryView,
     },
     pr::PrRecord,
     resources::{CommitOid, ComparisonMode},
@@ -29,21 +30,25 @@ const ROW_H: f32 = 58.;
 
 pub(super) struct HistoryState {
     pub busy: bool,
+    fetching: bool,
     repository: Option<RepositoryId>,
     request: u64,
     scroll: ScrollHandle,
     data: Option<HistoryData>,
     diff: Option<VisibleDiff>,
+    monitoring_input: Option<Entity<InputState>>,
 }
 impl Default for HistoryState {
     fn default() -> Self {
         Self {
             busy: false,
+            fetching: false,
             repository: None,
             request: 0,
             scroll: ScrollHandle::new(),
             data: None,
             diff: None,
+            monitoring_input: None,
         }
     }
 }
@@ -68,6 +73,7 @@ impl HistoryState {
 
 struct HistoryData {
     refs: Vec<HistoryRefState>,
+    monitoring: HistoryMonitoring,
     generation: Option<i64>,
     view: Option<HistoryView>,
     page: Option<HistoryPage>,
@@ -82,6 +88,65 @@ struct VisibleDiff {
     proof: threadline_storage::pr::PatchEvidence,
 }
 
+#[cfg(feature = "e2e")]
+#[derive(serde::Serialize)]
+pub(crate) struct HistoryObservation {
+    pub repository: Option<i64>,
+    pub refs: usize,
+    pub commits: usize,
+    pub coverage: Option<String>,
+    pub unloaded_parents: usize,
+    pub selected: Option<String>,
+    pub comparison: Option<&'static str>,
+    pub comparison_base: Option<String>,
+    pub comparison_head: Option<String>,
+    pub parent: Option<usize>,
+    pub files: usize,
+    pub displayed_file: Option<String>,
+}
+
+#[cfg(feature = "e2e")]
+impl HistoryState {
+    pub(super) fn observation(&self) -> HistoryObservation {
+        let data = self.data.as_ref();
+        let view = data.and_then(|data| data.view.as_ref());
+        let page = data.and_then(|data| data.page.as_ref());
+        let comparison = data.and_then(|data| data.comparison.as_ref());
+        let (comparison_kind, parent) = match comparison.map(|(plan, _)| plan) {
+            Some(HistoryComparison::Parent { parent_index, .. }) => {
+                (Some("Parent"), Some(parent_index + 1))
+            }
+            Some(HistoryComparison::Root { .. }) => (Some("Root"), None),
+            Some(HistoryComparison::Pair { .. }) => (Some("Pair"), None),
+            None => (None, None),
+        };
+        HistoryObservation {
+            repository: self.repository.map(|id| id.0),
+            refs: data.map_or(0, |data| data.refs.len()),
+            commits: page.map_or(0, |page| page.rows.len()),
+            coverage: page.map(|page| format!("{:?}", page.coverage)),
+            unloaded_parents: page.map_or(0, |page| {
+                page.rows
+                    .iter()
+                    .flat_map(|row| &row.parents)
+                    .filter(|edge| !edge.loaded)
+                    .count()
+            }),
+            selected: view
+                .and_then(|view| view.selected.as_ref())
+                .map(|oid| oid.as_str().to_owned()),
+            comparison: comparison_kind,
+            comparison_base: comparison
+                .and_then(|(_, page)| page.identity.base.as_ref())
+                .map(|oid| oid.as_str().to_owned()),
+            comparison_head: comparison.map(|(_, page)| page.identity.head.as_str().to_owned()),
+            parent,
+            files: comparison.map_or(0, |(_, page)| page.files.len()),
+            displayed_file: self.diff.as_ref().map(|diff| diff.path.clone()),
+        }
+    }
+}
+
 #[derive(Clone)]
 enum ChangeHistory {
     Reference(HistoryRef, CommitOid),
@@ -92,6 +157,19 @@ enum ChangeHistory {
     Page(Option<i64>),
 }
 
+#[derive(Clone)]
+enum HistoryFetch {
+    References,
+    Walk(HistoryRef),
+    Comparison(HistoryComparison),
+}
+
+enum MonitorHistory {
+    Branch(String),
+    Pattern(String),
+    Pull(std::num::NonZeroU64),
+}
+
 impl HistoryData {
     fn load(
         store: &Store,
@@ -100,6 +178,7 @@ impl HistoryData {
         request: Option<(Option<i64>, HistoryView, Option<i64>)>,
     ) -> Outcome<Self> {
         let refs = store.history_refs(account, repository, None, 100)?;
+        let monitoring = store.history_monitoring(account, repository)?;
         let (generation, view, after) = if let Some((generation, view, after)) = request {
             (generation, Some(view), after)
         } else if let Some(saved) = store.history_view(account, repository, VIEW_ID)? {
@@ -111,7 +190,6 @@ impl HistoryData {
             };
             (Some(saved.generation), Some(saved.state), after)
         } else {
-            let monitoring = store.history_monitoring(account, repository)?;
             let first = monitoring
                 .default_branch
                 .as_ref()
@@ -173,6 +251,7 @@ impl HistoryData {
             .transpose()?;
         Ok(Self {
             refs,
+            monitoring,
             generation,
             view,
             page,
@@ -207,6 +286,85 @@ fn ref_name(reference: &HistoryRef) -> String {
 }
 
 impl ReaderWorkspace {
+    fn fetch_history(
+        &mut self,
+        repository: RepositoryId,
+        fetch: HistoryFetch,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.history.repository != Some(repository)
+            || self.history.fetching
+            || !self.can_fetch()
+            || self.service.is_none()
+        {
+            return;
+        }
+        self.history.fetching = true;
+        let finished = fetch.clone();
+        self.remote(
+            window,
+            cx,
+            move |service, account, cancel| async move {
+                let page = match fetch {
+                    HistoryFetch::References => {
+                        service
+                            .fetch_history_refs(account, repository, &cancel)
+                            .await?
+                    }
+                    HistoryFetch::Walk(reference) => {
+                        service
+                            .fetch_history_page(account, repository, &reference, &cancel)
+                            .await?
+                    }
+                    HistoryFetch::Comparison(comparison) => {
+                        service.fetch_history_diff(&comparison, &cancel).await?
+                    }
+                };
+                Ok((page, page.contacted))
+            },
+            move |this, result, window, cx| {
+                this.history.fetching = false;
+                if this.history.repository != Some(repository) {
+                    return;
+                }
+                let same_route = match &finished {
+                    HistoryFetch::References => true,
+                    HistoryFetch::Walk(reference) => this
+                        .history
+                        .data
+                        .as_ref()
+                        .and_then(|data| data.view.as_ref())
+                        .is_some_and(|view| &view.reference == reference),
+                    HistoryFetch::Comparison(comparison) => this
+                        .history
+                        .data
+                        .as_ref()
+                        .and_then(|data| data.comparison.as_ref())
+                        .is_some_and(|(current, _)| current == comparison),
+                };
+                if let Some(state) = result.filter(|_| same_route) {
+                    let profile = this.history.data.as_ref().and_then(|data| {
+                        data.view.as_ref().cloned().map(|mut view| {
+                            remember_history_scroll(&this.history, &mut view);
+                            (data.generation, view, data.after)
+                        })
+                    });
+                    this.status = Some(if state.has_more {
+                        "Downloaded this page. More provider history is available."
+                    } else if state.complete {
+                        "GitHub finished the requested history resource."
+                    } else {
+                        "The provider could supply only part of the requested history."
+                    });
+                    this.load_history(repository, profile, window, cx);
+                }
+                cx.notify();
+            },
+        );
+        cx.notify();
+    }
+
     pub(super) fn open_activity_comparison(
         &mut self,
         repository: RepositoryId,
@@ -283,6 +441,9 @@ impl ReaderWorkspace {
 
     pub(super) fn show_history(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.surface = Surface::History;
+        if self.history.monitoring_input.is_none() {
+            self.history.monitoring_input = Some(cx.new(|cx| InputState::new(window, cx)));
+        }
         let selected = match self.scope {
             ReaderScope::Repository(repository) => Some(repository),
             ReaderScope::Selected => self.history.repository.or_else(|| {
@@ -510,6 +671,15 @@ impl ReaderWorkspace {
                 }));
             header = header.child(self.observed_control(id, button, false));
         }
+        if let Some(repository) = self.history.repository {
+            header = header.child(self.history_download_control(
+                "history-fetch-refs",
+                "Download branches and tags",
+                repository,
+                HistoryFetch::References,
+                cx,
+            ));
+        }
         let Some(data) = self.history.data.as_ref() else {
             return div()
                 .flex_1()
@@ -549,6 +719,20 @@ impl ReaderWorkspace {
                     )
                 }));
             refs = refs.child(self.observed_control(id, button, false));
+        }
+        refs = refs.child(self.history_monitoring_controls(data, cx));
+        if let Some(view) = data.view.as_ref()
+            && let Some(current) = data
+                .refs
+                .iter()
+                .find(|entry| entry.reference == view.reference)
+            && current.tip.as_ref() != Some(&view.tip)
+        {
+            refs = refs.child(div().text_xs().text_color(palette.muted).child(if let Some(latest) = &current.tip {
+                format!("Showing saved tip {}. Select this branch or tag again to view its new tip {}.", view.tip.as_str(), latest.as_str())
+            } else {
+                format!("The remote reference was removed. Its saved commits at {} remain available.", view.tip.as_str())
+            }));
         }
         let Some(page) = data.page.as_ref() else {
             return div()
@@ -703,6 +887,20 @@ impl ReaderWorkspace {
                     })),
             );
         }
+        if let (Some(repository), Some(view)) = (self.history.repository, data.view.as_ref()) {
+            let label = if page.rows.is_empty() {
+                "Download commit history"
+            } else {
+                "Check branch tip or fetch older history"
+            };
+            pagination = pagination.child(self.history_download_control(
+                "history-fetch-older",
+                label,
+                repository,
+                HistoryFetch::Walk(view.reference.clone()),
+                cx,
+            ));
+        }
         div()
             .flex_1()
             .min_h_0()
@@ -793,6 +991,17 @@ impl ReaderWorkspace {
                     .text_color(palette.muted)
                     .child("The stored patch retains whitespace and original source lines."),
             );
+        if let Some(repository) = self.history.repository
+            && page.coverage != HistoryCoverage::Complete
+        {
+            panel = panel.child(self.history_download_control(
+                "history-fetch-comparison",
+                "Download comparison files",
+                repository,
+                HistoryFetch::Comparison(comparison.clone()),
+                cx,
+            ));
+        }
         if let Some(parents) = data
             .view
             .as_ref()
@@ -810,16 +1019,15 @@ impl ReaderWorkspace {
             for (index, parent) in parents.iter().enumerate().take(16) {
                 let id = format!("history-parent-{index}");
                 let target = parent.clone();
-                controls = controls.child(
-                    control(
-                        id,
-                        format!("Parent {} · {}", index + 1, &parent.as_str()[..12]),
-                    )
-                    .disabled(self.history.busy)
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.history_action(ChangeHistory::Parent(target.clone()), window, cx)
-                    })),
-                );
+                let button = control(
+                    id.clone(),
+                    format!("Parent {} · {}", index + 1, &parent.as_str()[..12]),
+                )
+                .disabled(self.history.busy)
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.history_action(ChangeHistory::Parent(target.clone()), window, cx)
+                }));
+                controls = controls.child(self.observed_control(id, button, false));
             }
             panel = panel.child(controls);
         }
@@ -831,14 +1039,13 @@ impl ReaderWorkspace {
             let id = format!("history-file-{}", row.ordinal);
             let selected = data.view.as_ref().and_then(|view| view.file.as_deref()) == Some(path);
             let target = path.clone();
-            files = files.child(
-                control(id, format!("{status} · {path}"))
-                    .selected(selected)
-                    .disabled(self.history.busy)
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.history_action(ChangeHistory::File(target.clone()), window, cx);
-                    })),
-            );
+            let button = control(id.clone(), format!("{status} · {path}"))
+                .selected(selected)
+                .disabled(self.history.busy)
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.history_action(ChangeHistory::File(target.clone()), window, cx);
+                }));
+            files = files.child(self.observed_control(id, button, false));
         }
         panel = panel.child(files);
         if let Some(diff) = &self.history.diff {
@@ -853,6 +1060,152 @@ impl ReaderWorkspace {
             panel = panel.child("A text patch is unavailable for this file.");
         }
         panel.into_any_element()
+    }
+
+    fn history_download_control(
+        &self,
+        id: &str,
+        label: &str,
+        repository: RepositoryId,
+        fetch: HistoryFetch,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let button = control(id.to_owned(), label.to_owned())
+            .disabled(self.history.fetching || self.history.busy || !self.can_fetch())
+            .on_click(cx.listener(move |this, _, window, cx| {
+                this.fetch_history(repository, fetch.clone(), window, cx);
+            }));
+        self.observed_control(id, button, false)
+    }
+
+    fn history_monitoring_controls(
+        &self,
+        data: &HistoryData,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let mut choices = div().flex().flex_wrap().gap_1().items_center();
+        let Some(repository) = self.history.repository else {
+            return choices.into_any_element();
+        };
+        if let Some(view) = data.view.as_ref()
+            && let HistoryRef::Branch(name) = &view.reference
+        {
+            let name = name.clone();
+            let always = data.monitoring.default_branch.as_ref() == Some(&name);
+            let watched = data.monitoring.branches.contains(&name);
+            let button = control(
+                "history-monitor-branch",
+                if always {
+                    "Monitoring default branch"
+                } else if watched {
+                    "Stop monitoring branch"
+                } else {
+                    "Monitor this branch"
+                },
+            )
+            .disabled(always || self.history.busy)
+            .on_click(cx.listener(move |this, _, window, cx| {
+                this.change_history_monitoring(
+                    repository,
+                    MonitorHistory::Branch(name.clone()),
+                    window,
+                    cx,
+                );
+            }));
+            choices = choices.child(self.observed_control("history-monitor-branch", button, false));
+        }
+        if let Some(field) = self.history.monitoring_input.as_ref() {
+            choices = choices.child(
+                div().w(px(155.)).child(
+                    Input::new(field)
+                        .accessibility_id("history-monitor-input")
+                        .aria_label("Branch pattern or pull request number"),
+                ),
+            );
+            let br = field.clone();
+            choices = choices.child(
+                control("history-monitor-pattern", "Toggle branch pattern")
+                    .disabled(self.history.busy)
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.change_history_monitoring(
+                            repository,
+                            MonitorHistory::Pattern(br.read(cx).value().trim().to_owned()),
+                            window,
+                            cx,
+                        );
+                    })),
+            );
+            let pr = field.clone();
+            choices = choices.child(
+                control("history-monitor-pr", "Toggle followed PR")
+                    .disabled(self.history.busy)
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        if let Ok(number) = pr.read(cx).value().trim().parse() {
+                            this.change_history_monitoring(
+                                repository,
+                                MonitorHistory::Pull(number),
+                                window,
+                                cx,
+                            );
+                        } else {
+                            this.status = Some("Enter the positive pull request number to follow.");
+                            cx.notify();
+                        }
+                    })),
+            );
+        }
+        choices
+            .child(div().text_xs().child(format!(
+                "{} chosen branches · {} branch patterns · {} followed PRs",
+                data.monitoring.branches.len(),
+                data.monitoring.branch_patterns.len(),
+                data.monitoring.followed_prs.len()
+            )))
+            .into_any_element()
+    }
+
+    fn change_history_monitoring(
+        &mut self,
+        repository: RepositoryId,
+        action: MonitorHistory,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(account) = self
+            .account
+            .filter(|_| self.history.repository == Some(repository) && !self.history.busy)
+        else {
+            return;
+        };
+        self.history.busy = true;
+        self.launch(window, cx, move |store| {
+            let mut options = store.history_monitoring(account, repository)?;
+            match action {
+                MonitorHistory::Branch(name) => toggle(&mut options.branches, name),
+                MonitorHistory::Pattern(pattern) => toggle(&mut options.branch_patterns, pattern),
+                MonitorHistory::Pull(number) => toggle(&mut options.followed_prs, number),
+            }
+            store.set_history_monitoring(account, repository, &options)?;
+            Ok(options)
+        }, move |this, result, window, cx| {
+            this.history.busy = false;
+            if this.history.repository == Some(repository) {
+                match result {
+                    Ok(options) => {
+                        if let Some(data) = this.history.data.as_mut() { data.monitoring = options; }
+                        if let Some(worker) = this.sync_worker.as_ref() { worker.wake(None); }
+                    }
+                    Err(_) => this.status = Some("The branch pattern or history monitoring choice could not be saved."),
+                }
+            }
+            this.settle_departure(window, cx);
+        });
+    }
+}
+
+fn toggle<T: Ord>(set: &mut std::collections::BTreeSet<T>, member: T) {
+    if !set.remove(&member) {
+        set.insert(member);
     }
 }
 

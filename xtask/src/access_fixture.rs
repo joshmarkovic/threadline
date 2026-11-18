@@ -14,6 +14,7 @@ use std::{
 use serde::Serialize;
 use serde_json::{Value, json};
 
+mod history;
 mod pr;
 mod writes;
 
@@ -63,6 +64,7 @@ enum Phase {
     PrLoad,
     PrDelay,
     PrRelease,
+    History,
     WriteOnline,
     WriteDrop,
 }
@@ -85,6 +87,7 @@ impl Phase {
             "pr-load" => Ok(Self::PrLoad),
             "pr-delay" => Ok(Self::PrDelay),
             "pr-release" => Ok(Self::PrRelease),
+            "history" => Ok(Self::History),
             "write-online" => Ok(Self::WriteOnline),
             "write-drop" => Ok(Self::WriteDrop),
             _ => Err(io::Error::other("invalid access fixture phase")),
@@ -112,6 +115,13 @@ enum Route {
     CompareA,
     CompareB,
     ReviewContextIssue,
+    HistoryBranches,
+    HistoryTags,
+    HistoryBranch,
+    HistoryFirst,
+    HistoryOlder,
+    HistoryParentDiff,
+    HistoryPairDiff,
     CommentCreated,
     CommentReplyLost,
     Unexpected,
@@ -140,6 +150,7 @@ pub enum TraceCheck {
     SyncJourney,
     PullRequestJourney,
     ReviewContextJourney,
+    HistoryJourney,
     WritesWithLoss,
     WriteSurface,
 }
@@ -187,6 +198,7 @@ impl AccessFixture {
             TraceCheck::SyncJourney => complete_sync_journey(&records),
             TraceCheck::PullRequestJourney => pr::trace(&records),
             TraceCheck::ReviewContextJourney => pr::trace_review_context(&records),
+            TraceCheck::HistoryJourney => history::trace(&records),
             TraceCheck::WritesWithLoss => writes::trace(&records, true),
             TraceCheck::WriteSurface => writes::trace(&records, false),
         };
@@ -333,6 +345,12 @@ fn answer(
     if let Some(sso) = reply.sso {
         write!(socket, "X-GitHub-SSO: {sso}\r\n")?;
     }
+    if phase == Phase::History && route == Route::HistoryFirst && authorized && reply.status == 200
+    {
+        let next = history::older_target();
+        let address = socket.local_addr()?;
+        write!(socket, "Link: <http://{address}{next}>; rel=\"next\"\r\n")?;
+    }
     if route == Route::CommentCreated && reply.status == 201 {
         socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:4101:07\r\n")?;
     }
@@ -387,9 +405,9 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
             Route::UpdatedComments
         }
         (Some("POST"), Some("/graphql"), Some("HTTP/1.1")) => Route::Graphql,
-        (Some("GET"), Some(target), Some("HTTP/1.1")) => {
-            pr::route(target).unwrap_or(Route::Unexpected)
-        }
+        (Some("GET"), Some(target), Some("HTTP/1.1")) => pr::route(target)
+            .or_else(|| history::route(phase, target))
+            .unwrap_or(Route::Unexpected),
         _ => Route::Unexpected,
     };
     let mut authorized = false;
@@ -475,6 +493,9 @@ fn response(phase: Phase, route: Route, authorized: bool) -> Response {
     if !authorized || phase == Phase::Revoked {
         return result(401, "Unauthorized", json!({"message":"Bad credentials"}));
     }
+    if let Some(history) = history::response(phase, route) {
+        return history;
+    }
     if let Some(pr) = pr::response(phase, route) {
         return pr;
     }
@@ -483,7 +504,7 @@ fn response(phase: Phase, route: Route, authorized: bool) -> Response {
     }
     let repository = json!({
         "id":71, "node_id":"R_71", "name":"private", "owner":{"login":"fixture-org"},
-        "private":true, "permissions":{"pull":true,"push":false,"admin":false}
+        "default_branch":"main","private":true, "permissions":{"pull":true,"push":false,"admin":false}
     });
     let item = || {
         json!({

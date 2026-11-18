@@ -8,7 +8,7 @@ param(
     [switch]$PlatformProof,
     [switch]$ToastProof,
     [switch]$AccessProof,
-    [ValidateSet('Offline', 'Resume', 'Performance', 'Sync', 'PullRequest', 'ReviewContext', 'Writes', 'WriteSurface')][string]$ReaderProof,
+    [ValidateSet('Offline', 'Resume', 'Performance', 'Sync', 'PullRequest', 'ReviewContext', 'History', 'Writes', 'WriteSurface')][string]$ReaderProof,
     [string]$AccessAddress,
     [string]$AccessPhaseFile,
     [switch]$ManualTrayClick,
@@ -36,6 +36,8 @@ $reportName = if ($Measure) {
     'pr-native.json'
 } elseif ($ReaderProof -eq 'ReviewContext') {
     'review-context-native.json'
+} elseif ($ReaderProof -eq 'History') {
+    'history-native.json'
 } elseif ($ReaderProof -in @('Writes', 'WriteSurface')) {
     'writes-native.json'
 } elseif ($ReaderProof) {
@@ -73,7 +75,7 @@ $copiedClipboardSequence = $null
 $toastFixture = $null
 $toastSubmissionAttempted = $false
 $script:UseOwnedUiAutomation = $false
-$script:UseSeededFixtureAuth = $ReaderProof -in @('Resume', 'Sync', 'PullRequest', 'ReviewContext', 'Writes', 'WriteSurface')
+$script:UseSeededFixtureAuth = $ReaderProof -in @('Resume', 'Sync', 'PullRequest', 'ReviewContext', 'History', 'Writes', 'WriteSurface')
 
 function Get-FileSha256 {
     param([string]$Path)
@@ -877,7 +879,7 @@ try {
         }
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
-    if ($AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'PullRequest', 'ReviewContext', 'Writes', 'WriteSurface', 'Performance')) {
+    if ($AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'PullRequest', 'ReviewContext', 'History', 'Writes', 'WriteSurface', 'Performance')) {
         Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
         . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
         $script:UseOwnedUiAutomation = $true
@@ -886,8 +888,9 @@ try {
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
     if ($ReaderProof -eq 'Sync') { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
     if ($ReaderProof -in @('PullRequest', 'ReviewContext')) { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
-    if ($ReaderProof -in @('ReviewContext', 'Writes', 'WriteSurface')) { . (Join-Path $PSScriptRoot 'windows-issue-writes.ps1') }
+    if ($ReaderProof -in @('ReviewContext', 'History', 'Writes', 'WriteSurface')) { . (Join-Path $PSScriptRoot 'windows-issue-writes.ps1') }
     if ($ReaderProof -eq 'ReviewContext') { . (Join-Path $PSScriptRoot 'windows-review-context.ps1') }
+    if ($ReaderProof -eq 'History') { . (Join-Path $PSScriptRoot 'windows-history.ps1') }
     $firstProfile = Join-Path $ProfileDir ('initial-' + [guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $firstProfile -Force
     if ($ReaderProof -eq 'Offline') { Initialize-ReaderProfile $firstProfile 'small' }
@@ -898,6 +901,7 @@ try {
             Sync { 'sync-live' }
             PullRequest { 'pr-load' }
             ReviewContext { 'pr-load' }
+            History { 'history' }
             default { 'write-online' }
         }
         Set-AccessPhase $fixturePhase
@@ -944,6 +948,7 @@ try {
             Sync { Invoke-SyncProof $window $firstProfile }
             PullRequest { Invoke-PrReaderProof $window }
             ReviewContext { Invoke-ReviewContextProof $window $firstProfile }
+            History { Invoke-HistoryProof $window $firstProfile }
             Writes { Invoke-IssueWriteProof $window $firstProfile }
             WriteSurface { Invoke-IssueWriteSurfaceProof $window }
         }
