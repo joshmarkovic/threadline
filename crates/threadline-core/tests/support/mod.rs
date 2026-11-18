@@ -17,6 +17,9 @@ pub struct Reply {
     headers: HeaderMap,
     body: String,
     gate: Option<Arc<Notify>>,
+    pub authenticated: bool,
+    pub expected_etag: Option<&'static str>,
+    pub graph_repository: Option<(&'static str, &'static str)>,
 }
 
 impl Reply {
@@ -26,11 +29,17 @@ impl Reply {
             headers: HeaderMap::new(),
             body: body.into(),
             gate: None,
+            authenticated: false,
+            expected_etag: None,
+            graph_repository: None,
         }
     }
 
-    pub fn header(mut self, name: HeaderName, value: &'static str) -> Self {
-        self.headers.insert(name, HeaderValue::from_static(value));
+    pub fn header(mut self, name: HeaderName, value: impl AsRef<str>) -> Self {
+        self.headers.insert(
+            name,
+            HeaderValue::from_str(value.as_ref()).expect("fixture HTTP header"),
+        );
         self
     }
 
@@ -40,8 +49,11 @@ impl Reply {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct Observation {
+    method: &'static str,
+    route: &'static str,
+    response_status: u16,
     pub matched: bool,
     pub versioned: bool,
     pub expected_media_type: bool,
@@ -122,25 +134,80 @@ impl Drop for Simulator {
 }
 
 async fn serve_reply(State(shared): State<Arc<Shared>>, request: Request) -> Response {
-    let path = request
-        .uri()
-        .path_and_query()
-        .map_or("/", |uri| uri.as_str());
-    let key = (request.method().clone(), path.to_owned());
+    let (parts, body) = request.into_parts();
+    let path = parts.uri.path_and_query().map_or("/", |u| u.as_str());
+    let key = (parts.method.clone(), path.to_owned());
+    let graph_body = if parts.method == Method::POST {
+        let bytes = axum::body::to_bytes(body, 16 * 1024)
+            .await
+            .unwrap_or_default();
+        serde_json::from_slice::<serde_json::Value>(&bytes).ok()
+    } else {
+        None
+    };
     let reply = {
         let mut script = shared.script.lock().unwrap();
         let reply = script.routes.get_mut(&key).and_then(VecDeque::pop_front);
+        let matches = reply.as_ref().is_some_and(|expected| {
+            let headers = &parts.headers;
+            let authenticated = !expected.authenticated
+                || headers
+                    .get(header::AUTHORIZATION)
+                    .is_some_and(|v| v == "Bearer threadline-test-fixture");
+            let expected_tag = headers
+                .get(header::IF_NONE_MATCH)
+                .and_then(|v| v.to_str().ok())
+                == expected.expected_etag;
+            let graph = expected.graph_repository.is_none_or(|(owner, name)| {
+                let Some(body) = &graph_body else {
+                    return false;
+                };
+                body["variables"] == serde_json::json!({"owner":owner,"name":name})
+                    && body["query"].as_str().is_some_and(|q| {
+                        q.contains("query RepositoryAccess(") && q.contains("viewerPermission")
+                    })
+                    && headers
+                        .get(header::CONTENT_TYPE)
+                        .is_some_and(|v| v == "application/json")
+            });
+            authenticated
+                && expected_tag
+                && graph
+                && headers
+                    .get(header::USER_AGENT)
+                    .and_then(|v| v.to_str().ok())
+                    .is_some_and(|v| v.starts_with("Threadline/"))
+        });
+        let route = match parts.uri.path() {
+            "/user" => "/user",
+            "/user/repos" => "/user/repos",
+            "/graphql" => "/graphql",
+            p if p.starts_with("/repos/") && p.contains("/issues/") => {
+                "/repos/{owner}/{repo}/issues/{number}"
+            }
+            p if p.starts_with("/repos/") => "/repos/{owner}/{repo}",
+            _ => "unrecognized_route",
+        };
         script.observations.push(Observation {
-            matched: reply.is_some(),
-            versioned: request
-                .headers()
+            route,
+            method: if parts.method == Method::GET {
+                "GET"
+            } else if parts.method == Method::POST {
+                "POST"
+            } else {
+                "other"
+            },
+            response_status: reply.as_ref().map_or(400, |r| r.status.as_u16()),
+            matched: matches,
+            versioned: parts
+                .headers
                 .get("x-github-api-version")
-                .is_some_and(|value| value == GITHUB_REST_VERSION),
-            expected_media_type: request
-                .headers()
+                .is_some_and(|v| v == GITHUB_REST_VERSION),
+            expected_media_type: parts
+                .headers
                 .get(header::ACCEPT)
-                .is_some_and(|value| value == "application/vnd.github+json"),
-            authorization_sent: request.headers().contains_key(header::AUTHORIZATION),
+                .is_some_and(|v| v == "application/vnd.github+json"),
+            authorization_sent: parts.headers.contains_key(header::AUTHORIZATION),
         });
         shared.request_count.send_modify(|count| *count += 1);
         reply

@@ -1,3 +1,4 @@
+mod access;
 mod rest;
 mod scripted;
 
@@ -9,6 +10,7 @@ use std::time::Duration;
 
 use crate::domain::{IssueApiId, ItemKey, ItemKind, RepositoryName, Revision};
 
+pub use access::*;
 pub use rest::{GITHUB_REST_VERSION, RestProvider};
 pub use scripted::{ScriptedProvider, ScriptedReply};
 
