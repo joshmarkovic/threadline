@@ -21,6 +21,19 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     }
     if matches!(
         case,
+        "UT-002"
+            | "UT-005"
+            | "UT-006"
+            | "UT-007"
+            | "IT-006"
+            | "IT-007"
+            | "S05-FEED-HTTP"
+            | "S05-SYNC-WORKER"
+    ) {
+        return Some("s05-sync-v1");
+    }
+    if matches!(
+        case,
         "UT-008"
             | "UT-013"
             | "UT-018"
@@ -100,6 +113,11 @@ pub fn associations(case: &str) -> Associations {
         "S04-CACHED-STORE" | "S04-READ-SERVICE" => (
             "CACHE-03;CACHE-05;OFFLINE-03;SEARCH-01;TEST-03",
             "AC-06;AC-07;AC-08;AC-09",
+        ),
+        "S05-FEED-HTTP" => ("SYNC-05;SYNC-06;SYNC-07;SYNC-10;TEST-03", "AC-12;AC-54"),
+        "S05-SYNC-WORKER" => (
+            "SYNC-02;SYNC-03;SYNC-09;NOTIFY-13;TEST-03",
+            "AC-11;AC-54;AC-57",
         ),
         _ => catalog_associations(case).unwrap_or_default(),
     };

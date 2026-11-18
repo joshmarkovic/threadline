@@ -139,6 +139,14 @@ pub fn retry_delay(failures: u32, server_minimum: Duration) -> Option<Duration> 
     Some(Duration::from_secs(*delay).max(server_minimum))
 }
 
+/// Start from persisted provider update time, with overlap for interrupted pages and timestamp precision.
+pub fn activity_since(last_update_ms: Option<i64>, walk_started_ms: i64) -> i64 {
+    const OVERLAP_MS: i64 = 5 * 60_000;
+    last_update_ms
+        .unwrap_or(walk_started_ms)
+        .saturating_sub(OVERLAP_MS)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -194,4 +202,50 @@ mod tests {
         c.work_offline = true;
         assert!(!c.can_read(ReadPriority::Explicit));
     }
+}
+#[test]
+fn ut_002_sparse_numbers_do_not_define_the_provider_update_window() {
+    let old_issue_last_update = 3_000_000;
+    let newer_number_seen = 3_400_000;
+    let restarted = 4_000_000;
+    assert_eq!(activity_since(None, restarted), 3_700_000);
+    let since = activity_since(Some(newer_number_seen), restarted);
+    assert!(old_issue_last_update < since);
+    assert!(
+        3_450_000 > since,
+        "an edit to the old issue stays eligible after #900 was cached"
+    );
+    assert_eq!(since, 3_100_000);
+    assert_eq!(activity_since(Some(i64::MIN), restarted), i64::MIN);
+}
+
+#[test]
+fn ut_007_retry_and_server_floors_have_independent_bounds() {
+    use crate::github::RateLimit;
+
+    let rate = RateLimit {
+        retry_after_seconds: Some(5),
+        poll_after_seconds: Some(60),
+        remaining: Some(0),
+        reset_at_unix_seconds: Some(180),
+        ..Default::default()
+    };
+    assert_eq!(rate.not_before_ms(100_000), Some(180_000));
+    assert_eq!(
+        RateLimit {
+            remaining: Some(3),
+            ..rate
+        }
+        .not_before_ms(100_000),
+        Some(160_000)
+    );
+    assert_eq!(
+        retry_delay(1, Duration::from_secs(80)),
+        Some(Duration::from_secs(80))
+    );
+    assert_eq!(
+        retry_delay(4, Duration::ZERO),
+        Some(Duration::from_secs(60))
+    );
+    assert_eq!(retry_delay(5, Duration::ZERO), None);
 }

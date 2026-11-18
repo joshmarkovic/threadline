@@ -3,7 +3,7 @@ use crate::resources::{ResourceFamily, Validators};
 use crate::{AccountId, Error, ItemId, RepositoryId, Result, Store};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use std::time::Duration;
-use threadline_core::sync::policy::retry_delay;
+use threadline_core::sync::policy::{activity_since, retry_delay};
 pub use threadline_core::sync::policy::{ReadPriority, SyncControls, WorkSchedule};
 
 mod observation;
@@ -12,7 +12,6 @@ pub use observation::*;
 
 const LEASE_MS: i64 = 90_000;
 const SPACING_MS: i64 = 1_000;
-const OVERLAP_MS: i64 = 5 * 60_000;
 const SLOTS: [ReadPriority; 12] = [
     ReadPriority::Explicit,
     ReadPriority::Visible,
@@ -716,7 +715,7 @@ fn claim_in(tx: &Transaction<'_>, account: AccountId, now: i64) -> Result<Option
                 family,
                 ResourceFamily::RepositoryItems | ResourceFamily::Comments
             );
-        let since_ms = feed.then(|| watermark.unwrap_or(start).saturating_sub(OVERLAP_MS));
+        let since_ms = feed.then(|| activity_since(watermark, start));
         if cursor.is_some() || validator_since != since_ms {
             validators = Validators::default();
         }

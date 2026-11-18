@@ -20,6 +20,22 @@ struct CargoTest {
 
 const UNIT: &[CargoTest] = &[
     CargoTest {
+        id: "UT-002",
+        arguments: &["-p", "threadline-core", "--lib", "ut_002"],
+    },
+    CargoTest {
+        id: "UT-005",
+        arguments: &["-p", "threadline-core", "--lib", "ut_005"],
+    },
+    CargoTest {
+        id: "UT-006",
+        arguments: &["-p", "threadline-core", "--lib", "ut_006"],
+    },
+    CargoTest {
+        id: "UT-007",
+        arguments: &["-p", "threadline-core", "--lib", "ut_007"],
+    },
+    CargoTest {
         id: "UT-008",
         arguments: &["-p", "threadline-core", "--lib", "ut_008"],
     },
@@ -69,6 +85,33 @@ const UNIT: &[CargoTest] = &[
     },
 ];
 const INTEGRATION: &[CargoTest] = &[
+    CargoTest {
+        id: "IT-006",
+        arguments: &["-p", "threadline-storage", "--test", "sync", "it_006"],
+    },
+    CargoTest {
+        id: "IT-007",
+        arguments: &["-p", "threadline-storage", "--test", "sync", "it_007"],
+    },
+    CargoTest {
+        id: "S05-FEED-HTTP",
+        arguments: &[
+            "-p",
+            "threadline-core",
+            "--test",
+            "github_reader",
+            "sync_feeds_",
+        ],
+    },
+    CargoTest {
+        id: "S05-SYNC-WORKER",
+        arguments: &[
+            "-p",
+            "threadline-app",
+            "--lib",
+            "accounts::tests::sync_worker_",
+        ],
+    },
     CargoTest {
         id: "IT-003",
         arguments: &["-p", "threadline-storage", "--test", "reader", "it_003"],
@@ -817,13 +860,13 @@ mod tests {
             "test".into(),
             "unit".into(),
             "--case".into(),
-            "UT-002".into(),
+            "UT-014".into(),
         ])
         .unwrap();
         let dir = tempfile::tempdir().unwrap();
         let outcomes = execute(&options, dir.path(), dir.path());
         assert_eq!(outcomes.len(), 1);
-        assert_eq!(outcomes[0].case, "UT-002");
+        assert_eq!(outcomes[0].case, "UT-014");
         assert_eq!(outcomes[0].status, Status::Blocked);
         assert!(outcomes[0].evidence.is_none());
     }
