@@ -64,10 +64,18 @@ function Find-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [string]$Expecte
 function Invoke-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwatch]$InputClock, [string]$ExpectedName) {
     $element = Find-OwnedFixtureControl $Window $Id $ExpectedName
     if ($null -eq $element) { return $false }
-    $activation = Get-OwnedFixtureActivation $element $Id
-    if ($null -eq $activation) { return $false }
-    if (!(Test-OwnedFixtureWindow $Window) -or
-        !(Test-OwnedAutomationProperties $element.Current $Id $script:app.Id $ExpectedName)) {
+    try {
+        $activation = Get-OwnedFixtureActivation $element $Id
+        if ($null -eq $activation) { return $false }
+        $properties = $element.Current
+    } catch [Windows.Automation.ElementNotAvailableException] {
+        return $false
+    }
+    if (!(Test-OwnedFixtureWindow $Window)) {
+        Stop-Blocked 'The isolated Threadline window changed before Invoke.'
+    }
+    if (!(Test-OwnedAutomationProperties $properties $Id $script:app.Id $ExpectedName)) {
+        if ($ExpectedName) { return $false }
         Stop-Blocked 'The owned accessibility control changed before Invoke.'
     }
     if ($null -ne $InputClock) { $InputClock.Restart() }

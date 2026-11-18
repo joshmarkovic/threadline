@@ -209,3 +209,32 @@ try {
     [IO.Directory]::Delete($fixture, $true)
 }
 Write-Output 'Native observation predicate checks passed.'
+
+
+$script:observations.Clear()
+$script:observations.Enqueue([pscustomobject]@{ bounds = [pscustomobject]@{
+    'reader-result-0' = @(1, 2, 20, 10)
+    'reader-result-1' = @(1, 13, 20, 10)
+} })
+function Find-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [string]$ExpectedName) {
+    $candidate = $serverOrder | Where-Object { $_.Id -ceq $Id -and $_.Name -ceq $ExpectedName }
+    if ($null -ne $candidate) { return [pscustomobject]@{ Current = $candidate } }
+    return $null
+}
+$script:fixtureInvocations = 0
+function Invoke-OwnedFixtureControl([IntPtr]$Window, [string]$Id, $InputClock, [string]$ExpectedName) {
+    if ($Window -ne 123 -or $Id -cne 'reader-result-1' -or $ExpectedName -cne $resultA) {
+        throw 'The native PR journey lost its selected identity before activation.'
+    }
+    $script:fixtureInvocations++
+    return $script:fixtureInvocations -eq 2
+}
+function Add-Evidence([string]$Action, $Observed) {
+    if ($Observed.automation_id -cne 'reader-result-1' -or $Observed.eligible_controls -ne 1) {
+        throw 'The native PR journey did not record the unique expected target.'
+    }
+}
+Activate-FixturePr 123 'reader-result-' 42 'First fixture pull request' -Result
+if ($script:fixtureInvocations -ne 2) {
+    throw 'The journey did not retry transient pre-activation unavailability within the wait.'
+}

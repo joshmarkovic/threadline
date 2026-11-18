@@ -23,7 +23,7 @@ function Find-FixturePrChoice([object[]]$Choices, [string]$ExpectedName) {
 function Activate-FixturePr([IntPtr]$Window, [string]$Prefix, [int]$Number, [string]$Title, [switch]$Result) {
     $separator = if ($Result) { ' ' + [char]0x00b7 + ' ' } else { ' ' }
     $expectedName = "Pull request fixture-org/private #$Number$separator$Title"
-    $id = Wait-For 'the native control for the exact fixture repository and PR number' {
+    Wait-For "activation of fixture PR #$Number ($Prefix)" {
         $snapshot = Read-Observation
         if ($null -eq $snapshot) { return $null }
         $ids = @($snapshot.bounds.PSObject.Properties.Name | Where-Object {
@@ -35,10 +35,12 @@ function Activate-FixturePr([IntPtr]$Window, [string]$Prefix, [int]$Number, [str
                 if ($null -ne $node) { [pscustomobject]@{ Id = $candidate; Name = $node.Current.Name } }
             }
         )
-        Find-FixturePrChoice $choices $expectedName
-    }
-    if (!(Invoke-OwnedFixtureControl $Window $id $null $expectedName)) {
-        Stop-Blocked 'The verified pull request control is missing a native activation pattern.'
+        $id = Find-FixturePrChoice $choices $expectedName
+        if (!$id -or !(Invoke-OwnedFixtureControl $Window $id $null $expectedName)) { return $false }
+        Add-Evidence 'Activate the exact native fixture pull request' ([ordered]@{
+            automation_id = $id; name = $expectedName; eligible_controls = $choices.Count
+        })
+        return $true
     }
 }
 
