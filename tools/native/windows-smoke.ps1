@@ -82,13 +82,14 @@ function Get-FileSha256 {
     }
 }
 
-function Get-IsolatedSqlite([string]$Profile) {
+function Get-IsolatedSqlite([string]$Profile, [switch]$Live) {
     $database = Join-Path $Profile 'threadline.sqlite3'
     if (!(Test-Path -LiteralPath $database -PathType Leaf)) {
         throw 'The isolated profile database was not created.'
     }
     $header = New-Object byte[] 16
-    $stream = [IO.File]::OpenRead($database)
+    $sharing = if ($Live) { [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete } else { [IO.FileShare]::Read }
+    $stream = [IO.File]::Open($database, [IO.FileMode]::Open, [IO.FileAccess]::Read, $sharing)
     try {
         $read = $stream.Read($header, 0, $header.Length)
     } finally {
@@ -98,7 +99,7 @@ function Get-IsolatedSqlite([string]$Profile) {
         throw 'The isolated profile database does not have a SQLite header.'
     }
     return [ordered]@{
-        sha256 = Get-FileSha256 $database
+        sha256 = if ($Live) { $null } else { Get-FileSha256 $database }
         creation_time_ticks = [IO.File]::GetCreationTimeUtc($database).Ticks
     }
 }

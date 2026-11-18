@@ -10,9 +10,9 @@ if ($parseErrors.Count -ne 0) { throw ($parseErrors -join [Environment]::NewLine
 $helpers = $ast.FindAll({
     param($node)
     $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
-        $node.Name -cin @('Wait-For', 'Wait-State', 'Get-ThreadlineArguments')
+        $node.Name -cin @('Wait-For', 'Wait-State', 'Get-ThreadlineArguments', 'Get-IsolatedSqlite', 'Get-FileSha256')
 }, $false)
-if (@($helpers.Name | Sort-Object -Unique).Count -ne 3 -or $helpers.Count -ne 3) {
+if (@($helpers.Name | Sort-Object -Unique).Count -ne 5 -or $helpers.Count -ne 5) {
     throw 'Could not load the native driver test functions.'
 }
 . ([scriptblock]::Create(($helpers | ForEach-Object { $_.Extent.Text }) -join [Environment]::NewLine))
@@ -74,5 +74,29 @@ if ((Get-ThreadlineArguments $path) -cne '--e2e-report "C:\isolated profile\obse
     (Get-ThreadlineArguments $path -SeedReader 'small') -cne '--e2e-seed-reader small --e2e-report "C:\isolated profile\observation.json"' -or
     (Get-ThreadlineArguments $path -SeedReader 'section-16') -cne '--e2e-seed-reader section-16 --e2e-report "C:\isolated profile\observation.json"') {
     throw 'The cached reader and seeder receive distinct entry-point arguments.'
+}
+
+$fixture = Join-Path ([IO.Path]::GetTempPath()) ('threadline-shared-sqlite-' + [Guid]::NewGuid().ToString('N'))
+$null = [IO.Directory]::CreateDirectory($fixture)
+try {
+    $database = Join-Path $fixture 'threadline.sqlite3'
+    $sharing = [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete
+    $writer = [IO.File]::Open($database, [IO.FileMode]::CreateNew, [IO.FileAccess]::ReadWrite, $sharing)
+    try {
+        $header = [Text.Encoding]::ASCII.GetBytes('SQLite format 3' + [char]0)
+        $writer.Write($header, 0, $header.Length)
+        $writer.Flush()
+        $live = Get-IsolatedSqlite $fixture -Live
+        if ($null -ne $live.sha256) { throw 'The live reader computed an unquiesced database digest.' }
+    } finally {
+        $writer.Dispose()
+    }
+    $closed = Get-IsolatedSqlite $fixture
+    if ($live.creation_time_ticks -ne $closed.creation_time_ticks -or
+        $closed.sha256 -cne '3f8434aff012ffcb594ad7527d6042841ce94f499887f86ab828f84a9a275f91') {
+        throw 'The Windows SQLite header and clean-quit digest fixture did not match.'
+    }
+} finally {
+    [IO.Directory]::Delete($fixture, $true)
 }
 Write-Output 'Native observation predicate checks passed.'
