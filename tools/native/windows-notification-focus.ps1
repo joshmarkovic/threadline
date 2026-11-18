@@ -78,6 +78,8 @@ function Get-CenterFixtureHit($Root, $Native, $Stats) {
         $Stats.card_role_misses++
         return $null
     }
+    if ((Get-Variable fixtureSenderGuard -ErrorAction SilentlyContinue) -and
+        !(& $fixtureSenderGuard $card $Root $Native.ProcessId)) { return $null }
     if (!$card.Current.IsEnabled -or $card.Current.IsOffscreen) { return $null }
     $Stats.verified_card_reads++
     if ($Stats.card_structure.Count -eq 0) { $Stats.card_structure = @(Get-FixtureCardStructure $card $Native.ProcessId) }
