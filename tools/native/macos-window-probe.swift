@@ -150,10 +150,10 @@ private func runProbe(binary: URL, evidence: inout [String: Any]) throws -> Outc
     child.executableURL = binary
     child.currentDirectoryURL = scratch
     child.arguments = ["--e2e-report", scratch.appendingPathComponent("ui-observation.json").path]
-    var environment = ProcessInfo.processInfo.environment
-    environment["THREADLINE_PROFILE_DIR"] = profile.path
-    environment["THREADLINE_TEST_SEED"] = "12345"
-    child.environment = environment
+    var childEnvironment = environment
+    childEnvironment["THREADLINE_PROFILE_DIR"] = profile.path
+    childEnvironment["THREADLINE_TEST_SEED"] = "12345"
+    child.environment = childEnvironment
     child.standardInput = FileHandle.nullDevice
     child.standardOutput = FileHandle.nullDevice
     child.standardError = FileHandle.nullDevice
