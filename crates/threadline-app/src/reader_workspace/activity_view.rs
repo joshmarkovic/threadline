@@ -9,7 +9,7 @@ use gpui_kit::{
     component::{Disableable, Selectable, input::Input},
     div,
 };
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, num::NonZeroU64};
 use threadline_storage::{
     RepositoryId,
     notifications::{
