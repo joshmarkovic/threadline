@@ -20,6 +20,18 @@ struct CargoTest {
 
 const UNIT: &[CargoTest] = &[
     CargoTest {
+        id: "UT-008",
+        arguments: &["-p", "threadline-core", "--lib", "ut_008"],
+    },
+    CargoTest {
+        id: "UT-013",
+        arguments: &["-p", "threadline-core", "--lib", "ut_013"],
+    },
+    CargoTest {
+        id: "UT-018",
+        arguments: &["-p", "threadline-storage", "--lib", "ut_018"],
+    },
+    CargoTest {
         id: "UT-021",
         arguments: &["-p", "xtask", "--bin", "xtask"],
     },
@@ -57,6 +69,10 @@ const UNIT: &[CargoTest] = &[
     },
 ];
 const INTEGRATION: &[CargoTest] = &[
+    CargoTest {
+        id: "IT-003",
+        arguments: &["-p", "threadline-storage", "--test", "reader", "it_003"],
+    },
     CargoTest {
         id: "S01-SIMULATOR",
         arguments: &["-p", "threadline-core", "--test", "foundation"],

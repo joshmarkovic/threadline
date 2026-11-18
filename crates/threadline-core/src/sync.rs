@@ -159,6 +159,42 @@ mod tests {
     use crate::fixtures::FeasibilityFixture;
     use crate::github::{ScriptedProvider, ScriptedReply};
 
+    #[test]
+    fn ut_013_late_response_requires_the_same_account_target_tab_instance_and_generation() {
+        let fixture = FeasibilityFixture::new(12345);
+        let item = fixture.request.item().clone();
+        let selection = ViewSelection {
+            tab: 11.try_into().unwrap(),
+            generation: 2,
+        };
+        let result = ReadOutcome {
+            item: item.clone(),
+            view: Some(selection),
+            result: Ok(fixture.summary),
+        };
+        assert!(result.matches_view(&item, selection));
+        assert!(!result.matches_view(
+            &item,
+            ViewSelection {
+                generation: 3,
+                ..selection
+            }
+        ));
+        assert!(!result.matches_view(
+            &item,
+            ViewSelection {
+                tab: 12.try_into().unwrap(),
+                ..selection
+            }
+        ));
+        let mut another_account = item.clone();
+        another_account.repository.profile = 99.try_into().unwrap();
+        assert!(!result.matches_view(&another_account, selection));
+        let mut another_number = item;
+        another_number.number = 98.try_into().unwrap();
+        assert!(!result.matches_view(&another_number, selection));
+    }
+
     #[tokio::test]
     async fn simulated_time_controls_completion_and_stale_view_rejection() {
         let fixture = FeasibilityFixture::new(42);

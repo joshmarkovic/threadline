@@ -88,6 +88,16 @@ pub struct KnownCount {
     pub complete: bool,
     pub last_validated_at_ms: Option<i64>,
 }
+impl KnownCount {
+    /// Zero never needs a visual badge. Completeness distinguishes a confirmed empty view from a partial count.
+    pub fn badge(self) -> Option<u64> {
+        (self.known > 0).then_some(self.known)
+    }
+    pub fn confirms_empty(self) -> bool {
+        self.complete && self.known == 0
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SidebarCounts {
     pub assigned: KnownCount,
@@ -454,4 +464,35 @@ fn require_item(db: &Connection, account: AccountId, item: ItemId) -> Result<()>
     )
     .optional()?
     .ok_or(Error::NotFound)
+}
+
+#[cfg(test)]
+mod count_tests {
+    use super::KnownCount;
+
+    #[test]
+    fn ut_018_sidebar_badges_preserve_known_totals_and_distinguish_partial_from_confirmed_empty() {
+        let partial = KnownCount {
+            known: 0,
+            complete: false,
+            last_validated_at_ms: None,
+        };
+        assert_eq!(partial.badge(), None);
+        assert!(!partial.confirms_empty());
+        let empty = KnownCount {
+            complete: true,
+            ..partial
+        };
+        assert_eq!(empty.badge(), None);
+        assert!(empty.confirms_empty());
+        for complete in [false, true] {
+            let visible = KnownCount {
+                known: 12,
+                complete,
+                ..partial
+            };
+            assert_eq!(visible.badge(), Some(12));
+            assert!(!visible.confirms_empty());
+        }
+    }
 }

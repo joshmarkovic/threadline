@@ -21,7 +21,11 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     }
     if matches!(
         case,
-        "E2E-003"
+        "UT-008"
+            | "UT-013"
+            | "UT-018"
+            | "IT-003"
+            | "E2E-003"
             | "E2E-004"
             | "S04-READER-PERF"
             | "S04-READ-TRANSPORT"
