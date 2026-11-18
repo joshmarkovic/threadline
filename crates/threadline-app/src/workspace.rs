@@ -1468,11 +1468,11 @@ impl Workspace {
             account_access: self
                 .accounts
                 .as_ref()
-                .and_then(|panel| panel.read(cx).observation(self.accounts_open)),
+                .and_then(|panel| panel.read(cx).observation(self.accounts_open, cx)),
             cached_reader: self
                 .accounts
                 .as_ref()
-                .and_then(|panel| panel.read(cx).observation(self.accounts_open))
+                .and_then(|panel| panel.read(cx).observation(self.accounts_open, cx))
                 .and_then(|_| {
                     self.reader
                         .as_ref()

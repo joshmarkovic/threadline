@@ -23,6 +23,8 @@ use threadline_storage::{
 };
 use zeroize::Zeroize;
 
+pub(crate) const FIXTURE_PAT: &str = "threadline-test-fixture";
+
 pub(crate) struct Pat(Credential);
 
 impl Pat {
@@ -38,7 +40,7 @@ impl Pat {
     fn validated_kind(&self, fixture: bool) -> Result<CredentialKind, Problem> {
         let bytes = self.0.0.as_slice();
         if fixture {
-            return (bytes == b"threadline-test-fixture")
+            return (bytes == FIXTURE_PAT.as_bytes())
                 .then_some(CredentialKind::Classic)
                 .ok_or(Problem::InvalidPat);
         }
@@ -116,6 +118,15 @@ pub(crate) struct AccountReply {
     pub(crate) message: Option<&'static str>,
     pub(crate) github_error: Option<AccessError>,
     pub(crate) reachability: Reachability,
+    #[cfg(feature = "e2e")]
+    pub(crate) input_issue: Option<AccountInputIssue>,
+}
+
+#[cfg(feature = "e2e")]
+#[derive(Clone, Copy, serde::Serialize)]
+pub(crate) enum AccountInputIssue {
+    InvalidRepository,
+    InvalidPat,
 }
 
 enum Problem {
@@ -221,6 +232,8 @@ impl AccountService {
                 message,
                 github_error: None,
                 reachability,
+                #[cfg(feature = "e2e")]
+                input_issue: None,
             },
             Err(error) => problem_reply(view, error),
         }
@@ -697,6 +710,8 @@ fn problem_reply(view: AccountView, error: Problem) -> AccountReply {
             message: None,
             reachability,
             github_error: Some(github_error),
+            #[cfg(feature = "e2e")]
+            input_issue: None,
         };
     }
     if let Problem::GitHub(github_error) = error {
@@ -705,8 +720,16 @@ fn problem_reply(view: AccountView, error: Problem) -> AccountReply {
             message: None,
             reachability: github_error.reachability,
             github_error: Some(github_error),
+            #[cfg(feature = "e2e")]
+            input_issue: None,
         };
     }
+    #[cfg(feature = "e2e")]
+    let input_issue = match &error {
+        Problem::InvalidRepository => Some(AccountInputIssue::InvalidRepository),
+        Problem::InvalidPat => Some(AccountInputIssue::InvalidPat),
+        _ => None,
+    };
     let message = match error {
         Problem::Storage(error) => {
             let _ = error;
@@ -731,6 +754,8 @@ fn problem_reply(view: AccountView, error: Problem) -> AccountReply {
         message: Some(message),
         github_error: None,
         reachability: Reachability::NotAttempted,
+        #[cfg(feature = "e2e")]
+        input_issue,
     }
 }
 
@@ -751,7 +776,7 @@ impl CredentialStore for FixtureVault {
     }
 
     fn save(&self, key: &CredentialRef, value: &Credential) -> Result<(), PlatformError> {
-        if value.0 != b"threadline-test-fixture" {
+        if value.0 != FIXTURE_PAT.as_bytes() {
             return Err(PlatformError::InvalidCredentialValue);
         }
         let mut map = self.0.lock().map_err(|_| PlatformError::Unavailable)?;

@@ -16,6 +16,7 @@ struct Simulator {
     sso: Arc<AtomicBool>,
     stop: Arc<AtomicBool>,
     requests: Arc<AtomicUsize>,
+    user_requests: Arc<AtomicUsize>,
     repository_id: Arc<AtomicU64>,
     page_two_ready: Arc<AtomicBool>,
     worker: Option<thread::JoinHandle<()>>,
@@ -33,6 +34,8 @@ impl Simulator {
         let sso = Arc::new(AtomicBool::new(false));
         let stop = Arc::new(AtomicBool::new(false));
         let requests = Arc::new(AtomicUsize::new(0));
+        let user_requests = Arc::new(AtomicUsize::new(0));
+        let server_user_requests = user_requests.clone();
         let repository_id = Arc::new(AtomicU64::new(42));
         let page_two_ready = Arc::new(AtomicBool::new(false));
         let (server_sso, server_stop, server_requests, server_repository) = (
@@ -47,12 +50,14 @@ impl Simulator {
                 match listener.accept() {
                     Ok((stream, _)) => {
                         server_requests.fetch_add(1, Ordering::Relaxed);
-                        respond(
+                        if respond(
                             stream,
                             server_sso.load(Ordering::Relaxed),
                             server_repository.load(Ordering::Relaxed),
                             reader.then(|| (address, server_page_two.load(Ordering::Relaxed))),
-                        );
+                        ) {
+                            server_user_requests.fetch_add(1, Ordering::Relaxed);
+                        }
                     }
                     Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                         thread::sleep(Duration::from_millis(2))
@@ -66,6 +71,7 @@ impl Simulator {
             sso,
             stop,
             requests,
+            user_requests,
             repository_id,
             page_two_ready,
             worker: Some(worker),
@@ -91,7 +97,7 @@ fn respond(
     sso: bool,
     repository_id: u64,
     reader: Option<(SocketAddr, bool)>,
-) {
+) -> bool {
     // Windows can inherit the nonblocking listener mode on an accepted socket.
     stream.set_nonblocking(false).unwrap();
     stream
@@ -137,6 +143,7 @@ fn respond(
     };
     write!(stream,"HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n{extra}\r\n{body}",body.len()).unwrap();
     stream.flush().unwrap();
+    target == "/user"
 }
 
 fn reader_reply(
@@ -377,6 +384,7 @@ async fn account_journey_persists_private_access_partial_sso_and_signout() {
             .is_none()
     );
     assert!(fixture.requests.load(Ordering::Relaxed) >= 9);
+    assert_eq!(fixture.user_requests.load(Ordering::Relaxed), 3);
     drop(service);
     drop(store);
     let reopened = Store::open(&path).unwrap();
@@ -605,4 +613,101 @@ async fn cache_reader_reopens_the_selected_public_repo_and_resumes_an_edited_com
             .len(),
         2
     );
+}
+
+#[cfg(feature = "e2e")]
+#[gpui_kit::test]
+fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
+    cx: &mut gpui_kit::TestAppContext,
+) {
+    use crate::account_panel::AccountPanel;
+    use gpui_kit::{
+        AppContext, Bounds, Point, WindowBounds, WindowOptions, px, size, test::TestWindowExt,
+    };
+
+    cx.executor().allow_parking();
+    let simulator = Simulator::start();
+    let profile = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open(&profile.path().join("account-form.sqlite")).unwrap());
+    let service = AccountService {
+        store: store.clone(),
+        credentials: Arc::new(FixtureVault::default()),
+        github: GitHubClient::loopback(simulator.address).unwrap(),
+        fixture: true,
+    };
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    let handle = runtime.handle().clone();
+    let (window, panel) = cx.update(|cx| {
+        gpui_kit::init(cx);
+        gpui_kit::open_window(
+            WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(Bounds {
+                    origin: Point::default(),
+                    size: size(px(1060.), px(790.)),
+                })),
+                ..Default::default()
+            },
+            cx,
+            |window, cx| cx.new(|cx| AccountPanel::new(service, handle, window, cx)),
+        )
+        .unwrap()
+    });
+    wait_form(cx, |cx| cx.read(|cx| panel.read(cx).loaded()));
+
+    cx.update_window(window, |_, window, cx| {
+        panel.update(cx, |panel, cx| panel.focus_form(window, cx));
+        window.render_frame(cx);
+        window.input("fixture-org/private", cx);
+        let state = serde_json::to_value(panel.read(cx).observation(true, cx).unwrap()).unwrap();
+        assert_eq!(state["fixture_route_entered"], true);
+        assert_eq!(state["fixture_token_entered"], false);
+        window.press("tab", cx);
+        window.input(FIXTURE_PAT, cx);
+        let state = serde_json::to_value(panel.read(cx).observation(true, cx).unwrap()).unwrap();
+        assert_eq!(state["fixture_token_entered"], true);
+        assert!(!state.to_string().contains(FIXTURE_PAT));
+        window.click("account-connect", cx);
+    })
+    .unwrap();
+    wait_form(cx, |cx| {
+        cx.read(|cx| {
+            panel
+                .read(cx)
+                .local_reader_state()
+                .1
+                .is_some_and(|profile| profile.access == AccessState::Readable)
+        })
+    });
+    assert_eq!(simulator.user_requests.load(Ordering::Relaxed), 1);
+    let account = store.active_github_account().unwrap().unwrap();
+    let loaded = store.github_repository_views(account).unwrap();
+    assert_eq!(loaded.len(), 1);
+    assert_eq!(loaded[0].access, AccessState::Readable);
+    assert!(loaded[0].verified_current);
+    cx.read(|cx| {
+        let state = serde_json::to_value(panel.read(cx).observation(true, cx).unwrap()).unwrap();
+        assert_eq!(state["active_user_id"], 101);
+        assert_eq!(state["fixture_token_entered"], false);
+        assert_eq!(state["input_issue"], serde_json::Value::Null);
+    });
+}
+
+#[cfg(feature = "e2e")]
+fn wait_form(
+    cx: &mut gpui_kit::TestAppContext,
+    mut condition: impl FnMut(&gpui_kit::TestAppContext) -> bool,
+) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(8);
+    while std::time::Instant::now() < deadline {
+        cx.run_until_parked();
+        if condition(cx) {
+            return;
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+    panic!("The account form did not finish the isolated identity check");
 }

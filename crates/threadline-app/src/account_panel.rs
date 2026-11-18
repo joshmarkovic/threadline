@@ -31,6 +31,9 @@ pub(crate) struct AccountObservation {
     discovery: Option<String>,
     reachability: String,
     authorization_available: bool,
+    fixture_route_entered: bool,
+    fixture_token_entered: bool,
+    input_issue: Option<crate::accounts::AccountInputIssue>,
 }
 
 pub(crate) struct AccountPanel {
@@ -48,6 +51,12 @@ pub(crate) struct AccountPanel {
     cancel: Cancellation,
     #[cfg(feature = "e2e")]
     observer: Option<crate::observation::Observer>,
+    #[cfg(feature = "e2e")]
+    input_issue: Option<crate::accounts::AccountInputIssue>,
+    #[cfg(feature = "e2e")]
+    _route_observation: Option<gpui_kit::Subscription>,
+    #[cfg(feature = "e2e")]
+    token_observation: Option<gpui_kit::Subscription>,
 }
 
 impl AccountPanel {
@@ -65,6 +74,14 @@ impl AccountPanel {
     ) -> Self {
         let route = cx.new(|cx| InputState::new(window, cx).placeholder("owner/name"));
         let token = password_input(window, cx);
+        #[cfg(feature = "e2e")]
+        let route_observation = service
+            .fixture
+            .then(|| cx.observe(&route, |_, _, cx| cx.notify()));
+        #[cfg(feature = "e2e")]
+        let token_observation = service
+            .fixture
+            .then(|| cx.observe(&token, |_, _, cx| cx.notify()));
         let mut panel = Self {
             service,
             runtime,
@@ -80,6 +97,12 @@ impl AccountPanel {
             cancel: Cancellation::new(),
             #[cfg(feature = "e2e")]
             observer: None,
+            #[cfg(feature = "e2e")]
+            input_issue: None,
+            #[cfg(feature = "e2e")]
+            _route_observation: route_observation,
+            #[cfg(feature = "e2e")]
+            token_observation,
         };
         panel.launch(AccountCommand::Load, cx);
         panel
@@ -95,6 +118,10 @@ impl AccountPanel {
 
     pub(crate) fn clear_token(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.token = password_input(window, cx);
+        #[cfg(feature = "e2e")]
+        if self.service.fixture {
+            self.token_observation = Some(cx.observe(&self.token, |_, _, cx| cx.notify()));
+        }
         cx.notify();
     }
 
@@ -117,7 +144,7 @@ impl AccountPanel {
     }
 
     #[cfg(feature = "e2e")]
-    pub(crate) fn observation(&self, panel_open: bool) -> Option<AccountObservation> {
+    pub(crate) fn observation(&self, panel_open: bool, cx: &App) -> Option<AccountObservation> {
         if !self.service.fixture {
             return None;
         }
@@ -141,6 +168,16 @@ impl AccountPanel {
                 .github_error
                 .as_ref()
                 .is_some_and(|error| error.authorization_url().is_some()),
+            fixture_route_entered: panel_open
+                && self.route.read(cx).value().as_ref() == "fixture-org/private",
+            fixture_token_entered: panel_open
+                && self
+                    .token
+                    .read(cx)
+                    .text()
+                    .chars()
+                    .eq(crate::accounts::FIXTURE_PAT.chars()),
+            input_issue: self.input_issue,
         })
     }
 
@@ -156,6 +193,10 @@ impl AccountPanel {
         self.busy = true;
         self.message = None;
         self.github_error = None;
+        #[cfg(feature = "e2e")]
+        {
+            self.input_issue = None;
+        }
         let cancel = self.cancel.clone();
         let service = self.service.clone();
         let work = self
@@ -173,10 +214,16 @@ impl AccountPanel {
                         message,
                         github_error,
                         reachability,
+                        #[cfg(feature = "e2e")]
+                        input_issue,
                     }) => {
                         panel.view = view;
                         panel.message = message;
                         panel.github_error = github_error;
+                        #[cfg(feature = "e2e")]
+                        {
+                            panel.input_issue = input_issue;
+                        }
                         if reachability != Reachability::NotAttempted {
                             panel.reachability = reachability;
                         }

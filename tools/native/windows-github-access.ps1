@@ -40,9 +40,20 @@ function Connect-FixtureAccount([IntPtr]$Window) {
     Click-AccountControl $Window 'account-repository'
     [ThreadlineWinInput]::Chord(@(0x11, 0x41))
     [ThreadlineWinInput]::TypeText('fixture-org/private')
+    $null = Wait-Account 'the exact synthetic repository in the native form' {
+        param($account) $account.fixture_route_entered
+    }
     Click-AccountControl $Window 'account-token'
     $syntheticPat = 'threadline-test-fixture'
+    [ThreadlineWinInput]::Chord(@(0x11, 0x41))
     [ThreadlineWinInput]::TypeText($syntheticPat)
+    $null = Wait-Account 'the exact synthetic credential entered into the masked native form' {
+        param($account) $account.fixture_route_entered -and $account.fixture_token_entered
+    }
+    Add-Evidence 'Verify native input reached both authorization fields' ([ordered]@{
+        repository_value_confirmed = $true
+        synthetic_credential_confirmed = $true
+    })
     Click-AccountControl $Window 'account-connect'
     $identity = Wait-Account 'verified fixture identity and repository access' {
         param($account)
