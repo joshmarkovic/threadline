@@ -14,6 +14,7 @@ use std::{
 use serde::Serialize;
 use serde_json::{Value, json};
 
+mod backlog;
 mod history;
 mod merge;
 mod pr;
@@ -78,6 +79,9 @@ enum Phase {
     History,
     WriteOnline,
     WriteDrop,
+    BacklogAuth,
+    BacklogHold,
+    BacklogDrain,
 }
 
 impl Phase {
@@ -111,6 +115,9 @@ impl Phase {
             "history" => Ok(Self::History),
             "write-online" => Ok(Self::WriteOnline),
             "write-drop" => Ok(Self::WriteDrop),
+            "backlog-auth" => Ok(Self::BacklogAuth),
+            "backlog-hold" => Ok(Self::BacklogHold),
+            "backlog-drain" => Ok(Self::BacklogDrain),
             _ => Err(io::Error::other("invalid access fixture phase")),
         }
     }
@@ -153,6 +160,9 @@ enum Route {
     HistoryPairDiff,
     CommentCreated,
     CommentReplyLost,
+    BacklogIssue,
+    BacklogPermission,
+    BacklogComment(u8),
     Unexpected,
 }
 
@@ -175,6 +185,7 @@ pub enum TraceCheck {
     Observe,
     AccountJourney,
     OfflineReader,
+    LargeWorkspaceBacklog,
     ReaderResume,
     SyncJourney,
     NotificationSchedule,
@@ -227,6 +238,7 @@ impl AccessFixture {
             TraceCheck::Observe => true,
             TraceCheck::AccountJourney => complete_journey(&records),
             TraceCheck::OfflineReader => records.is_empty(),
+            TraceCheck::LargeWorkspaceBacklog => backlog::trace(&records),
             TraceCheck::ReaderResume => complete_reader_resume(&records),
             TraceCheck::SyncJourney => complete_sync_journey(&records),
             TraceCheck::NotificationSchedule => complete_notification_schedule(&records),
@@ -431,6 +443,18 @@ fn answer(
             status: 0,
         });
     }
+    if authorized
+        && phase == Phase::BacklogHold
+        && matches!(route, Route::BacklogComment(_))
+        && !backlog::await_release(phase_file, stopping)?
+    {
+        return Ok(RequestEvidence {
+            phase,
+            route,
+            fixture_authorization: true,
+            status: 0,
+        });
+    }
     let reply = response(phase, route, authorized, merge_sent);
     let body = serde_json::to_vec(&reply.body)?;
     write!(
@@ -451,6 +475,11 @@ fn answer(
     }
     if route == Route::CommentCreated && reply.status == 201 {
         socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:4101:07\r\n")?;
+    }
+    if let Route::BacklogComment(index) = route
+        && reply.status == 201
+    {
+        write!(socket, "X-GitHub-Request-Id: SYNTHETIC:71:{index:02}\r\n")?;
     }
     if reply.status == 200 {
         match route {
@@ -527,7 +556,8 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
             Route::UpdatedComments
         }
         (Some("POST"), Some("/graphql"), Some("HTTP/1.1")) => Route::Graphql,
-        (Some("GET"), Some(target), Some("HTTP/1.1")) => history::route(phase, target)
+        (Some("GET"), Some(target), Some("HTTP/1.1")) => backlog::read_route(phase, target)
+            .or_else(|| history::route(phase, target))
             .or_else(|| pr::route(target))
             .unwrap_or(Route::Unexpected),
         _ => Route::Unexpected,
@@ -570,7 +600,8 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
         let payload = serde_json::from_slice::<Value>(&body).ok();
         if route != Route::Graphql {
             route = payload.as_ref().map_or(Route::Unexpected, |body| {
-                pr::post(phase, &post_path, body)
+                backlog::post(phase, &post_path, body)
+                    .or_else(|| pr::post(phase, &post_path, body))
                     .unwrap_or_else(|| writes::post(phase, &post_path, body))
             });
         } else if let Some(merge) = payload
@@ -628,6 +659,9 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
     };
     if !authorized || phase == Phase::Revoked {
         return result(401, "Unauthorized", json!({"message":"Bad credentials"}));
+    }
+    if let Some(backlog) = backlog::response(phase, route) {
+        return backlog;
     }
     if let Some(history) = history::response(phase, route) {
         return history;

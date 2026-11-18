@@ -20,18 +20,25 @@ function Initialize-ReaderProfile([string]$Profile, [string]$Scale) {
         $seeder.Dispose()
     }
     $receipt = [IO.File]::ReadAllText($path) | ConvertFrom-Json
-    if ($receipt.fixture_revision -cne 's04-reader-v1' -or $receipt.scale -cne $Scale -or
+    $revision = if ($Scale -eq 'section-16-backlog') { 's12-large-workspace-v1' } else { 's04-reader-v1' }
+    if ($receipt.fixture_revision -cne $revision -or $receipt.scale -cne $Scale -or
         $receipt.seed -ne $script:Seed -or !$receipt.offline) {
         throw 'The reader fixture does not match the requested isolated workload.'
     }
-    if ($Scale -eq 'section-16' -and ($receipt.items -ne 50000 -or $receipt.comments -ne 250000 -or
+    if ($Scale -in @('section-16', 'section-16-backlog') -and ($receipt.items -ne 50000 -or $receipt.comments -ne 250000 -or
         $receipt.open_tabs -ne 20 -or $receipt.outbox_count -ne 1000)) {
         throw 'The reader fixture does not match the Section 16 workload.'
+    }
+    if ($Scale -eq 'section-16-backlog') {
+        if ($receipt.typed_outbox_count -ne 12 -or $receipt.unresolved_outbox -ne 901) {
+            throw 'The large workspace needs its exact typed actions and retained historical queue.'
+        }
+        $script:BacklogSeed = $receipt
     }
     Add-Evidence 'Seed the isolated profile with the application and bundled SQLite' $receipt
 }
 
-function Restart-Reader([string]$Profile, [hashtable]$Startup, [switch]$SeedQuietEvent) {
+function Restart-Reader([string]$Profile, [hashtable]$Startup, [switch]$SeedQuietEvent, [switch]$Backlog) {
     Stop-ThroughUi
     $script:app.Dispose()
     $script:app = $null
@@ -56,9 +63,10 @@ function Restart-Reader([string]$Profile, [hashtable]$Startup, [switch]$SeedQuie
             $seeder.Dispose()
         }
     }
-    $script:reportFile = Join-Path $script:ReportDir 'reader-restart-observation.json'
+    $observationName = if ($Backlog) { 'reader-backlog-observation.json' } else { 'reader-restart-observation.json' }
+    $script:reportFile = Join-Path $script:ReportDir $observationName
     if ($Startup) { $startupClock = [Diagnostics.Stopwatch]::StartNew() }
-    $script:app = Start-Threadline $Profile $script:reportFile -ReaderIdle:([bool]$Startup)
+    $script:app = Start-Threadline $Profile $script:reportFile -ReaderIdle:([bool]$Startup) -ReaderBacklog:$Backlog
     $script:report.restarted_pid = $script:app.Id
     $window = Get-ReadyWindow
     if ($Startup) {
@@ -399,14 +407,16 @@ function Invoke-LargeWorkspaceProof([IntPtr]$Window, [string]$Profile, [double]$
         initial_offline_start_ms = $InitialStartupMs
         initial_offline_peak_working_set_bytes = $script:app.PeakWorkingSet64
         warm_start_ms = $null
+        warm_process_id = $null
         idle_frames = $null
         idle_working_set_bytes = $null
         peak_working_set_bytes = $null
-        gpu_memory = [ordered]@{ idle = $null; after_actions = $null }
+        gpu_memory = [ordered]@{ idle = $null; after_actions = $null; after_drain = $null }
     }
     $script:report.runtime = $runtime
     $Window = Restart-Reader $Profile $startup
     $runtime.warm_start_ms = $startup.warm_start_ms
+    $runtime.warm_process_id = $script:app.Id
     $runtime.idle_frames = Read-LargeIdleSample
     $idleStatus = Get-LargeIdleStatus $runtime.idle_frames $script:app.Id
     $script:app.Refresh()
@@ -414,8 +424,9 @@ function Invoke-LargeWorkspaceProof([IntPtr]$Window, [string]$Profile, [double]$
     $runtime.gpu_memory.idle = Get-GpuProcessMemory $script:app.Id
     Invoke-ReaderPerformance $Window -KeepOpen
     Click-AccountControl $Window 'reader-outbox'
-    $null = Wait-Reader 'the signed-out native queue shows 900 unresolved fixture operations' {
-        param($reader) $reader.offline -and $reader.outbox_visible -and $reader.outbox -eq 900
+    $expectedUnresolved = $script:BacklogSeed.unresolved_outbox
+    $null = Wait-Reader 'the signed-out native queue shows the complete unresolved fixture count' {
+        param($reader) $reader.offline -and $reader.outbox_visible -and $reader.outbox -eq $expectedUnresolved
     }
     Click-AccountControl $Window 'reader-outbox-action-0'
     $null = Wait-Reader 'the first seeded action is queued' {
@@ -425,10 +436,10 @@ function Invoke-LargeWorkspaceProof([IntPtr]$Window, [string]$Profile, [double]$
     Click-AccountControl $Window 'reader-outbox-cancel' $cancel
     $null = Wait-Reader 'native cancellation committed and only one action left the unresolved count' {
         param($reader)
-        $reader.outbox_action_state -ceq 'Cancelled' -and $reader.outbox -eq 899 -and $reader.offline
+        $reader.outbox_action_state -ceq 'Cancelled' -and $reader.outbox -eq ($expectedUnresolved - 1) -and $reader.offline
     } 5
     Add-Evidence 'Inspect and cancel the first queued action in the full offline Outbox' ([ordered]@{
-        unresolved_before = 900; unresolved_after = 899; cancellation_ms = $cancel.Elapsed.TotalMilliseconds
+        unresolved_before = $expectedUnresolved; unresolved_after = $expectedUnresolved - 1; cancellation_ms = $cancel.Elapsed.TotalMilliseconds
     })
     $script:app.Refresh()
     $runtime.peak_working_set_bytes = [Math]::Max($runtime.initial_offline_peak_working_set_bytes, $script:app.PeakWorkingSet64)
@@ -462,8 +473,95 @@ function Invoke-LargeWorkspaceProof([IntPtr]$Window, [string]$Profile, [double]$
             status = Compare-Measurement $packageBytes $limits.package_bytes
         }
     }
-    Stop-ThroughUi
     $script:report.offline_checks_passed = $true
+    try {
+        Invoke-ReaderBacklog $Profile $runtime
+    } catch {
+        if ($budgets.Values.status -contains 'Fail' -and $script:blocked) {
+            $script:blocked = $false
+            $script:report.backlog_interruption = $_.Exception.Message
+            throw 'At least one Section 16 budget failed before the backlog journey could finish.'
+        }
+        throw
+    }
+    $budgets.peak_working_set_bytes.value = $runtime.peak_working_set_bytes
+    $budgets.peak_working_set_bytes.status = Compare-Measurement $runtime.peak_working_set_bytes $limits.peak_working_set_bytes
+    $gpuTotals = @($runtime.gpu_memory.Values | Where-Object { $null -ne $_ } | ForEach-Object {
+        $_.dedicated_bytes + $_.shared_bytes
+    })
+    $gpuMaximum = if ($gpuTotals.Count) { ($gpuTotals | Measure-Object -Maximum).Maximum } else { $null }
+    $budgets.gpu_memory_bytes = Get-GpuBudget $gpuMaximum $gpuTotals.Count $limits.gpu_memory_bytes
+    if ($null -eq $runtime.gpu_memory.after_drain -and $budgets.gpu_memory_bytes.status -eq 'Pass') {
+        $budgets.gpu_memory_bytes.status = 'Blocked'
+    }
     if ($budgets.Values.status -contains 'Fail') { throw 'At least one Section 16 large-workspace budget failed.' }
-    Stop-Blocked 'Offline workspace, warm startup and runtime measurements are recorded. The online drain still requires a verified workload.'
+    if ($budgets.Values.status -contains 'Blocked') { Stop-Blocked 'The native backlog journey completed. One or more runtime measurements remain unavailable.' }
+    $script:report.detail = 'The native workspace met the measured budgets, kept navigation and cancellation available during a held mutation, and confirmed the remaining eligible actions.'
+}
+
+function Invoke-ReaderBacklog([string]$Profile, $Runtime) {
+    Set-AccessPhase 'backlog-auth'
+    $window = Restart-Reader $Profile -Backlog
+    $script:report.backlog = [ordered]@{ process_id = $script:app.Id; held_action = 2; confirmed = $null }
+    $null = Wait-Account 'the exact reauthorized fixture account remains offline' {
+        param($account) $account.active_user_id -eq 41 -and $account.profile_access -ceq 'Readable'
+    }
+    $null = Wait-Reader 'the same two offline panes and the durable first cancellation' {
+        param($reader) $reader.offline -and $reader.outbox -eq 900 -and ($reader.tab_counts -join ',') -ceq '10,10'
+    }
+    Click-AccountControl $window 'reader-tab-0-0'
+    $before = Wait-Reader 'the original cached issue in the left pane' {
+        param($reader) $reader.active_number -eq 1 -and $reader.cached_content_ready
+    }
+    $null = Open-AccountFixture
+    Set-AccessPhase 'backlog-hold'
+    Click-AccountControl $window 'account-offline'
+    Click-AccountControl $window 'account-close'
+    $null = Wait-Reader 'the saved workspace running online' { param($reader) !$reader.offline }
+
+    $marker = Join-Path ([IO.Path]::GetDirectoryName($script:AccessPhaseFile)) 'backlog-request-pending.txt'
+    Wait-For 'the owned loopback simulator accepted the first eligible request' {
+        [IO.File]::Exists($marker)
+    } 12000 25
+    $navigation = [Diagnostics.Stopwatch]::new()
+    $cancellation = [Diagnostics.Stopwatch]::new()
+    try {
+        Click-AccountControl $window 'reader-tab-0-1' $navigation
+        $null = Wait-Reader 'a different cached tab while the write is pending' {
+            param($reader) $reader.active_item -ne $before.cached_reader.active_item -and
+                $reader.cached_content_ready -and ($reader.tab_counts -join ',') -ceq '10,10'
+        } 5
+        $script:report.backlog.cached_navigation_ms = $navigation.Elapsed.TotalMilliseconds
+        Click-AccountControl $window 'reader-outbox'
+        Click-AccountControl $window 'reader-outbox-action-3'
+        $null = Wait-Reader 'the next owned backlog action is still queued' {
+            param($reader) $reader.outbox_visible -and $reader.outbox_action_state -ceq 'Queued'
+        }
+        Click-AccountControl $window 'reader-outbox-cancel' $cancellation
+        $null = Wait-Reader 'the next action cancels while the first request remains pending' {
+            param($reader) $reader.outbox_action_state -ceq 'Cancelled' -and $reader.outbox -eq 899
+        } 5
+        if (![IO.File]::Exists($marker)) { Stop-Blocked 'The controlled response window ended before the native interaction was verified.' }
+        $script:report.backlog.cancellation_ms = $cancellation.Elapsed.TotalMilliseconds
+        $script:app.Refresh()
+        $script:report.backlog.overlap_working_set_bytes = $script:app.WorkingSet64
+    } finally {
+        Set-AccessPhase 'backlog-drain'
+    }
+    Add-Evidence 'Navigate and cancel another queued action while a verified remote operation was in flight' ([ordered]@{
+        displayed_tabs = 20; navigation_ms = $script:report.backlog.cached_navigation_ms
+        cancellation_ms = $script:report.backlog.cancellation_ms
+    })
+    Wait-For 'all nine remaining eligible actions confirm in the durable native Outbox' {
+        if ($script:app.HasExited) { throw 'Threadline exited before the backlog was drained.' }
+        $state = Read-Observation
+        $null -ne $state -and $state.pid -eq $script:app.Id -and $state.cached_reader.outbox -eq 890
+    } 120000 100
+    $script:report.backlog.confirmed = 9
+    $script:report.backlog.unresolved_after = 890
+    $script:app.Refresh()
+    $Runtime.peak_working_set_bytes = [Math]::Max($Runtime.peak_working_set_bytes, $script:app.PeakWorkingSet64)
+    $Runtime.gpu_memory.after_drain = Get-GpuProcessMemory $script:app.Id
+    Stop-ThroughUi
+    $script:report.backlog_checks_passed = $true
 }

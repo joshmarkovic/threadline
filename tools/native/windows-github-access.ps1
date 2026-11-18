@@ -60,6 +60,7 @@ function Click-AccountControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwat
 function Set-AccessPhase([string]$Phase) {
     if ($Phase -cnotin @('ready', 'partial', 'sso', 'denied', 'revoked', 'reader-failure', 'reader-resume',
         'sync-live', 'sync-offline', 'sync-service', 'sync-throttle', 'sync-transport', 'sync-notification-send',
+        'backlog-auth', 'backlog-hold', 'backlog-drain',
         'pr-load', 'pr-delay', 'pr-release', 'review-send', 'review-changed',
         'merge-prepare', 'merge-send', 'merge-wrong-head', 'history', 'write-online', 'write-drop',
         'credential-ready', 'credential-offline', 'credential-other', 'credential-return')) {

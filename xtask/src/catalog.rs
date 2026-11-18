@@ -16,6 +16,9 @@ pub fn scenario_ids() -> impl Iterator<Item = &'static str> {
 }
 
 pub fn fixture_revision(case: &str) -> Option<&'static str> {
+    if case == "E2E-014" {
+        return Some("s12-large-workspace-v1");
+    }
     if case == "E2E-020" {
         return Some("threadline-s12-installed-runtime-v1");
     }
@@ -99,7 +102,6 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
             | "E2E-004"
             | "S04-READER-PERF"
             | "S12-PHYSICAL-READER"
-            | "E2E-014"
             | "S04-READ-TRANSPORT"
             | "S04-CACHED-STORE"
             | "S04-READ-SERVICE"

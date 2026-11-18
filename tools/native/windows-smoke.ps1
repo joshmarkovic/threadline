@@ -206,7 +206,7 @@ function Get-ThreadlineArguments([string]$Observation, [switch]$OpenReview, [str
     return $arguments
 }
 
-function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenReview, [string]$SeedReader, [switch]$ReaderIdle, [switch]$SeedQuietEvent) {
+function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenReview, [string]$SeedReader, [switch]$ReaderIdle, [switch]$SeedQuietEvent, [switch]$ReaderBacklog) {
     $info = New-Object System.Diagnostics.ProcessStartInfo
     $info.FileName = $script:Binary
     $info.UseShellExecute = $false
@@ -229,7 +229,8 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     if ($AccessProof -or $ReaderProof) {
         $info.EnvironmentVariables['THREADLINE_E2E_GITHUB_ADDR'] = $script:AccessAddress
     }
-    if ($script:UseSeededFixtureAuth) { $info.EnvironmentVariables['THREADLINE_E2E_FIXTURE_AUTH'] = '1' }
+    if ($script:UseSeededFixtureAuth -or $ReaderBacklog) { $info.EnvironmentVariables['THREADLINE_E2E_FIXTURE_AUTH'] = '1' }
+    if ($ReaderBacklog) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
     if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'DirectMerge', 'CredentialBoundary', 'Writes', 'WriteSurface')) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
     return [Diagnostics.Process]::Start($info)
 }
@@ -927,7 +928,8 @@ try {
     $firstProfile = Join-Path $ProfileDir ('initial-' + [guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $firstProfile -Force
     if ($ReaderProof -eq 'Offline') { Initialize-ReaderProfile $firstProfile 'small' }
-    if ($ReaderProof -in @('Performance', 'PerformancePhysical', 'LargeWorkspace')) { Initialize-ReaderProfile $firstProfile 'section-16' }
+    if ($ReaderProof -in @('Performance', 'PerformancePhysical')) { Initialize-ReaderProfile $firstProfile 'section-16' }
+    if ($ReaderProof -eq 'LargeWorkspace') { Initialize-ReaderProfile $firstProfile 'section-16-backlog' }
     if ($script:UseSeededFixtureAuth) {
         $fixturePhase = switch ($ReaderProof) {
             Resume { 'reader-failure' }

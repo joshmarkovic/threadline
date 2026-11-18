@@ -996,12 +996,12 @@ fn native_driver(
                 Status::Pass,
                 NativeMode::WindowsReaderOffline | NativeMode::WindowsReaderPerformance,
             ) => TraceCheck::OfflineReader,
-            (Status::Blocked, NativeMode::WindowsLargeWorkspace)
+            (_, NativeMode::WindowsLargeWorkspace)
                 if details
                     .as_ref()
-                    .is_some_and(|json| json["offline_checks_passed"] == true) =>
+                    .is_some_and(|json| json["backlog_checks_passed"] == true) =>
             {
-                TraceCheck::OfflineReader
+                TraceCheck::LargeWorkspaceBacklog
             }
             (Status::Pass, NativeMode::WindowsReaderResume) => TraceCheck::ReaderResume,
             (Status::Pass, NativeMode::WindowsSync) => TraceCheck::SyncJourney,

@@ -18,38 +18,50 @@ impl AccountService {
         }
         check_cancel(cancel)?;
         let credential = Pat::from_input(FIXTURE_PAT.to_owned());
-        if let Some(account) = self.store.active_github_account()? {
+        let previous = if let Some(account) = self.store.active_github_account()? {
             let profile = self
                 .store
                 .github_access_profile(account, OWNER)?
-                .filter(|profile| {
-                    profile.user_id.get() == USER
-                        && profile.login == "fixture-user"
-                        && profile.access == AccessState::Readable
-                })
+                .filter(|profile| profile.user_id.get() == USER && profile.login == "fixture-user")
                 .ok_or(Problem::InactiveProfile)?;
-            // An opt-in profile cannot restore real, signed-out, or replaced account credentials.
             let repositories = self.store.github_repository_views(account)?;
-            if repositories.len() != 1
-                || !repositories.iter().any(|repository| {
-                    repository.provider_id.get() == REPOSITORY
-                        && repository.owner == OWNER
-                        && repository.name == REPO
-                        && repository.private == Some(true)
-                        && repository.selected
+            let large_workspace = repositories.len() == 2
+                && repositories.iter().any(|row| {
+                    row.provider_id.get() == threadline_storage::fixtures::BACKLOG_ARCHIVE
+                        && row.owner == OWNER
+                        && row.name == "archive"
+                        && row.private == Some(true)
+                })
+                && self.store.dispatch_profile(account)?.offline
+                && threadline_storage::fixtures::has_backlog_marker(&self.store, account)?;
+            if (repositories.len() != 1 && !large_workspace)
+                || !repositories.iter().any(|row| {
+                    row.provider_id.get() == REPOSITORY
+                        && row.owner == OWNER
+                        && row.name == REPO
+                        && row.private == Some(true)
+                        && row.selected
                 })
             {
                 return Err(Problem::InactiveProfile);
             }
-            let reference = credential_ref(&profile)?;
-            self.store.with_current_credential(&profile, || {
-                self.credentials.save(&reference, &credential.0)
-            })??;
-            return Ok((None, Reachability::NotAttempted));
-        }
-        if !self.store.github_access_profiles()?.is_empty() {
-            return Err(Problem::InactiveProfile);
-        }
+            match profile.access {
+                AccessState::Readable => {
+                    let reference = credential_ref(&profile)?;
+                    self.store.with_current_credential(&profile, || {
+                        self.credentials.save(&reference, &credential.0)
+                    })??;
+                    return Ok((None, Reachability::NotAttempted));
+                }
+                AccessState::SignedOut if large_workspace => Some(profile),
+                _ => return Err(Problem::InactiveProfile),
+            }
+        } else {
+            if !self.store.github_access_profiles()?.is_empty() {
+                return Err(Problem::InactiveProfile);
+            }
+            None
+        };
 
         let kind = credential.validated_kind(true)?;
         let owner = OwnerScope::new(OWNER)?;
@@ -77,7 +89,7 @@ impl AccountService {
             &user.login,
             OWNER,
             kind,
-            None,
+            previous.as_ref(),
         )?;
         let reference = credential_ref(&profile)?;
         self.store.install_current_credential(&profile, || {

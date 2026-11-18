@@ -5,7 +5,7 @@ use std::{fs::OpenOptions, io::BufWriter, path::PathBuf};
 use threadline_storage::{
     ItemKind, Store, UtcMillis,
     access::AccessState,
-    fixtures::{Scale, populate_reader},
+    fixtures::{Scale, populate_large_workspace, populate_reader},
     notifications::DeliveryMode,
     resources::ActivityEvent,
     writes::{WriteIntent, WriteSubmission},
@@ -28,10 +28,11 @@ pub fn run() -> Option<Result<(), String>> {
                     .as_deref()
                     .and_then(std::ffi::OsStr::to_str)
                 {
-                    Some("small") => Scale::Small,
-                    Some("section-16") => Scale::Section16,
+                    Some("small") => (Scale::Small, false),
+                    Some("section-16") => (Scale::Section16, false),
+                    Some("section-16-backlog") => (Scale::Section16, true),
                     _ => {
-                        return Err("Select small or section-16 for the reader fixture.".to_owned());
+                        return Err("Select small, section-16, or section-16-backlog for the reader fixture.".to_owned());
                     }
                 },
             )
@@ -51,7 +52,7 @@ pub fn run() -> Option<Result<(), String>> {
             .map(PathBuf::from)
             .filter(|path| path.is_absolute())
             .ok_or("An explicit isolated profile is required.")?;
-        let Some(scale) = scale else {
+        let Some((scale, backlog)) = scale else {
             return seed_quiet_notification(profile, report);
         };
         let seed: u64 = match std::env::var("THREADLINE_TEST_SEED") {
@@ -59,7 +60,7 @@ pub fn run() -> Option<Result<(), String>> {
             Err(std::env::VarError::NotPresent) => 12345,
             Err(_) => return Err("Invalid reader fixture seed.".into()),
         };
-        seed_profile(profile, scale, seed, report)
+        seed_profile(profile, scale, backlog, seed, report)
     })())
 }
 
@@ -206,7 +207,13 @@ fn seed_quiet_notification(profile: PathBuf, report: PathBuf) -> Result<(), Stri
         .map_err(|_| "Could not write isolated schedule fixture receipt.".into())
 }
 
-fn seed_profile(profile: PathBuf, scale: Scale, seed: u64, report: PathBuf) -> Result<(), String> {
+fn seed_profile(
+    profile: PathBuf,
+    scale: Scale,
+    backlog: bool,
+    seed: u64,
+    report: PathBuf,
+) -> Result<(), String> {
     let mut entries = std::fs::read_dir(&profile)
         .map_err(|_| "The isolated profile directory is unavailable.")?;
     if entries.next().is_some() {
@@ -218,7 +225,19 @@ fn seed_profile(profile: PathBuf, scale: Scale, seed: u64, report: PathBuf) -> R
         .open(report)
         .map_err(|_| "Could not create the reader fixture report.")?;
     let store = Store::open_profile(&profile).map_err(|error| error.to_string())?;
-    let fixture = populate_reader(&store, seed, scale).map_err(|error| error.to_string())?;
+    let fixture = if backlog {
+        populate_large_workspace(&store, seed)
+    } else {
+        populate_reader(&store, seed, scale)
+    }
+    .map_err(|error| error.to_string())?;
+    let unresolved = store
+        .sidebar_counts(
+            fixture.account,
+            threadline_storage::reader::ReaderScope::Selected,
+        )
+        .map_err(|error| error.to_string())?
+        .outbox;
     let offline = store
         .dispatch_profile(fixture.account)
         .map_err(|error| error.to_string())?
@@ -235,7 +254,7 @@ fn seed_profile(profile: PathBuf, scale: Scale, seed: u64, report: PathBuf) -> R
     let receipt = serde_json::json!({
         "fixture_revision": fixture.revision,
         "seed": seed,
-        "scale": if scale == Scale::Section16 { "section-16" } else { "small" },
+        "scale": if backlog { "section-16-backlog" } else if scale == Scale::Section16 { "section-16" } else { "small" },
         "account_id": fixture.account.0,
         "repository_id": fixture.repository.0,
         "discussion_item": fixture.long_discussion.0,
@@ -244,6 +263,8 @@ fn seed_profile(profile: PathBuf, scale: Scale, seed: u64, report: PathBuf) -> R
         "comments": fixture.comment_count,
         "open_tabs": fixture.open_tabs,
         "outbox_count": fixture.outbox_count,
+        "typed_outbox_count": fixture.typed_outbox_count,
+        "unresolved_outbox": unresolved,
         "offline": offline
     });
     let mut output = BufWriter::new(report);

@@ -12,6 +12,9 @@ use crate::{
     },
 };
 
+mod backlog;
+pub use backlog::*;
+
 const FIXTURE_TIME_MS: i64 = 1_700_000_000_000;
 const BATCH: usize = 250;
 pub const REVISION: &str = include_str!("../../../fixtures/storage-revision.txt").trim_ascii();
@@ -35,6 +38,7 @@ pub struct Fixture {
     pub comment_count: usize,
     pub open_tabs: usize,
     pub outbox_count: usize,
+    pub typed_outbox_count: usize,
 }
 
 impl Scale {
@@ -49,16 +53,29 @@ impl Scale {
 /// Populate a fresh synthetic database. Fixture writes use bounded transactions.
 /// Callers own the temporary database and can remove it if generation fails.
 pub fn populate(store: &Store, seed: u64, scale: Scale) -> Result<Fixture> {
-    populate_profile(store, seed, scale, false)
+    populate_profile(store, seed, scale, Profile::Data)
 }
 
 /// Build a signed-out synthetic GitHub profile for the actual offline reader.
 /// The selected repositories contain only generated data. No token is installed.
 pub fn populate_reader(store: &Store, seed: u64, scale: Scale) -> Result<Fixture> {
-    populate_profile(store, seed, scale, true)
+    populate_profile(store, seed, scale, Profile::Reader)
 }
 
-fn populate_profile(store: &Store, seed: u64, scale: Scale, reader: bool) -> Result<Fixture> {
+pub fn populate_large_workspace(store: &Store, seed: u64) -> Result<Fixture> {
+    populate_profile(store, seed, Scale::Section16, Profile::Backlog)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Profile {
+    Data,
+    Reader,
+    Backlog,
+}
+
+fn populate_profile(store: &Store, seed: u64, scale: Scale, profile: Profile) -> Result<Fixture> {
+    let reader = profile != Profile::Data;
+    let backlog = profile == Profile::Backlog;
     let empty: bool = store.read(|db| {
         Ok(
             db.query_row("SELECT NOT EXISTS(SELECT 1 FROM accounts)", [], |r| {
@@ -78,9 +95,14 @@ fn populate_profile(store: &Store, seed: u64, scale: Scale, reader: bool) -> Res
         } else {
             "fixtures.invalid"
         },
-        seed.max(1),
+        if backlog { BACKLOG_USER } else { seed.max(1) },
     )?;
-    let repository = store.ensure_repository(account, 1, "fixture", "relay")?;
+    let (provider_repository, owner, name) = if backlog {
+        (BACKLOG_REPOSITORY, BACKLOG_OWNER, BACKLOG_REPO_NAME)
+    } else {
+        (1, "fixture", "relay")
+    };
+    let repository = store.ensure_repository(account, provider_repository, owner, name)?;
     let (item_count, comments_per_item, files, history_count) = scale.workload();
     let long_extra = if scale == Scale::Section16 { 5_000 } else { 10 };
     let root_oid = fixture_oid(seed, 0)?;
@@ -312,15 +334,29 @@ fn populate_profile(store: &Store, seed: u64, scale: Scale, reader: bool) -> Res
         (Scale::Small, true) => 10,
         _ => 0,
     };
-    if outbox_count > 0 {
-        store.write(|tx| load_fixture_outbox(tx, account.0, &issue_targets, seed, outbox_count))?;
-    }
     if reader {
-        enroll_reader(store, account, repository, seed, item_count)?;
+        enroll_reader(store, account, repository, seed, item_count, profile)?;
+    }
+    let typed_outbox_count = if backlog {
+        backlog::seed_writes(store, account, discussion)?;
+        let mut settings = store.sync_settings(account)?;
+        settings.controls.pause_background = true;
+        store.save_sync_settings(account, &settings)?;
+        LARGE_WORKSPACE_WRITES
+    } else {
+        0
+    };
+    let historical = outbox_count - typed_outbox_count;
+    if historical > 0 {
+        store.write(|tx| load_fixture_outbox(tx, account.0, &issue_targets, seed, historical))?;
     }
 
     Ok(Fixture {
-        revision: if reader { "s04-reader-v1" } else { REVISION },
+        revision: match profile {
+            Profile::Backlog => LARGE_WORKSPACE_REVISION,
+            Profile::Reader => "s04-reader-v1",
+            Profile::Data => REVISION,
+        },
         account,
         repository,
         long_discussion: discussion,
@@ -331,6 +367,7 @@ fn populate_profile(store: &Store, seed: u64, scale: Scale, reader: bool) -> Res
         comment_count: item_count * comments_per_item,
         open_tabs,
         outbox_count,
+        typed_outbox_count,
     })
 }
 
@@ -344,11 +381,17 @@ fn enroll_reader(
     primary: RepositoryId,
     seed: u64,
     items: usize,
+    fixture: Profile,
 ) -> Result<()> {
     use crate::{
         IssueApiId, ItemLocator, TransferEvidence, TransferOutcome, reader::repository_list_key,
     };
-    let secondary = store.ensure_repository(account, 2, "fixture", "archive")?;
+    let (archive, owner, login) = if fixture == Profile::Backlog {
+        (BACKLOG_ARCHIVE, BACKLOG_OWNER, BACKLOG_LOGIN)
+    } else {
+        (2, "fixture", "fixture-reader")
+    };
+    let secondary = store.ensure_repository(account, archive, owner, "archive")?;
     let from = ItemLocator {
         repository: primary,
         number: 2,
@@ -369,15 +412,15 @@ fn enroll_reader(
     store.write(|db| {
         db.execute(
             "INSERT INTO github_access_profiles(account_id,owner_scope,login,credential_ref,credential_kind,access,checked_at_ms)
-            VALUES(?1,'fixture','fixture-reader',?2,0,2,?3)",
-            params![account, format!("{seed:032x}"), FIXTURE_TIME_MS],
+            VALUES(?1,?2,?3,?4,0,2,?5)",
+            params![account, owner, login, format!("{seed:032x}"), FIXTURE_TIME_MS],
         )?;
         db.execute("INSERT INTO active_profile(singleton,account_id) VALUES(1,?) ON CONFLICT(singleton) DO UPDATE SET account_id=excluded.account_id", [account])?;
         db.execute("INSERT INTO dispatch_profiles(account_id,authorized,offline) VALUES(?,0,1)
             ON CONFLICT(account_id) DO UPDATE SET authorized=0,offline=1", [account])?;
         for repository in [primary, secondary] {
             db.execute("INSERT INTO github_repository_access(repository_id,account_id,owner_scope,selected,private,access,checked_at_ms,last_success_at_ms)
-                VALUES(?1,?2,'fixture',1,1,2,?3,?3)", params![repository, account, FIXTURE_TIME_MS])?;
+                VALUES(?1,?2,?3,1,1,2,?4,?4)", params![repository, account, owner, FIXTURE_TIME_MS])?;
             let id = ensure_resource(db, repository_list_key(account, repository))?;
             db.execute("UPDATE cached_resources SET coverage=2,last_page_at_ms=?2,last_fetch_at_ms=?2,last_validation_at_ms=?2 WHERE id=?1", params![id, FIXTURE_TIME_MS])?;
         }
