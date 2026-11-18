@@ -1,0 +1,38 @@
+{
+  "case": "E2E-012",
+  "status": "Blocked",
+  "exit_code": 78,
+  "command": "cargo xtask test e2e --suite full --case E2E-012 --local-fixture <fixture.json>",
+  "source_revision": "f06de5ebff4a2ceed102c81c176a073d3c097112",
+  "source_dirty": false,
+  "seed": 12345,
+  "fixture_revision": "threadline-s11-installed-fixture-v1",
+  "fixture_sha256": "a5973b5c83b459c19aac024d967c857666c4b42ab6d7df590c5101cbcc7322b9",
+  "app_source": "fbb2484",
+  "local_version": "0.1.0-local.10",
+  "app_sha256": "4d55fa80a274abaed77d160c961855f8efdc9096e2d792d0e7444b396213e691",
+  "install": {
+    "exit_code": 0,
+    "registered_location_matches": true,
+    "shortcut_matches": true,
+    "default_profile_existed_after_setup": false
+  },
+  "observed": {
+    "source_events": 37,
+    "feed_entries": 37,
+    "native_groups": 1,
+    "native_journal_outcome": "delivered",
+    "history_actions": ["Open", "Snooze", "Mark read"],
+    "scoped_history_survived_full_application_exit": true,
+    "selected_issue": 41,
+    "original_draft_and_tab_preserved": true,
+    "synthetic_profile_archived": true,
+    "activation_observed": false
+  },
+  "driver_stop": "Windows did not grant focus to the fixture window. The driver stopped before invoking the Notification Center card.",
+  "source_sha256": {
+    "installed-activity.json": "695c17c569c97606c035d7a7c2c7a3152d444f4f947f2090e40008db4536e6cb",
+    "result.json": "481a44def26f217df813572252cb12b7abf7fb0a308eb59dc749f0a9853bf5b3",
+    "installer_check": "694ff87510d6bb3aa5506d376e2c782d446e31d08e9ba4ff99191fc58386e51e"
+  }
+}

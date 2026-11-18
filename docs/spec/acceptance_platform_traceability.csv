@@ -254,7 +254,7 @@ AC-84,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-85,windows,03,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-85,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-85,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-86,windows,11,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Local Windows feed fallback, retained draft and native registration. ../reports/sprint-11.md"
+AC-86,windows,11,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Local Windows feed fallback, retained draft, installed native group after full exit; cold activation awaiting verification. ../reports/sprint-11.md"
 AC-86,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-86,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-87,windows,,12,no,Not applicable,Scenario belongs to another platform-only milestone.,

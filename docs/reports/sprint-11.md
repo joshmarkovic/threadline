@@ -8,6 +8,7 @@ The native Windows fallback journey passed with the same executable copied outsi
 | IT-018 | Pass | Three real SQLite and observer tests covered repeated observations, changed preferences, catch-up grouping and recovery after an uncertain delivery. |
 | E2E-018 | Pass | A guarded Windows 11 x64 process used the normal in-app feed while its copied executable lacked the installed sender registration. |
 | E2E-012, first installed attempt | Blocked | The original installed process published all 37 events to the feed and reserved zero native groups. The driver never obtained a notification to open after process exit. |
+| E2E-012, local build 10 | Blocked before the click | Windows recorded one group for all 37 feed entries. Its Open, Snooze and Mark read actions remained in the installed sender's history after the app exited. The driver stopped when its own fixture window could not gain focus. [Installed result](evidence/sprint-11/installed-build-10.json) |
 
 The first two rows ran on Windows at `8a22b8d`. Six native test executables passed 48 tests in total. The native desktop journeys used clean runner `dd0f6a4` with seed 12345, Windows 11 build 22631.7652 and local package 9. The app was built at `1ddd9c8`. Use `cargo xtask test e2e --suite full --case E2E-018 --local-fixture <fixture.json>` or select `E2E-012` for the registered path. [Windows test binaries and results](evidence/sprint-11/windows-storage.json) · [Native fixture and driver](../../tools/windows/test-installed-activity.ps1)
 
