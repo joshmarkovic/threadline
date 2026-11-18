@@ -141,21 +141,7 @@ impl Store {
     pub fn pr_revision_body(&self, rev: &PrRevision) -> Result<crate::Change<String>> {
         self.read(|db| {
             validate_revision(db, rev)?;
-            let (body, stamp) = db.query_row(
-                "SELECT body,body_at FROM pr_revisions WHERE id=?",
-                [rev.id],
-                |row| {
-                    Ok((
-                        row.get::<_, Option<String>>(0)?,
-                        row.get::<_, Option<i64>>(1)?,
-                    ))
-                },
-            )?;
-            Ok(match (body, stamp) {
-                (_, None) => crate::Change::Missing,
-                (None, Some(_)) => crate::Change::Null,
-                (Some(text), Some(_)) => crate::Change::Value(text),
-            })
+            Ok(revision_body_in(db, rev)?.0)
         })
     }
 
@@ -292,6 +278,22 @@ impl PrHeader {
         self.merged_at_ms = self.merged_at_ms.or(other.merged_at_ms);
         self
     }
+}
+fn revision_body_in(
+    db: &Connection,
+    rev: &PrRevision,
+) -> Result<(crate::Change<String>, Option<i64>)> {
+    let (body, stamp) = db.query_row(
+        "SELECT body,body_at FROM pr_revisions WHERE id=?",
+        [rev.id],
+        |r| Ok((r.get::<_, Option<String>>(0)?, r.get::<_, Option<i64>>(1)?)),
+    )?;
+    let body = match (body, stamp) {
+        (_, None) => crate::Change::Missing,
+        (None, Some(_)) => crate::Change::Null,
+        (Some(text), Some(_)) => crate::Change::Value(text),
+    };
+    Ok((body, stamp))
 }
 fn current_in(
     db: &Connection,

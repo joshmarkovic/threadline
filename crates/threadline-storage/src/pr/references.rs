@@ -91,6 +91,15 @@ impl Store {
                 provenance:format!("PR body: {}/{}#{}",r.repository.owner().to_ascii_lowercase(),r.repository.name().to_ascii_lowercase(),r.number.get()),
                 verified:None}).collect::<Vec<_>>();
             replace_refs_in(tx,account,pr,previous_revision,body_revision,&candidates)?;
+            let proof_id:i64=tx.query_row(
+                "INSERT INTO cached_resources(account_id,item_id,family,coverage,revision,last_validation_at_ms)
+                 VALUES(?1,?2,'pr-body-reference-proof',2,?3,?4)
+                 ON CONFLICT(item_id,family) WHERE item_id IS NOT NULL DO UPDATE SET
+                   coverage=2,revision=excluded.revision,last_validation_at_ms=excluded.last_validation_at_ms
+                 RETURNING id",params![account,pr,body_revision,expected_body_at_ms],|row|row.get(0))?;
+            tx.execute("INSERT INTO cached_resource_records(resource_id,record_key,body) VALUES(?,'source',?)
+                ON CONFLICT(resource_id,record_key) DO UPDATE SET body=excluded.body",
+                params![proof_id,encoded(&body)?])?;
             for (index,link) in refs.into_iter().enumerate(){
                 let number=i64::try_from(link.number.get()).map_err(|_|Error::InvalidInput("Issue number exceeds the storage range"))?;
                 tx.execute("INSERT INTO pr_reference_results(account_id,pr_id,position,owner,repository,number,verification,checked_at)
@@ -99,6 +108,30 @@ impl Store {
                     params![account,pr,index as i64,link.repository.owner(),link.repository.name(),number])?;
             }
             references_in(tx,account,pr)
+        })
+    }
+
+    /// Read one revision body and only the candidates derived from exactly those downloaded bytes.
+    pub fn pr_revision_context(
+        &self,
+        rev: &PrRevision,
+    ) -> Result<(crate::Change<String>, Option<(String, Vec<BodyReference>)>)> {
+        self.read(|db|{
+            let tx=db.unchecked_transaction()?;
+            validate_revision(&tx,rev)?;
+            let (body,stamp)=revision_body_in(&tx,rev)?;
+            let Some(stamp)=stamp else{return Ok((body,None))};
+            let source=match &body{crate::Change::Value(text)=>Some(text),_=>None};
+            let label=tx.query_row(
+                "SELECT s.body_revision FROM pr_reference_sets s JOIN cached_resources r ON r.account_id=s.account_id
+                 AND r.item_id=s.pr_id AND r.family='pr-body-reference-proof' AND r.coverage=2 AND r.revision=s.body_revision
+                 JOIN cached_resource_records d ON d.resource_id=r.id AND d.record_key='source'
+                 JOIN items i ON i.id=s.pr_id AND i.account_id=s.account_id AND i.body_at=r.last_validation_at_ms
+                 AND json_extract(d.body,'$') IS i.body
+                 WHERE s.account_id=? AND s.pr_id=? AND r.last_validation_at_ms=? AND d.body=?",
+                params![rev.account,rev.pr,stamp,encoded(&source)?],|row|row.get::<_,String>(0)).optional()?;
+            let refs=label.map(|revision|Ok::<_,Error>((revision,references_in(&tx,rev.account,rev.pr)?))).transpose()?;
+            Ok((body,refs))
         })
     }
 
@@ -138,7 +171,12 @@ impl Store {
         self.write(|tx|{
             let row:Option<(String,String,i64,Option<i64>)>=tx.query_row(
                 "SELECT o.owner,o.repository,o.number,o.checked_at FROM pr_reference_results o
-                 JOIN pr_reference_sets b USING(account_id,pr_id) WHERE o.account_id=? AND o.pr_id=? AND b.body_revision=? AND o.position=?",
+                 JOIN pr_reference_sets b USING(account_id,pr_id) WHERE o.account_id=? AND o.pr_id=? AND b.body_revision=? AND o.position=?
+                   AND EXISTS(SELECT 1 FROM cached_resources r JOIN cached_resource_records d ON d.resource_id=r.id
+                     JOIN items i ON i.id=r.item_id AND i.account_id=r.account_id WHERE r.item_id=o.pr_id
+                       AND r.account_id=o.account_id AND r.family='pr-body-reference-proof' AND r.coverage=2
+                       AND r.revision=b.body_revision AND r.last_validation_at_ms=i.body_at
+                       AND d.record_key='source' AND json_extract(d.body,'$') IS i.body)",
                 params![account,pr,body_revision,position],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).optional()?;
             let (owner,name,number,previous)=row.ok_or(Error::Conflict("PR body or reference changed"))?;
             if previous.is_some_and(|t|t>checked_at_ms){return Err(Error::Conflict("Reference already has newer verification"));}

@@ -3,8 +3,8 @@ use crate::resources::{ResourceFamily, Validators};
 use crate::{AccountId, Error, ItemId, RepositoryId, Result, Store};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use std::time::Duration;
-use threadline_core::sync::policy::{activity_since, retry_delay};
 pub use threadline_core::sync::policy::{ReadPriority, SyncControls, WorkSchedule};
+use threadline_core::sync::policy::{activity_since, retry_delay};
 
 mod observation;
 mod pr;

@@ -1071,3 +1071,34 @@ fn it_017_cross_owner_issue_verification_does_not_select_or_monitor_the_other_re
     assert_eq!(offline[2].verified_item, Some(issue));
     assert_eq!(offline[2].verification, Verification::Offline);
 }
+
+#[test]
+fn it_017_body_and_reference_proof_are_one_snapshot_across_refresh() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Store::open_profile(dir.path()).unwrap();
+    let (a, r, pr) = setup(&db);
+    let old = db
+        .record_pr_revision(a, pr, &oid('a'), &oid('b'), None, &PrHeader::default(), 20)
+        .unwrap();
+    assert!(db.pr_revision_context(&old).unwrap().1.is_none());
+    db.index_pr_body(a, pr, None, "original", 20).unwrap();
+    assert_eq!(db.pr_revision_context(&old).unwrap().1.unwrap().1.len(), 3);
+    ingest(&db, a, r, 70, true, "No confirmed issue reference", 30);
+    let new = db
+        .record_pr_revision(a, pr, &oid('a'), &oid('c'), None, &PrHeader::default(), 30)
+        .unwrap();
+    assert!(db.pr_revision_context(&old).unwrap().1.is_none());
+    assert!(db.pr_revision_context(&new).unwrap().1.is_none());
+    assert!(
+        db.record_pr_reference(a, pr, "original", 0, ReferenceObservation::Missing, 31)
+            .is_err()
+    );
+    db.index_pr_body(a, pr, Some("original"), "current", 30)
+        .unwrap();
+    let (body, set) = db.pr_revision_context(&new).unwrap();
+    assert!(matches!(body,Change::Value(t) if t=="No confirmed issue reference"));
+    let (tag, rows) = set.unwrap();
+    assert_eq!(tag, "current");
+    assert!(rows.is_empty());
+    assert!(db.pr_revision_context(&old).unwrap().1.is_none());
+}

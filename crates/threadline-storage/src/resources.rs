@@ -1138,14 +1138,16 @@ pub(crate) fn clear_resource_cache(tx: &Transaction<'_>, account: AccountId) -> 
     // Mid-walk records and cursors form one checkpoint. Keep them together.
     tx.execute(
         "DELETE FROM cached_resource_records WHERE resource_id IN (
-        SELECT id FROM cached_resources WHERE account_id=?1 AND has_page=0 AND id NOT IN (SELECT resource_id FROM pr_pinned_resources) AND NOT EXISTS(
+        SELECT id FROM cached_resources WHERE account_id=?1 AND has_page=0 AND NOT (family='pr-body-reference-proof' AND item_id IN (SELECT item_id FROM pr_pinned_items WHERE account_id=?1))
+        AND id NOT IN (SELECT resource_id FROM pr_pinned_resources) AND NOT EXISTS(
         SELECT 1 FROM issue_downloads d WHERE d.item_id=cached_resources.item_id AND d.state IN ('pending','active','complete')))",
         [account.0],
     )?;
     tx.execute(
         "UPDATE cached_resources SET coverage=0,fetch=0,error=NULL,generation=generation+1,
         continuation=NULL,last_page_at_ms=NULL,last_fetch_at_ms=NULL,last_validation_at_ms=NULL,
-        etag=NULL,last_modified=NULL,revision=NULL WHERE account_id=?1 AND has_page=0 AND id NOT IN (SELECT resource_id FROM pr_pinned_resources) AND NOT EXISTS(
+        etag=NULL,last_modified=NULL,revision=NULL WHERE account_id=?1 AND has_page=0 AND NOT (family='pr-body-reference-proof' AND item_id IN (SELECT item_id FROM pr_pinned_items WHERE account_id=?1))
+        AND id NOT IN (SELECT resource_id FROM pr_pinned_resources) AND NOT EXISTS(
         SELECT 1 FROM issue_downloads d WHERE d.item_id=cached_resources.item_id AND d.state IN ('pending','active','complete'))",
         [account.0],
     )?;
