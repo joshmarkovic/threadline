@@ -1599,18 +1599,22 @@ impl ReaderWorkspace {
                     .on_click(cx.listener(|this, _, window, cx| this.reopen(window, cx))),
             )
             .child(
-                self.observed_control("reader-maximize-pane", control(
+                self.observed_control(
                     "reader-maximize-pane",
-                    if self.maximized {
-                        "Restore panes"
-                    } else {
-                        "Maximize pane"
-                    },
-                )
-                .on_click(cx.listener(|this, _, window, cx| {
-                    this.maximized = !this.maximized;
-                    this.save_layout(this.layout.clone(), window, cx);
-                })), false),
+                    control(
+                        "reader-maximize-pane",
+                        if self.maximized {
+                            "Restore panes"
+                        } else {
+                            "Maximize pane"
+                        },
+                    )
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.maximized = !this.maximized;
+                        this.save_layout(this.layout.clone(), window, cx);
+                    })),
+                    false,
+                ),
             )
             .child(
                 control("reader-duplicate-tab", "Duplicate view beside").on_click(cx.listener(
@@ -1662,8 +1666,10 @@ impl ReaderWorkspace {
             .min_w_0()
             .flex()
             .flex_col()
-            .children((self.surface != Surface::Browse || !self.maximized)
-                .then(|| self.workspace_upper_surface(palette, cx)));
+            .children(
+                (self.surface != Surface::Browse || !self.maximized)
+                    .then(|| self.workspace_upper_surface(palette, cx)),
+            );
         if self.surface == Surface::Browse {
             let panes = self
                 .layout
