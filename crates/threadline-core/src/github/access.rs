@@ -1,4 +1,4 @@
-//! Read-only GitHub access scoped to a verified user and a selected resource owner.
+//! GitHub access scoped to a verified user and a selected resource owner.
 use super::GITHUB_REST_VERSION;
 use crate::domain::{RepositoryApiId, RepositoryName};
 use reqwest::{
@@ -17,6 +17,7 @@ use std::{
 pub use tokio_util::sync::CancellationToken;
 pub mod reader;
 mod response;
+pub mod writer;
 pub use response::{AccessError, AccessKind, RateLimit, Reachability, SsoAction};
 use response::{RequestMode, partial_sso, request};
 
@@ -75,6 +76,10 @@ pub struct RepositoryPermissions {
     pub pull: bool,
     pub push: bool,
     pub admin: bool,
+    #[serde(default)]
+    pub triage: bool,
+    #[serde(default)]
+    pub maintain: bool,
 }
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Capability {
@@ -207,6 +212,7 @@ impl GitHubClient {
             .user_agent(concat!("Threadline/", env!("CARGO_PKG_VERSION")))
             .connect_timeout(Duration::from_secs(5))
             .timeout(Duration::from_secs(15))
+            .retry(reqwest::retry::never())
             .redirect(redirect::Policy::none());
         if fixture {
             builder = builder.no_proxy();

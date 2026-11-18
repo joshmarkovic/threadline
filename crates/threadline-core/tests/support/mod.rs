@@ -22,6 +22,7 @@ pub struct Reply {
     pub expected_modified: Option<&'static str>,
     pub graph_repository: Option<(&'static str, &'static str)>,
     graph_node: Option<(&'static str, &'static str, Option<&'static str>)>,
+    expected_json: Option<serde_json::Value>,
 }
 
 impl Reply {
@@ -36,6 +37,7 @@ impl Reply {
             expected_modified: None,
             graph_repository: None,
             graph_node: None,
+            expected_json: None,
         }
     }
 
@@ -49,6 +51,12 @@ impl Reply {
 
     pub fn delayed_until(mut self, gate: Arc<Notify>) -> Self {
         self.gate = Some(gate);
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn expects_json(mut self, body: serde_json::Value) -> Self {
+        self.expected_json = Some(body);
         self
     }
 
@@ -152,7 +160,7 @@ async fn serve_reply(State(shared): State<Arc<Shared>>, request: Request) -> Res
     let (parts, body) = request.into_parts();
     let path = parts.uri.path_and_query().map_or("/", |u| u.as_str());
     let key = (parts.method.clone(), path.to_owned());
-    let graph_body = if parts.method == Method::POST {
+    let json_body = if matches!(parts.method, Method::POST | Method::PATCH) {
         let bytes = axum::body::to_bytes(body, 16 * 1024)
             .await
             .unwrap_or_default();
@@ -178,7 +186,7 @@ async fn serve_reply(State(shared): State<Arc<Shared>>, request: Request) -> Res
                 .and_then(|v| v.to_str().ok())
                 == expected.expected_modified;
             let graph = expected.graph_repository.is_none_or(|(owner, name)| {
-                let Some(body) = &graph_body else {
+                let Some(body) = &json_body else {
                     return false;
                 };
                 body["variables"] == serde_json::json!({"owner":owner,"name":name})
@@ -190,7 +198,7 @@ async fn serve_reply(State(shared): State<Arc<Shared>>, request: Request) -> Res
                         .is_some_and(|v| v == "application/json")
             });
             let graph_node = expected.graph_node.is_none_or(|(operation, id, cursor)| {
-                let Some(body) = &graph_body else {
+                let Some(body) = &json_body else {
                     return false;
                 };
                 body["variables"] == serde_json::json!({"id":id,"cursor":cursor})
@@ -206,6 +214,12 @@ async fn serve_reply(State(shared): State<Arc<Shared>>, request: Request) -> Res
                 && expected_modified
                 && graph
                 && graph_node
+                && expected.expected_json.as_ref().is_none_or(|value| {
+                    json_body.as_ref() == Some(value)
+                        && headers
+                            .get(header::CONTENT_TYPE)
+                            .is_some_and(|value| value == "application/json")
+                })
                 && headers
                     .get(header::USER_AGENT)
                     .and_then(|v| v.to_str().ok())

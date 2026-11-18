@@ -129,7 +129,7 @@ impl AccessError {
             ..Self::local(kind)
         }
     }
-    fn transport(err: reqwest::Error) -> Self {
+    pub(super) fn transport(err: reqwest::Error) -> Self {
         let kind = if err.is_timeout() {
             AccessKind::Timeout
         } else {
@@ -144,7 +144,7 @@ impl AccessError {
 impl fmt::Display for AccessError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self.kind {
-            AccessKind::Cancelled => "GitHub read cancelled",
+            AccessKind::Cancelled => "GitHub request cancelled",
             AccessKind::InvalidCredential => "Invalid credential or simulator credential",
             AccessKind::WrongScope => "Request is outside the credential's owner or origin",
             AccessKind::IdentityMismatch => {
@@ -335,7 +335,7 @@ struct ErrorMessage {
     message: String,
 }
 
-fn map_status(
+pub(super) fn map_status(
     status: StatusCode,
     headers: &HeaderMap,
     message: Option<&str>,
