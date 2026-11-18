@@ -32,7 +32,23 @@ The independent configuration contains `current_sha256`, `predecessor` and `stag
 | 17 | The managed location or a staging file has unexpected ownership or a link. Restore the ordinary per-user path |
 | 18 | The Windows PowerShell prerequisite or verification failed. Review the local policy or permission error |
 | 19 | Setup kept staging files after a rollback was interrupted. Release open files and rerun the same setup |
+| 20 | Windows could not verify the approved publisher. Obtain the trusted signed package |
 
 Build an explicit staging failure fixture with `THREADLINE_SETUP_FIXTURE_FAULT=stage-write` before the same build command. It exits before replacing a working installation and marks the injection in its manifest. Test a real open-file refusal by holding the installed fixture executable open without delete sharing. Compare installed hashes and registered version after each failure. For an upgrade against retained state, install an actual predecessor executable built from a source revision with a known schema. Seed the local test profile, close it, install the candidate, and open the installed executable against that same profile. Record the exact payloads and the application’s migration evidence.
 
-Publication remains pending. The local compiler refuses to produce the production identity. `verify-release-installer.ps1` is the fail-closed verification step for an eventual signed package. It requires an independently trusted release manifest containing the target, minimum OS, channel, version, size, SHA-256 digest, and SHA-256 fingerprint of the approved signer certificate. It verifies both the digest and the Windows-trusted Authenticode signer. It does not install certificates, execute the installer, or publish anything. The unsigned local fixture cannot satisfy this release step.
+Run `test-local-lifecycle.ps1` in 64-bit Windows PowerShell with the actual predecessor and current packages, a `stage-write` fixture with the exact current payload, and independently recorded SHA-256 digests for all three. Supply `-ProfileSha256` for a closed, checkpointed synthetic profile at the native data location. The script exercises repair, an open-file refusal, a staged-write failure, upgrade, downgrade refusal, default uninstall, and reinstall. It leaves the current fixture installed. Run `smoke-installed.ps1` separately to start the exact installed executable without test flags, invoke a known tab through its owned accessibility tree, and close it normally.
+
+`verify-local-signed-manifest.ps1` accepts a local fixture and attached CMS metadata with its own separately recorded signer pin. It checks the signature, publisher pin, exact setup digest and byte size. Developers can create a disposable signer and use `openssl cms -sign -binary -nodetach -outform DER` to exercise a matching fixture, changed bytes and a different signer without changing Windows certificate trust. This local proof leaves the Authenticode release gate open.
+
+## Stage a signed Windows release
+
+Publication remains pending. For a release with approved publisher configuration, build the verifier with the same pinned Rust toolchain and Windows SDK as the app.
+
+```sh
+cargo build --locked --release --target x86_64-pc-windows-msvc -p threadline-platform --example verify_windows_publisher
+tools/windows/build-installer.sh --release-stage /private/windows-signer.json /build/verify_windows_publisher.exe /build/threadline-signed.exe /output/Threadline-unsigned.exe 0.1.0 1 10
+```
+
+The reviewed signer configuration supplies `channel` (`stable` or `preview`), `publisher_display`, `publisher_certificate_sha256` (the approved leaf certificate), `signer_reference` (`CurrentUser/My/` followed by the certificate thumbprint), `publisher_verifier_sha256`, `signed_app_sha256`, `artifact_url` (the exact HTTPS URL), and `oldest_supported_schema`. Record both digests from the approved builds. The Windows release environment signs the application before packaging. Keep certificate keys outside the repository. Change the publisher pin only through the reviewed signer configuration.
+
+Staging writes a setup and a `publication_pending` manifest. The release environment signs the exact staged setup using the configured signer and records the resulting size and SHA-256 as `size` and `sha256` in the trusted release manifest. `verify-release-installer.ps1` requires the verified signed bytes and checks both the supplied digest and the Windows-trusted Authenticode signer before any setup launch. The production setup also checks its own signature and the staged application’s signature with the approved pin and the Windows trust cache. Obtain a verified package or correct the trust configuration if either check fails. Both build modes leave certificate trust and publication to the release environment. [Microsoft WinVerifyTrust documentation](https://learn.microsoft.com/en-us/windows/win32/api/wintrust/nf-wintrust-winverifytrust)

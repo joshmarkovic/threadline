@@ -10,15 +10,27 @@ ShowUninstDetails show
 !include x64.nsh
 !include FileFunc.nsh
 
-!ifndef LOCAL_FIXTURE
-  !error "A reviewed publisher pin and signed package release flow are required before enabling a production installer."
+!ifdef LOCAL_FIXTURE
+  !define Product "Threadline Installer Test"
+  !define Registration "Software\Microsoft\Windows\CurrentVersion\Uninstall\Threadline.InstallTest"
+  !define History "Software\Threadline.InstallTest"
+  !define MutexName "Global\Threadline.InstallTest.367F090C-C2DE-4998-8429-BBA2FDF0BD0C"
+  !define StageId "367F090C-C2DE-4998-8429-BBA2FDF0BD0C"
+  !define PACKAGE_PUBLISHER "Threadline local test"
+!else
+  !ifndef PACKAGE_PUBLISHER & PUBLISHER_PIN & PUBLISHER_VERIFIER
+    !error "Supply an approved publisher, certificate fingerprint, and native Authenticode verifier."
+  !endif
+  !ifdef FIXTURE_FAIL_STAGING
+    !error "Staging fault injection is available only for the local fixture."
+  !endif
+  !define Product "Threadline"
+  !define Registration "Software\Microsoft\Windows\CurrentVersion\Uninstall\Threadline"
+  !define History "Software\Threadline"
+  !define MutexName "Global\Threadline.EF9956B0-0CA4-4139-B957-CA6F907027B6"
+  !define StageId "EF9956B0-0CA4-4139-B957-CA6F907027B6"
 !endif
-!define Product "Threadline Installer Test"
-!define Registration "Software\Microsoft\Windows\CurrentVersion\Uninstall\Threadline.InstallTest"
-!define History "Software\Threadline.InstallTest"
-!define MutexName "Global\Threadline.InstallTest.367F090C-C2DE-4998-8429-BBA2FDF0BD0C"
 !define Stage ".threadline-stage"
-!define StageId "367F090C-C2DE-4998-8429-BBA2FDF0BD0C"
 
 Name "${Product} ${PACKAGE_VERSION}"
 OutFile "${INSTALLER_OUTPUT}"
@@ -55,7 +67,7 @@ Var RollbackFailed
   StrCpy $LockHandle $0
   ${If} $0 == 0
   ${OrIf} $1 == 183
-    !insertmacro MessageAndStop 13 "Another Threadline Installer Test operation is running. Wait for it to finish, then rerun this installer."
+    !insertmacro MessageAndStop 13 "Another ${Product} setup operation is running. Wait for it to finish, then rerun this installer."
   ${EndIf}
 !macroend
 
@@ -120,7 +132,7 @@ Var RollbackFailed
   Pop $ResultCode
   Pop $0
   ${If} $ResultCode == 42
-    !insertmacro MessageAndStop 14 "Threadline Installer Test is running. Quit it from the application and rerun."
+    !insertmacro MessageAndStop 14 "${Product} is running. Quit it from the application and rerun."
   ${ElseIf} $ResultCode != 0
     !insertmacro MessageAndStop 18 "Could not check whether Threadline is running. Ensure Windows PowerShell is available, then rerun setup."
   ${EndIf}
@@ -143,11 +155,28 @@ Var RollbackFailed
   ${EndIf}
 !macroend
 
+!ifndef LOCAL_FIXTURE
+  !macro VerifyPublisher candidate
+    nsExec::ExecToStack /TIMEOUT=60000 '"$PLUGINSDIR\verify-publisher.exe" "${candidate}" "${PUBLISHER_PIN}"'
+    Pop $ResultCode
+    Pop $0
+    ${If} $ResultCode != 0
+      !insertmacro MessageAndStop 20 "Windows could not verify the approved publisher. Use a trusted, signed ${Product} package."
+    ${EndIf}
+  !macroend
+!endif
+
 Function .onInit
   ${IfNot} ${IsNativeAMD64}
   ${OrIfNot} ${AtLeastWin11}
-    !insertmacro MessageAndStop 11 "Threadline Installer Test requires Windows 11 on x64 hardware."
+    !insertmacro MessageAndStop 11 "${Product} requires Windows 11 on x64 hardware."
   ${EndIf}
+  !ifndef LOCAL_FIXTURE
+    InitPluginsDir
+    SetOutPath "$PLUGINSDIR"
+    File /oname=verify-publisher.exe "${PUBLISHER_VERIFIER}"
+    !insertmacro VerifyPublisher "$EXEPATH"
+  !endif
   SetShellVarContext current
   SetRegView 64
   StrCpy $INSTDIR "$LOCALAPPDATA\Programs\${Product}"
@@ -160,7 +189,7 @@ Function .onInit
   ${EndIf}
   ${If} $PriorLocation == ""
     IfFileExists "$INSTDIR\threadline.exe" 0 no_unregistered_binary
-      !insertmacro MessageAndStop 17 "An executable already exists in the fixture folder without a matching installation record. Its files were preserved."
+      !insertmacro MessageAndStop 17 "An executable already exists in the installation folder without a matching record. Its files were preserved."
     no_unregistered_binary:
     IfFileExists "$INSTDIR\Uninstall.exe" 0 no_unregistered_uninstaller
       !insertmacro MessageAndStop 17 "An unregistered uninstaller already exists. Its files were preserved."
@@ -177,7 +206,7 @@ Function .onInit
   ReadRegDWORD $0 HKCU "${History}" "HighestBuild"
   ${If} $0 != ""
   ${AndIf} ${PACKAGE_BUILD} < $0
-    !insertmacro MessageAndStop 12 "This profile has been used with a newer test package. Use the same or a newer installer to preserve compatibility."
+    !insertmacro MessageAndStop 12 "This profile has been used with a newer package. Use the same or a newer installer to preserve compatibility."
   ${EndIf}
   ${If} $PriorBuild != ""
   ${AndIf} ${PACKAGE_BUILD} < $PriorBuild
@@ -206,6 +235,9 @@ Function VerifyCandidate
     Delete "$INSTDIR\${Stage}\candidate.exe"
     !insertmacro MessageAndStop 18 "Could not verify the staged executable. Check Windows PowerShell and local installation permissions."
   ${EndIf}
+  !ifndef LOCAL_FIXTURE
+    !insertmacro VerifyPublisher "$INSTDIR\${Stage}\candidate.exe"
+  !endif
 FunctionEnd
 
 Section "Install Threadline" SEC_INSTALL
@@ -257,7 +289,7 @@ Section "Install Threadline" SEC_INSTALL
   WriteRegStr HKCU "${Registration}" "DisplayName" "${Product}"
   WriteRegStr HKCU "${Registration}" "DisplayVersion" "${PACKAGE_VERSION}"
   WriteRegStr HKCU "${Registration}" "DisplayIcon" "$INSTDIR\threadline.exe,0"
-  WriteRegStr HKCU "${Registration}" "Publisher" "Threadline local test"
+  WriteRegStr HKCU "${Registration}" "Publisher" "${PACKAGE_PUBLISHER}"
   WriteRegStr HKCU "${Registration}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegStr HKCU "${Registration}" "QuietUninstallString" '"$INSTDIR\Uninstall.exe" /S'
   WriteRegDWORD HKCU "${Registration}" "NoModify" 1
@@ -353,7 +385,7 @@ Function un.onInit
   ReadRegStr $0 HKCU "${Registration}" "InstallLocation"
   ${If} $INSTDIR != "$LOCALAPPDATA\Programs\${Product}"
   ${OrIf} $0 != $INSTDIR
-    !insertmacro MessageAndStop 17 "The uninstaller does not match the registered per-user test installation. No files were removed."
+    !insertmacro MessageAndStop 17 "The uninstaller does not match the registered per-user installation. No files were removed."
   ${EndIf}
   !insertmacro LockInstaller
   !insertmacro CheckPaths
