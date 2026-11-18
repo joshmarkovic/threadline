@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "lane": "live",
+  "suite": null,
+  "seed": 12345,
+  "host": {
+    "os": "linux",
+    "architecture": "x86_64",
+    "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+    "display_session": "Wayland and X11 environment"
+  },
+  "source_revision": "bc3a62d0b069e71a5e0b619a322ae7a340e29da4",
+  "source_dirty": false,
+  "cargo_lock_sha256": "28bee3e09919c863e231337b56b492b90c22105e2a20cfdffee740a032623844",
+  "package_version": "0.1.0",
+  "package_version_source": "checkout-app-manifest",
+  "fixture_revision": "s01-feasibility-v1",
+  "status": "Blocked",
+  "cases": [
+    {
+      "case": "LIVE-001",
+      "status": "Blocked",
+      "detail": "Read-only metadata access passed with explicitly supplied CLI OAuth. The PAT gate remains blocked.",
+      "tests_passed": null,
+      "evidence": "github-read.json",
+      "requirement_ids": [
+        "AUTH-01",
+        "AUTH-03",
+        "AUTH-04",
+        "AUTH-08",
+        "TEST-07"
+      ],
+      "acceptance_ids": [
+        "AC-01",
+        "AC-02",
+        "AC-03"
+      ],
+      "child_exit_code": 78
+    }
+  ],
+  "command": {
+    "program": "xtask",
+    "argv": [
+      "test",
+      "live",
+      "--repo",
+      "<repository>",
+      "--case",
+      "LIVE-001",
+      "--credential-stdin",
+      "--allow-existing-cli-oauth",
+      "--report-dir",
+      "<report-dir>"
+    ],
+    "redacted": true
+  },
+  "started_at_unix_ms": 1795027250444,
+  "finished_at_unix_ms": 1795027251635,
+  "exit_code": 78
+}

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="live" tests="1" failures="0" skipped="1">
+  <testcase classname="live" name="LIVE-001"><skipped message="Blocked: Read-only metadata access passed with explicitly supplied CLI OAuth. The PAT gate remains blocked." /></testcase>
+</testsuite>
