@@ -6,15 +6,32 @@ function Wait-Account([string]$Description, [scriptblock]$AccountCheck) {
     }
 }
 
-function Click-AccountControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwatch]$InputClock) {
-    $state = Wait-State ('account control ' + $Id) {
+function Wait-AccountControl([string]$Id) {
+    return Wait-State ('account control ' + $Id) {
         param($snapshot)
         $property = $snapshot.bounds.PSObject.Properties[$Id]
         if ($null -eq $property) { return $false }
         $rect = $property.Value
         return $rect.Count -eq 4 -and $rect[2] -gt 0 -and $rect[3] -gt 0
     }
-    if ($script:UseOwnedUiAutomation -and (Invoke-OwnedFixtureControl $Window $Id $InputClock)) { return }
+}
+
+function Click-AccountControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwatch]$InputClock) {
+    $state = Wait-AccountControl $Id
+    if ($script:UseOwnedUiAutomation) {
+        if ($Id -cnotin @('account-token', 'account-repository')) {
+            # GPUI observations can publish before Windows receives the matching accessibility tree.
+            for ($attempt = 0; $attempt -lt 12; $attempt++) {
+                if (Invoke-OwnedFixtureControl $Window $Id $InputClock) { return }
+                Start-Sleep -Milliseconds 50
+            }
+        }
+        if (!(Test-OwnedFixtureWindow $Window)) { Stop-Blocked 'The physical fallback lost the owned Threadline window.' }
+        if ([ThreadlineWinInput]::GetForegroundWindow() -ne $Window) { Set-WindowFocus $Window }
+        [ThreadlineWinInput]::TargetWindow = $Window
+        $state = Wait-AccountControl $Id
+        Add-Evidence 'Use the guarded physical fallback for an owned control' ([ordered]@{ automation_id = $Id })
+    }
     $bounds = $state.bounds.PSObject.Properties[$Id].Value
     $center = To-ClientPoint ($bounds[0] + $bounds[2] / 2) ($bounds[1] + $bounds[3] / 2) $state.scale_factor
     if ($null -ne $InputClock) { $InputClock.Restart() }

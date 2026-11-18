@@ -130,7 +130,7 @@ function Invoke-ReaderResumeProof([IntPtr]$Window, [string]$Profile) {
             $reader.download_state -cin @('Active', 'Pending')
     }
     Set-AccessPhase 'reader-resume'
-    Connect-FixtureAccount $restarted
+    Connect-FixtureAccount $restarted -FromVisibleControl
     Click-AccountControl $restarted 'account-close'
     Click-AccountControl $restarted 'reader-resume-download-0'
     $null = Wait-Reader 'the resumed offline download completed with two unique comments' {

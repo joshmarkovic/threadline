@@ -79,6 +79,15 @@ if ((Find-FixturePrChoice $serverOrder $resultA) -cne 'reader-result-1' -or
 }
 
 $script:observations.Clear()
+$script:observations.Enqueue([pscustomobject]@{ bounds = [pscustomobject]@{} })
+$script:observations.Enqueue([pscustomobject]@{ bounds = [pscustomobject]@{ 'account-open' = @(1, 2, 0, 1) } })
+$script:observations.Enqueue([pscustomobject]@{ bounds = [pscustomobject]@{ 'account-open' = @(1, 2, 10, 12) } })
+$state = Wait-AccountControl 'account-open'
+if ($state.bounds.'account-open'[2] -ne 10) {
+    throw 'The reconnect driver accepted a missing or zero-area native control.'
+}
+
+$script:observations.Clear()
 $script:observations.Enqueue([pscustomobject]@{ cached_reader = $null })
 $script:observations.Enqueue([pscustomobject]@{ cached_reader = @{ active_item = 43; cached_content_ready = $true } })
 $script:observations.Enqueue([pscustomobject]@{ cached_reader = @{ active_item = 44; cached_content_ready = $false } })
