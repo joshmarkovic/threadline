@@ -133,6 +133,8 @@ const INTEGRATION: &[CargoTest] = &[
             "sync",
             "--test",
             "notifications",
+            "--test",
+            "pr",
             "it_018",
         ],
     },

@@ -171,6 +171,7 @@ fn it_016_independent_pr_families_source_anchors_search_partial_and_stale_heads_
                 id: 8,
                 node_id: None,
                 author: Some("reviewer".into()),
+                actor: Default::default(),
                 body: "unique review observation".into(),
                 state: "APPROVED".into(),
                 submitted_at_ms: Some(90),
@@ -628,6 +629,7 @@ fn it_016_nested_inline_pages_keep_distinct_replies_anchors_and_category_baselin
         node_id: None,
         in_reply_to: if id == 4 { None } else { Some(4) },
         author: None,
+        actor: Default::default(),
         body: body.into(),
         created_at_ms: Some(created),
         updated_at_ms: Some(updated),
@@ -808,6 +810,118 @@ fn it_016_nested_inline_pages_keep_distinct_replies_anchors_and_category_baselin
             .unwrap()
             .rows,
         data.rows
+    );
+}
+
+#[test]
+fn it_018_review_actor_suppression_keeps_content_and_human_replies_after_restart() {
+    use threadline_storage::notifications::{
+        ActorRule, Category, DeliveryMode, EventActor, RuleActor, RuleScope,
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open_profile(dir.path()).unwrap();
+    let (account, repository, pr) = setup(&store);
+    store.schedule_selected_activity(account, 50).unwrap();
+    store
+        .update_repository_notification_rules(account, repository, |rules| {
+            rules.actor_rules.push(ActorRule {
+                actor: RuleActor::KnownAutomation,
+                scope: RuleScope::ReviewsAndInline,
+            });
+        })
+        .unwrap();
+    let rev = store
+        .record_pr_revision(
+            account,
+            pr,
+            &oid('a'),
+            &oid('b'),
+            None,
+            &PrHeader::default(),
+            51,
+        )
+        .unwrap();
+    let bot = EventActor {
+        user_id: Some(id(91)),
+        known_automation: true,
+        ..Default::default()
+    };
+    let human = EventActor {
+        user_id: Some(id(92)),
+        ..Default::default()
+    };
+    let formal = PrRecord::Review {
+        id: 15,
+        node_id: None,
+        author: Some("reviewer".into()),
+        actor: bot,
+        body: "Automated findings".into(),
+        state: "CHANGES_REQUESTED".into(),
+        submitted_at_ms: Some(60),
+        commit_oid: Some(oid('b').as_str().into()),
+    };
+    let inline = |id, in_reply_to, actor, body: &str| InlineComment {
+        id,
+        node_id: None,
+        in_reply_to,
+        author: None,
+        actor,
+        body: body.into(),
+        created_at_ms: Some(60),
+        updated_at_ms: Some(60),
+        anchor: None,
+    };
+    let discussion = PrRecord::Thread {
+        node_id: "T1".into(),
+        resolved: Some(false),
+        outdated: Some(false),
+        comments: vec![
+            inline(21, None, bot, "Automated detail"),
+            inline(22, Some(21), human, "I checked this"),
+        ],
+        replies_complete: true,
+        reply_cursor: None,
+    };
+    for (family, row) in [
+        (PrFamily::Reviews, formal.clone()),
+        (PrFamily::Threads, discussion.clone()),
+    ] {
+        let fetch = store.start_pr_fetch(&rev, family, WalkMode::Full).unwrap();
+        store
+            .commit_pr_page(&rev, family, &fetch, input(vec![row], None, None))
+            .unwrap();
+    }
+    drop(store);
+    let reopened = Store::open_profile(dir.path()).unwrap();
+    assert_eq!(
+        reopened
+            .process_notification_events(account, 101, "UTC", true, 20)
+            .unwrap(),
+        3
+    );
+    let visible = reopened.notification_feed(account, None, 20).unwrap();
+    assert_eq!(visible.len(), 1);
+    assert_eq!(
+        visible[0].event_key,
+        "github:pr-inline-comments:22:inline_comment_created:60"
+    );
+    assert_eq!(visible[0].categories, [Category::InlineComment].into());
+    assert_eq!(visible[0].decision.mode, DeliveryMode::FeedOnly);
+    assert_eq!(
+        reopened
+            .pr_page(&rev, PrFamily::Reviews, None, 5)
+            .unwrap()
+            .rows[0]
+            .1,
+        formal
+    );
+    assert_eq!(
+        reopened
+            .pr_page(&rev, PrFamily::Threads, None, 5)
+            .unwrap()
+            .rows[0]
+            .1,
+        discussion
     );
 }
 

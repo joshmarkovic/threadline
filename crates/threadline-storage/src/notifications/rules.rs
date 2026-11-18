@@ -122,12 +122,7 @@ impl Default for NotificationSettings {
         }
     }
 }
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct EventActor {
-    pub user_id: Option<NonZeroU64>,
-    pub app_id: Option<NonZeroU64>,
-    pub known_automation: bool,
-}
+pub use threadline_core::github::reader::ActorIdentity as EventActor;
 impl RuleActor {
     fn matches(&self, who: &EventActor) -> bool {
         match self {

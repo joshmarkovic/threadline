@@ -177,6 +177,7 @@ async fn sync_feeds_keep_the_same_bounded_window_and_respect_conditional_headers
     );
 
     let old_comment = json!({"id":55,"node_id":"C_55","body":"old item freshly edited", "created_at":"2012-01-01T00:00:00Z",
+        "user":{"login":"reviewer","id":9001,"type":"Bot"},"performed_via_github_app":{"id":93},
         "updated_at":OLD_DATE,"issue_url":"https://api.github.com/repos/fixture-org/private/issues/12"});
     let comments = format!("{COMMENTS}&page=1");
     sim.enqueue(Method::GET, &comments, ok(json!([old_comment.clone()])));
@@ -189,6 +190,9 @@ async fn sync_feeds_keep_the_same_bounded_window_and_respect_conditional_headers
     assert_eq!(result.records[0].issue.get(), 12);
     assert!(result.records[0].comment.created_at_ms < result.records[0].comment.updated_at_ms);
     assert_eq!(result.records[0].comment.id.get(), 55);
+    assert_eq!(result.records[0].comment.author_id, NonZeroU64::new(9001));
+    assert_eq!(result.records[0].comment.via_app_id, NonZeroU64::new(93));
+    assert!(result.records[0].comment.author_is_bot);
 
     let mut transferred = old_comment;
     transferred["issue_url"] = json!("https://api.github.com/repos/another-org/private/issues/12");

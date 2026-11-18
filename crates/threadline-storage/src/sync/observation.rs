@@ -16,6 +16,7 @@ pub struct ObservedItem {
 pub struct ObservedComment {
     pub number: u64,
     pub comment: DiscussionComment,
+    pub actor: crate::notifications::EventActor,
 }
 
 pub struct ObservationPage<'a> {
@@ -335,17 +336,23 @@ fn observe_comment(
         state: None,
     };
     if let Some((key, action)) = observe_object(tx, claim, &object, Some(baseline), now)? {
-        use crate::notifications::{
-            self, Category, EventActor, EventFacts, NotificationTarget, ReceiptMatch,
-        };
+        use crate::notifications::{self, Category, EventFacts, NotificationTarget, ReceiptMatch};
         let login: String = tx.query_row(
             "SELECT p.login FROM github_access_profiles p JOIN github_repository_access r
             USING(account_id,owner_scope) WHERE r.account_id=? AND r.repository_id=?",
             params![claim.account, repo],
             |r| r.get(0),
         )?;
-        let actor:Option<String>=tx.query_row("SELECT author_id FROM write_comment_authors WHERE account_id=? AND item_id=? AND comment_id=?",
-            params![claim.account,item,c.provider_id.to_string()],|r|r.get(0)).optional()?;
+        let mut actor = row.actor;
+        if actor.user_id.is_none() {
+            let cached: Option<String> = tx.query_row(
+                "SELECT author_id FROM write_comment_authors WHERE account_id=? AND item_id=? AND comment_id=?",
+                params![claim.account, item, c.provider_id.to_string()], |r| r.get(0)
+            ).optional()?;
+            actor.user_id = cached
+                .map(|id| id.parse().map_err(|_| Error::Corrupt))
+                .transpose()?;
+        }
         let mentioned = notifications::mentions_login(&c.body, &login);
         let mut categories = std::collections::BTreeSet::from([Category::OrdinaryComment]);
         if mentioned {
@@ -361,10 +368,7 @@ fn observe_comment(
                     thread: Some(format!("issue-comment:{}", c.provider_id)),
                 },
                 categories,
-                actor: EventActor {
-                    user_id: actor.and_then(|v| v.parse().ok()),
-                    ..Default::default()
-                },
+                actor,
                 involves_me: mentioned,
                 receipt: Some(ReceiptMatch::Ordinary {
                     action: action.into(),

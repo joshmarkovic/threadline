@@ -94,6 +94,7 @@ fn enrich_text(
     rev: &PrRevision,
     key: &str,
     body: &str,
+    actor: &notifications::EventActor,
     thread: Option<&str>,
 ) -> Result<()> {
     let pending=tx.query_row("SELECT n.facts,p.login FROM notification_events n JOIN github_repository_access r
@@ -102,6 +103,9 @@ fn enrich_text(
         params![rev.account,key,rev.repository],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?))).optional()?;
     if let Some((raw, login)) = pending {
         let mut facts: EventFacts = serde_json::from_str(&raw).map_err(|_| Error::Corrupt)?;
+        facts.actor.user_id = facts.actor.user_id.or(actor.user_id);
+        facts.actor.app_id = facts.actor.app_id.or(actor.app_id);
+        facts.actor.known_automation |= actor.known_automation;
         if notifications::mentions_login(body, &login) {
             facts.categories.insert(Category::DirectMention);
             facts.involves_me = true;
@@ -133,6 +137,7 @@ pub(super) fn record_observations(
         PrRecord::Review {
             id,
             body,
+            actor,
             state,
             submitted_at_ms,
             ..
@@ -158,6 +163,7 @@ pub(super) fn record_observations(
                     rev,
                     &format!("github:pr-reviews:{id}:review_submitted:{at}"),
                     body,
+                    actor,
                     None,
                 )?;
             }
@@ -200,6 +206,7 @@ pub(super) fn record_observations(
                             rev,
                             &format!("github:pr-inline-comments:{}:{action}:{at}", c.id),
                             &c.body,
+                            &c.actor,
                             Some(node_id),
                         )?;
                     }

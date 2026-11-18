@@ -357,6 +357,9 @@ fn observed_comment(row: UpdatedComment) -> ObservedComment {
         id,
         node_id,
         author,
+        author_id,
+        author_is_bot,
+        via_app_id,
         created_at_ms,
         updated_at_ms,
         body,
@@ -364,6 +367,11 @@ fn observed_comment(row: UpdatedComment) -> ObservedComment {
     } = row.comment;
     ObservedComment {
         number: row.issue.get(),
+        actor: threadline_storage::notifications::EventActor {
+            user_id: author_id,
+            app_id: via_app_id,
+            known_automation: author_is_bot,
+        },
         comment: DiscussionComment {
             provider_id: id.get(),
             node_id: Some(node_id),

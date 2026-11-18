@@ -248,7 +248,12 @@ async fn graph_reads_verify_current_pr_identity_and_resume_a_single_thread_witho
         "repository":{"id":"R_71","name":"private","owner":{"login":"fixture-org"}}})
     };
     let comment = |id, reply_to| {
-        json!({"id":format!("PRRC_{id}"),"fullDatabaseId":id,"replyTo":reply_to,"author":{"login":"reviewer"},
+        let author = if id == 51 {
+            json!({"login":"reviewer","__typename":"Bot","databaseId":91})
+        } else {
+            json!({"login":"name-looks-like-a-bot","__typename":"User","databaseId":92})
+        };
+        json!({"id":format!("PRRC_{id}"),"fullDatabaseId":id,"replyTo":reply_to,"author":author,
         "body":"Review draft fixture","createdAt":TIME,"updatedAt":TIME,"path":"src/lib.rs","originalLine":5,
         "originalCommit":{"oid":HEAD}})
     };
@@ -263,7 +268,7 @@ async fn graph_reads_verify_current_pr_identity_and_resume_a_single_thread_witho
     let mut reviews = identity();
     reviews["reviewDecision"] = json!("CHANGES_REQUESTED");
     reviews["reviews"] = json!({"nodes":[{"id":"PRR_5000000001","fullDatabaseId":"5000000001","body":"Formal review",
-        "state":"CHANGES_REQUESTED","author":null,"submittedAt":TIME,"commit":{"oid":HEAD}}],
+        "state":"CHANGES_REQUESTED","author":{"login":"reviewer","__typename":"Bot","databaseId":91},"submittedAt":TIME,"commit":{"oid":HEAD}}],
         "pageInfo":{"hasNextPage":false,"endCursor":null}});
     send(
         "ThreadlineReviews",
@@ -274,6 +279,11 @@ async fn graph_reads_verify_current_pr_identity_and_resume_a_single_thread_witho
     let review = reader.pr_reviews(&pinned, None, &cancel).await.unwrap();
     assert_eq!(review.review_decision.as_deref(), Some("CHANGES_REQUESTED"));
     assert_eq!(review.records[0].id, 5_000_000_001);
+    assert_eq!(
+        review.records[0].actor.user_id,
+        std::num::NonZeroU64::new(91)
+    );
+    assert!(review.records[0].actor.known_automation);
 
     let mut thread_page = identity();
     thread_page["reviewThreads"] = json!({"nodes":[{"id":"PRRT_1","diffSide":"RIGHT","isResolved":true,"isOutdated":false,
@@ -290,6 +300,7 @@ async fn graph_reads_verify_current_pr_identity_and_resume_a_single_thread_witho
     assert_eq!(first.node_id(), "PRRT_1");
     assert_eq!(first.resolved, Some(true));
     assert!(!first.replies_complete);
+    assert_eq!(first.comments[0].actor, review.records[0].actor);
     let anchor = first.comments[0].anchor.as_ref().unwrap();
     assert_eq!(
         (anchor.side, anchor.line, anchor.original_oid.as_str()),
@@ -310,6 +321,11 @@ async fn graph_reads_verify_current_pr_identity_and_resume_a_single_thread_witho
         .await
         .unwrap();
     assert_eq!(replies.records[0].in_reply_to, Some(51));
+    assert_eq!(
+        replies.records[0].actor.user_id,
+        std::num::NonZeroU64::new(92)
+    );
+    assert!(!replies.records[0].actor.known_automation);
     assert!(replies.next_cursor.is_none());
 
     let mut old = identity();

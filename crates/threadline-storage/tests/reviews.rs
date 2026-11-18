@@ -105,6 +105,7 @@ fn rev(db: &Store, a: AccountId, r: RepositoryId, num: u64, head: char, at: i64)
             node_id: None,
             in_reply_to: None,
             author: Some("someone".into()),
+            actor: Default::default(),
             body: "first".into(),
             created_at_ms: Some(at),
             updated_at_ms: None,

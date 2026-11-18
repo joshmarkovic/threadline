@@ -102,6 +102,8 @@ pub struct InlineComment {
     pub node_id: Option<String>,
     pub in_reply_to: Option<u64>,
     pub author: Option<String>,
+    #[serde(default)]
+    pub actor: crate::notifications::EventActor,
     pub body: String,
     pub created_at_ms: Option<i64>,
     pub updated_at_ms: Option<i64>,
@@ -129,6 +131,8 @@ pub enum PrRecord {
         id: u64,
         node_id: Option<String>,
         author: Option<String>,
+        #[serde(default)]
+        actor: crate::notifications::EventActor,
         body: String,
         state: String,
         submitted_at_ms: Option<i64>,

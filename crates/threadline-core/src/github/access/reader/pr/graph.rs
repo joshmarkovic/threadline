@@ -7,6 +7,7 @@ use super::{
     AccessError, AccessKind, CancellationToken, GitHubReader, PrSnapshot, PullRequestSummary,
     RequestMode, identity_mismatch, malformed, wire::checked_path,
 };
+use crate::github::access::reader::ActorIdentity;
 use crate::github::access::{
     GraphError, RateLimit,
     reader::wire::{millis, oid, opaque_id},
@@ -14,7 +15,14 @@ use crate::github::access::{
 
 const PR_IDENTITY: &str =
     "id fullDatabaseId baseRefOid headRefOid repository { id name owner { login } }";
-const COMMENTS: &str = "nodes { id fullDatabaseId replyTo { fullDatabaseId } author { login } body createdAt updatedAt path originalLine originalCommit { oid } } pageInfo { hasNextPage endCursor }";
+const AUTHOR: &str =
+    "author { login __typename ... on User { databaseId } ... on Bot { databaseId } }";
+
+fn comments() -> String {
+    format!(
+        "nodes {{ id fullDatabaseId replyTo {{ fullDatabaseId }} {AUTHOR} body createdAt updatedAt path originalLine originalCommit {{ oid }} }} pageInfo {{ hasNextPage endCursor }}"
+    )
+}
 
 pub struct PrGraphPage<T> {
     pub records: Vec<T>,
@@ -28,6 +36,7 @@ pub struct PrReview {
     pub id: u64,
     pub node_id: String,
     pub author: Option<String>,
+    pub actor: ActorIdentity,
     pub body: String,
     pub state: String,
     pub submitted_at_ms: Option<i64>,
@@ -56,6 +65,7 @@ pub struct PrInlineComment {
     pub node_id: String,
     pub in_reply_to: Option<u64>,
     pub author: Option<String>,
+    pub actor: ActorIdentity,
     pub body: String,
     pub created_at_ms: i64,
     pub updated_at_ms: i64,
@@ -84,7 +94,7 @@ impl GitHubReader<'_> {
     ) -> Result<PrGraphPage<PrReview>, AccessError> {
         let pull = self.require_snapshot(snapshot)?;
         let query = format!("query ThreadlineReviews($id:ID!,$cursor:String) {{ node(id:$id) {{ ... on PullRequest {{ {PR_IDENTITY}
-            reviewDecision reviews(first:20,after:$cursor) {{ nodes {{ id fullDatabaseId author {{ login }} body state submittedAt commit {{ oid }} }}
+            reviewDecision reviews(first:20,after:$cursor) {{ nodes {{ id fullDatabaseId {AUTHOR} body state submittedAt commit {{ oid }} }}
             pageInfo {{ hasNextPage endCursor }} }} }} }} }}");
         let data: GraphData<ReviewData> =
             self.pr_graph(query, &pull.node_id, cursor, cancel).await?;
@@ -107,8 +117,9 @@ impl GitHubReader<'_> {
         cancel: &CancellationToken,
     ) -> Result<PrGraphPage<PrThread>, AccessError> {
         let pull = self.require_snapshot(snapshot)?;
+        let comments = comments();
         let query = format!("query ThreadlineThreads($id:ID!,$cursor:String) {{ node(id:$id) {{ ... on PullRequest {{ {PR_IDENTITY}
-            reviewThreads(first:10,after:$cursor) {{ nodes {{ id diffSide isResolved isOutdated comments(first:20) {{ {COMMENTS} }} }}
+            reviewThreads(first:10,after:$cursor) {{ nodes {{ id diffSide isResolved isOutdated comments(first:20) {{ {comments} }} }}
             pageInfo {{ hasNextPage endCursor }} }} }} }} }}");
         let data: GraphData<ThreadData> =
             self.pr_graph(query, &pull.node_id, cursor, cancel).await?;
@@ -148,8 +159,9 @@ impl GitHubReader<'_> {
     ) -> Result<PrGraphPage<PrInlineComment>, AccessError> {
         let pull = self.require_snapshot(snapshot)?;
         let thread_node = opaque_id(thread_node.to_owned())?;
+        let comments = comments();
         let query = format!("query ThreadlineReplies($id:ID!,$cursor:String) {{ node(id:$id) {{ ... on PullRequestReviewThread {{
-            id diffSide pullRequest {{ {PR_IDENTITY} }} comments(first:20,after:$cursor) {{ {COMMENTS} }} }} }} }}");
+            id diffSide pullRequest {{ {PR_IDENTITY} }} comments(first:20,after:$cursor) {{ {comments} }} }} }} }}");
         let data: GraphData<RepliesData> = self
             .pr_graph(query, &thread_node, Some(cursor), cancel)
             .await?;
@@ -367,6 +379,28 @@ struct Login {
 }
 
 #[derive(Deserialize)]
+struct Author {
+    login: String,
+    #[serde(rename = "__typename")]
+    kind: Option<String>,
+    #[serde(rename = "databaseId")]
+    database_id: Option<NonZeroU64>,
+}
+
+impl Author {
+    fn identity(&self) -> ActorIdentity {
+        let kind = self.kind.as_deref();
+        ActorIdentity {
+            user_id: self
+                .database_id
+                .filter(|_| matches!(kind, Some("User" | "Bot"))),
+            known_automation: kind == Some("Bot"),
+            app_id: None,
+        }
+    }
+}
+
+#[derive(Deserialize)]
 struct GraphCommit {
     oid: String,
 }
@@ -385,7 +419,7 @@ struct ReviewData {
 struct ReviewWire {
     id: String,
     full_database_id: Option<GraphId>,
-    author: Option<Login>,
+    author: Option<Author>,
     body: String,
     state: String,
     submitted_at: Option<String>,
@@ -400,6 +434,11 @@ impl ReviewWire {
         Ok(Some(PrReview {
             id,
             node_id: opaque_id(self.id)?,
+            actor: self
+                .author
+                .as_ref()
+                .map(Author::identity)
+                .unwrap_or_default(),
             author: self.author.map(|author| author.login),
             body: self.body,
             state: self.state,
@@ -472,7 +511,7 @@ struct Comment {
     id: String,
     full_database_id: Option<GraphId>,
     reply_to: Option<ReplyTo>,
-    author: Option<Login>,
+    author: Option<Author>,
     body: String,
     created_at: String,
     updated_at: String,
@@ -520,6 +559,11 @@ impl Comment {
                 .reply_to
                 .and_then(|reply| reply.full_database_id)
                 .and_then(GraphId::id),
+            actor: self
+                .author
+                .as_ref()
+                .map(Author::identity)
+                .unwrap_or_default(),
             author: self.author.map(|author| author.login),
             body: self.body,
             created_at_ms,

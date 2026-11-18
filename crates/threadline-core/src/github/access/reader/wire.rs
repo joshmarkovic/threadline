@@ -14,6 +14,13 @@ use super::{
 struct Author {
     login: String,
     id: Option<NonZeroU64>,
+    #[serde(rename = "type")]
+    kind: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct App {
+    id: Option<NonZeroU64>,
 }
 
 #[derive(Deserialize)]
@@ -237,6 +244,7 @@ pub(super) struct Comment {
     id: NonZeroU64,
     node_id: String,
     user: Option<Author>,
+    performed_via_github_app: Option<App>,
     body: String,
     created_at: String,
     updated_at: String,
@@ -276,6 +284,11 @@ impl Comment {
             id: self.id,
             node_id: opaque_id(self.node_id)?,
             author_id: self.user.as_ref().and_then(|author| author.id),
+            author_is_bot: self
+                .user
+                .as_ref()
+                .is_some_and(|user| user.kind.as_deref() == Some("Bot")),
+            via_app_id: self.performed_via_github_app.and_then(|app| app.id),
             author: self.user.map(|author| author.login),
             body: self.body,
             created_at_ms: millis(&self.created_at)?,

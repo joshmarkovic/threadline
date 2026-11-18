@@ -33,6 +33,14 @@ pub struct Page<T> {
     pub sso_limited: bool,
 }
 
+/// Stable actor information actually reported for a provider event.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ActorIdentity {
+    pub user_id: Option<NonZeroU64>,
+    pub app_id: Option<NonZeroU64>,
+    pub known_automation: bool,
+}
+
 #[derive(Clone, Eq, PartialEq)]
 pub struct IssueSummary {
     pub number: ItemNumber,
@@ -106,6 +114,8 @@ pub struct ConversationComment {
     pub node_id: String,
     pub author: Option<String>,
     pub author_id: Option<NonZeroU64>,
+    pub author_is_bot: bool,
+    pub via_app_id: Option<NonZeroU64>,
     pub body: String,
     pub created_at_ms: i64,
     pub updated_at_ms: i64,

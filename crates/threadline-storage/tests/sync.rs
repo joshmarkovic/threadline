@@ -82,6 +82,7 @@ fn no_changes() -> ObservationPage<'static> {
 fn comment(number: u64, id: u64, created: i64, updated: i64) -> ObservedComment {
     ObservedComment {
         number,
+        actor: Default::default(),
         comment: DiscussionComment {
             provider_id: id,
             node_id: None,
@@ -982,4 +983,82 @@ fn it_018_issue_assignment_tracks_stable_ids_across_restarts_and_missing_fields(
     assert_eq!(visible.len(), 2);
     assert_eq!(visible[0].occurred_at_ms, Some(latest - 2));
     assert_eq!(visible[1].event_key, first[0].event_key);
+}
+
+#[test]
+fn it_018_ordinary_bot_comment_can_pass_review_mute_or_match_specific_app_rule() {
+    use threadline_storage::notifications::{
+        ActorRule, Category, EventActor, RuleActor, RuleScope,
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open_profile(dir.path()).unwrap();
+    let (account, repository) = install(&store);
+    store
+        .update_notification_settings(account, |settings| {
+            settings.actor_rules.push(ActorRule {
+                actor: RuleActor::KnownAutomation,
+                scope: RuleScope::ReviewsAndInline,
+            });
+            settings.actor_rules.push(ActorRule {
+                actor: RuleActor::App(id(93)),
+                scope: RuleScope::Categories([Category::OrdinaryComment].into()),
+            });
+        })
+        .unwrap();
+    store
+        .subscribe_read(
+            account,
+            &feed(repository, ResourceFamily::Comments),
+            "activity",
+            ReadPriority::Activity,
+            START,
+        )
+        .unwrap();
+    let first = store.claim_sync_read(account, START).unwrap().unwrap();
+    store
+        .commit_observed_page(&first, no_changes(), START, "UTC")
+        .unwrap();
+    let at = START + 3_600_000;
+    let claim = store.claim_sync_read(account, at).unwrap().unwrap();
+    let mut bot = comment(44, 81, at - 1, at - 1);
+    bot.actor = EventActor {
+        user_id: Some(id(91)),
+        known_automation: true,
+        app_id: None,
+    };
+    let mut via_app = comment(44, 82, at, at);
+    via_app.actor = EventActor {
+        user_id: Some(id(92)),
+        known_automation: false,
+        app_id: Some(id(93)),
+    };
+    store
+        .commit_observed_page(
+            &claim,
+            ObservationPage {
+                comments: vec![bot, via_app],
+                ..no_changes()
+            },
+            at,
+            "UTC",
+        )
+        .unwrap();
+    assert_eq!(
+        store
+            .process_notification_events(account, at + 1, "UTC", true, 10)
+            .unwrap(),
+        2
+    );
+    let visible = store.notification_feed(account, None, 10).unwrap();
+    assert_eq!(visible.len(), 1);
+    assert_eq!(
+        visible[0].event_key,
+        format!("github:comments:81:comment_created:{}", at - 1)
+    );
+    assert!(
+        store
+            .load_activity_event(account, &format!("github:comments:82:comment_created:{at}"))
+            .unwrap()
+            .is_some()
+    );
 }
