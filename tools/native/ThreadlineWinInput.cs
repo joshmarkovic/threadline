@@ -1,10 +1,16 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Threading;
 
 public static class ThreadlineWinInput
 {
+    private const uint KeyUp = 2;
+    private const uint LeftDown = 2;
+    private const uint LeftUp = 4;
+    private static readonly int InputSize = Marshal.SizeOf(typeof(Input));
+
     public static IntPtr TargetWindow { get; set; }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -96,8 +102,76 @@ public static class ThreadlineWinInput
     private static void Send(Input[] input, bool requireFocus = true)
     {
         if (requireFocus) RequireTargetFocus();
-        if (SendInput((uint)input.Length, input, Marshal.SizeOf(typeof(Input))) != input.Length)
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "SendInput did not inject every event.");
+        uint accepted = 0;
+        try
+        {
+            accepted = SendInput((uint)input.Length, input, InputSize);
+            if (accepted != input.Length)
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "SendInput did not inject every event.");
+        }
+        finally
+        {
+            if (accepted > 0 && accepted < input.Length)
+                ReleaseInterruptedInput(input, (int)accepted);
+        }
+    }
+
+    private static List<Input> PendingReleases(Input[] input, int accepted)
+    {
+        var pending = new List<Input>();
+        for (int index = 0; index < accepted; index++)
+        {
+            var current = input[index];
+            if (current.Kind == 1)
+            {
+                var keyboard = current.Data.Keyboard;
+                if ((keyboard.Flags & KeyUp) == 0)
+                {
+                    pending.Add(Key(keyboard.VirtualKey, keyboard.ScanCode, keyboard.Flags | KeyUp));
+                }
+                else
+                {
+                    int match = pending.FindLastIndex(release =>
+                        release.Kind == 1 &&
+                        release.Data.Keyboard.VirtualKey == keyboard.VirtualKey &&
+                        release.Data.Keyboard.ScanCode == keyboard.ScanCode &&
+                        release.Data.Keyboard.Flags == keyboard.Flags);
+                    if (match >= 0) pending.RemoveAt(match);
+                }
+            }
+            else if (current.Kind == 0 && current.Data.Mouse.Flags == LeftDown) pending.Add(MouseEvent(LeftUp));
+            else if (current.Kind == 0 && current.Data.Mouse.Flags == LeftUp)
+            {
+                int match = pending.FindLastIndex(release => release.Kind == 0 && release.Data.Mouse.Flags == LeftUp);
+                if (match >= 0) pending.RemoveAt(match);
+            }
+        }
+        return pending;
+    }
+
+    private static void ReleaseInterruptedInput(Input[] input, int accepted)
+    {
+        var pending = PendingReleases(input, accepted);
+        Win32Exception failure = null;
+        for (int index = pending.Count - 1; index >= 0; index--)
+        {
+            try { Release(pending[index]); }
+            catch (Win32Exception error) { failure = error; }
+        }
+        if (failure != null) throw failure;
+    }
+
+    private static void Release(Input input)
+    {
+        var events = new[] { input };
+        int error = 0;
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            if (SendInput(1, events, InputSize) == 1) return;
+            error = Marshal.GetLastWin32Error();
+            if (attempt < 2) Thread.Sleep(16);
+        }
+        throw new Win32Exception(error, "SendInput could not release an injected key or mouse button.");
     }
 
     private static Input Key(ushort key, ushort scanCode, uint flags)
@@ -120,7 +194,7 @@ public static class ThreadlineWinInput
             var key = (ushort)keys[index];
             var flags = key >= 0x25 && key <= 0x28 ? 1u : 0u;
             events[index] = Key(key, 0, flags);
-            events[events.Length - index - 1] = Key(key, 0, flags | 2);
+            events[events.Length - index - 1] = Key(key, 0, flags | KeyUp);
         }
         Send(events);
     }
@@ -133,31 +207,42 @@ public static class ThreadlineWinInput
         {
             var character = (ushort)text[index];
             events[index * 2] = Key(0, character, 4);
-            events[index * 2 + 1] = Key(0, character, 6);
+            events[index * 2 + 1] = Key(0, character, 4 | KeyUp);
         }
         Send(events);
     }
 
-    private static void Move(Point point)
+    private static void RequirePointerTarget(Point point)
     {
         RequireTargetFocus();
         if (WindowFromPoint(point) != TargetWindow)
             throw new InvalidOperationException("A different native window covers the requested Threadline control.");
-        if (!SetCursorPos(point.X, point.Y)) throw new Win32Exception(Marshal.GetLastWin32Error());
     }
 
-    private static void Mouse(uint flags, int data = 0, bool requireFocus = true)
+    private static void Move(Point point)
     {
-        Send(new[] { new Input
+        RequirePointerTarget(point);
+        if (!SetCursorPos(point.X, point.Y)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        RequirePointerTarget(point);
+    }
+
+    private static Input MouseEvent(uint flags, int data = 0)
+    {
+        return new Input
         {
             Data = new InputData { Mouse = new MouseInput { Flags = flags, Data = unchecked((uint)data) } }
-        } }, requireFocus);
+        };
+    }
+
+    private static void ClickPointer(bool requireFocus)
+    {
+        Send(new[] { MouseEvent(LeftDown), MouseEvent(LeftUp) }, requireFocus);
     }
 
     public static void Drag(Point from, Point to)
     {
         Move(from);
-        Mouse(2);
+        Send(new[] { MouseEvent(LeftDown) });
         try
         {
             for (int step = 1; step <= 12; step++)
@@ -165,27 +250,29 @@ public static class ThreadlineWinInput
                 Move(new Point { X = from.X + (to.X - from.X) * step / 12, Y = from.Y + (to.Y - from.Y) * step / 12 });
                 Thread.Sleep(16);
             }
+            RequireTargetFocus();
         }
-        finally { Mouse(4, requireFocus: false); }
+        finally { Release(MouseEvent(LeftUp)); }
     }
 
     public static void Click(Point point)
     {
         Move(point);
-        Mouse(2);
-        Mouse(4);
+        ClickPointer(requireFocus: true);
     }
 
     public static void ClickShellControl(Point point, uint shellProcess)
     {
-        uint actualProcess;
-        if (GetWindowThreadProcessId(WindowFromPoint(point), out actualProcess) == 0 ||
-            actualProcess != shellProcess)
-            throw new InvalidOperationException("The selected point is no longer in the shell control.");
-
+        RequireShellTarget(point, shellProcess);
         if (!SetCursorPos(point.X, point.Y)) throw new Win32Exception(Marshal.GetLastWin32Error());
-        Mouse(2, requireFocus: false);
-        Mouse(4, requireFocus: false);
+        RequireShellTarget(point, shellProcess);
+        ClickPointer(requireFocus: false);
+    }
+
+    private static void RequireShellTarget(Point point, uint shellProcess)
+    {
+        if (shellProcess == 0 || WindowProcessId(WindowFromPoint(point)) != shellProcess)
+            throw new InvalidOperationException("The selected point is no longer in the shell control.");
     }
 
     public static uint WindowProcessId(IntPtr window)
@@ -205,8 +292,7 @@ public static class ThreadlineWinInput
             var point = new Point { X = 36, Y = 16 };
             if (!ClientToScreen(window, ref point) || WindowFromPoint(point) != window) return false;
             if (!SetCursorPos(point.X, point.Y) || WindowFromPoint(point) != window) return false;
-            Mouse(2, requireFocus: false);
-            Mouse(4, requireFocus: false);
+            ClickPointer(requireFocus: false);
             return true;
         }
         finally { SetWindowPos(window, new IntPtr(-2), 0, 0, 0, 0, flags); }
@@ -218,7 +304,7 @@ public static class ThreadlineWinInput
         int movement = notches < 0 ? -120 : 120;
         for (int index = 0; index < Math.Abs(notches); index++)
         {
-            Mouse(0x0800, movement);
+            Send(new[] { MouseEvent(0x0800, movement) });
             Thread.Sleep(intervalMilliseconds);
         }
     }
