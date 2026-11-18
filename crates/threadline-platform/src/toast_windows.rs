@@ -8,7 +8,7 @@ use windows::UI::Notifications::{
     NotificationSetting, ToastActivatedEventArgs, ToastFailedEventArgs, ToastNotification,
     ToastNotificationManager, ToastNotifier,
 };
-use windows::Win32::Foundation::{CLASS_E_NOAGGREGATION, E_INVALIDARG, E_POINTER};
+use windows::Win32::Foundation::{CLASS_E_NOAGGREGATION, E_INVALIDARG, E_POINTER, ERROR_NOT_FOUND};
 use windows::Win32::System::Com::{
     CLSCTX_LOCAL_SERVER, CoCreateGuid, CoRegisterClassObject, CoRevokeClassObject, IClassFactory,
     IClassFactory_Impl, REGCLS_MULTIPLEUSE,
@@ -25,7 +25,10 @@ use windows::core::{
 use windows_sys::Win32::System::Registry::{HKEY_CLASSES_ROOT, HKEY_CURRENT_USER};
 
 use super::toast_registration::{installed_link_matches, registry_matches};
-use super::{Activation, ActivityActivation, ActivityNotification, PlatformError, PlatformEvent};
+use super::{
+    Activation, ActivityActivation, ActivityNotification, ActivityPermission, PlatformError,
+    PlatformEvent,
+};
 
 const BODY: &str = "Open the sample pull request in Threadline.";
 const GROUP: &str = "ThreadlineReview";
@@ -322,23 +325,16 @@ impl Toasts {
         ))
         .map_err(|error| native_error("Find the Threadline activity sender", error))
     }
-    pub(super) fn activity_enabled(&self) -> Result<bool, PlatformError> {
-        Ok(self
-            .activity_notifier()?
-            .Setting()
-            .map_err(|error| native_error("Read Windows notification preferences", error))?
-            == NotificationSetting::Enabled)
+    pub(super) fn activity_permission(&self) -> Result<ActivityPermission, PlatformError> {
+        sender_permission(&self.activity_notifier()?)
     }
     pub(super) fn submit_activity(
         &self,
         notice: ActivityNotification,
     ) -> Result<(), PlatformError> {
         let notifier = self.activity_notifier()?;
-        if notifier
-            .Setting()
-            .map_err(|e| native_error("Read Windows notification preferences", e))?
-            != NotificationSetting::Enabled
-        {
+        let permission = sender_permission(&notifier)?;
+        if permission == ActivityPermission::Disabled {
             return Err(PlatformError::Denied);
         }
         let document =
@@ -358,7 +354,11 @@ impl Toasts {
         // Windows retains the card across orderly application exit. The registered COM class handles all three actions.
         notifier
             .Show(&toast)
-            .map_err(|e| native_error("Submit activity to Windows", e))
+            .map_err(|e| native_error("Submit activity to Windows", e))?;
+        if permission == ActivityPermission::SenderSettingUnknown {
+            corroborate_unknown_sender(&self.identity.app_id, &key)?;
+        }
+        Ok(())
     }
 
     pub(super) fn show_review(&mut self) -> Result<(), PlatformError> {
@@ -526,6 +526,56 @@ fn native_error(operation: &'static str, error: Error) -> PlatformError {
         operation,
         code: error.code().0 as u32,
     }
+}
+
+fn sender_permission(notifier: &ToastNotifier) -> Result<ActivityPermission, PlatformError> {
+    match notifier.Setting() {
+        Ok(value) if value == NotificationSetting::Enabled => Ok(ActivityPermission::Enabled),
+        Ok(_) => Ok(ActivityPermission::Disabled),
+        // A registered unpackaged sender may have no preference record before its first submission.
+        // Windows still applies its current policy when the application calls Show.
+        Err(error) if error.code() == windows::core::HRESULT::from_win32(ERROR_NOT_FOUND.0) => {
+            Ok(ActivityPermission::SenderSettingUnknown)
+        }
+        Err(error) => Err(native_error("Read Windows notification preferences", error)),
+    }
+}
+
+fn corroborate_unknown_sender(app_id: &str, key: &str) -> Result<(), PlatformError> {
+    let history = ToastNotificationManager::History()
+        .map_err(|e| native_error("Open Windows notification history", e))?;
+    let sender = HSTRING::from(app_id);
+    let tag = HSTRING::from(&key[..16]);
+    let group = HSTRING::from(&key[16..]);
+    for attempt in 0..6 {
+        let contains = || -> windows::core::Result<bool> {
+            let entries = history.GetHistoryWithId(&sender)?;
+            for index in 0..entries.Size()? {
+                let entry = entries.GetAt(index)?;
+                if entry.Tag()? == tag && entry.Group()? == group {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        };
+        match contains() {
+            Ok(true) => return Ok(()),
+            Ok(false) => (),
+            Err(error) if error.code() == windows::core::HRESULT::from_win32(ERROR_NOT_FOUND.0) => {
+                ()
+            }
+            Err(error) => {
+                return Err(native_error(
+                    "Read the submitted Windows activity group",
+                    error,
+                ));
+            }
+        }
+        if attempt < 5 {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+    }
+    Err(PlatformError::Unavailable)
 }
 
 #[cfg(test)]

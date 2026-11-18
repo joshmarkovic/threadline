@@ -249,6 +249,10 @@ fn inspect(root: &Path) -> Result<Value, Box<dyn Error>> {
         "latest_feed_id": db.query_row("SELECT MAX(id) FROM notification_events WHERE published=1", [], |row| row.get::<_,Option<i64>>(0))?,
         "os_feed_only":count("SELECT count(*) FROM notification_events n WHERE n.published=1
             AND json_extract(n.decision,'$.mode')='FeedOnly' AND EXISTS(SELECT 1 FROM json_each(n.decision,'$.reasons') WHERE value='OperatingSystem')")?,
+        "registration_feed_only":count("SELECT count(*) FROM notification_events n WHERE n.published=1
+            AND json_extract(n.decision,'$.mode')='FeedOnly' AND EXISTS(SELECT 1 FROM json_each(n.decision,'$.reasons') WHERE value='RegistrationMissing')")?,
+        "adapter_feed_only":count("SELECT count(*) FROM notification_events n WHERE n.published=1
+            AND json_extract(n.decision,'$.mode')='FeedOnly' AND EXISTS(SELECT 1 FROM json_each(n.decision,'$.reasons') WHERE value='AdapterUnavailable')")?,
         "snoozed_targets":count("SELECT count(*) FROM notification_targets WHERE snooze_until>unixepoch('now')*1000")?,
         "read_count":count("SELECT count(*) FROM notification_events WHERE read_at IS NOT NULL")?,
         "group_count":count("SELECT count(*) FROM native_notification_groups")?,

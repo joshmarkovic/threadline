@@ -159,6 +159,7 @@ internal sealed class NotificationRegistration
         if (!ThreadlineToastShortcut.LinkMatches(staged, identity, app) || !ThreadlineToastShortcut.LinkHasActivator(staged, activator)) throw new InvalidDataException();
         File.Copy(staged, link, true);
         SetValues(new[] { Command, classText, display });
+        ThreadlineToastShortcut.NotifyPublishedLink(link, hadLink);
     }
     private void Restore()
     {
@@ -166,6 +167,7 @@ internal sealed class NotificationRegistration
         bool hadLink;
         string[] values = Snapshot(out hadLink);
         CheckLink(); Values();
+        bool existed = File.Exists(link);
         if (hadLink)
         {
             if (!ThreadlineToastShortcut.TargetsExecutable(At(OldLink), app)) throw new InvalidDataException();
@@ -173,12 +175,18 @@ internal sealed class NotificationRegistration
         }
         else if (File.Exists(link)) File.Delete(link);
         SetValues(values);
+        if (hadLink) ThreadlineToastShortcut.NotifyPublishedLink(link, existed);
+        else if (existed) ThreadlineToastShortcut.NotifyRemovedLink(link);
     }
     private void Remove()
     {
         bool hadLink;
         Snapshot(out hadLink); CheckLink(); Values();
         SetValues(new string[3]);
-        if (File.Exists(link)) File.Delete(link);
+        if (File.Exists(link))
+        {
+            File.Delete(link);
+            ThreadlineToastShortcut.NotifyRemovedLink(link);
+        }
     }
 }

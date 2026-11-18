@@ -54,7 +54,7 @@ enum Command {
     EnableTray(bool),
     NotifyReview,
     SubmitActivity(ActivityNotification, SyncSender<Result<(), PlatformError>>),
-    ActivitySetting(SyncSender<Result<bool, PlatformError>>),
+    ActivitySetting(SyncSender<Result<super::ActivityPermission, PlatformError>>),
     Shutdown,
 }
 
@@ -72,7 +72,7 @@ impl Desktop {
         self.post(Command::SubmitActivity(notice, reply))?;
         response.recv().map_err(|_| PlatformError::Unavailable)?
     }
-    pub fn activity_notifications_enabled(&self) -> Result<bool, PlatformError> {
+    pub fn activity_permission(&self) -> Result<super::ActivityPermission, PlatformError> {
         let (reply, response) = mpsc::sync_channel(1);
         self.post(Command::ActivitySetting(reply))?;
         response.recv().map_err(|_| PlatformError::Unavailable)?
@@ -391,16 +391,16 @@ impl WindowState {
                     let result = match self.toasts.borrow().as_ref() {
                         Some(Ok(toasts)) => toasts.submit_activity(notice),
                         Some(Err(error)) => Err(*error),
-                        None => Err(PlatformError::Unsupported),
+                        None => Err(PlatformError::NotificationRegistrationMissing),
                     };
                     let _ = reply.send(result);
                     Ok(())
                 }
                 Command::ActivitySetting(reply) => {
                     let result = match self.toasts.borrow().as_ref() {
-                        Some(Ok(toasts)) => toasts.activity_enabled(),
+                        Some(Ok(toasts)) => toasts.activity_permission(),
                         Some(Err(error)) => Err(*error),
-                        None => Err(PlatformError::Unsupported),
+                        None => Err(PlatformError::NotificationRegistrationMissing),
                     };
                     let _ = reply.send(result);
                     Ok(())

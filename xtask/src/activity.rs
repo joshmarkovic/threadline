@@ -58,7 +58,7 @@ fn corroborates(id: &str, receipt: &Value) -> bool {
         }
         "E2E-018" => {
             state["group_count"] == 0
-                && state["os_feed_only"] == 37
+                && state["registration_feed_only"] == 37
                 && state["snoozed_targets"] == 1
                 && state["read_count"] == 1
         }

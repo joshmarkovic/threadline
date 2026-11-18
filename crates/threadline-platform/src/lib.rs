@@ -7,7 +7,9 @@ use std::path::{Path, PathBuf};
 use tokio::sync::mpsc::{self, UnboundedReceiver};
 
 mod activity;
-pub use activity::{ActivityAction, ActivityActivation, ActivityId, ActivityNotification};
+pub use activity::{
+    ActivityAction, ActivityActivation, ActivityId, ActivityNotification, ActivityPermission,
+};
 mod credentials;
 mod paths;
 #[cfg(windows)]
@@ -52,6 +54,7 @@ pub struct Capabilities {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PlatformError {
     Unsupported,
+    NotificationRegistrationMissing,
     Unavailable,
     Locked,
     Denied,
@@ -67,6 +70,9 @@ impl Display for PlatformError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
             Self::Unsupported => "This desktop service is unavailable on this platform",
+            Self::NotificationRegistrationMissing => {
+                "Windows did not recognize this executable's notification registration"
+            }
             Self::Unavailable => "Desktop service is temporarily unavailable",
             Self::Locked => "The desktop service is locked",
             Self::Denied => "The desktop service denied this operation",
@@ -130,11 +136,19 @@ impl PlatformControls {
     }
 
     /// Read the sender's current setting before taking a native delivery reservation.
-    pub fn activity_notifications_enabled(&self) -> Result<bool, PlatformError> {
+    pub fn activity_permission(&self) -> Result<ActivityPermission, PlatformError> {
         #[cfg(windows)]
-        return self.desktop.activity_notifications_enabled();
+        return self.desktop.activity_permission();
         #[cfg(not(windows))]
         Err(PlatformError::Unsupported)
+    }
+
+    pub fn activity_notifications_enabled(&self) -> Result<bool, PlatformError> {
+        match self.activity_permission()? {
+            ActivityPermission::Enabled => Ok(true),
+            ActivityPermission::Disabled => Ok(false),
+            ActivityPermission::SenderSettingUnknown => Err(PlatformError::Unavailable),
+        }
     }
 
     /// Queue a native feasibility notification. WinRT reports submission before any activation.

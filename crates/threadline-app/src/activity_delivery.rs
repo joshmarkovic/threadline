@@ -5,7 +5,10 @@ use std::sync::{
 };
 use threadline_core::sync::policy::system_timezone;
 use threadline_platform::{ActivityId, ActivityNotification, PlatformControls, PlatformError};
-use threadline_storage::{Store, UtcMillis, notifications::PopupOutcome};
+use threadline_storage::{
+    Store, UtcMillis,
+    notifications::{PopupAvailability, PopupOutcome},
+};
 
 pub(crate) struct ActivityDelivery {
     stop: Arc<AtomicBool>,
@@ -57,19 +60,32 @@ fn deliver(
         return Ok(());
     }
     let zone = system_timezone().map_err(threadline_storage::Error::InvalidInput)?;
-    let native_allowed = native.activity_notifications_enabled().unwrap_or(false);
+    use threadline_platform::ActivityPermission;
+    let availability = match native.activity_permission() {
+        Ok(ActivityPermission::Enabled) => PopupAvailability::Enabled,
+        Ok(ActivityPermission::Disabled) => PopupAvailability::Disabled,
+        Ok(ActivityPermission::SenderSettingUnknown) => PopupAvailability::SenderSettingUnknown,
+        Err(PlatformError::Denied) => PopupAvailability::Disabled,
+        Err(PlatformError::NotificationRegistrationMissing) => {
+            PopupAvailability::RegistrationMissing
+        }
+        Err(error) => {
+            eprintln!("Threadline could not query the desktop notification service: {error}");
+            PopupAvailability::Unavailable
+        }
+    };
     while !stop.load(Ordering::Acquire)
         && store.process_notification_events(
             account,
             UtcMillis::now()?.0,
             &zone,
-            native_allowed,
+            availability,
             128,
         )? == 128
     {}
     while !stop.load(Ordering::Acquire) {
         let Some(group) =
-            store.claim_notification_popup(account, UtcMillis::now()?.0, &zone, native_allowed)?
+            store.claim_notification_popup(account, UtcMillis::now()?.0, &zone, availability)?
         else {
             break;
         };
@@ -82,7 +98,11 @@ fn deliver(
         });
         let outcome = match result {
             Ok(()) => PopupOutcome::Delivered,
-            Err(PlatformError::Unsupported | PlatformError::Denied) => PopupOutcome::Rejected,
+            Err(
+                PlatformError::Unsupported
+                | PlatformError::Denied
+                | PlatformError::NotificationRegistrationMissing,
+            ) => PopupOutcome::Rejected,
             Err(_) => PopupOutcome::Unknown,
         };
         store.record_notification_outcome(

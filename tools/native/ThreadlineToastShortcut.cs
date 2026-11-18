@@ -62,6 +62,16 @@ public static class ThreadlineToastShortcut
     [DllImport("shell32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
     private static extern void SHChangeNotify(uint eventId, uint flags, string item, IntPtr unused);
 
+    public static void NotifyPublishedLink(string path, bool existed)
+    {
+        SHChangeNotify(existed ? 0x2000u : 0x2u, 0x1005, path, IntPtr.Zero);
+    }
+
+    public static void NotifyRemovedLink(string path)
+    {
+        SHChangeNotify(0x4, 0x1005, path, IntPtr.Zero);
+    }
+
     public static void CreateOwnedLink(string linkPath, string binary, string appId)
     {
         CreateOwnedLinkWithActivator(linkPath, binary, appId, Guid.Empty);

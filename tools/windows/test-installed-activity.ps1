@@ -130,7 +130,7 @@ try {
         $child = Start-Process -FilePath $exe -PassThru
         $feed = Wait-Activity 'the unsupported adapter and feed-only decisions' {
             $state = Read-Fixture inspect
-            if ($state.os_feed_only -eq 37 -and $state.group_count -eq 0 -and $state.feed_count -eq 37) { return $state }
+            if ($state.registration_feed_only -eq 37 -and $state.group_count -eq 0 -and $state.feed_count -eq 37) { return $state }
         }
         $report.initial_pid = $child.Id
         $null = Wait-Activity 'the owned activity entry point' { Find-OwnedId (Get-OwnedWindow $child) $child.Id 'reader-activity' }
@@ -152,7 +152,11 @@ try {
         $delivered = Wait-Activity 'Windows notification submission and committed delivery' {
             if ($child.HasExited) { throw 'The installed app exited before native delivery.' }
             $state = Read-Fixture inspect
-            if ($state.feed_count -eq 37 -and $null -eq $state.native_id) { Stop-Blocked 'Windows notifications were unavailable; the feed retained the events.' }
+            if ($state.feed_count -eq 37 -and $null -eq $state.native_id) {
+                if ($state.registration_feed_only -gt 0) { throw 'Threadline did not recognize its installed notification registration.' }
+                if ($state.adapter_feed_only -gt 0) { throw 'Threadline could not query the registered native notification adapter.' }
+                if ($state.os_feed_only -gt 0) { Stop-Blocked 'Windows disabled notifications for this registered sender; the feed retained the events.' }
+            }
             if ($state.outcome -ceq 'delivered' -and $state.group_count -eq 1 -and $state.native_id -cmatch '^[a-f0-9]{32}$') { return $state }
         }
         $group = $delivered.native_id

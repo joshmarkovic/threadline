@@ -198,7 +198,26 @@ pub struct DeliveryContext {
     pub followed: bool,
     pub snoozed: bool,
     pub quiet: bool,
-    pub os_allows_popup: bool,
+    pub popup: PopupAvailability,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PopupAvailability {
+    Enabled,
+    SenderSettingUnknown,
+    Disabled,
+    RegistrationMissing,
+    Unavailable,
+}
+
+impl From<bool> for PopupAvailability {
+    fn from(enabled: bool) -> Self {
+        if enabled {
+            Self::Enabled
+        } else {
+            Self::Disabled
+        }
+    }
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum DecisionReason {
@@ -213,6 +232,9 @@ pub enum DecisionReason {
     QuietHours,
     Snoozed,
     OperatingSystem,
+    SenderSettingUnknown,
+    RegistrationMissing,
+    AdapterUnavailable,
     Enabled,
 }
 impl DecisionReason {
@@ -233,6 +255,13 @@ impl DecisionReason {
             Self::QuietHours => "Quiet hours keep this activity in the feed.",
             Self::Snoozed => "This target is snoozed.",
             Self::OperatingSystem => "Desktop notifications are disabled in the operating system.",
+            Self::SenderSettingUnknown => {
+                "Windows returned no preference for this registered sender. Windows evaluates the submitted notification under its current policy."
+            }
+            Self::RegistrationMissing => {
+                "Windows could not match this application to its registered Start shortcut and notification activator."
+            }
+            Self::AdapterUnavailable => "The desktop notification service was unavailable.",
             Self::Enabled => "An enabled category permits this delivery.",
         }
     }
@@ -314,10 +343,18 @@ pub fn preview(
         if ctx.quiet {
             reasons.push(QuietHours)
         }
-        if !ctx.os_allows_popup {
-            reasons.push(OperatingSystem)
+        match ctx.popup {
+            PopupAvailability::Enabled => (),
+            PopupAvailability::SenderSettingUnknown => reasons.push(SenderSettingUnknown),
+            PopupAvailability::Disabled => reasons.push(OperatingSystem),
+            PopupAvailability::RegistrationMissing => reasons.push(RegistrationMissing),
+            PopupAvailability::Unavailable => reasons.push(AdapterUnavailable),
         }
-        if ctx.snoozed || ctx.quiet || !ctx.os_allows_popup {
+        let can_submit = matches!(
+            ctx.popup,
+            PopupAvailability::Enabled | PopupAvailability::SenderSettingUnknown
+        );
+        if ctx.snoozed || ctx.quiet || !can_submit {
             result = DeliveryMode::FeedOnly
         }
     }
@@ -365,7 +402,7 @@ mod tests {
             followed: false,
             quiet: false,
             snoozed: false,
-            os_allows_popup: true,
+            popup: PopupAvailability::Enabled,
         };
         let mut e = EventFacts {
             target: NotificationTarget::Repository,
@@ -378,6 +415,36 @@ mod tests {
             receipt: None,
         };
         assert_eq!(preview(&s, &r, &e, ctx).mode, DeliveryMode::Popup);
+        let uninitialized = preview(
+            &s,
+            &r,
+            &e,
+            DeliveryContext {
+                popup: PopupAvailability::SenderSettingUnknown,
+                ..ctx
+            },
+        );
+        assert_eq!(uninitialized.mode, DeliveryMode::Popup);
+        assert_eq!(
+            uninitialized.reasons,
+            [DecisionReason::SenderSettingUnknown]
+        );
+        for (popup, reason) in [
+            (PopupAvailability::Disabled, DecisionReason::OperatingSystem),
+            (
+                PopupAvailability::RegistrationMissing,
+                DecisionReason::RegistrationMissing,
+            ),
+            (
+                PopupAvailability::Unavailable,
+                DecisionReason::AdapterUnavailable,
+            ),
+        ] {
+            let decision = preview(&s, &r, &e, DeliveryContext { popup, ..ctx });
+            assert_eq!(decision.mode, DeliveryMode::FeedOnly);
+            assert_eq!(decision.reasons, [reason]);
+            assert!(!decision.sound);
+        }
         r.actor_rules.push(ActorRule {
             actor: RuleActor::User(actor),
             scope: RuleScope::ReviewsAndInline,

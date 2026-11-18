@@ -1,5 +1,13 @@
 use super::PlatformError;
 
+/// Windows may have no per-sender preference for a newly registered application.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActivityPermission {
+    Enabled,
+    Disabled,
+    SenderSettingUnknown,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ActivityId(u128);
 impl ActivityId {

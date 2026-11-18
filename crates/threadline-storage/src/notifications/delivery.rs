@@ -161,7 +161,7 @@ fn decide(
     settings: &NotificationSettings,
     now: i64,
     zone: &str,
-    os: bool,
+    popup: PopupAvailability,
 ) -> Result<Decision> {
     let group = group_key(e.repo, &e.facts.target)?;
     let(mut followed,until):(bool,Option<i64>)=db.query_row("SELECT followed,snooze_until FROM notification_targets WHERE account_id=? AND repository_id=? AND group_key=?",
@@ -217,7 +217,7 @@ fn decide(
             followed,
             snoozed: until.is_some_and(|t| t > now),
             quiet: quiet || quiet_override,
-            os_allows_popup: os,
+            popup,
         },
     ))
 }
@@ -358,12 +358,13 @@ impl Store {
         a: AccountId,
         now: i64,
         zone: &str,
-        os_allows_popup: bool,
+        popup: impl Into<PopupAvailability>,
         limit: u16,
     ) -> Result<usize> {
         if !(1..=512).contains(&limit) {
             return Err(Error::InvalidInput("Invalid notification batch size"));
         }
+        let popup = popup.into();
         self.write(|tx| {
             if !dispatch_allowed(tx, a)? {
                 return Ok(0);
@@ -379,7 +380,7 @@ impl Store {
             let count = rows.len();
             for row in rows {
                 let e = event(tx, row)?;
-                let decision = decide(tx, a, &e, &settings, now, zone, os_allows_popup)?;
+                let decision = decide(tx, a, &e, &settings, now, zone, popup)?;
                 save_decision(tx, &e, &decision)?;
                 let group = if decision.mode == DeliveryMode::Popup {
                     Some(attach_group(tx, a, &e, now)?)
@@ -405,8 +406,9 @@ impl Store {
         a: AccountId,
         now: i64,
         zone: &str,
-        os_allows_popup: bool,
+        popup: impl Into<PopupAvailability>,
     ) -> Result<Option<PopupGroup>> {
+        let popup = popup.into();
         self.write(|tx| {
             if !dispatch_allowed(tx, a)? {
                 return Ok(None);
@@ -447,7 +449,7 @@ impl Store {
                     for raw in rows {
                         let event = event(tx, raw)?;
                         last_id = event.id;
-                        let decision = decide(tx, a, &event, &settings, now, zone, os_allows_popup)?;
+                        let decision = decide(tx, a, &event, &settings, now, zone, popup)?;
                         save_decision(tx, &event, &decision)?;
                         let read: bool = tx.query_row(
                             "SELECT read_at IS NOT NULL FROM notification_events WHERE id=?",
