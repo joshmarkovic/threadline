@@ -47,6 +47,8 @@ pub struct IssueSummary {
     pub author: Option<String>,
     pub labels: Option<Vec<String>>,
     pub assignees: Option<Vec<String>>,
+    /// Present only when the entire returned list has stable GitHub user IDs.
+    pub assignee_ids: Option<std::collections::BTreeSet<NonZeroU64>>,
     pub milestone: Reported<String>,
     pub reactions: Option<ReactionCounts>,
 }

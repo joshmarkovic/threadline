@@ -338,14 +338,16 @@ fn page(claim: &ReadClaim) -> Result<u32, ReaderError> {
     })
 }
 
-fn observed_issue(summary: IssueSummary) -> Result<ObservedItem, ReaderError> {
+fn observed_issue(mut summary: IssueSummary) -> Result<ObservedItem, ReaderError> {
     let provider_id = summary.issue_id.get();
     let created_at_ms = summary.created_at_ms;
+    let assignee_ids = summary.assignee_ids.take();
     let parsed = crate::reader::issue(summary)?;
     Ok(ObservedItem {
         number: parsed.number,
         provider_id,
         created_at_ms,
+        assignee_ids,
         update: parsed.update,
     })
 }

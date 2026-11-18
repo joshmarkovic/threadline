@@ -122,6 +122,10 @@ impl Issue {
             labels: self
                 .labels
                 .map(|labels| labels.into_iter().map(|label| label.name).collect()),
+            assignee_ids: self
+                .assignees
+                .as_ref()
+                .and_then(|people| people.iter().map(|user| user.id).collect()),
             assignees: self
                 .assignees
                 .map(|people| people.into_iter().map(|user| user.login).collect()),

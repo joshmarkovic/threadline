@@ -97,6 +97,7 @@ fn issue(number: u64, updated: i64, closed: bool) -> ObservedItem {
         number,
         provider_id: number + 100,
         created_at_ms: Some(1),
+        assignee_ids: None,
         update: ItemUpdate {
             representation: ItemRepresentation::Issue(IssueRecord {
                 id: IssueApiId::new(id(number + 100)),
@@ -869,4 +870,116 @@ fn it_018_unopened_issue_comment_uses_real_feed_and_preserves_comment_off_mentio
     assert!(
         matches!(&popup.destination.target, NotificationTarget::Item{thread:Some(k),..} if k=="issue-comment:32")
     );
+}
+
+#[test]
+fn it_018_issue_assignment_tracks_stable_ids_across_restarts_and_missing_fields() {
+    use threadline_storage::notifications::{
+        Category, DeliveryMode, NotificationTarget, Relevance,
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open_profile(dir.path()).unwrap();
+    let (account, repository) = install(&store);
+    store
+        .update_notification_settings(account, |settings| {
+            settings.fallback = DeliveryMode::Off;
+            settings
+                .categories
+                .insert(Category::IssueAssignment, DeliveryMode::Popup);
+            settings.relevance = Relevance::InvolvingMe;
+        })
+        .unwrap();
+    store
+        .subscribe_read(
+            account,
+            &feed(repository, ResourceFamily::RepositoryItems),
+            "activity",
+            ReadPriority::Activity,
+            START,
+        )
+        .unwrap();
+    let row = |number, updated, assignees: Option<&[u64]>| {
+        let mut row = issue(number, updated, false);
+        row.assignee_ids = assignees.map(|ids| ids.iter().copied().map(id).collect());
+        row
+    };
+    let walk = |store: &Store, now, items| {
+        let claim = store.claim_sync_read(account, now).unwrap().unwrap();
+        store
+            .commit_observed_page(
+                &claim,
+                ObservationPage {
+                    items,
+                    ..no_changes()
+                },
+                now,
+                "UTC",
+            )
+            .unwrap();
+        store
+            .process_notification_events(account, now + 1, "UTC", true, 100)
+            .unwrap()
+    };
+    let hour = 3_600_000;
+    assert_eq!(
+        walk(
+            &store,
+            START,
+            vec![row(44, 50, Some(&[5])), row(45, 50, None)]
+        ),
+        0
+    );
+    let next = START + hour;
+    let mut pr = row(46, next, Some(&[102]));
+    if let ItemRepresentation::Issue(record) = &mut pr.update.representation {
+        record.classification = IssueClassification::PullRequest;
+    }
+    // Changes to another issue's general fields do not establish who assigned it.
+    assert_eq!(
+        walk(
+            &store,
+            next,
+            vec![
+                row(44, next - 4, Some(&[5, 102])),
+                row(44, next - 3, None),
+                row(44, next - 4, Some(&[])),
+                row(44, next - 2, Some(&[102, 5])),
+                row(45, next, Some(&[102])),
+                pr,
+            ]
+        ),
+        1
+    );
+    let first = store.notification_feed(account, None, 10).unwrap();
+    assert_eq!(first.len(), 1);
+    assert_eq!(first[0].categories, [Category::IssueAssignment].into());
+    assert_eq!(first[0].decision.mode, DeliveryMode::Popup);
+    let target = store.ensure_placeholder(account, repository, 44).unwrap();
+    assert_eq!(
+        first[0].target,
+        NotificationTarget::Item {
+            item: target,
+            thread: None
+        }
+    );
+    drop(store);
+    let store = Store::open_profile(dir.path()).unwrap();
+    let latest = next + hour;
+    assert_eq!(
+        walk(
+            &store,
+            latest,
+            vec![
+                row(44, next - 4, Some(&[5, 102])),
+                row(44, latest - 2, Some(&[5])),
+                row(44, latest - 1, Some(&[5, 77])),
+                row(44, latest, Some(&[77, 5])),
+            ]
+        ),
+        2
+    );
+    let visible = store.notification_feed(account, None, 10).unwrap();
+    assert_eq!(visible.len(), 2);
+    assert_eq!(visible[0].occurred_at_ms, Some(latest - 2));
+    assert_eq!(visible[1].event_key, first[0].event_key);
 }

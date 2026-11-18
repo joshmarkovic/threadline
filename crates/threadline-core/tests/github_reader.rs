@@ -126,7 +126,11 @@ async fn sync_feeds_keep_the_same_bounded_window_and_respect_conditional_headers
     let reader = bound.reader();
     let first_path = format!("{ISSUES}&page=1");
     let second_path = format!("{ISSUES}&page=2");
-    let first = ok(json!([issue(12, false)]))
+    let mut assigned = issue(12, false);
+    assigned["assignees"] = json!([{"id":91,"login":"first"},{"id":41,"login":"second"}]);
+    let mut partial = issue(13, false);
+    partial["assignees"] = json!([{"id":91,"login":"first"},{"login":"second"}]);
+    let first = ok(json!([assigned, partial]))
         .header(header::ETAG, "W/\"first-issue-page\"")
         .header(header::LAST_MODIFIED, LAST_MODIFIED)
         .header(header::LINK, format!("<{second_path}>; rel=\"next\""))
@@ -144,6 +148,11 @@ async fn sync_feeds_keep_the_same_bounded_window_and_respect_conditional_headers
     let first_page = response.value.unwrap();
     assert_eq!(first_page.records[0].number.get(), 12);
     assert!(first_page.records[0].closed);
+    assert_eq!(
+        first_page.records[0].assignee_ids,
+        Some([41, 91].map(|id| NonZeroU64::new(id).unwrap()).into())
+    );
+    assert_eq!(first_page.records[1].assignee_ids, None);
     assert_eq!(first_page.next_page, Some(2));
     let next = reader
         .updated_issues(SINCE_MS, 2, &response.validators, &cancel)
@@ -153,6 +162,7 @@ async fn sync_feeds_keep_the_same_bounded_window_and_respect_conditional_headers
         .unwrap();
     assert_eq!(next.records[0].number.get(), 900);
     assert_eq!(next.records[0].kind, ItemKind::PullRequest);
+    assert_eq!(next.records[0].assignee_ids, Some(Default::default()));
     let mut unchanged = reply(StatusCode::NOT_MODIFIED, Value::Null);
     unchanged.expected_etag = Some("W/\"first-issue-page\"");
     unchanged.expected_modified = Some(LAST_MODIFIED);

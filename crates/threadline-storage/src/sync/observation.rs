@@ -3,11 +3,13 @@ use crate::{
     Change, ItemLocator, ItemRepresentation, ItemUpdate, identity::ingest_in,
     reader::DiscussionComment,
 };
+use std::{collections::BTreeSet, num::NonZeroU64};
 
 pub struct ObservedItem {
     pub number: u64,
     pub provider_id: u64,
     pub created_at_ms: Option<i64>,
+    pub assignee_ids: Option<BTreeSet<NonZeroU64>>,
     pub update: ItemUpdate,
 }
 
@@ -166,6 +168,8 @@ fn observe_issue(
         _ => None,
     };
     let repo = claim.target.repository;
+    let is_issue = matches!(&row.update.representation, ItemRepresentation::Issue(record)
+        if record.classification == crate::IssueClassification::Issue);
     let item = ingest_in(
         tx,
         claim.account,
@@ -196,7 +200,86 @@ fn observe_issue(
         state,
     };
     observe_object(tx, claim, &object, Some(baseline), now)?;
+    if is_issue && let Some(assignees) = row.assignee_ids {
+        observe_assignments(tx, claim, &object, item, &assignees, baseline, now)?;
+    }
     Ok(updated)
+}
+
+fn observe_assignments(
+    tx: &Transaction<'_>,
+    claim: &ReadClaim,
+    issue: &Object<'_>,
+    item: ItemId,
+    current: &BTreeSet<NonZeroU64>,
+    baseline: i64,
+    now: i64,
+) -> Result<()> {
+    use crate::notifications::{self, Category, EventFacts, NotificationTarget, ReceiptMatch};
+
+    let repository = claim.target.repository;
+    let provider_id = issue.id.to_string();
+    let (latest_issue, previous_time, previous_set, account_user) = tx.query_row(
+        "SELECT issue.updated_at, assignments.updated_at, assignments.state, accounts.provider_user_id
+         FROM feed_object_versions issue JOIN accounts ON accounts.id=issue.account_id
+         LEFT JOIN feed_object_versions assignments
+           ON assignments.account_id=issue.account_id AND assignments.repository_id=issue.repository_id
+           AND assignments.provider_id=issue.provider_id AND assignments.category='issue_assignments'
+         WHERE issue.account_id=? AND issue.repository_id=? AND issue.provider_id=? AND issue.category='issues'",
+        params![claim.account, repository, provider_id],
+        |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<i64>>(1)?,
+                  row.get::<_, Option<String>>(2)?, row.get::<_, String>(3)?)),
+    )?;
+    if latest_issue > issue.updated || previous_time.is_some_and(|time| time >= issue.updated) {
+        return Ok(());
+    }
+    let previous: Option<BTreeSet<NonZeroU64>> = previous_set
+        .map(|raw| serde_json::from_str(&raw).map_err(|_| Error::Corrupt))
+        .transpose()?;
+    let encoded = serde_json::to_string(current).map_err(|_| Error::Corrupt)?;
+    tx.execute(
+        "INSERT INTO feed_object_versions(account_id,repository_id,category,provider_id,updated_at,state)
+         VALUES(?,?,'issue_assignments',?,?,?)
+         ON CONFLICT(account_id,repository_id,category,provider_id) DO UPDATE
+         SET updated_at=excluded.updated_at,state=excluded.state",
+        params![claim.account, repository, provider_id, issue.updated, encoded],
+    )?;
+    let changed = match &previous {
+        Some(known) => known != current,
+        None => !current.is_empty() && issue.created.is_some_and(|created| created > baseline),
+    };
+    if !changed || issue.updated <= baseline {
+        return Ok(());
+    }
+    let event_kind = "issue_assignment_changed";
+    let event_key = format!("github:issues:{provider_id}:{event_kind}:{}", issue.updated);
+    let revision = issue.updated.to_string();
+    let inserted = tx.execute(
+        "INSERT INTO activity_events(account_id,event_key,repository_id,item_id,event_kind,revision,occurred_at_ms,observed_at_ms)
+         VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(account_id,event_key) DO NOTHING",
+        params![claim.account, event_key, repository, item, event_kind, revision, issue.updated, now],
+    )?;
+    if inserted == 1 {
+        let account_user = account_user.parse().map_err(|_| Error::Corrupt)?;
+        notifications::attach_in(
+            tx,
+            claim.account,
+            &event_key,
+            &EventFacts {
+                target: NotificationTarget::Item { item, thread: None },
+                categories: [Category::IssueAssignment].into(),
+                actor: Default::default(),
+                involves_me: current.contains(&account_user)
+                    || previous.is_some_and(|ids| ids.contains(&account_user)),
+                receipt: Some(ReceiptMatch::Ordinary {
+                    action: "issue_edited".into(),
+                    remote_id: provider_id,
+                    revision,
+                }),
+            },
+        )?;
+    }
+    Ok(())
 }
 
 fn observe_comment(
