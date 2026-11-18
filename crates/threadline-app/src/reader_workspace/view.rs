@@ -142,7 +142,46 @@ impl ReaderWorkspace {
         }
     }
 
-    fn select_tab(&mut self, pane: usize, tab: usize, window: &mut Window, cx: &mut Context<Self>) {
+    fn select_tab(&mut self, tab_id: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if self.departure.is_some() {
+            return;
+        }
+        if self.layout_busy {
+            self.pending_tab_selection = Some(tab_id.to_owned());
+            return;
+        }
+        self.activate_tab(tab_id, window, cx);
+    }
+
+    pub(super) fn apply_pending_tab_selection(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(tab_id) = self.pending_tab_selection.take() {
+            self.activate_tab(&tab_id, window, cx);
+        }
+    }
+
+    fn activate_tab(&mut self, tab_id: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let Some((pane, tab)) = self
+            .layout
+            .panes
+            .iter()
+            .enumerate()
+            .find_map(|(index, pane)| {
+                pane.tabs
+                    .iter()
+                    .position(|tab| tab.id == tab_id)
+                    .map(|tab| (index, tab))
+            })
+        else {
+            return;
+        };
+        if self.layout.focused_pane == pane && self.layout.panes[pane].active == Some(tab) {
+            self.focus[pane].focus(window, cx);
+            return;
+        }
         self.capture_scroll();
         let mut layout = self.layout.clone();
         layout.focused_pane = pane;
@@ -928,10 +967,18 @@ impl ReaderWorkspace {
                                 )
                             });
                         let name = format!("reader-tab-{index}-{position}");
+                        let tab_id = tab.id.clone();
+                        let selected = pane.active == Some(position);
+                        let accessibility_label = if selected {
+                            format!("{label} · Active tab")
+                        } else {
+                            label.clone()
+                        };
                         let button = control(name.clone(), label)
-                            .selected(pane.active == Some(position))
+                            .selected(selected)
+                            .accessibility_label(accessibility_label)
                             .on_click(cx.listener(move |this, _, window, cx| {
-                                this.select_tab(index, position, window, cx)
+                                this.select_tab(&tab_id, window, cx)
                             }));
                         self.observed_control(name, button, false)
                     })

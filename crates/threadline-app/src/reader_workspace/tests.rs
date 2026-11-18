@@ -595,6 +595,57 @@ fn ui_008_keyboard_find_panes_and_multiline_editor_have_accessible_identity(
 }
 
 #[gpui_kit::test]
+fn ui_008_cache_restores_a_tab_selected_during_a_pane_focus_save(cx: &mut TestAppContext) {
+    let setup = ReaderHarness::seeded();
+    let account = setup.fixture.account;
+    let mut layout = setup.store.workspace(account).unwrap().unwrap();
+    layout.focused_pane = 1;
+    layout.panes[0].active = Some(0);
+    let selected = layout.panes[0].tabs[1].clone();
+    setup.store.save_workspace(account, &layout).unwrap();
+    let (window, reader) = setup.open(cx);
+
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        reader.update(cx, |reader, cx| reader.remember_pane_focus(0, window, cx));
+        assert!(
+            reader.read(cx).layout_busy,
+            "the focus-only save is still pending"
+        );
+        window.click("reader-tab-0-1", cx);
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let reader = reader.read(cx);
+            !reader.layout_busy && reader.active_tab().is_some_and(|tab| tab.id == selected.id)
+        })
+    });
+    let persisted = setup.store.workspace(account).unwrap().unwrap();
+    assert_eq!(persisted.focused_pane, 0);
+    assert_eq!(persisted.panes[0].active, Some(1));
+    assert_eq!(persisted.panes[0].tabs[1].id, selected.id);
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(
+            window
+                .find("reader-tab-0-1")
+                .label()
+                .unwrap()
+                .ends_with(" · Active tab")
+        );
+        assert!(
+            !window
+                .find("reader-tab-0-0")
+                .label()
+                .unwrap()
+                .ends_with(" · Active tab")
+        );
+    })
+    .unwrap();
+}
+
+#[gpui_kit::test]
 fn ui_008_observed_reader_controls_follow_the_visible_panes(cx: &mut TestAppContext) {
     let setup = ReaderHarness::seeded();
     let (window, reader) = setup.open(cx);

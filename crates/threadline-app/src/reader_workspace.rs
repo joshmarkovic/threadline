@@ -130,6 +130,7 @@ pub(crate) struct ReaderWorkspace {
     forward: Vec<ItemId>,
     layout: Workspace,
     layout_busy: bool,
+    pending_tab_selection: Option<String>,
     surface_focus: FocusHandle,
     focus: Vec<FocusHandle>,
     focus_events: Vec<Subscription>,
@@ -389,6 +390,7 @@ impl ReaderWorkspace {
             forward: Vec::new(),
             layout: empty_workspace(),
             layout_busy: false,
+            pending_tab_selection: None,
             surface_focus: cx.focus_handle(),
             focus: Vec::new(),
             focus_events: Vec::new(),
@@ -461,19 +463,20 @@ impl ReaderWorkspace {
             let focus = cx.focus_handle();
             self.focus_events
                 .push(cx.on_focus_in(&focus, window, move |this, window, cx| {
-                    if this.layout_busy
-                        || this.layout.focused_pane == pane
-                        || pane >= this.layout.panes.len()
-                    {
-                        return;
-                    }
-                    this.capture_scroll();
-                    let mut layout = this.layout.clone();
-                    layout.focused_pane = pane;
-                    this.save_layout(layout, window, cx);
+                    this.remember_pane_focus(pane, window, cx);
                 }));
             self.focus.push(focus);
         }
+    }
+
+    fn remember_pane_focus(&mut self, pane: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if self.layout_busy || self.layout.focused_pane == pane || pane >= self.layout.panes.len() {
+            return;
+        }
+        self.capture_scroll();
+        let mut layout = self.layout.clone();
+        layout.focused_pane = pane;
+        self.save_layout(layout, window, cx);
     }
 
     pub(crate) fn has_account(&self) -> bool {
@@ -571,6 +574,7 @@ impl ReaderWorkspace {
             self.outbox = outbox::OutboxState::default();
             self.tab_views.clear();
             self.pending_tabs.clear();
+            self.pending_tab_selection = None;
             self.search_hits = None;
             self.search_reply = None;
             self.pending_draft = None;
@@ -1176,6 +1180,7 @@ impl ReaderWorkspace {
                             Some("Workspace changes could not be saved. Your tabs are still open.")
                     }
                 }
+                this.apply_pending_tab_selection(window, cx);
                 this.settle_departure(window, cx);
             },
         );
@@ -1306,6 +1311,8 @@ impl ReaderWorkspace {
                     this.load_visible(window, cx);
                     this.restore_active_draft(window, cx);
                 }
+                this.apply_pending_tab_selection(window, cx);
+                this.settle_departure(window, cx);
             },
         );
     }
