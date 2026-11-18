@@ -1536,8 +1536,15 @@ impl ReaderWorkspace {
             .layout
             .panes
             .iter()
-            .filter_map(|pane| pane.active.and_then(|index| pane.tabs.get(index)))
-            .filter(|tab| tab.item == item)
+            .flat_map(|pane| {
+                pane.tabs.iter().enumerate().filter_map(|(index, tab)| {
+                    (tab.item == item
+                        && (pane.active == Some(index)
+                            || self.tab_views.contains_key(&tab.id)
+                            || self.pending_tabs.contains_key(&tab.id)))
+                    .then_some(tab)
+                })
+            })
             .cloned()
             .collect::<Vec<_>>();
         for tab in tabs {

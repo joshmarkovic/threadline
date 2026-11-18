@@ -821,12 +821,14 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
                 }),
                 remote_updated_at: UtcMillis(stamp),
                 title: Change::Value("Offline review fixture".into()),
-                body: Change::Value("Review introduction\n\nFixes #101. Resolves #102.".into()),
+                body: Change::Value(
+                    "Review introduction\n\nFixes #101. Resolves #102. Closes #103.".into(),
+                ),
                 closed: Change::Value(false),
             },
         )
         .unwrap();
-    let issue_ids = (101..=102)
+    let issue_ids = (101..=103)
         .map(|number| {
             let issue_id =
                 threadline_storage::IssueApiId::new(NonZeroU64::new(6000 + number).unwrap());
@@ -907,23 +909,28 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
     let candidates = store
         .index_pr_body(account, pr, prior.as_deref(), body_revision, stamp)
         .unwrap();
-    for (candidate, (item, issue_id)) in candidates.into_iter().zip(&issue_ids) {
+    let verify = |index: usize| {
+        let (item, issue_id) = issue_ids[index];
         store
             .record_pr_reference(
                 account,
                 pr,
                 body_revision,
-                candidate.position,
+                candidates[index].position,
                 ReferenceObservation::Item {
                     repository,
-                    item: *item,
-                    issue_id: *issue_id,
+                    item,
+                    issue_id,
                 },
                 stamp + 1,
             )
             .unwrap();
+    };
+    verify(0);
+    verify(1);
+    if review {
+        store.sign_out_github_account(account, stamp + 2).unwrap();
     }
-    store.sign_out_github_account(account, stamp + 2).unwrap();
     let commit = |byte: char| CommitOid::parse(&byte.to_string().repeat(40)).unwrap();
     let revision = store
         .record_pr_revision(
@@ -1172,6 +1179,49 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
             threadline_storage::reviews::ReviewIntent::Review(original_review.draft)
         );
         assert_eq!(operation.snapshot.base, revision.head.as_str());
+    }
+    if !review {
+        cx.update_window(window, |_, window, cx| {
+            reader.update(cx, |reader, cx| {
+                reader.open(issue_ids[0].0, None, false, false, window, cx);
+            });
+        })
+        .unwrap();
+        until(cx, |cx| {
+            cx.read(|cx| {
+                reader
+                    .read(cx)
+                    .active_tab()
+                    .is_some_and(|tab| tab.item == issue_ids[0].0)
+            })
+        });
+        verify(2);
+        cx.update_window(window, |_, window, cx| {
+            reader.update(cx, |reader, cx| reader.reload_pr(pr, window, cx));
+        })
+        .unwrap();
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let reader = reader.read(cx);
+                reader
+                    .active_tab()
+                    .is_some_and(|tab| tab.item == issue_ids[0].0)
+                    && reader.tab_views[&tab.id]
+                        .pr
+                        .as_ref()
+                        .and_then(|pr| pr.data.references.as_ref())
+                        .is_some_and(|(_, rows)| rows[2].verified_item == Some(issue_ids[2].0))
+            })
+        });
+        click(cx, window, "reader-tab-0-0");
+        until(cx, |cx| {
+            cx.read(|cx| {
+                reader
+                    .read(cx)
+                    .active_tab()
+                    .is_some_and(|tab| tab.item == pr)
+            })
+        });
     }
 }
 
