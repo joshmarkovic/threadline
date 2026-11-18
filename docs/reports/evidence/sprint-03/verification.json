@@ -1,0 +1,502 @@
+{
+  "format": 1,
+  "runs": [
+    {
+      "lane": "integration",
+      "suite": null,
+      "source_revision": "43a1cead5e3b39bcdcf12c09ea6948aaa16109ef",
+      "source_dirty": false,
+      "cargo_lock_sha256": "d0661686e2c1d36f84d69f846dd246abbc6b3c5e9622bb74d78e4ae3980b15e4",
+      "fixture_revision": "mixed",
+      "seed": 12345,
+      "package_version": "0.1.0",
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "Wayland and X11 environment"
+      },
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "integration",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "status": "Pass",
+      "exit_code": 0,
+      "started_at_unix_ms": 1795027822643,
+      "finished_at_unix_ms": 1795027900120,
+      "source_result_sha256": "6a768a4a5a7ef1011bceb5f63074755f94a1491739ef01af3b602077fee014d2",
+      "cases": [
+        {
+          "case": "S01-SIMULATOR",
+          "status": "Pass",
+          "tests_passed": 5,
+          "requirement_ids": [
+            "FND-04",
+            "TEST-03",
+            "TEST-05"
+          ],
+          "acceptance_ids": [
+            "AC-90"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s01-feasibility-v1"
+        },
+        {
+          "case": "S01-PLATFORM",
+          "status": "Pass",
+          "tests_passed": 4,
+          "requirement_ids": [
+            "PORT-02",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-83"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s01-feasibility-v1"
+        },
+        {
+          "case": "IT-001",
+          "status": "Pass",
+          "tests_passed": 8,
+          "requirement_ids": [
+            "FND-03",
+            "DATA-01",
+            "DATA-05",
+            "DATA-06",
+            "DATA-07",
+            "DATA-09",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-50",
+            "AC-51",
+            "AC-55",
+            "AC-90"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "IT-002",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "CACHE-05",
+            "SYNC-11",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-08",
+            "AC-90"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "S02-RESOURCE-CONTRACTS",
+          "status": "Pass",
+          "tests_passed": 3,
+          "requirement_ids": [
+            "CACHE-03",
+            "CACHE-05",
+            "CACHE-09",
+            "CACHE-10",
+            "SYNC-11",
+            "NOTIFY-15"
+          ],
+          "acceptance_ids": [
+            "AC-07",
+            "AC-08",
+            "AC-90"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "S02-DURABILITY",
+          "status": "Pass",
+          "tests_passed": 10,
+          "requirement_ids": [
+            "CACHE-07",
+            "CACHE-13",
+            "OUTBOX-10",
+            "DATA-01",
+            "TEST-03",
+            "TEST-05"
+          ],
+          "acceptance_ids": [
+            "AC-10",
+            "AC-68",
+            "AC-73",
+            "AC-74",
+            "AC-92"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "S02-DISK-FULL",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "OUTBOX-01",
+            "OUTBOX-10",
+            "TEST-03",
+            "TEST-05"
+          ],
+          "acceptance_ids": [
+            "AC-58",
+            "AC-92"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "S02-FIXTURES",
+          "status": "Pass",
+          "tests_passed": 2,
+          "requirement_ids": [
+            "TEST-02",
+            "TEST-03",
+            "TEST-05"
+          ],
+          "acceptance_ids": [
+            "AC-35",
+            "AC-90"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "IT-004",
+          "status": "Pass",
+          "tests_passed": 5,
+          "requirement_ids": [
+            "FND-05",
+            "AUTH-04",
+            "AUTH-05",
+            "CACHE-05",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-01",
+            "AC-02",
+            "AC-03",
+            "AC-90"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s03-github-access-v1"
+        },
+        {
+          "case": "IT-005",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "AUTH-01",
+            "AUTH-03",
+            "AUTH-06",
+            "TEST-03",
+            "TEST-05"
+          ],
+          "acceptance_ids": [],
+          "child_exit_code": 0,
+          "fixture_revision": "s03-github-access-v1"
+        },
+        {
+          "case": "S03-ACCOUNT-PROFILES",
+          "status": "Pass",
+          "tests_passed": 3,
+          "requirement_ids": [
+            "AUTH-04",
+            "AUTH-05",
+            "AUTH-06",
+            "AUTH-11",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-01",
+            "AC-02",
+            "AC-03",
+            "AC-90"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s03-github-access-v1"
+        },
+        {
+          "case": "S03-ACCESS-STORAGE",
+          "status": "Pass",
+          "tests_passed": 2,
+          "requirement_ids": [
+            "AUTH-06",
+            "AUTH-11",
+            "CACHE-08",
+            "OUTBOX-09",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-67",
+            "AC-90"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s03-github-access-v1"
+        }
+      ]
+    },
+    {
+      "lane": "unit",
+      "suite": null,
+      "source_revision": "43a1cead5e3b39bcdcf12c09ea6948aaa16109ef",
+      "source_dirty": false,
+      "cargo_lock_sha256": "d0661686e2c1d36f84d69f846dd246abbc6b3c5e9622bb74d78e4ae3980b15e4",
+      "fixture_revision": "mixed",
+      "seed": 12345,
+      "package_version": "0.1.0",
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "Wayland and X11 environment"
+      },
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "unit",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "status": "Pass",
+      "exit_code": 0,
+      "started_at_unix_ms": 1795027822653,
+      "finished_at_unix_ms": 1795027868857,
+      "source_result_sha256": "644bf0a92014ab49b1bd81c65e457454bc8654fcdec42f3d104236d9f6da3541",
+      "cases": [
+        {
+          "case": "UT-021",
+          "status": "Pass",
+          "tests_passed": 23,
+          "requirement_ids": [
+            "TEST-01",
+            "TEST-02",
+            "TEST-08"
+          ],
+          "acceptance_ids": [
+            "AC-89"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s01-feasibility-v1"
+        },
+        {
+          "case": "S01-CORE",
+          "status": "Pass",
+          "tests_passed": 8,
+          "requirement_ids": [
+            "FND-04",
+            "DATA-05",
+            "DATA-06",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-89"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s01-feasibility-v1"
+        },
+        {
+          "case": "S01-DIFF-FIXTURE",
+          "status": "Pass",
+          "tests_passed": 6,
+          "requirement_ids": [
+            "FND-02",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-89"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s01-feasibility-v1"
+        },
+        {
+          "case": "UT-001",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "DATA-05",
+            "DATA-06",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-50"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "UT-003",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "DATA-07",
+            "CACHE-09",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-51",
+            "AC-52"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "UT-004",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "CACHE-03",
+            "CACHE-04",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-07"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "UT-009",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "OUTBOX-01",
+            "OUTBOX-02",
+            "OUTBOX-07",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-60",
+            "AC-61"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "UT-010",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "AUTH-03",
+            "OUTBOX-09",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-67"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s03-github-access-v1"
+        },
+        {
+          "case": "UT-020",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "AUTH-07",
+            "DATA-03",
+            "TEST-02",
+            "TEST-05"
+          ],
+          "acceptance_ids": [],
+          "child_exit_code": 0,
+          "fixture_revision": "s03-github-access-v1"
+        }
+      ]
+    },
+    {
+      "lane": "e2e",
+      "suite": "smoke",
+      "source_revision": "43a1cead5e3b39bcdcf12c09ea6948aaa16109ef",
+      "source_dirty": false,
+      "cargo_lock_sha256": "d0661686e2c1d36f84d69f846dd246abbc6b3c5e9622bb74d78e4ae3980b15e4",
+      "fixture_revision": "s01-feasibility-v1",
+      "seed": 12345,
+      "package_version": "0.1.0",
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "X11 environment"
+      },
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "smoke",
+          "--case",
+          "E2E-001",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "status": "Pass",
+      "exit_code": 0,
+      "started_at_unix_ms": 1795028004412,
+      "finished_at_unix_ms": 1795028016034,
+      "source_result_sha256": "057830d24ecca7e303bb6c46c7d49b1a55102b6ef7ae55ab9cb3dcf4efa62af3",
+      "cases": [
+        {
+          "case": "E2E-001",
+          "status": "Pass",
+          "tests_passed": null,
+          "requirement_ids": [
+            "FND-01",
+            "FND-02",
+            "TEST-04",
+            "PORT-03"
+          ],
+          "acceptance_ids": [
+            "AC-84",
+            "AC-91"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s01-feasibility-v1"
+        }
+      ],
+      "native_actions": [
+        "Launch native window",
+        "Select and copy formatted Markdown",
+        "Type and copy after activating the right pane while background preview is pending",
+        "Change active PR tab and return to the draft",
+        "Choose linked issue context",
+        "Resize workspace divider",
+        "Resize context divider",
+        "Quit with the native keyboard shortcut",
+        "Relaunch the same isolated profile and retain its SQLite database"
+      ],
+      "relaunch": {
+        "sqlite_header": true,
+        "initial_sqlite_sha256": "eb5e22ff9bc2e773651c8218ab255ff14fb50e3f63040b95fa76c895a06e8e5c",
+        "restart_sqlite_sha256": "eb5e22ff9bc2e773651c8218ab255ff14fb50e3f63040b95fa76c895a06e8e5c",
+        "retained": true
+      }
+    }
+  ]
+}

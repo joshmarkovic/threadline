@@ -1,7 +1,7 @@
 acceptance_id,closure_sprint,initial_phase,applicable_platform_release_reruns,status,scenario,evidence
 AC-01,04,windows,"windows:12,macos:13,linux:14",Not run,A valid account with access to an SSO-protected private GitHub.com repository can select it and browse issues and PRs.,
-AC-02,03,windows,"windows:12,macos:13,linux:14",Not run,A token requiring SSO authorization or organization approval produces an actionable access state without claiming that private repositories were deleted.,
-AC-03,03,windows,"windows:12,macos:13,linux:14",Not run,Partial SSO results are identified; the UI does not claim that the visible repository list is complete.,
+AC-02,03,windows,"windows:12,macos:13,linux:14",Blocked,A token requiring SSO authorization or organization approval produces an actionable access state without claiming that private repositories were deleted.,Actionable approval and validated SSO action passed in provider tests. Real organization SSO and the complete external Windows account journey remain open. docs/reports/sprint-03.md
+AC-03,03,windows,"windows:12,macos:13,linux:14",Blocked,Partial SSO results are identified; the UI does not claim that the visible repository list is complete.,The simulator returns partial discovery across pages and the controller retains that state. External Windows GUI confirmation remains open. docs/reports/sprint-03.md
 AC-04,04,windows,"windows:12,macos:13,linux:14",Not run,A user can browse a closed issue or merged PR older than 90 days without enabling a bulk archive.,
 AC-05,06,windows,"windows:12,macos:13,linux:14",Not run,Rapidly switching between PRs cannot display a delayed response or diff belonging to the previously selected PR.,
 AC-06,04,windows,"windows:12,macos:13,linux:14",Not run,"With networking disabled, reopening a downloaded issue shows its content and unfinished draft.",

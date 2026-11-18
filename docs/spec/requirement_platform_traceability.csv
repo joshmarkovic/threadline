@@ -11,7 +11,7 @@ FND-03,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required;
 FND-04,windows,Windows first release,01,05,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Typed cancellable work, seeded fake, and real loopback HTTP integration."
 FND-04,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-04,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-FND-05,windows,Windows first release,03,03,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+FND-05,windows,Windows first release,03,03,12,yes,Pass,Actual target evidence required; earlier-platform results do not close this row.,Production REST/GraphQL contracts passed with real loopback HTTP and the designated private GitHub repository returned HTTP 200. docs/reports/sprint-03.md
 FND-05,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-05,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-06,windows,Windows first release,04,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -44,25 +44,25 @@ PORT-07,linux,Linux release,13,,14,no,Not applicable,Requirement is specific to 
 PORT-08,windows,Windows first release,14,,12,no,Not applicable,Requirement is specific to another platform release.,
 PORT-08,macos,macOS release,14,,13,no,Not applicable,Requirement is specific to another platform release.,
 PORT-08,linux,Linux release,14,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-AUTH-01,windows,Windows first release,03,03,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+AUTH-01,windows,Windows first release,03,03,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,Private metadata access verified with existing GitHub CLI OAuth. A live PAT and organization SSO account remain unavailable. docs/reports/sprint-03.md
 AUTH-01,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-01,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-02,windows,Windows first release,03,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-02,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-02,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-AUTH-03,windows,Windows first release,03,03,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+AUTH-03,windows,Windows first release,03,03,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Owner-scoped synthetic PAT login, native protected storage and replacement verified. Real PAT compatibility remains open. docs/reports/sprint-03.md"
 AUTH-03,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-03,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-AUTH-04,windows,Windows first release,03,03,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+AUTH-04,windows,Windows first release,03,03,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Test server returned actionable SSO, approval and partial-discovery evidence. LIVE-001 has no observed organization SSO challenge. docs/reports/sprint-03.md"
 AUTH-04,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-04,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-AUTH-05,windows,Windows first release,03,03,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+AUTH-05,windows,Windows first release,03,03,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Provider tests distinguish revocation, permission, SSO, rate and service responses. Windows account GUI verification is still open. docs/reports/sprint-03.md"
 AUTH-05,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-05,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-06,windows,Windows first release,03,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-06,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-06,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-AUTH-07,windows,Windows first release,03,03,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+AUTH-07,windows,Windows first release,03,03,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,Native protected-store and account tests passed. External Windows GUI exit/relaunch and sign-out is still being verified. docs/reports/sprint-03.md
 AUTH-07,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-07,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-08,windows,Windows first release,03,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,

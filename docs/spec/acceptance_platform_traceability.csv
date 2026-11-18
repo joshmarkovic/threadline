@@ -2,10 +2,10 @@ acceptance_id,platform,platform_closure_sprint,release_gate_sprint,applicable,st
 AC-01,windows,04,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-01,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-01,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-02,windows,03,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-02,windows,03,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Actionable approval and validated SSO action passed in provider tests. Real organization SSO and the complete external Windows account journey remain open. docs/reports/sprint-03.md
 AC-02,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-02,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-03,windows,03,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-03,windows,03,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,The simulator returns partial discovery across pages and the controller retains that state. External Windows GUI confirmation remains open. docs/reports/sprint-03.md
 AC-03,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-03,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-04,windows,04,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
