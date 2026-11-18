@@ -22,57 +22,45 @@ use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
 use windows::core::{
     BOOL, Error, GUID, HSTRING, IInspectable, IUnknown, Interface, PCWSTR, Ref, implement,
 };
-use windows_sys::Win32::System::Registry::{HKEY_CLASSES_ROOT, RRF_RT_REG_SZ, RegGetValueW};
+use windows_sys::Win32::System::Registry::{HKEY_CLASSES_ROOT, HKEY_CURRENT_USER};
 
+use super::toast_registration::{installed_link_matches, registry_matches};
 use super::{Activation, PlatformError, PlatformEvent};
 
 const BODY: &str = "Open the sample pull request in Threadline.";
 const GROUP: &str = "ThreadlineReview";
+const INSTALLED_APP_ID: &str = "Threadline.Desktop";
 const INSTALLED_CLASS: GUID = GUID::from_u128(0x5a20cea8_a5d8_4b5e_9be3_4121ba0aa753);
 
 pub(super) struct Identity {
     app_id: String,
     class: GUID,
     title: String,
+    action: String,
 }
 
 impl Identity {
     pub(super) fn installed() -> Option<Self> {
         let executable = std::env::current_exe().ok()?;
         let command = format!("\"{}\" --notification-com-server", executable.display());
-        let subkey: Vec<u16> = r"CLSID\{5a20cea8-a5d8-4b5e-9be3-4121ba0aa753}\LocalServer32"
-            .encode_utf16()
-            .chain([0])
-            .collect();
-        let mut value = vec![0u16; command.encode_utf16().count() + 1];
-        let mut bytes = u32::try_from(value.len().checked_mul(2)?).ok()?;
-        // This read is scoped to Threadline's installed class. Unregistered development builds keep the legacy adapter.
-        let status = unsafe {
-            RegGetValueW(
-                HKEY_CLASSES_ROOT,
-                subkey.as_ptr(),
-                std::ptr::null(),
-                RRF_RT_REG_SZ,
-                std::ptr::null_mut(),
-                value.as_mut_ptr().cast(),
-                &mut bytes,
-            )
-        };
-        if status != 0
-            || !String::from_utf16_lossy(&value)
-                .trim_end_matches('\0')
-                .eq_ignore_ascii_case(&command)
+        if !registry_matches(
+            HKEY_CLASSES_ROOT,
+            r"CLSID\{5a20cea8-a5d8-4b5e-9be3-4121ba0aa753}\LocalServer32",
+            None,
+            &command,
+        ) || !installed_link_matches(&executable, INSTALLED_APP_ID, INSTALLED_CLASS)
         {
             return None;
         }
         Some(Self {
-            app_id: "Threadline.Desktop".into(),
+            app_id: INSTALLED_APP_ID.into(),
             class: INSTALLED_CLASS,
             title: "Threadline review".into(),
+            action: "Open review".into(),
         })
     }
 
-    pub(super) fn fixture(token: &str) -> Result<Self, PlatformError> {
+    fn fixture(token: &str) -> Result<Self, PlatformError> {
         if token.len() != 32
             || !token
                 .bytes()
@@ -89,7 +77,37 @@ impl Identity {
             app_id: format!("Threadline.Feasibility.{token}"),
             class: GUID::from_u128(class),
             title: format!("Threadline review {}", &token[..8]),
+            action: format!("Open review {}", &token[..8]),
         })
+    }
+
+    pub(super) fn registered_fixture(token: &str) -> Result<Self, PlatformError> {
+        let identity = Self::fixture(token)?;
+        let subkey = format!(
+            r"Software\Classes\CLSID\{{{}-{}-{}-{}-{}}}",
+            &token[..8],
+            &token[8..12],
+            &token[12..16],
+            &token[16..20],
+            &token[20..]
+        );
+        let executable = std::env::current_exe().map_err(|_| PlatformError::Unavailable)?;
+        let command = format!("\"{}\" --notification-com-server", executable.display());
+        if registry_matches(
+            HKEY_CURRENT_USER,
+            &subkey,
+            Some("ThreadlineFeasibilityOwner"),
+            token,
+        ) && registry_matches(
+            HKEY_CURRENT_USER,
+            &format!(r"{subkey}\LocalServer32"),
+            None,
+            &command,
+        ) {
+            Ok(identity)
+        } else {
+            Err(PlatformError::ActivationRejected)
+        }
     }
 
     pub(super) fn set_process(&self) -> Result<(), PlatformError> {
@@ -98,6 +116,49 @@ impl Identity {
         unsafe { SetCurrentProcessExplicitAppUserModelID(PCWSTR(id.as_ptr())) }
             .map_err(|error| native_error("Assign the Threadline notification identity", error))
     }
+}
+
+pub(super) fn clear_fixture_history(token: &str) -> Result<u32, PlatformError> {
+    let identity = Identity::registered_fixture(token)?;
+    identity.set_process()?;
+    // Cleanup runs as the same executable and uses only this per-run fixture identity.
+    unsafe { RoInitialize(RO_INIT_MULTITHREADED) }
+        .map_err(|error| native_error("Initialize fixture notification cleanup", error))?;
+    let _apartment = Apartment;
+    let app_id = HSTRING::from(identity.app_id.as_str());
+    let group = HSTRING::from(GROUP);
+    let cleanup = || -> windows::core::Result<u32> {
+        let history = ToastNotificationManager::History()?;
+        let entries = history.GetHistoryWithId(&app_id)?;
+        let mut removed = 0;
+        for index in 0..entries.Size()? {
+            let item = entries.GetAt(index)?;
+            let tag = item.Tag()?;
+            let valid_tag = tag.to_string_lossy();
+            if item.Group()? == group
+                && valid_tag.len() == 12
+                && valid_tag
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            {
+                history.RemoveGroupedTagWithId(&tag, &group, &app_id)?;
+                removed += 1;
+            }
+        }
+        for _ in 0..3 {
+            if history.GetHistoryWithId(&app_id)?.Size()? == 0 {
+                return Ok(removed);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(80));
+        }
+        Err(E_INVALIDARG.into())
+    };
+    cleanup().map_err(|error| {
+        native_error(
+            "Clear and verify the owned Threadline fixture notification history",
+            error,
+        )
+    })
 }
 
 struct Route {
@@ -253,8 +314,8 @@ impl Toasts {
         let document = XmlDocument::new()
             .map_err(|error| native_error("Create the Threadline notification body", error))?;
         let xml = format!(
-            "<toast launch='{token}' activationType='foreground'><visual><binding template='ToastGeneric'><text>{}</text><text>{BODY}</text></binding></visual><actions><action content='Open review' arguments='{token}' activationType='foreground'/></actions></toast>",
-            self.identity.title
+            "<toast launch='{token}' activationType='foreground'><visual><binding template='ToastGeneric'><text>{}</text><text>{BODY}</text></binding></visual><actions><action content='{}' arguments='{token}' activationType='foreground'/></actions></toast>",
+            self.identity.title, self.identity.action
         );
         document
             .LoadXml(&HSTRING::from(xml))
@@ -439,6 +500,7 @@ mod tests {
             0x01234567_89ab_cdef_0123_456789abcdef
         );
         assert_eq!(identity.title, "Threadline review 01234567");
+        assert_eq!(identity.action, "Open review 01234567");
         assert!(Identity::fixture("00000000000000000000000000000000").is_err());
         assert!(Identity::fixture("5a20cea8a5d84b5e9be34121ba0aa753").is_err());
     }

@@ -525,6 +525,8 @@ unsafe extern "system" fn window_proc(
         }
         WM_DESTROY => {
             state.remove_icon(hwnd);
+            // Release the notification and class registration before the sender's shutdown request returns.
+            state.toasts.borrow_mut().take();
             // The receiver has terminated; wake the owning thread to release its resources.
             unsafe { PostQuitMessage(0) };
         }

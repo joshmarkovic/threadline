@@ -6,6 +6,10 @@ use std::time::Instant;
 use threadline_app::Options;
 
 fn main() {
+    #[cfg(windows)]
+    if threadline_app::handle_notification_command() {
+        return;
+    }
     let started = Instant::now();
     if let Err(error) = parse_args().and_then(|options| {
         threadline_app::run(options, started).map_err(|error| error.to_string())

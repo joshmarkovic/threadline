@@ -9,6 +9,8 @@ use tokio::sync::mpsc::{self, UnboundedReceiver};
 #[cfg(windows)]
 mod platform_windows;
 #[cfg(windows)]
+mod toast_registration;
+#[cfg(windows)]
 mod toast_windows;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -135,8 +137,13 @@ pub fn start_isolated_with_test_toast(
     token: &str,
 ) -> Result<Launch, PlatformError> {
     let profile = canonical_profile(profile)?;
-    let identity = toast_windows::Identity::fixture(token)?;
+    let identity = toast_windows::Identity::registered_fixture(token)?;
     start_windows(activation, Some(&profile), Some(identity))
+}
+
+#[cfg(windows)]
+pub fn clear_test_toast_history(token: &str) -> Result<u32, PlatformError> {
+    toast_windows::clear_fixture_history(token)
 }
 
 fn canonical_profile(profile: &Path) -> Result<PathBuf, PlatformError> {

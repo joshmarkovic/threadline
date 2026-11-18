@@ -1,10 +1,14 @@
 mod fixtures;
+#[cfg(windows)]
+mod notification_commands;
 #[cfg(feature = "e2e")]
 mod observation;
 mod palette;
 mod pane_content;
 mod workspace;
 
+#[cfg(windows)]
+pub use notification_commands::handle_notification_command;
 pub use workspace::{Workspace, bind_shortcuts};
 
 use std::path::{Path, PathBuf};
