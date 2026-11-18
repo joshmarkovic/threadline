@@ -208,6 +208,33 @@ try {
 } finally {
     [IO.Directory]::Delete($fixture, $true)
 }
+. (Join-Path $PSScriptRoot 'windows-issue-writes.ps1')
+$script:observations.Clear()
+$script:observations.Enqueue([pscustomobject]@{ bounds = [pscustomobject]@{
+    'reader-issue-title-0' = @(1, 2, 20, 10)
+} })
+$script:fixtureText = $null
+$script:fixtureWrites = 0
+function Set-OwnedFixtureEditValue([IntPtr]$Window, [string]$Id, [string]$Name, [string]$Value) {
+    if ($Window -ne 123 -or $Id -cne 'reader-issue-title-0' -or $Name -cne 'Issue title') {
+        throw 'Fixture editing did not target the expected owned field.'
+    }
+    $script:fixtureWrites++
+    $script:fixtureText = $Value
+    return $true
+}
+function Get-OwnedFixtureEditPattern([IntPtr]$Window, [string]$Id, [string]$Name) {
+    return [pscustomobject]@{ Current = [pscustomobject]@{ Value = $script:fixtureText } }
+}
+Type-WriteFixtureField 123 'reader-issue-title-0' 'Cancelled fixture issue title'
+$refused = $false
+try {
+    Type-WriteFixtureField 123 'account-token' 'Cancelled fixture issue title'
+} catch {
+    $refused = $_.Exception.Message -like '*unknown synthetic field or value*'
+}
+if (!$refused -or $script:fixtureWrites -ne 1) { throw 'The native edit journey accepted an out-of-scope field.' }
+
 Write-Output 'Native observation predicate checks passed.'
 
 

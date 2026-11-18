@@ -25,11 +25,13 @@ function Get-OwnedFixtureActivation($Element, [string]$Id) {
     return $null
 }
 
-function Select-UniqueOwnedFixtureControl($Controls, [string]$Id, [int]$Owner, [string]$ExpectedName) {
+function Select-UniqueOwnedFixtureControl($Controls, [string]$Id, [int]$Owner, [string]$ExpectedName, [switch]$Edit) {
     $match = $null
     foreach ($control in $Controls) {
         if (!(Test-OwnedAutomationProperties $control.Current $Id $Owner $ExpectedName)) { continue }
-        if ($ExpectedName -and $null -eq (Get-OwnedFixtureActivation $control $Id)) { continue }
+        if ($Edit -and ($control.Current.IsPassword -or
+            $control.Current.ControlType.Id -ne [Windows.Automation.ControlType]::Edit.Id)) { continue }
+        if (!$Edit -and $ExpectedName -and $null -eq (Get-OwnedFixtureActivation $control $Id)) { continue }
         if ($null -ne $match) {
             Stop-Blocked 'The owned accessibility tree returned multiple eligible controls for the exact identity.'
         }
@@ -38,7 +40,7 @@ function Select-UniqueOwnedFixtureControl($Controls, [string]$Id, [int]$Owner, [
     return $match
 }
 
-function Find-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [string]$ExpectedName) {
+function Find-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [string]$ExpectedName, [switch]$Edit) {
     if (!(Test-OwnedFixtureWindow $Window)) { Stop-Blocked 'The isolated Threadline window is no longer visible and owned.' }
     try {
         $root = [Windows.Automation.AutomationElement]::FromHandle($Window)
@@ -55,7 +57,7 @@ function Find-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [string]$Expecte
         }
         $condition = [Windows.Automation.AndCondition]::new([Windows.Automation.Condition[]]$conditions)
         $controls = $root.FindAll([Windows.Automation.TreeScope]::Descendants, $condition)
-        return Select-UniqueOwnedFixtureControl $controls $Id $script:app.Id $ExpectedName
+        return Select-UniqueOwnedFixtureControl $controls $Id $script:app.Id $ExpectedName -Edit:$Edit
     } catch [Windows.Automation.ElementNotAvailableException] {
         return $null
     }
@@ -87,6 +89,33 @@ function Invoke-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [Diagnostics.S
         $kind = 'UIA SelectionItemPattern'
     }
     Add-Evidence 'Activate an owned accessibility control' ([ordered]@{ automation_id = $Id; input = $kind })
+    return $true
+}
+
+function Get-OwnedFixtureEditPattern([IntPtr]$Window, [string]$Id, [string]$Name) {
+    $element = Find-OwnedFixtureControl $Window $Id $Name -Edit
+    if ($null -eq $element) { return $null }
+    try {
+        $properties = $element.Current
+        $pattern = $null
+        if (!(Test-OwnedAutomationProperties $properties $Id $script:app.Id $Name) -or
+            $properties.IsPassword -or $properties.ControlType.Id -ne [Windows.Automation.ControlType]::Edit.Id -or
+            !$element.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern, [ref]$pattern) -or
+            $pattern.Current.IsReadOnly) {
+            return $null
+        }
+    } catch [Windows.Automation.ElementNotAvailableException] {
+        return $null
+    }
+    if (!(Test-OwnedFixtureWindow $Window)) { Stop-Blocked 'The isolated window changed before the editor action.' }
+    return $pattern
+}
+
+function Set-OwnedFixtureEditValue([IntPtr]$Window, [string]$Id, [string]$Name, [string]$Value) {
+    $pattern = Get-OwnedFixtureEditPattern $Window $Id $Name
+    if ($null -eq $pattern) { return $false }
+    $pattern.SetValue($Value)
+    Add-Evidence 'Edit an owned synthetic field' ([ordered]@{ automation_id = $Id; input = 'UIA ValuePattern' })
     return $true
 }
 

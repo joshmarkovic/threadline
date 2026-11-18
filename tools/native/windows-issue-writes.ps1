@@ -22,8 +22,32 @@ function Set-WriteFixtureOffline([IntPtr]$Window, [bool]$Offline) {
 }
 
 function Type-WriteFixtureField([IntPtr]$Window, [string]$Id, [string]$Value) {
-    Click-AccountControl $Window $Id
-    [ThreadlineWinInput]::ReplaceFixtureText($Window, [uint32]$script:app.Id, $Value)
+    $name = switch -CaseSensitive ($Id) {
+        'reader-issue-title-0' {
+            if ($Value -ceq 'Cancelled fixture issue title') { 'Issue title' }
+        }
+        'reader-draft-input-0' {
+            if ($Value -cin @(
+                'This cancelled issue draft stays in the same profile.',
+                'Threadline S07 explicitly queued comment.',
+                'Threadline S07 unsent local draft.',
+                'Threadline S07 accepted comment with a lost response.'
+            )) { 'Local Markdown draft' }
+        }
+    }
+    if (!$name) { throw 'The write journey requested an unknown synthetic field or value.' }
+    $null = Wait-AccountControl $Id
+    Wait-For "the exact editable fixture control $Id" {
+        Set-OwnedFixtureEditValue $Window $Id $name $Value
+    }
+    Wait-For "confirmation from the exact native fixture editor $Id" {
+        $pattern = Get-OwnedFixtureEditPattern $Window $Id $name
+        try {
+            $null -ne $pattern -and $pattern.Current.Value -ceq $Value
+        } catch [Windows.Automation.ElementNotAvailableException] {
+            $false
+        }
+    }
 }
 
 function Wait-WriteFixtureDraft([long]$Item, [string]$Value) {
