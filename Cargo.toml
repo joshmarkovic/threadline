@@ -2,6 +2,7 @@
 members = [
     "crates/threadline-app",
     "crates/threadline-core",
+    "crates/threadline-installer",
     "crates/threadline-platform",
     "crates/threadline-storage",
     "xtask",

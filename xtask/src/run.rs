@@ -72,6 +72,10 @@ const UNIT: &[CargoTest] = &[
         arguments: &["-p", "threadline-storage", "--lib", "ut_018"],
     },
     CargoTest {
+        id: "UT-019",
+        arguments: &["-p", "threadline-installer", "--lib", "ut_019"],
+    },
+    CargoTest {
         id: "UT-021",
         arguments: &["-p", "xtask", "--bin", "xtask"],
     },
@@ -109,6 +113,17 @@ const UNIT: &[CargoTest] = &[
     },
 ];
 const INTEGRATION: &[CargoTest] = &[
+    CargoTest {
+        id: "IT-021",
+        arguments: &[
+            "-p",
+            "threadline-installer",
+            "--lib",
+            "--test",
+            "bootstrap_command",
+            "it_021",
+        ],
+    },
     CargoTest {
         id: "IT-018",
         arguments: &[

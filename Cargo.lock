@@ -7222,6 +7222,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "threadline-installer"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "rusqlite",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+ "threadline-platform",
+ "tokio",
+ "windows 0.62.2",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "threadline-platform"
 version = "0.1.0"
 dependencies = [

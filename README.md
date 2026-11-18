@@ -1,8 +1,8 @@
 # Threadline
 
-Threadline is a native desktop client for reading and reviewing GitHub work. This repository starts with the Sprint 01 feasibility workspace. It uses synthetic issues, pull requests, and history and opens without a GitHub account.
+Threadline is a native desktop client for GitHub issues and pull requests. It keeps downloaded conversations, reviews, tabs, and drafts in a local SQLite profile. You can reopen cached work offline and inspect queued changes in the Outbox.
 
-## Run the feasibility workspace
+## Build and run
 
 Use Rust 1.98 or later. The dependency set is pinned in `Cargo.lock`. On Windows, use the x64 MSVC toolchain, Visual Studio 2022 Build Tools with the Desktop development with C++ workload, a Windows SDK that includes `fxc.exe`, and CMake. See the [GPUI Kit installation guide](https://gpui-kit.com/docs/installation/) for the development prerequisites on other hosts.
 
@@ -10,7 +10,11 @@ Use Rust 1.98 or later. The dependency set is pinned in `Cargo.lock`. On Windows
 cargo run --locked -p threadline-app
 ```
 
-The [Sprint 01 report](docs/reports/sprint-01.md) records which configurations have actually run and which gates remain open. The [architecture notes](docs/architecture/foundation.md) cover the workspace boundaries, platform targets, and distribution design. The complete version 1.7 [sprint pack](docs/spec/README.md), including its traceability ledgers, lives in `docs/spec`.
+Open **Accounts**, enter the private repository as `owner/repository`, paste its GitHub personal access token into the masked field, and choose **Check access**. Threadline verifies the account and repository with GitHub. Select the repositories you want to keep in the reader. On Windows, the native credential store protects the token. The token's repository selection and permissions govern which reads and writes GitHub allows. [Account setup and endpoint permissions](docs/architecture/github-api.md)
+
+The per-user Windows 11 x64 development installer has been tested locally. The signed public package and its end-user download command remain pending. Developers can build and exercise the local installer. [Windows packaging guide](tools/windows/README.md) · [Package evidence](docs/reports/sprint-12.md)
+
+The reports record which configurations and scenarios have actually run. The sprint pack contains the acceptance criteria and traceability ledgers. [Sprint reports](docs/reports/) · [Architecture](docs/architecture/foundation.md) · [Version 1.7 sprint pack](docs/spec/README.md)
 
 ## Test the workspace
 

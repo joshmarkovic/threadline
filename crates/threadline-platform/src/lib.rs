@@ -13,6 +13,8 @@ mod paths;
 #[cfg(windows)]
 mod platform_windows;
 #[cfg(windows)]
+pub mod publisher;
+#[cfg(windows)]
 mod toast_registration;
 #[cfg(windows)]
 mod toast_windows;
