@@ -5,6 +5,7 @@ use gpui_kit::component::diff::DiffFile;
 #[cfg(feature = "e2e")]
 pub(crate) const REVISION: &str = "s01-feasibility-v1";
 pub(crate) const COPY_SENTENCE: &str = "Offline review keeps cached changes close.";
+pub(crate) const DISCUSSION_LEAD_BLOCK: usize = 3;
 pub(crate) const PATCH_PATH: &str = "src/cache.rs";
 pub(crate) const ISSUE_TITLE: &str = "Keep the last review available offline";
 pub(crate) const PRIMARY_PR: &str = "Keep cached reads available after startup";
@@ -21,7 +22,10 @@ pub(crate) const LINKED_BODIES: [&str; 2] = [
 ];
 
 pub(crate) fn issue_discussion() -> String {
-    let mut body = String::from(concat!(
+    let mut body = format!(
+        "**Open issue · #41**\n\n## {ISSUE_TITLE}\n\n*Mira Chen · 96 replies*\n\n{COPY_SENTENCE}\n\n"
+    );
+    body.push_str(concat!(
         "A review can start while connected and finish on a train without losing its place. ",
         "Keep the last confirmed revision available while a refresh runs in the background.\n\n",
         "### What should happen\n\n",

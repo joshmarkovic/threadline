@@ -2,6 +2,7 @@ mod fixtures;
 #[cfg(feature = "e2e")]
 mod observation;
 mod palette;
+mod pane_content;
 mod workspace;
 
 pub use workspace::{Workspace, bind_shortcuts};

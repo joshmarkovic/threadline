@@ -2,17 +2,23 @@ use gpui_kit::base::Root;
 use gpui_kit::component::diff::DiffFile;
 use gpui_kit::test::{TestQueryExt, TestWindowExt};
 use gpui_kit::{
-    AppContext, Bounds, ClipboardItem, Point, TestAppContext, WindowBounds, WindowHandle,
-    WindowOptions, point, px, size,
+    AppContext, Bounds, ClipboardItem, Entity, Point, ScrollDelta, TestAppContext, WindowBounds,
+    WindowHandle, WindowOptions, point, px, size,
 };
 use threadline_app::{Workspace, bind_shortcuts};
 
-fn open(cx: &mut TestAppContext) -> (WindowHandle<Root>, tokio::runtime::Runtime) {
+fn open(
+    cx: &mut TestAppContext,
+) -> (
+    WindowHandle<Root>,
+    Entity<Workspace>,
+    tokio::runtime::Runtime,
+) {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_time()
         .build()
         .unwrap();
-    let (window, _) = cx.update(|cx| {
+    let (window, workspace) = cx.update(|cx| {
         gpui_kit::init(cx);
         bind_shortcuts(cx);
         let options = WindowOptions {
@@ -42,12 +48,12 @@ fn open(cx: &mut TestAppContext) -> (WindowHandle<Root>, tokio::runtime::Runtime
         .unwrap()
     });
     cx.run_until_parked();
-    (window.downcast().unwrap(), runtime)
+    (window.downcast().unwrap(), workspace, runtime)
 }
 
 #[gpui_kit::test]
 fn focus_tabs_and_context_keep_the_active_draft(cx: &mut TestAppContext) {
-    let (handle, _runtime) = open(cx);
+    let (handle, workspace, _runtime) = open(cx);
     cx.update_window(handle.into(), |_, window, cx| {
         window.render_frame(cx);
         assert!(window.try_find("cache-review-note").is_some());
@@ -98,7 +104,7 @@ fn focus_tabs_and_context_keep_the_active_draft(cx: &mut TestAppContext) {
         window.press("ctrl-tab", cx);
         assert!(window.try_find("commit-history").is_some());
         window.press("ctrl-tab", cx);
-        assert!(window.try_find("markdown-copy").is_some());
+        assert!(workspace.read(cx).discussion_opening_bounds(cx).is_some());
         assert_eq!(
             window.find("left_input").value(),
             Some("local discussion draft")
@@ -109,7 +115,7 @@ fn focus_tabs_and_context_keep_the_active_draft(cx: &mut TestAppContext) {
 
 #[gpui_kit::test]
 fn resize_drag_geometry_survives_scale_change(cx: &mut TestAppContext) {
-    let (handle, _runtime) = open(cx);
+    let (handle, _, _runtime) = open(cx);
     let (outer_width, context_width) = cx
         .update_window(handle.into(), |_, window, cx| {
             window.render_frame(cx);
@@ -156,11 +162,11 @@ fn resize_drag_geometry_survives_scale_change(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn markdown_drag_then_copy_uses_the_toolkit_selection(cx: &mut TestAppContext) {
-    let (handle, _runtime) = open(cx);
+fn virtualized_markdown_scroll_and_copy_preserve_the_document(cx: &mut TestAppContext) {
+    let (handle, workspace, _runtime) = open(cx);
     cx.update_window(handle.into(), |_, window, cx| {
         window.render_frame(cx);
-        let bounds = window.find("markdown-copy").bounds();
+        let bounds = workspace.read(cx).discussion_opening_bounds(cx).unwrap();
         assert!(bounds.size.height > px(0.));
         let left = point(bounds.left() + px(1.), bounds.center().y);
         let right = point(
@@ -175,6 +181,26 @@ fn markdown_drag_then_copy_uses_the_toolkit_selection(cx: &mut TestAppContext) {
             .and_then(|item| item.text())
             .unwrap();
         assert!(copied.contains("Offline review"), "clipboard: {copied:?}");
+
+        window.scroll("issue-discussion", ScrollDelta::Lines(point(0., -40.)), cx);
+        assert!(workspace.read(cx).discussion_opening_bounds(cx).is_none());
+        assert!(window.try_find("cache-review-note").is_some());
+
+        window.press("secondary-a", cx);
+        window.press("secondary-c", cx);
+        let copied = cx
+            .read_from_clipboard()
+            .and_then(|item| item.text())
+            .unwrap();
+        assert!(copied.contains("Offline review"));
+        assert!(copied.contains("What should happen"));
+        assert!(copied.contains("Comment 96"));
+
+        window.scroll("issue-discussion", ScrollDelta::Lines(point(0., 40.)), cx);
+        assert_eq!(
+            workspace.read(cx).discussion_opening_bounds(cx),
+            Some(bounds)
+        );
     })
     .unwrap();
 }

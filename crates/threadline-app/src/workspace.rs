@@ -3,15 +3,13 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
-use gpui_kit::base::text::{TextView, TextViewState, TextViewStyle};
+use gpui_kit::base::text::TextViewState;
 use gpui_kit::component::button::{Button, ButtonVariants};
-use gpui_kit::component::diff::{
-    Diff, DiffAnnotation, DiffFile, DiffLinePosition, DiffMode, DiffSide, DiffState,
-};
+use gpui_kit::component::diff::{DiffFile, DiffMode, DiffState};
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::{Disableable, Selectable, Sizable};
 use gpui_kit::{
-    Action, AnyElement, App, AppContext, Context, Entity, FocusHandle, Focusable,
+    Action, AnyElement, App, AppContext, Bounds, Context, Entity, FocusHandle, Focusable,
     InteractiveElement, IntoElement, KeyBinding, KeyBindingContextPredicate, MouseButton,
     ParentElement, PathBuilder, Pixels, Role, ScrollHandle, StatefulInteractiveElement, Styled,
     Subscription, TestSupportExt, Window, actions, canvas, div, point, prelude::FluentBuilder, px,
@@ -24,13 +22,11 @@ use threadline_core::{
 };
 use threadline_platform::{Activation, PlatformControls, PlatformEvent};
 
-use crate::fixtures::{
-    COPY_SENTENCE, HISTORY, ISSUE_TITLE, LINKED_BODIES, PATCH_PATH, PR_BODIES, PRIMARY_PR,
-    SECONDARY_PR, issue_discussion,
-};
+use crate::fixtures::{HISTORY, LINKED_BODIES, PR_BODIES, PRIMARY_PR, SECONDARY_PR};
 #[cfg(feature = "e2e")]
 use crate::observation::{Observer, Snapshot};
 use crate::palette::Palette;
+use crate::pane_content::{DiscussionPane, ReviewDiff, markdown, pane_size};
 
 const GUTTER: f32 = 8.;
 const WORKSPACE_INSET: f32 = 12.;
@@ -140,6 +136,7 @@ struct PrTab {
     context_ratio: f32,
     show_compact_context: bool,
     diff: Entity<DiffState>,
+    diff_view: Entity<ReviewDiff>,
 }
 
 pub struct Workspace {
@@ -157,9 +154,7 @@ pub struct Workspace {
     inputs: [[Entity<InputState>; 2]; 2],
     outer_ratio: f32,
     drag: Option<Drag>,
-    discussion_open: Entity<TextViewState>,
-    discussion: Entity<TextViewState>,
-    issue_scroll: ScrollHandle,
+    discussion: Entity<DiscussionPane>,
     reviews: [PrTab; 2],
     diff_loaded: bool,
     preview: Preview,
@@ -202,15 +197,20 @@ impl Workspace {
         let focused = if open_review { Pane::Right } else { Pane::Left };
         let initial_focus = focus[focused.index()].clone();
         window.defer(cx, move |window, cx| initial_focus.focus(window, cx));
-        let reviews = std::array::from_fn(|index| PrTab {
-            body: cx.new(|cx| TextViewState::markdown(PR_BODIES[index], cx)),
-            issue: cx.new(|cx| TextViewState::markdown(LINKED_BODIES[index], cx)),
-            body_scroll: ScrollHandle::new(),
-            issue_scroll: ScrollHandle::new(),
-            context: ContextMode::Body,
-            context_ratio: 0.33,
-            show_compact_context: false,
-            diff: cx.new(|cx| DiffState::new([], cx).with_context_lines(None)),
+        let reviews = std::array::from_fn(|index| {
+            let diff = cx.new(|cx| DiffState::new([], cx).with_context_lines(None));
+            let diff_view = cx.new(|cx| ReviewDiff::new(diff.clone(), index == 0, cx));
+            PrTab {
+                body: cx.new(|cx| TextViewState::markdown(PR_BODIES[index], cx)),
+                issue: cx.new(|cx| TextViewState::markdown(LINKED_BODIES[index], cx)),
+                body_scroll: ScrollHandle::new(),
+                issue_scroll: ScrollHandle::new(),
+                context: ContextMode::Body,
+                context_ratio: 0.33,
+                show_compact_context: false,
+                diff,
+                diff_view,
+            }
         });
         Self {
             seed,
@@ -227,9 +227,7 @@ impl Workspace {
             inputs,
             outer_ratio: 0.39,
             drag: None,
-            discussion_open: cx.new(|cx| TextViewState::markdown(COPY_SENTENCE, cx)),
-            discussion: cx.new(|cx| TextViewState::markdown(&issue_discussion(), cx)),
-            issue_scroll: ScrollHandle::new(),
+            discussion: cx.new(DiscussionPane::new),
             reviews,
             diff_loaded: false,
             preview: Preview::Idle,
@@ -727,7 +725,7 @@ impl Workspace {
                     ),
             )
             .child(match pane {
-                Pane::Left if current == 0 => self.discussion(palette).into_any_element(),
+                Pane::Left if current == 0 => self.discussion().into_any_element(),
                 Pane::Left => history(palette).into_any_element(),
                 Pane::Right => self.review(compact, palette, cx).into_any_element(),
             })
@@ -751,46 +749,21 @@ impl Workspace {
             .into_any_element()
     }
 
-    fn discussion(&self, palette: Palette) -> impl IntoElement {
+    /// Bounds of the rendered issue lead when visible in the active pane.
+    pub fn discussion_opening_bounds(&self, cx: &App) -> Option<Bounds<Pixels>> {
+        (self.selected_tab[0] == 0)
+            .then(|| self.discussion.read(cx).opening_bounds(cx))
+            .flatten()
+    }
+
+    fn discussion(&self) -> impl IntoElement {
         div()
             .id("issue-discussion")
-            .track_scroll(&self.issue_scroll)
-            .overflow_y_scroll()
+            .test_support()
+            .relative()
             .flex_1()
             .min_h_0()
-            .px_5()
-            .py_4()
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(palette.good)
-                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
-                    .child("Open issue · #41"),
-            )
-            .child(
-                div()
-                    .mt_2()
-                    .text_xl()
-                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
-                    .child(ISSUE_TITLE),
-            )
-            .child(
-                div()
-                    .mt_1()
-                    .text_xs()
-                    .text_color(palette.muted)
-                    .child("Mira Chen · 96 replies"),
-            )
-            .child(
-                div()
-                    .id("markdown-copy")
-                    .test_support()
-                    .relative()
-                    .mt_5()
-                    .child(markdown(&self.discussion_open, palette))
-                    .children(self.observed_bounds("markdown_copy")),
-            )
-            .child(div().mt_3().child(markdown(&self.discussion, palette)))
+            .child(self.discussion.clone().cached(pane_size()))
     }
 
     fn review(&self, compact: bool, palette: Palette, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1011,32 +984,13 @@ impl Workspace {
                         .relative()
                         .flex_1()
                         .min_h_0()
-                        .child(
-                            Diff::new(&review.diff)
-                                .size_full()
-                                .annotations((index == 0).then(|| DiffAnnotation::line(
-                                    "cache-review-note",
-                                    DiffLinePosition::new(PATCH_PATH, DiffSide::Modified, 3),
-                                )).into_iter().collect::<Vec<_>>())
-                                .render_annotation(move |_, _, _| {
-                                    div()
-                                        .id("cache-review-note")
-                                        .role(Role::Comment)
-                                        .aria_label("Mira Chen: Keep the last confirmed revision on screen.")
-                                        .test_support()
-                                        .mx_2().my_1().px_3().py_2()
-                                        .rounded_md()
-                                        .bg(palette.accent_bg)
-                                        .text_color(palette.ink)
-                                        .text_xs()
-                                        .child(div().font_weight(gpui_kit::FontWeight::SEMIBOLD).child("Mira Chen · Review note"))
-                                        .child("Keep the last confirmed revision on screen.")
-                                }),
-                        )
+                        .child(review.diff_view.clone().cached(pane_size()))
                         .children(self.observed_bounds("diff")),
                 )
             })
-            .when(!self.diff_loaded, |display| display.child(div().p_4().child("Preparing diff…")))
+            .when(!self.diff_loaded, |display| {
+                display.child(div().p_4().child("Preparing diff…"))
+            })
     }
 }
 
@@ -1146,9 +1100,10 @@ impl gpui_kit::Render for Workspace {
             )
             .child(self.status_bar(palette));
         #[cfg(feature = "e2e")]
-        let window_content = window_content
-            .when_some(self.observer.clone(), |content, observer| {
-                content.child(observer.frame_report(self.snapshot(cx)))
+        let window_content =
+            window_content.when_some(self.observer.clone(), |content, observer| {
+                let discussion = (self.selected_tab[0] == 0).then(|| self.discussion.clone());
+                content.child(observer.frame_report(self.snapshot(cx), discussion))
             });
         window_content
     }
@@ -1193,19 +1148,6 @@ impl Workspace {
 
 fn button(id: &'static str, label: &'static str) -> Button {
     Button::new(id).label(label).ghost().small()
-}
-
-fn markdown(state: &Entity<TextViewState>, palette: Palette) -> impl IntoElement {
-    TextView::new(state).selectable(true).style(
-        TextViewStyle::default()
-            .with_dark(palette.dark)
-            .with_foreground(palette.ink)
-            .with_muted_foreground(palette.muted)
-            .with_link(palette.accent)
-            .with_selection(palette.accent_bg)
-            .with_code_background(palette.surface)
-            .with_border(palette.border),
-    )
 }
 
 fn history(palette: Palette) -> impl IntoElement {

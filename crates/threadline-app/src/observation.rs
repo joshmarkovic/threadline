@@ -6,12 +6,16 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use gpui_kit::profiler::{FrameEvent, FrameTimingCollector, set_trace_enabled};
-use gpui_kit::{IntoElement, ScrollEvent, Styled, Window, canvas};
+use gpui_kit::profiler::{FrameEvent, FrameTiming, FrameTimingCollector, set_trace_enabled};
+use gpui_kit::{
+    Bounds, Entity, GpuSpecs, IntoElement, Pixels, ScrollEvent, Styled, Window, canvas,
+};
 use serde::Serialize;
 use tokio::runtime::Handle;
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
+
+use crate::pane_content::DiscussionPane;
 
 #[derive(Clone)]
 pub(crate) struct Observer(Rc<RefCell<Recorder>>);
@@ -38,8 +42,21 @@ pub(crate) struct ReportWriter {
 struct Measurement {
     collector: FrameTimingCollector,
     last_scroll: Option<Instant>,
-    pending_frame: Option<Instant>,
+    pending_frame: Option<FrameTiming>,
     frame_times: Vec<f64>,
+    frame_phases: Vec<FramePhases>,
+    gpu: Option<Option<GpuSpecs>>,
+}
+
+#[derive(Serialize)]
+struct FramePhases {
+    before_draw_ms: f64,
+    draw_ms: f64,
+    request_layout_ms: f64,
+    prepaint_ms: f64,
+    paint_ms: f64,
+    before_present_ms: f64,
+    platform_present_ms: f64,
 }
 
 #[derive(Serialize)]
@@ -70,6 +87,10 @@ struct Report<'a> {
     startup_ms: f64,
     bounds: &'a BTreeMap<&'static str, [f32; 4]>,
     scroll_frame_times_ms: &'a [f64],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    scroll_frame_phases: Option<&'a [FramePhases]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    renderer_adapter: Option<&'a GpuSpecs>,
 }
 
 impl Observer {
@@ -86,6 +107,8 @@ impl Observer {
                 last_scroll: None,
                 pending_frame: None,
                 frame_times: Vec::new(),
+                frame_phases: Vec::new(),
+                gpu: None,
             }
         });
         let writer = ReportWriter::new(path, runtime);
@@ -107,15 +130,11 @@ impl Observer {
         let observer = self.clone();
         canvas(
             move |bounds, _, _| {
-                observer.0.borrow_mut().bounds.insert(
-                    name,
-                    [
-                        bounds.origin.x.as_f32(),
-                        bounds.origin.y.as_f32(),
-                        bounds.size.width.as_f32(),
-                        bounds.size.height.as_f32(),
-                    ],
-                );
+                observer
+                    .0
+                    .borrow_mut()
+                    .bounds
+                    .insert(name, logical_bounds(bounds));
             },
             |_, _, _, _| {},
         )
@@ -149,17 +168,24 @@ impl Observer {
         .size_0()
     }
 
-    pub(crate) fn frame_report(&self, snapshot: Snapshot) -> impl IntoElement {
+    pub(crate) fn frame_report(
+        &self,
+        snapshot: Snapshot,
+        discussion: Option<Entity<DiscussionPane>>,
+    ) -> impl IntoElement {
         let observer = self.clone();
         canvas(
             |_, _, _| {},
-            move |_, _, window, _| observer.write(snapshot, window),
+            move |_, _, window, cx| {
+                let opening = discussion.and_then(|pane| pane.read(cx).opening_bounds(cx));
+                observer.write(snapshot, opening, window);
+            },
         )
         .absolute()
         .size_0()
     }
 
-    fn write(&self, snapshot: Snapshot, window: &Window) {
+    fn write(&self, snapshot: Snapshot, opening: Option<Bounds<Pixels>>, window: &Window) {
         let mut recorder = self.0.borrow_mut();
         let elapsed_ms = recorder.started.elapsed().as_secs_f64() * 1_000.;
         let startup_ms = if snapshot.ready {
@@ -172,19 +198,25 @@ impl Observer {
             measurement,
             ..
         } = &mut *recorder;
-        let frame_times = if let Some(measurement) = measurement {
+        if let Some(opening) = opening {
+            bounds.insert("markdown_copy", logical_bounds(opening));
+        }
+        if let Some(measurement) = measurement {
             measurement.collect();
-            &measurement.frame_times[..]
-        } else {
-            &[]
-        };
+            if snapshot.ready && measurement.gpu.is_none() {
+                measurement.gpu = Some(window.gpu_specs());
+            }
+        }
+        let measurement = measurement.as_ref();
         let report = Report {
             snapshot,
             pid: std::process::id(),
             scale_factor: window.scale_factor(),
             startup_ms,
             bounds,
-            scroll_frame_times_ms: frame_times,
+            scroll_frame_times_ms: measurement.map_or(&[], |data| &data.frame_times),
+            scroll_frame_phases: measurement.map(|data| data.frame_phases.as_slice()),
+            renderer_adapter: measurement.and_then(|data| data.gpu.as_ref()?.as_ref()),
         };
         let Ok(json) = serde_json::to_vec(&report) else {
             return;
@@ -197,6 +229,15 @@ impl Observer {
             true
         });
     }
+}
+
+fn logical_bounds(bounds: Bounds<Pixels>) -> [f32; 4] {
+    [
+        bounds.origin.x.as_f32(),
+        bounds.origin.y.as_f32(),
+        bounds.size.width.as_f32(),
+        bounds.size.height.as_f32(),
+    ]
 }
 
 impl ReportWriter {
@@ -259,24 +300,41 @@ impl Measurement {
                                 <= Duration::from_millis(200)
                                 && frame.draw_start >= *scroll
                         })
-                        .map(|_| frame.dirty_at.unwrap_or(frame.draw_start));
+                        .map(|_| frame);
                 }
                 FrameEvent::Present(present) => {
-                    if let Some(start) = self.pending_frame.take()
+                    if let Some(frame) = self.pending_frame.take()
+                        && frame.window_id == present.window_id
                         && self.frame_times.len() < 4_096
                     {
-                        self.frame_times.push(
-                            present
-                                .present_end
-                                .saturating_duration_since(start)
-                                .as_secs_f64()
-                                * 1_000.,
-                        );
+                        let start = frame.dirty_at.unwrap_or(frame.draw_start);
+                        self.frame_times.push(milliseconds(
+                            present.present_end.saturating_duration_since(start),
+                        ));
+                        self.frame_phases.push(FramePhases {
+                            before_draw_ms: milliseconds(
+                                frame.draw_start.saturating_duration_since(start),
+                            ),
+                            draw_ms: milliseconds(frame.draw_duration()),
+                            request_layout_ms: milliseconds(frame.phases.request_layout),
+                            prepaint_ms: milliseconds(frame.phases.prepaint),
+                            paint_ms: milliseconds(frame.phases.paint),
+                            before_present_ms: milliseconds(
+                                present
+                                    .present_start
+                                    .saturating_duration_since(frame.draw_end),
+                            ),
+                            platform_present_ms: milliseconds(present.present_duration()),
+                        });
                     }
                 }
             }
         }
     }
+}
+
+fn milliseconds(duration: Duration) -> f64 {
+    duration.as_secs_f64() * 1_000.
 }
 
 #[cfg(test)]
