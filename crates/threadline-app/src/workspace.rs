@@ -223,6 +223,27 @@ impl Workspace {
         open_review: bool,
         feasibility_fixture: bool,
     ) -> Self {
+        let account_service = crate::profile_store(cx).and_then(AccountService::new);
+        Self::new_with_service(
+            window,
+            cx,
+            seed,
+            runtime,
+            open_review,
+            feasibility_fixture,
+            account_service,
+        )
+    }
+
+    pub(crate) fn new_with_service(
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        seed: u64,
+        runtime: tokio::runtime::Handle,
+        open_review: bool,
+        feasibility_fixture: bool,
+        account_service: Option<AccountService>,
+    ) -> Self {
         let focus = [cx.focus_handle(), cx.focus_handle()];
         let shell_focus = cx.focus_handle();
         let inputs = std::array::from_fn(|_| {
@@ -249,7 +270,6 @@ impl Workspace {
         }
         let focused = if open_review { Pane::Right } else { Pane::Left };
         let store = crate::profile_store(cx);
-        let account_service = store.clone().and_then(AccountService::new);
         let reader = store.as_ref().map(|store| {
             let service = account_service
                 .clone()
@@ -1472,7 +1492,7 @@ impl gpui_kit::Render for Workspace {
             window_content.when_some(self.observer.clone(), |content, observer| {
                 let discussion = (self.feasibility_fixture && self.selected_tab[0] == 0)
                     .then(|| self.discussion.clone());
-                content.child(observer.frame_report(self.snapshot(cx), discussion))
+                content.child(observer.frame_report(self.snapshot(window, cx), discussion))
             });
         window_content
     }
@@ -1480,7 +1500,7 @@ impl gpui_kit::Render for Workspace {
 
 #[cfg(feature = "e2e")]
 impl Workspace {
-    fn snapshot(&self, cx: &App) -> Snapshot {
+    fn snapshot(&self, window: &Window, cx: &App) -> Snapshot {
         let tab = &self.reviews[self.selected_tab[1]];
         Snapshot {
             ready: if self.feasibility_fixture {
@@ -1522,11 +1542,11 @@ impl Workspace {
             account_access: self
                 .accounts
                 .as_ref()
-                .and_then(|panel| panel.read(cx).observation(self.accounts_open, cx)),
+                .and_then(|panel| panel.read(cx).observation(self.accounts_open, window, cx)),
             cached_reader: self
                 .accounts
                 .as_ref()
-                .and_then(|panel| panel.read(cx).observation(self.accounts_open, cx))
+                .and_then(|panel| panel.read(cx).observation(self.accounts_open, window, cx))
                 .and_then(|_| {
                     self.reader
                         .as_ref()

@@ -753,14 +753,16 @@ async fn cache_reader_reopens_the_selected_public_repo_and_resumes_an_edited_com
 fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
     cx: &mut gpui_kit::TestAppContext,
 ) {
-    use crate::account_panel::AccountPanel;
+    use crate::{ProfileStore, observation::Observer, workspace::Workspace};
     use gpui_kit::{
-        AppContext, Bounds, Point, WindowBounds, WindowOptions, px, size, test::TestWindowExt,
+        AppContext, Bounds, InputEvent as _, MouseButton, MouseDownEvent, MouseMoveEvent,
+        MouseUpEvent, Point, WindowBounds, WindowOptions, point, px, size, test::TestWindowExt,
     };
 
     cx.executor().allow_parking();
     let simulator = Simulator::start();
     let profile = tempfile::tempdir().unwrap();
+    let report = profile.path().join("native-receipt.json");
     let store = Arc::new(Store::open(&profile.path().join("account-form.sqlite")).unwrap());
     let service = AccountService {
         store: store.clone(),
@@ -774,8 +776,12 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
         .build()
         .unwrap();
     let handle = runtime.handle().clone();
-    let (window, panel) = cx.update(|cx| {
+    let (observer, writer) =
+        Observer::new(report.clone(), std::time::Instant::now(), false, &handle);
+    let (window, _) = cx.update(|cx| {
         gpui_kit::init(cx);
+        crate::workspace::bind_shortcuts(cx);
+        cx.set_global(ProfileStore(store.clone()));
         gpui_kit::open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds {
@@ -785,54 +791,132 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
                 ..Default::default()
             },
             cx,
-            |window, cx| cx.new(|cx| AccountPanel::new(service, handle, window, cx)),
+            |window, cx| {
+                cx.new(|cx| {
+                    let mut workspace = Workspace::new_with_service(
+                        window,
+                        cx,
+                        42,
+                        handle,
+                        false,
+                        false,
+                        Some(service),
+                    );
+                    workspace.set_observer(Some(observer.clone()), cx);
+                    workspace
+                })
+            },
         )
         .unwrap()
     });
-    wait_form(cx, |cx| cx.read(|cx| panel.read(cx).loaded()));
-
+    let read_account = || {
+        let bytes = std::fs::read(&report).ok()?;
+        let root: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+        Some(root.get("account_access")?.clone())
+    };
+    wait_form(cx, |cx| {
+        cx.update_window(window, |_, window, cx| window.render_frame(cx))
+            .unwrap();
+        read_account().is_some_and(|account| account["busy"] == false)
+    });
     cx.update_window(window, |_, window, cx| {
-        panel.update(cx, |panel, cx| panel.focus_form(window, cx));
-        window.render_frame(cx);
-        window.input("fixture-org/private", cx);
-        let state = serde_json::to_value(panel.read(cx).observation(true, cx).unwrap()).unwrap();
-        assert_eq!(state["fixture_route_entered"], true);
-        assert_eq!(state["fixture_token_entered"], false);
-        window.press("tab", cx);
-        window.input(FIXTURE_PAT, cx);
-        let state = serde_json::to_value(panel.read(cx).observation(true, cx).unwrap()).unwrap();
-        assert_eq!(state["fixture_token_entered"], true);
-        assert!(!state.to_string().contains(FIXTURE_PAT));
-        window.click("account-connect", cx);
+        window.press("secondary-shift-a", cx)
     })
     .unwrap();
-    wait_form(cx, |cx| {
-        cx.read(|cx| {
-            panel
-                .read(cx)
-                .local_reader_state()
-                .1
-                .is_some_and(|profile| profile.access == AccessState::Readable)
+
+    let click = |id: &str, cx: &mut gpui_kit::TestAppContext| {
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            let [x, y, width, height] = observer.test_control_bounds(id).unwrap();
+            let position = point(px(x + width / 2.), px(y + height / 2.));
+            let modifiers = window.modifiers();
+            window.dispatch_event(
+                MouseMoveEvent {
+                    position,
+                    pressed_button: None,
+                    modifiers,
+                }
+                .to_platform_input(),
+                cx,
+            );
+            window.dispatch_event(
+                MouseDownEvent {
+                    button: MouseButton::Left,
+                    position,
+                    modifiers,
+                    click_count: 1,
+                    first_mouse: false,
+                }
+                .to_platform_input(),
+                cx,
+            );
+            window.dispatch_event(
+                MouseUpEvent {
+                    button: MouseButton::Left,
+                    position,
+                    modifiers,
+                    click_count: 1,
+                }
+                .to_platform_input(),
+                cx,
+            );
+            window.render_frame(cx);
         })
+        .unwrap();
+    };
+    let wait_receipt = |field: &str, cx: &mut gpui_kit::TestAppContext| {
+        wait_form(cx, |cx| {
+            cx.update_window(window, |_, window, cx| window.render_frame(cx))
+                .unwrap();
+            read_account().is_some_and(|account| account[field] == true)
+        });
+    };
+    // Exercise real focus transfer in both directions using the receipt geometry.
+    click("account-token", cx);
+    wait_receipt("fixture_token_focused", cx);
+    click("account-repository", cx);
+    wait_receipt("fixture_route_focused", cx);
+    cx.update_window(window, |_, window, cx| {
+        window.press("secondary-a", cx);
+        window.input("fixture-org/private", cx);
+    })
+    .unwrap();
+    wait_receipt("fixture_route_entered", cx);
+    assert_eq!(read_account().unwrap()["fixture_token_entered"], false);
+    click("account-token", cx);
+    wait_receipt("fixture_token_focused", cx);
+    cx.update_window(window, |_, window, cx| {
+        window.press("secondary-a", cx);
+        window.input(FIXTURE_PAT, cx);
+    })
+    .unwrap();
+    wait_receipt("fixture_token_entered", cx);
+    assert!(
+        !std::fs::read_to_string(&report)
+            .unwrap()
+            .contains(FIXTURE_PAT)
+    );
+    click("account-connect", cx);
+    wait_form(cx, |cx| {
+        cx.update_window(window, |_, window, cx| window.render_frame(cx))
+            .unwrap();
+        read_account().is_some_and(|account| account["profile_access"] == "Readable")
     });
-    assert_eq!(simulator.user_requests.load(Ordering::Relaxed), 1);
+    assert_eq!(simulator.user_requests.load(Ordering::SeqCst), 1);
     let account = store.active_github_account().unwrap().unwrap();
     let loaded = store.github_repository_views(account).unwrap();
     assert_eq!(loaded.len(), 1);
     assert_eq!(loaded[0].access, AccessState::Readable);
     assert!(loaded[0].verified_current);
-    cx.read(|cx| {
-        let state = serde_json::to_value(panel.read(cx).observation(true, cx).unwrap()).unwrap();
-        assert_eq!(state["active_user_id"], 101);
-        assert_eq!(state["fixture_token_entered"], false);
-        assert_eq!(state["input_issue"], serde_json::Value::Null);
-    });
+    assert_eq!(read_account().unwrap()["active_user_id"], 101);
+    assert_eq!(read_account().unwrap()["fixture_token_entered"], false);
+    runtime.block_on(writer.finish()).unwrap();
 }
 
 #[cfg(feature = "e2e")]
 fn wait_form(
     cx: &mut gpui_kit::TestAppContext,
-    mut condition: impl FnMut(&gpui_kit::TestAppContext) -> bool,
+    mut condition: impl FnMut(&mut gpui_kit::TestAppContext) -> bool,
 ) {
     let deadline = std::time::Instant::now() + Duration::from_secs(8);
     while std::time::Instant::now() < deadline {

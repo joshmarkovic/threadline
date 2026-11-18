@@ -38,12 +38,18 @@ function Open-AccountFixture {
 function Connect-FixtureAccount([IntPtr]$Window) {
     $null = Open-AccountFixture
     Click-AccountControl $Window 'account-repository'
+    $null = Wait-Account 'focus in the native repository field' {
+        param($account) $account.panel_open -and $account.fixture_route_focused
+    }
     [ThreadlineWinInput]::Chord(@(0x11, 0x41))
     [ThreadlineWinInput]::TypeText('fixture-org/private')
     $null = Wait-Account 'the exact synthetic repository in the native form' {
         param($account) $account.fixture_route_entered
     }
     Click-AccountControl $Window 'account-token'
+    $null = Wait-Account 'focus in the masked native token field' {
+        param($account) $account.panel_open -and $account.fixture_token_focused
+    }
     $syntheticPat = 'threadline-test-fixture'
     [ThreadlineWinInput]::Chord(@(0x11, 0x41))
     [ThreadlineWinInput]::TypeText($syntheticPat)

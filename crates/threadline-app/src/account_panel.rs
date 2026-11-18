@@ -31,6 +31,8 @@ pub(crate) struct AccountObservation {
     discovery: Option<String>,
     reachability: String,
     authorization_available: bool,
+    fixture_route_focused: bool,
+    fixture_token_focused: bool,
     fixture_route_entered: bool,
     fixture_token_entered: bool,
     input_issue: Option<crate::accounts::AccountInputIssue>,
@@ -148,7 +150,12 @@ impl AccountPanel {
     }
 
     #[cfg(feature = "e2e")]
-    pub(crate) fn observation(&self, panel_open: bool, cx: &App) -> Option<AccountObservation> {
+    pub(crate) fn observation(
+        &self,
+        panel_open: bool,
+        window: &Window,
+        cx: &App,
+    ) -> Option<AccountObservation> {
         if !self.service.fixture {
             return None;
         }
@@ -172,6 +179,8 @@ impl AccountPanel {
                 .github_error
                 .as_ref()
                 .is_some_and(|error| error.authorization_url().is_some()),
+            fixture_route_focused: panel_open && self.route.focus_handle(cx).is_focused(window),
+            fixture_token_focused: panel_open && self.token.focus_handle(cx).is_focused(window),
             fixture_route_entered: panel_open
                 && self.route.read(cx).value().as_ref() == "fixture-org/private",
             fixture_token_entered: panel_open
