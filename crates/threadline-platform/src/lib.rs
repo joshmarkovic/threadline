@@ -6,12 +6,15 @@ use std::path::{Path, PathBuf};
 
 use tokio::sync::mpsc::{self, UnboundedReceiver};
 
+mod paths;
 #[cfg(windows)]
 mod platform_windows;
 #[cfg(windows)]
 mod toast_registration;
 #[cfg(windows)]
 mod toast_windows;
+
+pub use paths::NativePaths;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Activation {

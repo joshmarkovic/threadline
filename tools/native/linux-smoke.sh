@@ -142,7 +142,7 @@ window_ready() {
 
 launch() {
     local profile=$1
-    mkdir "$profile"
+    mkdir -p "$profile"
     env -u WAYLAND_DISPLAY THREADLINE_PROFILE_DIR="$profile" THREADLINE_TEST_SEED="$seed" \
         "$binary" --e2e-report "$observation" > "$report_dir/app-$2.log" 2>&1 &
     pid=$!
@@ -152,6 +152,11 @@ launch() {
         timeout 3s xdotool windowfocus --sync "$window" || blocked 'X11 desktop did not allow foreground focus.'
     fi
     [[ $(xdotool getwindowfocus) == "$window" ]] || blocked 'The Threadline window did not receive X11 keyboard focus.'
+}
+
+sqlite_header_matches() {
+    local database=$1
+    [[ -f $database ]] && printf 'SQLite format 3\0' | cmp -s -n 16 - "$database"
 }
 
 key() {
@@ -211,7 +216,9 @@ quit_app() {
     pid=''
 }
 
-launch "$profile_root/initial" initial
+profile="$profile_root/initial"
+database="$profile/threadline.sqlite3"
+launch "$profile" initial
 first_pid=$pid
 awk 'NF >= 6 && $6 ~ "^/" {n=split($6, parts, "/");print parts[n]}' "/proc/$pid/maps" | sort -u > "$report_dir/native-modules.txt"
 if rg -iq '^(lib)?(webkit|wry|electron|cef|chromium|msedgewebview2)' "$report_dir/native-modules.txt"; then
@@ -277,11 +284,20 @@ fi
 quit_app
 record 'Quit with the native keyboard shortcut' '0'
 
+sqlite_header_matches "$database" || fail 'The isolated profile does not contain a valid SQLite header.'
+initial_database_sha=$(sha256sum "$database" | cut -d ' ' -f1)
+initial_database_identity=$(stat -Lc '%d:%i' "$database")
 observation="$report_dir/restart-observation.json"
-launch "$profile_root/restart" restart
+launch "$profile" restart
 restart_pid=$pid
 quit_app
-record 'Relaunch a fresh isolated feasibility profile and quit again' "$restart_pid"
+sqlite_header_matches "$database" || fail 'The relaunched profile does not contain a valid SQLite header.'
+restart_database_sha=$(sha256sum "$database" | cut -d ' ' -f1)
+[[ $initial_database_identity == "$(stat -Lc '%d:%i' "$database")" ]] ||
+    fail 'The SQLite database was replaced during the same-profile restart.'
+record 'Relaunch the same isolated profile and retain its SQLite database' \
+    "$(jq -cn --argjson pid "$restart_pid" --arg before "$initial_database_sha" --arg after "$restart_database_sha" \
+        '{pid:$pid,sqlite_header:true,initial_sqlite_sha256:$before,restart_sqlite_sha256:$after,retained:true}')"
 
 status=Pass
 detail="Exercised the X11 window, Markdown selection, independent focus and tabs, review input, and both splitters"

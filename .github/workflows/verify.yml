@@ -82,6 +82,9 @@ jobs:
             echo 'A browser runtime feature or dependency is present.'
             exit 1
           fi
+      - name: Build the isolated macOS probe app
+        if: runner.os == 'macOS'
+        run: cargo build --locked -p threadline-app --features e2e
       - name: Attempt early macOS native window proof
         if: runner.os == 'macOS'
         timeout-minutes: 3

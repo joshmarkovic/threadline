@@ -48,7 +48,6 @@ $report = [ordered]@{
 $measurement = [ordered]@{}
 $app = $null
 $firstProfile = $null
-$secondProfile = $null
 $reportFile = Join-Path $ReportDir 'ui-observation.json'
 $blocked = $false
 $clipboardBackup = $null
@@ -70,6 +69,27 @@ function Get-FileSha256 {
         }
     } finally {
         $stream.Dispose()
+    }
+}
+
+function Get-IsolatedSqlite([string]$Profile) {
+    $database = Join-Path $Profile 'threadline.sqlite3'
+    if (!(Test-Path -LiteralPath $database -PathType Leaf)) {
+        throw 'The isolated profile database was not created.'
+    }
+    $header = New-Object byte[] 16
+    $stream = [IO.File]::OpenRead($database)
+    try {
+        $read = $stream.Read($header, 0, $header.Length)
+    } finally {
+        $stream.Dispose()
+    }
+    if ($read -ne $header.Length -or [Text.Encoding]::ASCII.GetString($header) -cne ("SQLite format 3" + [char]0)) {
+        throw 'The isolated profile database does not have a SQLite header.'
+    }
+    return [ordered]@{
+        sha256 = Get-FileSha256 $database
+        creation_time_ticks = [IO.File]::GetCreationTimeUtc($database).Ticks
     }
 }
 
@@ -845,15 +865,24 @@ try {
         Invoke-Smoke $window
         $app.Dispose()
         $app = $null
-        $secondProfile = Join-Path $ProfileDir ('restart-' + [guid]::NewGuid().ToString('N'))
-        $null = New-Item -ItemType Directory -Path $secondProfile -Force
+        $initialDatabase = Get-IsolatedSqlite $firstProfile
         $reportFile = Join-Path $ReportDir 'restart-observation.json'
-        $app = Start-Threadline $secondProfile $reportFile
+        $app = Start-Threadline $firstProfile $reportFile
         $report.restarted_pid = $app.Id
         $window = Get-ReadyWindow
         Set-WindowFocus $window
         Stop-ThroughUi
-        Add-Evidence 'Relaunch a fresh isolated feasibility profile and quit again' $report.restarted_pid
+        $restartDatabase = Get-IsolatedSqlite $firstProfile
+        if ($restartDatabase.creation_time_ticks -ne $initialDatabase.creation_time_ticks) {
+            throw 'The SQLite database was replaced during the same-profile restart.'
+        }
+        Add-Evidence 'Relaunch the same isolated profile and retain its SQLite database' ([ordered]@{
+            pid = $report.restarted_pid
+            sqlite_header = $true
+            initial_sqlite_sha256 = $initialDatabase.sha256
+            restart_sqlite_sha256 = $restartDatabase.sha256
+            retained = $true
+        })
         $report.detail = 'Exercised the native window, Markdown selection, independent focus and tabs, review input, and both splitters.'
     }
     $report.status = 'Pass'

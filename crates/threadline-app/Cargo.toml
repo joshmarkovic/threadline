@@ -17,7 +17,9 @@ serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 threadline-core = { path = "../threadline-core" }
 threadline-platform = { path = "../threadline-platform" }
+threadline-storage = { path = "../threadline-storage" }
 tokio = { version = "1", features = ["rt-multi-thread", "time", "sync"] }
 
 [dev-dependencies]
 gpui-kit = { version = "=0.10.0", features = ["test-support"] }
+tempfile = "3"

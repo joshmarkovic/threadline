@@ -144,9 +144,16 @@ private func runProbe(binary: URL, evidence: inout [String: Any]) throws -> Outc
         if !retainScratch { try? files.removeItem(at: scratch) }
     }
 
+    let profile = scratch.appendingPathComponent("profile", isDirectory: true)
+    try files.createDirectory(at: profile, withIntermediateDirectories: false)
     let child = Process()
     child.executableURL = binary
     child.currentDirectoryURL = scratch
+    child.arguments = ["--e2e-report", scratch.appendingPathComponent("ui-observation.json").path]
+    var environment = ProcessInfo.processInfo.environment
+    environment["THREADLINE_PROFILE_DIR"] = profile.path
+    environment["THREADLINE_TEST_SEED"] = "12345"
+    child.environment = environment
     child.standardInput = FileHandle.nullDevice
     child.standardOutput = FileHandle.nullDevice
     child.standardError = FileHandle.nullDevice
@@ -175,7 +182,20 @@ private func runProbe(binary: URL, evidence: inout [String: Any]) throws -> Outc
     }
     evidence["child_termination_status"] = child.terminationStatus
     evidence["child_termination_reason"] = child.terminationReason == .exit ? "exit" : "signal"
+    let database = profile.appendingPathComponent("threadline.sqlite3")
+    let databaseHeader = sqliteHeaderMatches(database)
+    evidence["isolated_profile_sqlite_header"] = databaseHeader
+    if outcome.status == "Pass" && !databaseHeader {
+        return .fail("The app completed its window and Quit probe without creating an isolated SQLite database.")
+    }
     return outcome
+}
+
+private func sqliteHeaderMatches(_ database: URL) -> Bool {
+    guard let stream = try? FileHandle(forReadingFrom: database) else { return false }
+    defer { try? stream.close() }
+    guard let bytes = try? stream.read(upToCount: 16) else { return false }
+    return bytes == Data("SQLite format 3\0".utf8)
 }
 
 private func main() -> Int32 {

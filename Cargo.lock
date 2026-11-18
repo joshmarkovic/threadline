@@ -7163,8 +7163,10 @@ dependencies = [
  "gpui-kit",
  "serde",
  "serde_json",
+ "tempfile",
  "threadline-core",
  "threadline-platform",
+ "threadline-storage",
  "tokio",
 ]
 
