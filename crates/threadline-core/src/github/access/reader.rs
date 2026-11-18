@@ -1,5 +1,6 @@
 //! Read-only access to one verified repository. Page cursors never select an origin or target.
 
+pub mod pr;
 pub mod refresh;
 mod wire;
 
@@ -75,6 +76,21 @@ pub struct PullRequestSummary {
     pub base_oid: String,
     pub head_oid: String,
     pub merge_oid: Reported<String>,
+    pub presentation: PullPresentation,
+}
+
+#[derive(Clone, Default, Eq, PartialEq)]
+pub struct PullPresentation {
+    pub author: Option<String>,
+    pub base_ref: Option<String>,
+    pub head_ref: Option<String>,
+    pub draft: Option<bool>,
+    pub requested_reviewers: Option<Vec<String>>,
+    pub created_at_ms: Option<i64>,
+    pub merged_at_ms: Option<i64>,
+    pub changed_files: Option<u64>,
+    base_repository_id: Option<RepositoryApiId>,
+    base_repository_node: Option<String>,
 }
 
 #[derive(Clone, Eq, PartialEq)]

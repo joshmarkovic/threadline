@@ -6,8 +6,8 @@ use serde::{Deserialize, Deserializer, de::DeserializeOwned};
 use crate::domain::{IssueApiId, ItemKind, ItemNumber};
 
 use super::{
-    AccessError, ConversationComment, GitHubReader, IssueSummary, PullRequestSummary,
-    ReactionCounts, Reported, TimelineEvent, malformed,
+    AccessError, ConversationComment, GitHubReader, IssueSummary, PullPresentation,
+    PullRequestSummary, ReactionCounts, Reported, TimelineEvent, malformed,
 };
 
 #[derive(Deserialize)]
@@ -137,6 +137,15 @@ impl Issue {
 #[derive(Deserialize)]
 struct Ref {
     sha: String,
+    #[serde(rename = "ref")]
+    name: Option<String>,
+    repo: Option<RefRepository>,
+}
+
+#[derive(Deserialize)]
+struct RefRepository {
+    id: NonZeroU64,
+    node_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -154,6 +163,12 @@ pub(super) struct PullRequest {
     head: Ref,
     #[serde(default, deserialize_with = "reported")]
     merge_commit_sha: Reported<String>,
+    user: Option<Author>,
+    draft: Option<bool>,
+    requested_reviewers: Option<Vec<Author>>,
+    created_at: Option<String>,
+    merged_at: Option<String>,
+    changed_files: Option<u64>,
 }
 
 impl PullRequest {
@@ -175,6 +190,29 @@ impl PullRequest {
             base_oid: oid(self.base.sha)?,
             head_oid: oid(self.head.sha)?,
             merge_oid,
+            presentation: PullPresentation {
+                author: self.user.map(|user| user.login),
+                base_ref: self.base.name,
+                head_ref: self.head.name,
+                draft: self.draft,
+                requested_reviewers: self
+                    .requested_reviewers
+                    .map(|reviewers| reviewers.into_iter().map(|user| user.login).collect()),
+                created_at_ms: self.created_at.as_deref().map(millis).transpose()?,
+                merged_at_ms: self.merged_at.as_deref().map(millis).transpose()?,
+                changed_files: self.changed_files,
+                base_repository_id: self
+                    .base
+                    .repo
+                    .as_ref()
+                    .map(|repo| crate::domain::RepositoryApiId::new(repo.id)),
+                base_repository_node: self
+                    .base
+                    .repo
+                    .and_then(|repo| repo.node_id)
+                    .map(opaque_id)
+                    .transpose()?,
+            },
         };
         Ok(summary)
     }
@@ -327,20 +365,20 @@ fn reported<'de, D: Deserializer<'de>, T: DeserializeOwned>(
     Ok(Option::<T>::deserialize(deserializer)?.map_or(Reported::Null, Reported::Value))
 }
 
-fn millis(value: &str) -> Result<i64, AccessError> {
+pub(super) fn millis(value: &str) -> Result<i64, AccessError> {
     DateTime::parse_from_rfc3339(value)
         .map(|date| date.timestamp_millis())
         .map_err(|_| malformed())
 }
 
-fn opaque_id(id: String) -> Result<String, AccessError> {
+pub(super) fn opaque_id(id: String) -> Result<String, AccessError> {
     if id.is_empty() || id.len() > 256 || id.chars().any(char::is_control) {
         return Err(malformed());
     }
     Ok(id)
 }
 
-fn oid(sha: String) -> Result<String, AccessError> {
+pub(super) fn oid(sha: String) -> Result<String, AccessError> {
     if !matches!(sha.len(), 40 | 64) || !sha.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(malformed());
     }

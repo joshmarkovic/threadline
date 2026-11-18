@@ -24,7 +24,7 @@ pub struct ReadValidators {
 }
 
 impl ReadValidators {
-    fn request_mode(&self) -> RequestMode<'_> {
+    pub(super) fn request_mode(&self) -> RequestMode<'_> {
         RequestMode::Revalidate {
             etag: self
                 .etag
@@ -63,7 +63,7 @@ pub struct Refresh<T> {
 }
 
 impl<T> Refresh<T> {
-    fn from_headers(value: Option<T>, headers: &HeaderMap) -> Self {
+    pub(super) fn from_headers(value: Option<T>, headers: &HeaderMap) -> Self {
         Self {
             value,
             validators: ReadValidators::from_headers(headers),
@@ -200,11 +200,11 @@ impl GitHubReader<'_> {
         Ok(Refresh::from_headers(value, &response.headers))
     }
 
-    fn permanent_path(&self, suffix: &str) -> String {
+    pub(super) fn permanent_path(&self, suffix: &str) -> String {
         format!("repositories/{}/{suffix}", self.repository.get())
     }
 
-    async fn get_refresh<T: DeserializeOwned>(
+    pub(super) async fn get_refresh<T: DeserializeOwned>(
         &self,
         path: &str,
         mode: RequestMode<'_>,

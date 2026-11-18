@@ -21,6 +21,7 @@ pub struct Reply {
     pub expected_etag: Option<&'static str>,
     pub expected_modified: Option<&'static str>,
     pub graph_repository: Option<(&'static str, &'static str)>,
+    graph_node: Option<(&'static str, &'static str, Option<&'static str>)>,
 }
 
 impl Reply {
@@ -34,6 +35,7 @@ impl Reply {
             expected_etag: None,
             expected_modified: None,
             graph_repository: None,
+            graph_node: None,
         }
     }
 
@@ -47,6 +49,17 @@ impl Reply {
 
     pub fn delayed_until(mut self, gate: Arc<Notify>) -> Self {
         self.gate = Some(gate);
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn graph_node(
+        mut self,
+        operation: &'static str,
+        id: &'static str,
+        cursor: Option<&'static str>,
+    ) -> Self {
+        self.graph_node = Some((operation, id, cursor));
         self
     }
 }
@@ -176,10 +189,23 @@ async fn serve_reply(State(shared): State<Arc<Shared>>, request: Request) -> Res
                         .get(header::CONTENT_TYPE)
                         .is_some_and(|v| v == "application/json")
             });
+            let graph_node = expected.graph_node.is_none_or(|(operation, id, cursor)| {
+                let Some(body) = &graph_body else {
+                    return false;
+                };
+                body["variables"] == serde_json::json!({"id":id,"cursor":cursor})
+                    && body["query"]
+                        .as_str()
+                        .is_some_and(|query| query.starts_with(&format!("query {operation}(")))
+                    && headers
+                        .get(header::CONTENT_TYPE)
+                        .is_some_and(|value| value == "application/json")
+            });
             authenticated
                 && expected_tag
                 && expected_modified
                 && graph
+                && graph_node
                 && headers
                     .get(header::USER_AGENT)
                     .and_then(|v| v.to_str().ok())

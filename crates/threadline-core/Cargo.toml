@@ -6,6 +6,7 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 chrono-tz = "0.10.4"
 iana-time-zone = "0.1.65"
