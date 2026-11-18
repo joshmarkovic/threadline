@@ -239,13 +239,13 @@ ISSUE-01,linux,Linux release,04,14,14,yes,Planned,Actual target evidence require
 ISSUE-02,windows,Windows first release,04,04,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 ISSUE-02,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 ISSUE-02,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-ISSUE-03,windows,Windows first release,07,07,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+ISSUE-03,windows,Windows first release,07,07,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Existing-issue writes, cancellation, recovery and scoped LIVE-002. docs/reports/sprint-07.md"
 ISSUE-03,macos,macOS release,07,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 ISSUE-03,linux,Linux release,07,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-ISSUE-04,windows,Windows first release,07,07,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+ISSUE-04,windows,Windows first release,07,07,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Existing-issue writes, cancellation, recovery and scoped LIVE-002. docs/reports/sprint-07.md"
 ISSUE-04,macos,macOS release,07,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 ISSUE-04,linux,Linux release,07,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-ISSUE-05,windows,Windows first release,07,07,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+ISSUE-05,windows,Windows first release,07,07,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Existing-issue writes, cancellation, recovery and scoped LIVE-002. docs/reports/sprint-07.md"
 ISSUE-05,macos,macOS release,07,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 ISSUE-05,linux,Linux release,07,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 ISSUE-06,windows,Windows first release,07,07,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -392,10 +392,10 @@ WRITE-01,linux,Linux release,07,14,14,yes,Planned,Actual target evidence require
 WRITE-02,windows,Windows first release,07,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WRITE-02,macos,macOS release,07,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WRITE-02,linux,Linux release,07,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-WRITE-03,windows,Windows first release,07,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+WRITE-03,windows,Windows first release,07,09,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Existing-issue writes, cancellation, recovery and scoped LIVE-002. docs/reports/sprint-07.md"
 WRITE-03,macos,macOS release,07,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WRITE-03,linux,Linux release,07,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-WRITE-04,windows,Windows first release,07,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+WRITE-04,windows,Windows first release,07,09,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Existing-issue writes, cancellation, recovery and scoped LIVE-002. docs/reports/sprint-07.md"
 WRITE-04,macos,macOS release,07,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WRITE-04,linux,Linux release,07,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 MERGE-01,windows,Windows first release,09,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,

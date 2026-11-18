@@ -1,0 +1,129 @@
+{
+  "live": {
+    "source_revision": "011ac9859b11524e8b625b6fbca9cfcab7d6055a",
+    "source_dirty": true,
+    "status": "Pass",
+    "exit_code": 0,
+    "lane": "live",
+    "seed": 12345,
+    "run": "live-1795037066757-1910768",
+    "host": {
+      "os": "linux",
+      "arch": "x86_64"
+    },
+    "result_sha256": "a0135ab614fa64310182a88f7342d467fda9fdef8b26c3abf758df6579db3cf8",
+    "github_write_sha256": "3ee5ba778bc9585e8a9f75c2308c2775f087abbf4c7f204006e3edbac1530205"
+  },
+  "development_suites": [
+    {
+      "host": "Linux",
+      "suite": "SQLite writes",
+      "log_sha256": "d76ce33afa2f89f4202a0ffb907bdf84094f75b187461c5f70dfe0a9c4ce35dc",
+      "passed": 12,
+      "elapsed_s": 1.36,
+      "selected_tests": [
+        "it_010_interrupted_preflight_releases_only_the_exact_unsent_attempt",
+        "it_011_cached_author_proof_is_bound_to_original_comment_and_cannot_change_actors",
+        "it_010_atomic_cancel_before_send_and_changed_credential_reject_stale_preflight",
+        "it_008_offline_save_and_submit_are_distinct_and_duplicate_editors_share_one_operation",
+        "it_009_throttle_survives_restart_and_unknown_work_cannot_skip_the_floor_or_resume",
+        "it_009_timeout_and_cancel_never_replay_identity_free_matches_and_accepted_creation_reconciles",
+        "it_009_unreadable_accepted_comment_cannot_starve_another_item_after_restart",
+        "it_012_conflicting_fields_retain_remote_local_original_and_an_unrelated_issue_can_dispatch",
+        "it_012_cached_repository_options_and_numeric_edit_base_survive_offline_restart",
+        "it_012_confirmed_issue_fields_and_repository_choices_preserve_unknown_unedited_values",
+        "it_010_racing_abort_and_dispatch_across_wal_connections_has_one_durable_winner",
+        "it_011_pending_comment_edit_uses_confirmed_predecessor_identity_and_updates_one_cached_object"
+      ]
+    },
+    {
+      "host": "Linux",
+      "suite": "GitHub HTTP",
+      "log_sha256": "b9f1ec215c13d0461c7cd128c2650b0e7c1e366d64931d55a182ac13878e6e80",
+      "passed": 2,
+      "elapsed_s": 0.04,
+      "selected_tests": [
+        "it_008_issue_patch_and_ordinary_comment_create_and_edit_are_exactly_scoped",
+        "it_009_write_rejection_throttle_wrong_identity_and_post_send_loss_are_distinct"
+      ]
+    },
+    {
+      "host": "Windows 11",
+      "suite": "GitHub HTTP",
+      "log_sha256": "aedb49605cf964357c6b0efa726bb59269619d9add7a526b51bcce77a829847f",
+      "passed": 2,
+      "elapsed_s": 0.14,
+      "selected_tests": [
+        "it_009_write_rejection_throttle_wrong_identity_and_post_send_loss_are_distinct",
+        "it_008_issue_patch_and_ordinary_comment_create_and_edit_are_exactly_scoped"
+      ]
+    },
+    {
+      "host": "Windows 11",
+      "suite": "SQLite writes",
+      "log_sha256": "d796e7b62074f19155924e2cd35f74c24b54c242038109fd6760dcb2a2ced636",
+      "passed": 8,
+      "elapsed_s": 1.7,
+      "selected_tests": [
+        "it_008_offline_save_and_submit_are_distinct_and_duplicate_editors_share_one_operation",
+        "it_009_throttle_survives_restart_and_unknown_work_cannot_skip_the_floor_or_resume",
+        "it_010_atomic_cancel_before_send_and_changed_credential_reject_stale_preflight",
+        "it_009_timeout_and_cancel_never_replay_identity_free_matches_and_accepted_creation_reconciles",
+        "it_011_pending_comment_edit_uses_confirmed_predecessor_identity_and_updates_one_cached_object",
+        "it_010_racing_abort_and_dispatch_across_wal_connections_has_one_durable_winner",
+        "it_012_confirmed_issue_fields_and_repository_choices_preserve_unknown_unedited_values",
+        "it_012_conflicting_fields_retain_remote_local_original_and_an_unrelated_issue_can_dispatch"
+      ]
+    },
+    {
+      "host": "Windows 11",
+      "suite": "SQLite durability",
+      "log_sha256": "ec138b6ca12b94000d78e86ae102414f949c4e5a104ce9e67492cca4d886130e",
+      "passed": 10,
+      "elapsed_s": 1.91,
+      "selected_tests": []
+    },
+    {
+      "host": "Windows 11",
+      "suite": "storage unit",
+      "log_sha256": "553f4afa9e3a4da8b0462ad09bdda1bebd04c61d5a070871147b9fc804714900",
+      "passed": 9,
+      "elapsed_s": 0.79,
+      "selected_tests": [
+        "queue::tests::disk_full_rolls_back_enqueue_and_keeps_the_saved_editor",
+        "writes::tests::it_009_disk_full_after_remote_success_rolls_back_receipt_cache_and_own_action_together"
+      ]
+    },
+    {
+      "host": "Windows 11",
+      "suite": "app dispatcher",
+      "log_sha256": "58d50273dc7f4bb9404de424d77ef9647aa89685996428020419c866463a21a2",
+      "passed": 1,
+      "elapsed_s": 10.14,
+      "selected_tests": [
+        "accounts::write_tests::write_dispatch_uses_durable_offline_outbox_and_stops_after_lost_response"
+      ]
+    },
+    {
+      "host": "Linux",
+      "suite": "app dispatcher",
+      "log_sha256": "0a4637cdf89df9aefc36cd79cdccade078b32e5bc155c4bf0b528b898d9f780d",
+      "passed": 1,
+      "elapsed_s": 10.73,
+      "selected_tests": [
+        "accounts::write_tests::write_dispatch_uses_durable_offline_outbox_and_stops_after_lost_response"
+      ]
+    },
+    {
+      "host": "Linux",
+      "suite": "GPUI editor",
+      "log_sha256": "d2e2710b13cb2612a8c4ab4c467c091aebcc92cd999844a7c46618e28fad6955",
+      "passed": 2,
+      "elapsed_s": 23.55,
+      "selected_tests": [
+        "reader_workspace::tests::ui_006_registered_native_commands_offer_edits_and_comments_without_issue_creation",
+        "reader_workspace::tests::ui_006_native_offline_edit_keeps_saved_text_and_cancels_the_original_queue_target"
+      ]
+    }
+  ]
+}

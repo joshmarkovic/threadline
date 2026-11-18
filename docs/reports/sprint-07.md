@@ -1,0 +1,16 @@
+# Sprint 07 existing issue and comment writes
+
+The Windows and Linux application workers submitted an existing-item mutation through the production dispatcher against the local HTTP fixture. Both also exercised a lost response. The authorized live check edited and restored the title of disposable issue 1 and created and edited one ordinary comment. The original title was restored and the comment was read back after both writes. [Live provider receipt](evidence/sprint-07/github-write.json) · [Development receipts](evidence/sprint-07/verification.json)
+
+## Outbox and editor behavior
+
+Saving a local draft and submitting it are separate actions. Submission captures its account, repository, item identity, original field values and requested changes. A fresh connected preflight verifies the target and touched fields before one transaction reserves the request. Conflicts retain local, original and remote values. Cancellation before reservation prevents the request. An uncertain response keeps the submitted snapshot and blocks automatic replay. An acknowledged comment can be read back by its exact numeric ID. Its own retry deadline lets the worker confirm other accepted comments when one is missing or inaccessible. [Storage and receipts](../../crates/threadline-storage/src/writes.rs) · [Provider requests](../../crates/threadline-core/src/github/access/writer.rs) · [SQLite regressions](../../crates/threadline-storage/tests/writes.rs)
+
+| Environment | Verification | Result |
+| --- | --- | --- |
+| WSL Linux x64, committed client `4c105d1` | `cargo xtask test live --case LIVE-002` on the authorized disposable issue | Pass. GitHub returned 200 for the title edit, 201 for comment creation, 200 for the comment edit and 200 for title restoration. The single comment ID was `6992069417`. The existing CLI OAuth credential authenticated the requests. The live check did not exercise dedicated PAT authentication. |
+| Native Windows 11 x64 | SQLite issue/ordinary-comment writes, durability, storage unit tests and local GitHub HTTP | Pass. The four suites ran eight, ten, nine and two tests respectively. They exercised cancellation around dispatch, durable receipts, field conflicts, disk exhaustion and the actual request shapes. |
+| Windows 11 and Linux x64 | Production application dispatcher against the local GitHub fixture | Pass on both hosts. The worker preserved offline submitted intent, resumed eligible requests, recorded an accepted comment and stopped after a lost response. |
+| Linux x64 | Updated SQLite writes, local provider and GPUI editor suites | Pass. Twelve SQLite tests included per-comment recovery across restart. Two HTTP tests checked scoped writes and error handling. Two GPUI tests exercised existing-issue editing, ordinary comments and cancellation from the original queue target. |
+
+LIVE-002 covers the shared provider for the Windows phase. The recorded host was WSL Linux. Native-process E2E-006 and E2E-019 remain separate gates. Later sprints extend the cross-action fault cases to reviews and direct merges. The release checks use the user's chosen local installer test. Publication remains pending. [Sprint requirements](../spec/sprints/sprint_07_issues_and_write_engine.md) · [Scenario ledger](../spec/test_scenarios.csv)
