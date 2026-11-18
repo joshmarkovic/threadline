@@ -1,0 +1,379 @@
+{
+  "format": 1,
+  "canonical": [
+    {
+      "lane": "integration",
+      "seed": 12345,
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "Wayland and X11 environment"
+      },
+      "source_revision": "8ebe3a9fac7a0bd28d89949a54b7ac75e4cdb4a1",
+      "source_dirty": false,
+      "cargo_lock_sha256": "f1717e262ce2964d9b398759e2febce1fb143d9ff41043330c6556ef5e2883d8",
+      "fixture_revision": "mixed",
+      "status": "Pass",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "integration",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "exit_code": 0,
+      "source_sha256": "1739ffb378203e9df93887f4fdd6bcb3dad234d0d8a1a6e7d33b80090cf23c3b",
+      "case_count": 22,
+      "tests_passed": 83,
+      "sync_cases": [
+        {
+          "case": "IT-006",
+          "status": "Pass",
+          "tests_passed": 3,
+          "requirement_ids": [
+            "SYNC-06",
+            "SYNC-07",
+            "SYNC-10",
+            "SYNC-11",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-54",
+            "AC-75",
+            "AC-76"
+          ],
+          "fixture_revision": "s06-pr-reading-v1"
+        },
+        {
+          "case": "IT-007",
+          "status": "Pass",
+          "tests_passed": 4,
+          "requirement_ids": [
+            "SYNC-03",
+            "SYNC-05",
+            "WORKSPACE-10",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-12",
+            "AC-44",
+            "AC-69"
+          ],
+          "fixture_revision": "s05-sync-v1"
+        },
+        {
+          "case": "S05-FEED-HTTP",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "SYNC-05",
+            "SYNC-06",
+            "SYNC-07",
+            "SYNC-10",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-12",
+            "AC-54"
+          ],
+          "fixture_revision": "s05-sync-v1"
+        },
+        {
+          "case": "S05-SYNC-WORKER",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "SYNC-02",
+            "SYNC-03",
+            "SYNC-09",
+            "NOTIFY-13",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-11",
+            "AC-54",
+            "AC-57"
+          ],
+          "fixture_revision": "s05-sync-v1"
+        }
+      ]
+    },
+    {
+      "lane": "ui",
+      "seed": 12345,
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "Wayland and X11 environment"
+      },
+      "source_revision": "8ebe3a9fac7a0bd28d89949a54b7ac75e4cdb4a1",
+      "source_dirty": false,
+      "cargo_lock_sha256": "f1717e262ce2964d9b398759e2febce1fb143d9ff41043330c6556ef5e2883d8",
+      "fixture_revision": "s01-feasibility-v1",
+      "status": "Pass",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "ui",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "exit_code": 0,
+      "source_sha256": "f67e51565f9a89d3f80d1fe98904cbe9db7f1855f1a114c4ca7a1aa2ff2e6146",
+      "case_count": 4,
+      "tests_passed": 9,
+      "sync_cases": []
+    },
+    {
+      "lane": "unit",
+      "seed": 12345,
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "Wayland and X11 environment"
+      },
+      "source_revision": "8ebe3a9fac7a0bd28d89949a54b7ac75e4cdb4a1",
+      "source_dirty": false,
+      "cargo_lock_sha256": "f1717e262ce2964d9b398759e2febce1fb143d9ff41043330c6556ef5e2883d8",
+      "fixture_revision": "mixed",
+      "status": "Pass",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "unit",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "exit_code": 0,
+      "source_sha256": "7a17eb55326a8fc689b7304813dd5eeb40ae784bb564db016ea1de95b0188992",
+      "case_count": 18,
+      "tests_passed": 70,
+      "sync_cases": [
+        {
+          "case": "UT-002",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "SYNC-07",
+            "SYNC-10",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-54"
+          ],
+          "fixture_revision": "s05-sync-v1"
+        },
+        {
+          "case": "UT-005",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "SYNC-01",
+            "DATA-02",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-11",
+            "AC-69"
+          ],
+          "fixture_revision": "s05-sync-v1"
+        },
+        {
+          "case": "UT-006",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "SYNC-03",
+            "SYNC-04",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-69"
+          ],
+          "fixture_revision": "s05-sync-v1"
+        },
+        {
+          "case": "UT-007",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "SYNC-05",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-12"
+          ],
+          "fixture_revision": "s05-sync-v1"
+        }
+      ]
+    }
+  ],
+  "windows_portable": [
+    {
+      "suite": "s06-native-windows-core",
+      "count": 17,
+      "sync_tests": [
+        "sync::policy::tests::ut_005_dst_gap_fold_overnight_and_system_zone_keep_local_workdays",
+        "sync::policy::tests::ut_006_controls_keep_background_dispatch_and_delivery_independent",
+        "sync::policy::ut_002_sparse_numbers_do_not_define_the_provider_update_window",
+        "sync::policy::ut_007_retry_and_server_floors_have_independent_bounds",
+        "sync::tests::cancellation_and_queue_limit_do_not_dispatch_unwanted_requests",
+        "sync::tests::mismatched_provider_item_is_rejected_even_for_a_current_selection",
+        "sync::tests::simulated_time_controls_completion_and_stale_view_rejection",
+        "sync::tests::ut_013_late_response_requires_the_same_account_target_tab_instance_and_generation"
+      ],
+      "raw_sha256": "79ca028ca8869cb3915d1e51fcf7b572802b4aaa85d8d51b219c4b6987168a5f"
+    },
+    {
+      "suite": "s05-native-windows-sync",
+      "count": 8,
+      "sync_tests": [
+        "foreground_admission_distinguishes_local_spacing_from_the_persisted_server_floor",
+        "it_006_concurrent_full_discussion_refresh_cannot_erase_a_newer_feed_edit",
+        "it_006_old_item_changes_and_comment_edits_survive_restarts_with_independent_overlapping_windows",
+        "it_007_expired_cursors_partial_permissions_budget_floors_and_retry_exhaustion_survive_restart",
+        "it_007_panes_share_a_claim_cancel_independently_and_obey_offline_and_repository_holds",
+        "it_007_shared_budget_gives_every_class_a_turn_under_continuous_user_load",
+        "it_007_visible_subscriptions_replace_atomically_after_relaunch_without_waking_unchanged_panes",
+        "stale_visible_response_cannot_publish_another_item_or_change_cache_after_deselection"
+      ],
+      "raw_sha256": "23feeb57d8a1ce549284c9770f767984245fcb56bd13681df2d12b2d08a4988e"
+    },
+    {
+      "suite": "s06-native-windows-app",
+      "count": 20,
+      "sync_tests": [
+        "accounts::tests::sync_worker_waits_for_hydration_and_restored_offline_then_observes_both_feeds",
+        "sync_panel::tests::work_windows_parse_clock_boundaries_and_positive_intervals",
+        "sync_panel::ui_tests::settings_controls_persist_separate_pause_flags_and_work_window"
+      ],
+      "raw_sha256": "98741fbece9da2790c08c9f39c0d0f851eef96a4bef18eec7027d37420b6f71a"
+    }
+  ],
+  "native_controls": {
+    "lane": "e2e",
+    "seed": 12345,
+    "host": {
+      "os": "windows",
+      "architecture": "x86_64",
+      "version": "Microsoft Windows [Version 10.0.22631.7652]",
+      "display_session": "Windows desktop availability is checked by native driver"
+    },
+    "source_revision": "8e445d202f38e3633c4ef3a5d9114e9e4655f7d9",
+    "source_dirty": false,
+    "cargo_lock_sha256": "f1717e262ce2964d9b398759e2febce1fb143d9ff41043330c6556ef5e2883d8",
+    "fixture_revision": "s05-sync-v1",
+    "status": "Fail",
+    "command": {
+      "program": "xtask",
+      "argv": [
+        "test",
+        "e2e",
+        "--suite",
+        "full",
+        "--case",
+        "S05-WINDOWS-SYNC",
+        "--binary",
+        "<binary-path>",
+        "--seed",
+        "12345",
+        "--report-dir",
+        "<report-dir>"
+      ],
+      "redacted": true
+    },
+    "exit_code": 1,
+    "case": "S05-WINDOWS-SYNC",
+    "sha256": "aebaf5686335feab162abca197eae34cb42834f7f7ff809f5d3772caef93a7c7",
+    "app_sha256": "44e12b6cb59267e20e732851f07c38e2cbf00e5ee9476b2a02c884440679283e",
+    "dpi": 144,
+    "actions": [
+      "Attempt focus through a verified native pointer target",
+      "Verify native input reached both authorization fields",
+      "Connect through native repository and password controls",
+      "Select the verified repository",
+      "Observe authenticated issue and comment updates in the native reader",
+      "Relaunch the same SQLite profile in a separate process",
+      "Restore the native synchronization controls in a new process"
+    ],
+    "separate_process": true,
+    "retained": {
+      "work_offline": true,
+      "pause_background": true,
+      "pause_queued_actions": true,
+      "notification_quiet": true
+    },
+    "http": [
+      {
+        "phase": "sync_live",
+        "route": "user",
+        "status": 200
+      },
+      {
+        "phase": "sync_live",
+        "route": "repository",
+        "status": 200
+      },
+      {
+        "phase": "sync_live",
+        "route": "discovery",
+        "status": 200
+      },
+      {
+        "phase": "sync_live",
+        "route": "user",
+        "status": 200
+      },
+      {
+        "phase": "sync_live",
+        "route": "user",
+        "status": 200
+      },
+      {
+        "phase": "sync_live",
+        "route": "repository",
+        "status": 200
+      },
+      {
+        "phase": "sync_live",
+        "route": "discovery",
+        "status": 200
+      },
+      {
+        "phase": "sync_live",
+        "route": "repository",
+        "status": 200
+      },
+      {
+        "phase": "sync_live",
+        "route": "updated_comments",
+        "status": 200
+      },
+      {
+        "phase": "sync_live",
+        "route": "updated_items",
+        "status": 200
+      }
+    ],
+    "trace_sha256": "6b5ef9bf05cca973b87e8f855c766963aabd58a850e1910ce06b967eac7defb1",
+    "termination": "Driver timeout opening the native Accounts panel after restart."
+  }
+}
