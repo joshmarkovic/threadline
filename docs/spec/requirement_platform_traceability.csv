@@ -290,7 +290,7 @@ DIFF-01,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required
 DIFF-02,windows,Windows first release,08,08,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DIFF-02,macos,macOS release,08,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DIFF-02,linux,Linux release,08,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-DIFF-03,windows,Windows first release,10,10,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+DIFF-03,windows,Windows first release,10,10,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,Native second-parent and endpoint comparisons passed. PR merge-base behavior was verified separately. docs/reports/sprint-10.md
 DIFF-03,macos,macOS release,10,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DIFF-03,linux,Linux release,10,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DIFF-04,windows,Windows first release,06,08,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -305,22 +305,22 @@ DIFF-06,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required
 DIFF-07,windows,Windows first release,06,06,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
 DIFF-07,macos,macOS release,06,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DIFF-07,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-GRAPH-01,windows,Windows first release,10,10,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+GRAPH-01,windows,Windows first release,10,10,12,yes,Pass,Actual target evidence required; earlier-platform results do not close this row.,Native E2E-011 loaded branch and tag labels and expanded both merge parents in the history graph. docs/reports/sprint-10.md
 GRAPH-01,macos,macOS release,10,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 GRAPH-01,linux,Linux release,10,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-GRAPH-02,windows,Windows first release,10,10,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+GRAPH-02,windows,Windows first release,10,10,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,Native E2E-011 verified the bounded graph and explicit older-history action. The background worker verified the watched scopes in loopback. docs/reports/sprint-10.md
 GRAPH-02,macos,macOS release,10,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 GRAPH-02,linux,Linux release,10,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-GRAPH-03,windows,Windows first release,10,10,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+GRAPH-03,windows,Windows first release,10,10,12,yes,Pass,Actual target evidence required; earlier-platform results do not close this row.,"Native E2E-011 selected the second merge parent, opened its patch and restored the exact two-commit comparison offline. docs/reports/sprint-10.md"
 GRAPH-03,macos,macOS release,10,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 GRAPH-03,linux,Linux release,10,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-GRAPH-04,windows,Windows first release,10,10,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+GRAPH-04,windows,Windows first release,10,10,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,Native continuation boundaries and stable stored lanes passed. SQLite restored the scroll anchor and offset. Native scroll stability during expansion remains open. docs/reports/sprint-10.md
 GRAPH-04,macos,macOS release,10,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 GRAPH-04,linux,Linux release,10,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-GRAPH-05,windows,Windows first release,10,10,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+GRAPH-05,windows,Windows first release,10,10,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,Windows SQLite preserved immutable commits and cached views after a force-push. The scheduler verified confirmed branch deletion. Native move/delete with an open draft remains open. docs/reports/sprint-10.md
 GRAPH-05,macos,macOS release,10,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 GRAPH-05,linux,Linux release,10,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-GRAPH-06,windows,Windows first release,10,10,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+GRAPH-06,windows,Windows first release,10,10,12,yes,Pass,Actual target evidence required; earlier-platform results do not close this row.,"Native history used bounded GitHub reference, commits and comparison endpoints in an isolated HTTP fixture. docs/reports/sprint-10.md"
 GRAPH-06,macos,macOS release,10,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 GRAPH-06,linux,Linux release,10,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 GRAPH-07,windows,Windows first release,10,10,12,yes,Planned,Future option: record object-cache deferral. No clone or bare-object cache is mandatory.,
@@ -335,7 +335,7 @@ NOTIFY-02,linux,Linux release,05,14,14,yes,Planned,Actual target evidence requir
 NOTIFY-03,windows,Windows first release,11,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-03,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-03,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-NOTIFY-04,windows,Windows first release,10,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+NOTIFY-04,windows,Windows first release,10,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Loopback worker and SQLite tests verified scoped reference monitoring, baseline and pinned ancestry. Delivery remains a separate Sprint 11 gate. docs/reports/sprint-10.md"
 NOTIFY-04,macos,macOS release,10,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-04,linux,Linux release,10,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-05,windows,Windows first release,11,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,

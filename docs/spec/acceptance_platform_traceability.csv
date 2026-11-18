@@ -68,13 +68,13 @@ AC-22,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-23,windows,06,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
 AC-23,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-23,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-24,windows,10,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-24,windows,10,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,E2E-011 proved that older history expanded from two parent boundaries to a complete graph. SQLite restored the graph scroll anchor and offset. Native scroll position during expansion remains open. docs/reports/sprint-10.md
 AC-24,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-24,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-25,windows,10,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-25,windows,10,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Windows SQLite proved that moved branch tips preserve old immutable commits and history views. Portable scheduling tested authoritative deletion, incomplete reads and stale claims. Native move/delete with an open draft remains open. docs/reports/sprint-10.md"
 AC-25,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-25,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-26,windows,10,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-26,windows,10,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,E2E-011 proved labeled second-parent and exact two-commit comparisons. Core and SQLite separately verified PR merge-base semantics. A native comparison of all three labels remains open. docs/reports/sprint-10.md
 AC-26,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-26,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-27,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,

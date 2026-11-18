@@ -1,0 +1,276 @@
+{
+  "windows_e2e_011": {
+    "host": {
+      "os": "windows",
+      "architecture": "AMD64",
+      "version": "Microsoft Windows [Version 10.0.22631.7652]",
+      "display_session": "Windows desktop availability is checked by native driver",
+      "product": "Microsoft Windows 11 Enterprise",
+      "display": {
+        "width": 3840,
+        "height": 2160
+      }
+    },
+    "succeeded": {
+      "run": "e2e-1795044158867-28656",
+      "source_revision": "43a288a7ea1325ab29d06ad96fea6f1a5f7509e2",
+      "source_dirty": false,
+      "app_source_revision": "43a288a7ea1325ab29d06ad96fea6f1a5f7509e2",
+      "app_sha256": "22c4ef9c2bae65f0358dbe459dae2f6f4adb52af03a2c7b3ef24f51dc6ca2589",
+      "app_size_bytes": 79895552,
+      "artifact_mode": "test-build native process",
+      "cargo_lock_sha256": "f2092926683ea585d88545929599323405607777b5f355ce14882ba1c9611cee",
+      "app_version": "0.1.0",
+      "lane": "e2e",
+      "suite": "full",
+      "reported_fixture_revision": "not-applicable",
+      "seed": 12345,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-011",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_unix_ms": 1795044158865,
+      "finished_at_unix_ms": 1795044209660,
+      "status": "Pass",
+      "exit_code": 0,
+      "action_count": 23,
+      "dpi": 144,
+      "http_count": 20,
+      "non_200_http": [],
+      "detail": "Native history followed the exact immutable continuation, opened a labeled merge parent and restored a separate exact two-commit comparison after an offline restart.",
+      "graph": {
+        "initial_rows": 1,
+        "initial_boundaries": 2,
+        "expanded_rows": 3,
+        "expanded_boundaries": 0
+      },
+      "second_parent": {
+        "base": "cccccccccccccccccccccccccccccccccccccccc",
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "parent_order": 2,
+        "file": "parent-two.txt"
+      },
+      "reopened_comparison": {
+        "comparison": "Pair",
+        "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "file": "pair.txt",
+        "coverage": "Complete",
+        "offline": true,
+        "separate_process": true,
+        "profile_retained": true
+      },
+      "sha256": {
+        "result.json": "7c38765f875c80d58fa219bf6b38920c7ed4fd20ee38835109be32a9640bc4cf",
+        "history-native.json": "e72451542090751224fe6998e024db09ef8ee22ccee83c12cecab706322f5feb",
+        "binary.json": "76e82633f6bee0c81db1be3db18b7b98fbaf6b4a3c38b6ebb6e4242ef3d086f1",
+        "github-access-trace.json": "e25db4e7dec3c14d7cb5add178cbf24da094bbc533eb945e7397e2f8e3638f74",
+        "reader-restart-observation.json": "0564dab4e952932b41cb9b1ed0521203c3845b2d9d4f11c56e4ad3dd12e28edb"
+      }
+    },
+    "earlier": [
+      {
+        "run": "e2e-1795043185882-26852",
+        "source_revision": "40fe4d47cc1911e12b91b00b79e5d9d8bd651277",
+        "source_dirty": false,
+        "app_source_revision": "40fe4d47cc1911e12b91b00b79e5d9d8bd651277",
+        "app_sha256": "1d4b9e96f3445380fe07c196d1002c638441a963e271baec4f2426453bfc2560",
+        "app_size_bytes": 79883776,
+        "artifact_mode": "test-build native process",
+        "cargo_lock_sha256": "f1717e262ce2964d9b398759e2febce1fb143d9ff41043330c6556ef5e2883d8",
+        "app_version": "0.1.0",
+        "lane": "e2e",
+        "suite": "full",
+        "reported_fixture_revision": "not-applicable",
+        "seed": 12345,
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "e2e",
+            "--suite",
+            "full",
+            "--case",
+            "E2E-011",
+            "--binary",
+            "<binary-path>",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "started_at_unix_ms": 1795043185881,
+        "finished_at_unix_ms": 1795043201872,
+        "status": "Fail",
+        "exit_code": 1,
+        "action_count": 4,
+        "dpi": 144,
+        "http_count": 6,
+        "non_200_http": [],
+        "detail": "Timed out waiting for the real branch and tag index.",
+        "sha256": {
+          "result.json": "0413a02cfd101b846d88a5ab3dfc4fa40fcb779e0144d2a666059bbdd8ad0d72",
+          "history-native.json": "627c48014df8a9b027357d96f40b99e4c8259a5d24ce27805dd0ab33f54cb455",
+          "binary.json": "d3d6cd5a196722c6fb19a05c66e5c17ad19264205f15e8ffd181089adde6dbd6",
+          "github-access-trace.json": "0f0015ce17f3dd7e33d766ec1151391d111dafa51b0a20f9754a69f7643f94c5"
+        }
+      },
+      {
+        "run": "e2e-1795043338617-7636",
+        "source_revision": "dd0f6a4a8bfc1093e233cfec2185fca83b13765d",
+        "source_dirty": false,
+        "app_source_revision": "40fe4d47cc1911e12b91b00b79e5d9d8bd651277",
+        "app_sha256": "1d4b9e96f3445380fe07c196d1002c638441a963e271baec4f2426453bfc2560",
+        "app_size_bytes": 79883776,
+        "artifact_mode": "test-build native process",
+        "cargo_lock_sha256": "f1717e262ce2964d9b398759e2febce1fb143d9ff41043330c6556ef5e2883d8",
+        "app_version": "0.1.0",
+        "lane": "e2e",
+        "suite": "full",
+        "reported_fixture_revision": "not-applicable",
+        "seed": 12345,
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "e2e",
+            "--suite",
+            "full",
+            "--case",
+            "E2E-011",
+            "--binary",
+            "<binary-path>",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "started_at_unix_ms": 1795043338616,
+        "finished_at_unix_ms": 1795043360772,
+        "status": "Fail",
+        "exit_code": 1,
+        "action_count": 15,
+        "dpi": 144,
+        "http_count": 20,
+        "non_200_http": [
+          {
+            "route": "compare_a",
+            "status": 404
+          }
+        ],
+        "detail": "Timed out waiting for one file for the exact two-commit comparison.",
+        "sha256": {
+          "result.json": "4a30ea60cb403244721f4ec90a92bdbce565a2af3d18ad1b3ceab095ca419528",
+          "history-native.json": "f1b2aa0ce73906825f3a5934c050276c5e0f653e09c482174ba1469981868e26",
+          "binary.json": "d3d6cd5a196722c6fb19a05c66e5c17ad19264205f15e8ffd181089adde6dbd6",
+          "github-access-trace.json": "f943f3b2a2b322190efff56485652ab3f470184cc138f671d9bd78f578a47754"
+        }
+      }
+    ]
+  },
+  "portable_monitor": {
+    "S10-HISTORY-MONITOR": {
+      "run": "integration-1795044284240-2165969",
+      "source_revision": "3fb08abd237be1db0a7be37294b1211e8504edd1",
+      "cargo_lock_sha256": "f2092926683ea585d88545929599323405607777b5f355ce14882ba1c9611cee",
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "Wayland and X11 environment"
+      },
+      "fixture_revision": "s10-history-monitor-v1",
+      "seed": 12345,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "integration",
+          "--case",
+          "S10-HISTORY-MONITOR",
+          "--seed",
+          "12345"
+        ],
+        "redacted": false
+      },
+      "lane": "integration",
+      "started_at_unix_ms": 1795044284240,
+      "finished_at_unix_ms": 1795044359893,
+      "status": "Pass",
+      "exit_code": 0,
+      "tests_passed": 1,
+      "requirement_ids": [
+        "NOTIFY-04",
+        "SYNC-03",
+        "TEST-03"
+      ],
+      "acceptance_ids": [
+        "AC-39",
+        "AC-54"
+      ],
+      "result_sha256": "0f785d8acdffc2838c9555c87add3c2538a18c9c0c00b8992c1e16f081bc1dc8"
+    },
+    "IT-006": {
+      "run": "integration-1795044331203-2167942",
+      "source_revision": "3fb08abd237be1db0a7be37294b1211e8504edd1",
+      "cargo_lock_sha256": "f2092926683ea585d88545929599323405607777b5f355ce14882ba1c9611cee",
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "Wayland and X11 environment"
+      },
+      "fixture_revision": "s06-pr-reading-v1",
+      "seed": 12345,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "integration",
+          "--case",
+          "IT-006",
+          "--seed",
+          "12345"
+        ],
+        "redacted": false
+      },
+      "lane": "integration",
+      "started_at_unix_ms": 1795044331202,
+      "finished_at_unix_ms": 1795044379447,
+      "status": "Pass",
+      "exit_code": 0,
+      "tests_passed": 10,
+      "requirement_ids": [
+        "SYNC-06",
+        "SYNC-07",
+        "SYNC-10",
+        "SYNC-11",
+        "TEST-03"
+      ],
+      "acceptance_ids": [
+        "AC-54",
+        "AC-75",
+        "AC-76"
+      ],
+      "result_sha256": "2e44a41745ae1181673c75d1bf79298e80f1e0535616d8be995715a38f8c87f2"
+    }
+  }
+}
