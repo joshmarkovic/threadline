@@ -170,17 +170,22 @@ function Wait-SettledLayout([string]$Description, [scriptblock]$Check) {
     return $stable.state
 }
 
+function Get-ThreadlineArguments([string]$Observation, [switch]$OpenReview, [string]$SeedReader) {
+    $arguments = '--e2e-report "' + $Observation + '"'
+    if ($SeedReader) { return "--e2e-seed-reader $SeedReader $arguments" }
+    if (!$AccessProof -and !$ReaderProof) { $arguments += ' --fixture-s01' }
+    if ($Measure) { $arguments += ' --measure' }
+    if ($OpenReview) { $arguments += ' --open-review' }
+    return $arguments
+}
+
 function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenReview, [string]$SeedReader) {
     $info = New-Object System.Diagnostics.ProcessStartInfo
     $info.FileName = $script:Binary
     $info.UseShellExecute = $false
     $info.CreateNoWindow = $true
     $info.WorkingDirectory = $Profile
-    $info.Arguments = '--e2e-report "' + $Observation + '"'
-    if (!$AccessProof -and !$ReaderProof) { $info.Arguments += ' --fixture-s01' }
-    if ($SeedReader) { $info.Arguments += ' --e2e-seed-reader ' + $SeedReader }
-    if ($Measure) { $info.Arguments += ' --measure' }
-    if ($OpenReview) { $info.Arguments += ' --open-review' }
+    $info.Arguments = Get-ThreadlineArguments $Observation -OpenReview:$OpenReview -SeedReader $SeedReader
     $info.EnvironmentVariables['THREADLINE_PROFILE_DIR'] = $Profile
     $info.EnvironmentVariables['THREADLINE_TEST_SEED'] = $Seed.ToString([Globalization.CultureInfo]::InvariantCulture)
     $info.EnvironmentVariables.Remove('THREADLINE_TEST_TOAST_TOKEN')
