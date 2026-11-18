@@ -23,6 +23,7 @@ use crate::{
 pub(crate) struct AccountObservation {
     panel_open: bool,
     busy: bool,
+    active_local_id: Option<i64>,
     active_user_id: Option<u64>,
     active_login: Option<String>,
     repository_count: usize,
@@ -35,6 +36,8 @@ pub(crate) struct AccountObservation {
     fixture_token_focused: bool,
     fixture_route_entered: bool,
     fixture_token_entered: bool,
+    fixture_replacement_active: bool,
+    fixture_identity_rejected: bool,
     input_issue: Option<crate::accounts::AccountInputIssue>,
 }
 
@@ -165,6 +168,7 @@ impl AccountPanel {
         Some(AccountObservation {
             panel_open,
             busy: self.busy,
+            active_local_id: self.view.active.map(|account| account.0),
             active_user_id: profile.map(|profile| profile.user_id.get()),
             active_login: profile.map(|profile| profile.login.clone()),
             repository_count: self.view.repositories.len(),
@@ -192,6 +196,10 @@ impl AccountPanel {
                     .text()
                     .chars()
                     .eq(crate::accounts::FIXTURE_PAT.chars()),
+            fixture_replacement_active: panel_open && self.renew.is_some(),
+            fixture_identity_rejected: self.github_error.as_ref().is_some_and(|error| {
+                error.kind == threadline_core::github::AccessKind::IdentityMismatch
+            }),
             input_issue: self.input_issue,
         })
     }
@@ -410,6 +418,7 @@ impl AccountPanel {
                 let active = Some(account) == self.view.active;
                 Some(
                     Button::new(format!("account-switch-{}", account.0))
+                        .accessibility_id(format!("account-switch-{}", account.0))
                         .label(if active {
                             format!("{} (active)", profile.login)
                         } else {
@@ -523,6 +532,10 @@ impl AccountPanel {
                             )
                             .child(
                                 Button::new(format!(
+                                    "account-renew-{}-{}",
+                                    profile.account.0, profile.owner_scope
+                                ))
+                                .accessibility_id(format!(
                                     "account-renew-{}-{}",
                                     profile.account.0, profile.owner_scope
                                 ))

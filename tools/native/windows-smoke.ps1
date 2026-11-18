@@ -8,7 +8,7 @@ param(
     [switch]$PlatformProof,
     [switch]$ToastProof,
     [switch]$AccessProof,
-    [ValidateSet('Offline', 'Resume', 'Performance', 'LargeWorkspace', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'History', 'Writes', 'WriteSurface')][string]$ReaderProof,
+    [ValidateSet('Offline', 'Resume', 'Performance', 'LargeWorkspace', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface')][string]$ReaderProof,
     [switch]$AccessibilityProof,
     [string]$AccessAddress,
     [string]$AccessPhaseFile,
@@ -45,6 +45,8 @@ $reportName = if ($Measure) {
     'review-context-native.json'
 } elseif ($ReaderProof -eq 'DirectMerge') {
     'direct-merge-native.json'
+} elseif ($ReaderProof -eq 'CredentialBoundary') {
+    'credential-boundary-native.json'
 } elseif ($ReaderProof -eq 'History') {
     'history-native.json'
 } elseif ($ReaderProof -in @('Writes', 'WriteSurface')) {
@@ -225,7 +227,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
         $info.EnvironmentVariables['THREADLINE_E2E_GITHUB_ADDR'] = $script:AccessAddress
     }
     if ($script:UseSeededFixtureAuth) { $info.EnvironmentVariables['THREADLINE_E2E_FIXTURE_AUTH'] = '1' }
-    if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'DirectMerge', 'Writes', 'WriteSurface')) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
+    if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'DirectMerge', 'CredentialBoundary', 'Writes', 'WriteSurface')) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
     return [Diagnostics.Process]::Start($info)
 }
 
@@ -905,7 +907,7 @@ try {
         }
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
-    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'History', 'Writes', 'WriteSurface', 'Performance', 'LargeWorkspace')) {
+    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface', 'Performance', 'LargeWorkspace')) {
         Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
         . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
         $script:UseOwnedUiAutomation = !$AccessibilityProof
@@ -914,9 +916,10 @@ try {
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
     if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'DirectMerge')) { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
     if ($ReaderProof -in @('PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge')) { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
-    if ($ReaderProof -in @('ReviewDraft', 'ReviewContext', 'DirectMerge', 'History', 'Writes', 'WriteSurface')) { . (Join-Path $PSScriptRoot 'windows-issue-writes.ps1') }
+    if ($ReaderProof -in @('ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface')) { . (Join-Path $PSScriptRoot 'windows-issue-writes.ps1') }
     if ($ReaderProof -in @('ReviewDraft', 'ReviewContext')) { . (Join-Path $PSScriptRoot 'windows-review-context.ps1') }
     if ($ReaderProof -eq 'DirectMerge') { . (Join-Path $PSScriptRoot 'windows-merge.ps1') }
+    if ($ReaderProof -eq 'CredentialBoundary') { . (Join-Path $PSScriptRoot 'windows-credential-boundary.ps1') }
     if ($ReaderProof -eq 'History') { . (Join-Path $PSScriptRoot 'windows-history.ps1') }
     $firstProfile = Join-Path $ProfileDir ('initial-' + [guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $firstProfile -Force
@@ -985,6 +988,7 @@ try {
             ReviewDraft { Invoke-ReviewDraftProof $window $firstProfile }
             ReviewContext { Invoke-ReviewContextProof $window $firstProfile }
             DirectMerge { Invoke-MergeProof $window }
+            CredentialBoundary { Invoke-CredentialBoundaryProof $window $firstProfile }
             History { Invoke-HistoryProof $window $firstProfile }
             Writes { Invoke-IssueWriteProof $window $firstProfile }
             WriteSurface { Invoke-IssueWriteSurfaceProof $window }

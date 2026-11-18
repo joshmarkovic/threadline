@@ -40,6 +40,9 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if matches!(case, "UT-017" | "IT-014" | "IT-015" | "E2E-009") {
         return Some("s09-direct-merge-v1");
     }
+    if case == "E2E-010" {
+        return Some("s09-credential-boundary-v1");
+    }
     if case == "S10-HISTORY-MONITOR" {
         return Some("s10-history-monitor-v1");
     }

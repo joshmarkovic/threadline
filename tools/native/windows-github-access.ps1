@@ -61,7 +61,8 @@ function Set-AccessPhase([string]$Phase) {
     if ($Phase -cnotin @('ready', 'partial', 'sso', 'denied', 'revoked', 'reader-failure', 'reader-resume',
         'sync-live', 'sync-offline', 'sync-service', 'sync-throttle', 'sync-transport',
         'pr-load', 'pr-delay', 'pr-release', 'review-send', 'review-changed',
-        'merge-prepare', 'merge-send', 'merge-wrong-head', 'history', 'write-online', 'write-drop')) {
+        'merge-prepare', 'merge-send', 'merge-wrong-head', 'history', 'write-online', 'write-drop',
+        'credential-ready', 'credential-offline', 'credential-other', 'credential-return')) {
         throw 'Unknown access fixture phase.'
     }
     try {
@@ -80,15 +81,7 @@ function Open-AccountFixture {
     return Wait-Account 'open the native account panel' { param($account) $account.panel_open }
 }
 
-function Connect-FixtureAccount([IntPtr]$Window, [switch]$FromVisibleControl) {
-    if ($FromVisibleControl) {
-        Click-AccountControl $Window 'account-open'
-        $null = Wait-Account 'open the native account panel through its visible control' {
-            param($account) $account.panel_open
-        }
-    } else {
-        $null = Open-AccountFixture
-    }
+function Enter-FixtureAccountForm([IntPtr]$Window) {
     if (!$script:UseOwnedUiAutomation -or !(Set-OwnedFixtureRepository $Window)) {
         if ($script:UseOwnedUiAutomation) { Set-WindowFocus $Window }
         Click-AccountControl $Window 'account-repository'
@@ -119,6 +112,18 @@ function Connect-FixtureAccount([IntPtr]$Window, [switch]$FromVisibleControl) {
         repository_value_confirmed = $true
         synthetic_credential_confirmed = $true
     })
+}
+
+function Connect-FixtureAccount([IntPtr]$Window, [switch]$FromVisibleControl) {
+    if ($FromVisibleControl) {
+        Click-AccountControl $Window 'account-open'
+        $null = Wait-Account 'open the native account panel through its visible control' {
+            param($account) $account.panel_open
+        }
+    } else {
+        $null = Open-AccountFixture
+    }
+    Enter-FixtureAccountForm $Window
     Click-AccountControl $Window 'account-connect'
     $identity = Wait-Account 'verified fixture identity and repository access' {
         param($account)

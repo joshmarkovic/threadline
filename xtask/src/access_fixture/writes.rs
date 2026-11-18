@@ -9,14 +9,23 @@ pub(super) fn post(phase: Phase, path: &str, payload: &Value) -> Route {
         return Route::Unexpected;
     }
     match phase {
-        Phase::WriteOnline if *payload == json!({"body":CONFIRMED}) => Route::CommentCreated,
+        Phase::WriteOnline | Phase::CredentialReturn if *payload == json!({"body":CONFIRMED}) => {
+            Route::CommentCreated
+        }
         Phase::WriteDrop if *payload == json!({"body":UNKNOWN}) => Route::CommentReplyLost,
         _ => Route::Unexpected,
     }
 }
 
 pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
-    if !matches!(phase, Phase::WriteOnline | Phase::WriteDrop) {
+    if !matches!(
+        phase,
+        Phase::WriteOnline
+            | Phase::WriteDrop
+            | Phase::CredentialReady
+            | Phase::CredentialOther
+            | Phase::CredentialReturn
+    ) {
         return None;
     }
     let issue = || {

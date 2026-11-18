@@ -70,6 +70,10 @@ enum Phase {
     MergePrepare,
     MergeSend,
     MergeWrongHead,
+    CredentialReady,
+    CredentialOffline,
+    CredentialOther,
+    CredentialReturn,
     History,
     WriteOnline,
     WriteDrop,
@@ -98,6 +102,10 @@ impl Phase {
             "merge-prepare" => Ok(Self::MergePrepare),
             "merge-send" => Ok(Self::MergeSend),
             "merge-wrong-head" => Ok(Self::MergeWrongHead),
+            "credential-ready" => Ok(Self::CredentialReady),
+            "credential-offline" => Ok(Self::CredentialOffline),
+            "credential-other" => Ok(Self::CredentialOther),
+            "credential-return" => Ok(Self::CredentialReturn),
             "history" => Ok(Self::History),
             "write-online" => Ok(Self::WriteOnline),
             "write-drop" => Ok(Self::WriteDrop),
@@ -172,6 +180,7 @@ pub enum TraceCheck {
     ReviewContextJourney,
     ReviewDraftJourney,
     MergeJourney,
+    CredentialBoundary,
     HistoryJourney,
     WritesWithLoss,
     WriteSurface,
@@ -223,6 +232,7 @@ impl AccessFixture {
             TraceCheck::ReviewContextJourney => pr::trace_review_context(&records),
             TraceCheck::ReviewDraftJourney => pr::trace_review_draft(&records),
             TraceCheck::MergeJourney => merge::trace(&records),
+            TraceCheck::CredentialBoundary => complete_credential_boundary(&records),
             TraceCheck::HistoryJourney => history::trace(&records),
             TraceCheck::WritesWithLoss => writes::trace(&records, true),
             TraceCheck::WriteSurface => writes::trace(&records, false),
@@ -324,6 +334,30 @@ fn complete_journey(records: &[RequestEvidence]) -> bool {
         && observed(Phase::Sso, Route::Repository, 403)
         && observed(Phase::Denied, Route::Repository, 403)
         && observed(Phase::Revoked, Route::User, 401)
+}
+
+fn complete_credential_boundary(records: &[RequestEvidence]) -> bool {
+    let successful = |phase, route| {
+        records
+            .iter()
+            .filter(|row| row.phase == phase && row.route == route && row.status == 200)
+            .count()
+    };
+    let effects: Vec<_> = records
+        .iter()
+        .filter(|row| matches!(row.route, Route::CommentCreated | Route::CommentReplyLost))
+        .map(|row| (row.phase, row.route, row.status))
+        .collect();
+    records.iter().all(|row| {
+        row.fixture_authorization
+            && row.route != Route::Unexpected
+            && row.phase != Phase::CredentialOffline
+    }) && successful(Phase::CredentialReady, Route::User) >= 1
+        && successful(Phase::CredentialOther, Route::User) >= 2
+        && successful(Phase::CredentialOther, Route::Repository) >= 1
+        && successful(Phase::CredentialReturn, Route::User) >= 1
+        && successful(Phase::CredentialReturn, Route::Repository) >= 1
+        && effects == [(Phase::CredentialReturn, Route::CommentCreated, 201)]
 }
 
 fn serve(
@@ -459,7 +493,14 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
         (Some("GET"), Some(ITEMS), Some("HTTP/1.1")) => Route::Items,
         (Some("GET"), Some(ITEM), Some("HTTP/1.1")) => Route::Item,
         (Some("GET"), Some(SCHEDULED_ISSUE), Some("HTTP/1.1"))
-            if matches!(phase, Phase::WriteOnline | Phase::WriteDrop) =>
+            if matches!(
+                phase,
+                Phase::WriteOnline
+                    | Phase::WriteDrop
+                    | Phase::CredentialReady
+                    | Phase::CredentialOther
+                    | Phase::CredentialReturn
+            ) =>
         {
             Route::ScheduledIssue
         }
@@ -620,6 +661,9 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
             "Too Many Requests",
             json!({"message":"Fixture throttled"}),
         ),
+        (Phase::CredentialOther, Route::User) => {
+            result(200, "OK", json!({"id":42,"login":"alternate-fixture-user"}))
+        }
         (_, Route::User) => result(200, "OK", json!({"id":41,"login":"fixture-user"})),
         (Phase::Partial, Route::Discovery) => Response {
             sso: Some("partial-results; organizations=123".into()),

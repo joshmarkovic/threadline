@@ -1,6 +1,8 @@
-function Open-WriteFixtureIssue([IntPtr]$Window) {
-    Set-AccessPhase 'write-online'
-    Wait-SeededFixtureAccount
+function Open-WriteFixtureIssue([IntPtr]$Window, [switch]$UserConnected) {
+    if (!$UserConnected) {
+        Set-AccessPhase 'write-online'
+        Wait-SeededFixtureAccount
+    }
     Click-AccountControl $Window 'reader-repository-1'
     Click-AccountControl $Window 'reader-fetch-repository'
     Click-AccountControl $Window 'reader-result-0'
