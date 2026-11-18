@@ -1,0 +1,91 @@
+{
+  "source_revision": "37f195246c2fb1f06b14708c32b677755e18a406",
+  "source_dirty": false,
+  "command": {
+    "program": "xtask",
+    "argv": [
+      "test",
+      "e2e",
+      "--suite",
+      "full",
+      "--case",
+      "E2E-003",
+      "--binary",
+      "<binary-path>",
+      "--seed",
+      "12345",
+      "--report-dir",
+      "<report-dir>"
+    ],
+    "redacted": true
+  },
+  "host": {
+    "os": "windows",
+    "architecture": "x86_64",
+    "version": "Microsoft Windows [Version 10.0.22631.7652]",
+    "display_session": "Windows desktop availability is checked by native driver"
+  },
+  "fixture_revision": "s04-reader-v1",
+  "seed": 12345,
+  "status": "Pass",
+  "exit_code": 0,
+  "cases": [
+    {
+      "case": "E2E-003",
+      "status": "Pass",
+      "detail": "Cached content, panes and the local Markdown draft survived a separate-process restart while signed out and offline. See native-driver.log.",
+      "tests_passed": null,
+      "requirement_ids": [
+        "OFFLINE-01",
+        "CACHE-01",
+        "WORKSPACE-08",
+        "WORKSPACE-09",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-06",
+        "AC-46",
+        "AC-56",
+        "AC-91"
+      ],
+      "child_exit_code": 0,
+      "fixture_revision": "s04-reader-v1"
+    }
+  ],
+  "source_sha256": {
+    "reader-native.json": "735a6b577753a4bf0e7ac72fea5eb05cd5471abf33ce8f3ac4372b86bff101cf",
+    "reader-restart-observation.json": "739905a303f3a1d5511cf211184b7163286679908116c2377c4b188334adcf4f",
+    "binary.json": "e0998880d37e868d4defd14ce0ce1d4f7d7bc17b78f80301035883cc3a138575",
+    "result.json": "c230bda55957c397c33b81d0de0e2e0db2c39973ddba6ea5e37efbfe3a4fc6a5"
+  },
+  "app": {
+    "binary_sha256": "b51f5bfc4b8bc50ec85ed6c111ddb9af4f73cfd6b65c16ac0ad87fd4a9ace0d5",
+    "executable_bytes": 66892288,
+    "dpi": 144
+  },
+  "actions": [
+    "Seed the isolated profile with the application and bundled SQLite",
+    "Attempt focus through a verified native pointer target",
+    "Type and save a local Markdown draft offline",
+    "Relaunch the same SQLite profile in a separate process",
+    "Restore cached content, tab layout and the exact local draft offline"
+  ],
+  "restoration": {
+    "distinct_processes": true,
+    "verified_pointer_injection": true,
+    "sqlite_retained": true,
+    "typed_draft_sha256": "8feca84e766104606481f760813ce90e1fe9136c95b4c05d315bdc0326a43062",
+    "restored_draft_sha256": "8feca84e766104606481f760813ce90e1fe9136c95b4c05d315bdc0326a43062",
+    "cached_content_ready": true,
+    "active_item": 3,
+    "focused_pane": 1,
+    "pane_count": 2,
+    "tab_counts": [
+      10,
+      10
+    ],
+    "comment_count": 2,
+    "signed_out": true,
+    "offline": true
+  }
+}

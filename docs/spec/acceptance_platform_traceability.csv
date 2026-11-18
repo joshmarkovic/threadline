@@ -14,7 +14,7 @@ AC-04,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-05,windows,06,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-05,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-05,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-06,windows,04,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Product rendered the signed-out offline Section 16 workspace. Native draft restoration journey remains open. docs/reports/sprint-04.md
+AC-06,windows,04,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"E2E-003 restored the same reader item, two panes, 20 tabs and the exact draft in a fresh process while signed out and offline. docs/reports/evidence/sprint-04/windows-cached-restart.json"
 AC-06,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-06,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-07,windows,04,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,SQLite and GPUI tests verify incomplete discussion coverage and recovery. docs/reports/sprint-04.md
@@ -134,7 +134,7 @@ AC-44,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-45,windows,09,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-45,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-45,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-46,windows,04,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Native launch restored 20 tabs offline. A component test verifies orderly exit during editing. docs/reports/sprint-04.md
+AC-46,windows,04,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"E2E-003 restored the same reader item, two panes, 20 tabs and the exact draft in a fresh process while signed out and offline. docs/reports/evidence/sprint-04/windows-cached-restart.json"
 AC-46,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-46,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-47,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,

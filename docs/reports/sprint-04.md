@@ -1,6 +1,6 @@
 # Sprint 04 cached workspace
 
-Threadline reopened the Section 16 fixture on Windows 11 while signed out and offline. The development app restored two panes with ten tabs each, displayed four downloaded comments for the active item and showed 900 unresolved actions. The Windows reference run recorded the rendered workspace. External keyboard and pointer journeys, and the three cached-navigation timing gates, remain open. [Native and portable receipts](evidence/sprint-04/verification.json) · [Sprint requirements and acceptance](../spec/sprints/sprint_04_cached_workspace.md)
+Threadline reopened the Section 16 fixture on Windows 11 while signed out and offline. The development app restored two panes with ten tabs each, displayed four downloaded comments for the active item and showed 900 unresolved actions. The Windows reference run recorded the rendered workspace. On a separate small fixture, the external Windows driver saved a draft, quit, reopened the same profile and recovered the exact draft. The partial-download journey and the three cached-navigation timing gates remain open. [Native and portable receipts](evidence/sprint-04/verification.json) · [Sprint requirements and acceptance](../spec/sprints/sprint_04_cached_workspace.md)
 
 ## Reader and verification
 
@@ -18,7 +18,9 @@ The early Windows build at `f42b123` exhausted its 1 MiB stack on both the small
 
 ## Remaining gates
 
-E2E-003 and E2E-004 still require an external driver to verify the complete cached start, search, tab, draft and offline control journeys. AC-01 also requires separate real organization single sign-on access. The authorized private GitHub read used an existing CLI credential. The Section 16 cold-open, local-search and tab-switch timing gates and exact installed Windows package remain separate from this development launch. [Scenario ledger](../spec/test_scenarios.csv) · [GitHub access evidence](sprint-03.md)
+E2E-003 passed on clean Windows revision `37f1952` using guarded real input. The app recovered the retained SQLite profile, both ten-tab panes, the same selected item and the exact saved draft across two distinct processes while signed out and offline. The command was `cargo xtask test e2e --suite full --case E2E-003 --binary <binary-path> --seed 12345 --report-dir <report-dir>` and it exited 0. E2E-004 still requires external verification of on-demand download and recovery. [Windows cached restart](evidence/sprint-04/windows-cached-restart.json)
+
+AC-01 also requires separate real organization single sign-on access. The authorized private GitHub read used an existing CLI credential. The Section 16 cold-open, local-search and tab-switch timing gates and exact installed Windows package remain separate from this development launch. [Scenario ledger](../spec/test_scenarios.csv) · [GitHub access evidence](sprint-03.md)
 
 A Windows E2E-003 run on the small offline fixture saved a Markdown draft through the native controls, quit and reopened the development app. The second process restored the identical draft digest for item 3. The driver's subsequent attempt to open the live SQLite file failed on its Windows file-sharing mode, so the scenario exited 1. The next attempt stopped at the foreground guard. [External driver receipts](evidence/sprint-04/reader-followup.json)
 

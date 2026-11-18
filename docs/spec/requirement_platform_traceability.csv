@@ -113,10 +113,10 @@ WORKSPACE-06,linux,Linux release,07,14,14,yes,Planned,Actual target evidence req
 WORKSPACE-07,windows,Windows first release,07,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-07,macos,macOS release,07,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-07,linux,Linux release,07,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-WORKSPACE-08,windows,Windows first release,04,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
+WORKSPACE-08,windows,Windows first release,04,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,Native Windows E2E-003 confirmed cached offline restore with the original two panes and exact draft after process restart. docs/reports/sprint-04.md
 WORKSPACE-08,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-08,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-WORKSPACE-09,windows,Windows first release,04,09,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
+WORKSPACE-09,windows,Windows first release,04,09,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,Native Windows E2E-003 confirmed cached offline restore with the original two panes and exact draft after process restart. docs/reports/sprint-04.md
 WORKSPACE-09,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-09,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-10,windows,Windows first release,05,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -140,7 +140,7 @@ SEARCH-03,linux,Linux release,04,14,14,yes,Planned,Actual target evidence requir
 SEARCH-04,windows,Windows first release,04,04,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 SEARCH-04,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 SEARCH-04,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-CACHE-01,windows,Windows first release,04,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+CACHE-01,windows,Windows first release,04,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,Native Windows E2E-003 confirmed cached offline restore with the original two panes and exact draft after process restart. docs/reports/sprint-04.md
 CACHE-01,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-01,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-02,windows,Windows first release,04,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -179,7 +179,7 @@ CACHE-12,linux,Linux release,04,14,14,yes,Planned,Actual target evidence require
 CACHE-13,windows,Windows first release,02,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-02.md Normal-exit storage contract and persistent sign-out holds. Later workflows extend the restart matrix.
 CACHE-13,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-13,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-OFFLINE-01,windows,Windows first release,04,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
+OFFLINE-01,windows,Windows first release,04,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,Native Windows E2E-003 confirmed cached offline restore with the original two panes and exact draft after process restart. docs/reports/sprint-04.md
 OFFLINE-01,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OFFLINE-01,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OFFLINE-02,windows,Windows first release,07,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
