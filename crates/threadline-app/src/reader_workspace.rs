@@ -622,6 +622,9 @@ impl ReaderWorkspace {
             self.layout_busy = account.is_some();
         }
         self.repositories = repositories;
+        if changed {
+            self.adopt_sync_snapshot(window, cx);
+        }
         if let Some(worker) = self.sync_worker.as_ref() {
             if changed || offline_changed {
                 worker.interrupt(None);

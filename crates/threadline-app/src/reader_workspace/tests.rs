@@ -10,6 +10,86 @@ use threadline_storage::{
 };
 
 #[gpui_kit::test]
+fn cached_offline_account_adopts_worker_snapshot_published_before_hydration(
+    cx: &mut TestAppContext,
+) {
+    use crate::{accounts::AccountService, sync_worker::SyncWorker};
+    use threadline_core::connectivity::ConnectionStatus;
+
+    let setup = ReaderHarness::seeded();
+    let account = setup.fixture.account;
+    setup
+        .store
+        .update_sync_settings(account, |settings| settings.controls.work_offline = true)
+        .unwrap();
+    let accounts = AccountService::new(Arc::clone(&setup.store)).unwrap();
+    let worker = Arc::new(SyncWorker::start(accounts, setup.runtime.handle(), 42));
+    let mut updates = worker.watch();
+    setup.runtime.block_on(async {
+        tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            updates.wait_for(|snapshot| {
+                snapshot.account == Some(account)
+                    && snapshot.connection.status == ConnectionStatus::Offline
+            }),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    });
+
+    let (window, reader) = setup.open(cx);
+    let profile = setup
+        .store
+        .github_access_profiles()
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap();
+    let repositories = setup.store.github_repository_views(account).unwrap();
+    cx.update_window(window, |_, window, cx| {
+        reader.update(cx, |reader, cx| {
+            reader.set_account(
+                ReaderAccount {
+                    account: None,
+                    profile: None,
+                    offline: true,
+                    reachability: Reachability::NotAttempted,
+                    repositories: Vec::new(),
+                },
+                window,
+                cx,
+            );
+            reader.attach_sync(worker, window, cx);
+        });
+    })
+    .unwrap();
+    cx.run_until_parked();
+
+    cx.update_window(window, |_, window, cx| {
+        reader.update(cx, |reader, cx| {
+            assert!(reader.sync_update.is_none());
+            reader.set_account(
+                ReaderAccount {
+                    account: Some(account),
+                    profile: Some(profile),
+                    offline: true,
+                    reachability: Reachability::NotAttempted,
+                    repositories,
+                },
+                window,
+                cx,
+            );
+            assert_eq!(
+                reader.shared_connection().unwrap().status,
+                ConnectionStatus::Offline
+            );
+        });
+    })
+    .unwrap();
+}
+
+#[gpui_kit::test]
 fn ui_008_cached_markdown_and_native_editor_survive_immediate_orderly_exit(
     cx: &mut TestAppContext,
 ) {

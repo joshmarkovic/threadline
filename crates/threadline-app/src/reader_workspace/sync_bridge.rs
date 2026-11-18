@@ -35,6 +35,13 @@ impl ReaderWorkspace {
         .detach();
     }
 
+    pub(super) fn adopt_sync_snapshot(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(worker) = self.sync_worker.as_ref() {
+            let snapshot = worker.watch().borrow().clone();
+            self.update_sync(snapshot, window, cx);
+        }
+    }
+
     pub(super) fn maybe_start_sync(&mut self) {
         if !self.sync_started
             && self.account.is_some()
