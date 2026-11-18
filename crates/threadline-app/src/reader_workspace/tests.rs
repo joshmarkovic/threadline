@@ -182,6 +182,13 @@ fn cached_offline_account_adopts_worker_snapshot_published_before_hydration(
 fn ui_008_cached_markdown_and_native_editor_survive_immediate_orderly_exit(
     cx: &mut TestAppContext,
 ) {
+    use super::write_composer::WriteBase;
+    use threadline_storage::{
+        queue::DraftContent,
+        resources::{
+            ResourceFamily, ResourceKey, ResourcePage, ResourceTarget, Validators, WalkMode,
+        },
+    };
     cx.executor().allow_parking();
     let profile = tempfile::tempdir().unwrap();
     let path = profile.path().join("reader.sqlite");
@@ -193,6 +200,8 @@ fn ui_008_cached_markdown_and_native_editor_survive_immediate_orderly_exit(
         .unwrap()
         .unwrap();
     let initial_body = "Issue text. ![Fixture attachment](https://github.com/user-attachments/assets/missing-fixture)";
+    let initial_title = "Initial fixture issue title";
+    let provider_revision = "fixture-editor-base-17";
     store
         .ingest(
             account,
@@ -204,9 +213,32 @@ fn ui_008_cached_markdown_and_native_editor_survive_immediate_orderly_exit(
                     classification: IssueClassification::Issue,
                 }),
                 remote_updated_at: UtcMillis(1_900_000_000_000),
-                title: Change::Missing,
+                title: Change::Value(initial_title.into()),
                 body: Change::Value(initial_body.into()),
-                closed: Change::Missing,
+                closed: Change::Value(false),
+            },
+        )
+        .unwrap();
+    let metadata = ResourceKey {
+        account,
+        target: ResourceTarget::Item(item.id),
+        family: ResourceFamily::Metadata,
+    };
+    let fetch = store
+        .start_resource_fetch(metadata, WalkMode::Full)
+        .unwrap();
+    store
+        .commit_resource_page(
+            metadata,
+            &fetch,
+            ResourcePage {
+                records: &[],
+                next_cursor: None,
+                completed_validators: Some(&Validators {
+                    revision: Some(provider_revision.into()),
+                    ..Default::default()
+                }),
+                fetched_at_ms: 1_900_000_000_001,
             },
         )
         .unwrap();
@@ -287,14 +319,30 @@ fn ui_008_cached_markdown_and_native_editor_survive_immediate_orderly_exit(
         })
     });
     let (departed, wait) = std::sync::mpsc::channel();
+    click(cx, window, "reader-issue-issue-state-0");
     cx.update_window(window, |_, window, cx| {
-        let editor = reader
+        let draft = reader
             .read(cx)
             .drafts
             .get(&format!("issue-{}", item.id.0))
+            .unwrap();
+        let editor = draft.view.clone();
+        let title = draft
+            .issue_choices
+            .as_ref()
             .unwrap()
-            .view
+            .title
+            .as_ref()
+            .unwrap()
             .clone();
+        title.focus_handle(cx).focus(window, cx);
+        window.render_frame(cx);
+        window.press("secondary-a", cx);
+        window.input("Changed fixture issue title", cx);
+        assert_eq!(
+            title.read(cx).value().as_ref(),
+            "Changed fixture issue title"
+        );
         editor.focus_handle(cx).focus(window, cx);
         window.render_frame(cx);
         window.press("secondary-a", cx);
@@ -322,7 +370,41 @@ fn ui_008_cached_markdown_and_native_editor_survive_immediate_orderly_exit(
     let draft_id = persisted.panes[0].tabs[0].view.draft.as_deref().unwrap();
     let draft = reopened.draft(account, draft_id).unwrap().unwrap();
     assert_eq!(draft.content.body, "Latest Markdown **before exit**");
-    assert_eq!(draft.content.anchor, initial_body);
+    let Some(WriteBase::Issue {
+        fields,
+        provider_revision: saved_revision,
+    }) = WriteBase::decode(&draft.content, true)
+    else {
+        panic!("Expected the original issue edit base");
+    };
+    assert_eq!(
+        fields.body.as_ref().and_then(|body| body.as_deref()),
+        Some(initial_body)
+    );
+    assert_eq!(fields.title.as_deref(), Some(initial_title));
+    assert_eq!(fields.closed, Some(false));
+    assert_eq!(saved_revision, provider_revision);
+    let desired: serde_json::Value = serde_json::from_str(&draft.content.anchor).unwrap();
+    assert_eq!(desired["title"], "Changed fixture issue title");
+    assert_eq!(desired["closed"], true);
+
+    let legacy = DraftContent {
+        body: draft.content.body,
+        anchor: initial_body.into(),
+        base: provider_revision.into(),
+    };
+    let Some(WriteBase::Issue {
+        fields,
+        provider_revision: legacy_revision,
+    }) = WriteBase::decode(&legacy, true)
+    else {
+        panic!("Expected the legacy issue edit base");
+    };
+    assert_eq!(
+        fields.body.as_ref().and_then(|body| body.as_deref()),
+        Some(initial_body)
+    );
+    assert_eq!(legacy_revision, provider_revision);
     assert!(
         reopened
             .acquire_editor(account, draft_id, "restart", now_ms(), now_ms() + 10_000)
