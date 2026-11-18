@@ -3,7 +3,7 @@ use std::path::PathBuf;
 pub const USAGE: &str =
     "cargo xtask test <unit|integration|ui> [--case ID] [--seed N] [--report-dir DIR]
 cargo xtask test e2e --suite <smoke|full> [--binary PATH] [--case ID] [--seed N] [--report-dir DIR]
-cargo xtask test install --artifact PATH [--case ID] [--report-dir DIR]
+cargo xtask test install --artifact PATH [--local-fixture TRUSTED_JSON] [--case ID] [--report-dir DIR]
 cargo xtask test live --repo OWNER/REPO --case LIVE-001 [--credential-stdin [--allow-existing-cli-oauth]] [--first-issue-pr-page] [--report-dir DIR]
 cargo xtask measure windows [--binary PATH] [--artifact PATH] [--seed N] [--report-dir DIR]";
 
@@ -40,6 +40,7 @@ pub struct Options {
     pub report_dir: Option<PathBuf>,
     pub binary: Option<PathBuf>,
     pub artifact: Option<PathBuf>,
+    pub local_fixture: Option<PathBuf>,
     pub repo: Option<String>,
     pub allow_live_writes: bool,
     pub credential_stdin: bool,
@@ -74,6 +75,7 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
         report_dir: None,
         binary: None,
         artifact: None,
+        local_fixture: None,
         repo: None,
         allow_live_writes: false,
         credential_stdin: false,
@@ -131,6 +133,9 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
             }
             "--artifact" if matches!(lane, Lane::Install | Lane::Measure) => {
                 options.artifact = Some(value.into());
+            }
+            "--local-fixture" if lane == Lane::Install => {
+                options.local_fixture = Some(value.into());
             }
             "--repo" if lane == Lane::Live => {
                 if !valid_repo(value) {
@@ -206,6 +211,7 @@ pub fn report_arguments(args: &[String]) -> Vec<String> {
                     "--artifact" if matches!(lane, Some(Lane::Install | Lane::Measure)) => {
                         public_path(value, "<artifact-path>")
                     }
+                    "--local-fixture" if lane == Some(Lane::Install) => "<local-fixture-path>",
                     "--report-dir" => public_path(value, "<report-dir>"),
                     "--repo" if lane == Some(Lane::Live) && value == "OWNER/REPO" => value,
                     "--repo" => "<repository>",
@@ -261,7 +267,14 @@ pub fn public_path<'a>(value: &'a str, placeholder: &'static str) -> &'a str {
 fn is_value_option(option: &str) -> bool {
     matches!(
         option,
-        "--case" | "--seed" | "--report-dir" | "--binary" | "--artifact" | "--repo" | "--suite"
+        "--case"
+            | "--seed"
+            | "--report-dir"
+            | "--binary"
+            | "--artifact"
+            | "--local-fixture"
+            | "--repo"
+            | "--suite"
     )
 }
 
@@ -332,6 +345,7 @@ fn known_case(lane: Lane, case: &str) -> bool {
             | (Lane::E2e, "S04-READER-PERF")
             | (Lane::E2e, "S05-WINDOWS-SYNC")
             | (Lane::E2e, "S01-WINDOWS-TOAST")
+            | (Lane::Install, crate::install::LOCAL_CASE)
     ) || catalog_cases(lane).any(|id| id == case)
 }
 

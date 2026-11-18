@@ -16,6 +16,9 @@ pub fn scenario_ids() -> impl Iterator<Item = &'static str> {
 }
 
 pub fn fixture_revision(case: &str) -> Option<&'static str> {
+    if case == crate::install::LOCAL_CASE {
+        return Some("s12-windows-local-installer-v1");
+    }
     if matches!(case, "IT-011" | "IT-013") {
         return Some("s08-revision-bound-reviews-v1");
     }

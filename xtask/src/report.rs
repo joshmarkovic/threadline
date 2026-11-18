@@ -17,14 +17,25 @@ pub enum Status {
     Pass,
     Fail,
     Blocked,
+    #[serde(rename = "Not applicable")]
+    NotApplicable,
 }
 
 impl Status {
     pub const fn exit_code(self) -> u8 {
         match self {
-            Self::Pass => 0,
+            Self::Pass | Self::NotApplicable => 0,
             Self::Fail => 1,
             Self::Blocked => 78,
+        }
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Pass => "Pass",
+            Self::Fail => "Fail",
+            Self::Blocked => "Blocked",
+            Self::NotApplicable => "Not applicable",
         }
     }
 }
@@ -184,13 +195,19 @@ impl Report {
         fs::write(&report_path, document)?;
         let mut output = io::stdout().lock();
         for case in &self.cases {
-            let _ = writeln!(output, "{}: {:?} — {}", case.case, case.status, case.detail);
+            let _ = writeln!(
+                output,
+                "{}: {} — {}",
+                case.case,
+                case.status.label(),
+                case.detail
+            );
         }
         let _ = writeln!(
             output,
-            "{}: {:?} ({} cases). Results: {}",
+            "{}: {} ({} cases). Results: {}",
             self.lane,
-            self.status,
+            self.status.label(),
             self.cases.len(),
             report_path.display()
         );
@@ -206,7 +223,7 @@ impl Report {
         let skipped = self
             .cases
             .iter()
-            .filter(|case| case.status == Status::Blocked)
+            .filter(|case| matches!(case.status, Status::Blocked | Status::NotApplicable))
             .count();
         let lane = xml_escape(&self.lane);
         let mut xml = format!(
@@ -220,6 +237,9 @@ impl Report {
                 Status::Pass => String::new(),
                 Status::Fail => format!("<failure message=\"{detail}\" />"),
                 Status::Blocked => format!("<skipped message=\"Blocked: {detail}\" />"),
+                Status::NotApplicable => {
+                    format!("<skipped message=\"Not applicable: {detail}\" />")
+                }
             };
             writeln!(
                 &mut xml,
@@ -355,6 +375,11 @@ fn combined_status(cases: &[CaseResult]) -> Status {
         Status::Fail
     } else if cases.iter().any(|case| case.status == Status::Blocked) {
         Status::Blocked
+    } else if cases
+        .iter()
+        .all(|case| case.status == Status::NotApplicable)
+    {
+        Status::NotApplicable
     } else {
         Status::Pass
     }
@@ -440,6 +465,7 @@ mod tests {
             (Status::Pass, 0, "failures=\"0\" skipped=\"0\""),
             (Status::Fail, 1, "failures=\"1\" skipped=\"0\""),
             (Status::Blocked, 78, "failures=\"0\" skipped=\"1\""),
+            (Status::NotApplicable, 0, "failures=\"0\" skipped=\"1\""),
         ] {
             let dir = tempfile::tempdir().unwrap();
             let invocation = Invocation::new(

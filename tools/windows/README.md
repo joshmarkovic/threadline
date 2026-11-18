@@ -12,6 +12,14 @@ tools/windows/build-installer.sh --fixture /path/to/threadline.exe /output/Threa
 
 The example uses local build ordinal 2 and schema 10. Use the actual version and schema from the chosen source revision. The sibling `.exe.json` records the setup and exact installed executable digests. Verify the former against the separately recorded digest from the build before running the local fixture. Launch setup normally or with `/S` and wait for completion. Start the app through **Threadline Installer Test** in the Start menu. Use the Windows installed-apps entry or `Uninstall.exe` in the fixture directory to uninstall. The fixture retains `HKCU\Software\Threadline.InstallTest` build history to reject older test packages after uninstall.
 
+Run the canonical local case from a native Windows checkout with the fixture uninstalled.
+
+```powershell
+cargo xtask test install --case S12-LOCAL-PACKAGE --artifact C:\fixtures\Threadline-Current.exe --local-fixture C:\fixtures\approved-local-packages.json
+```
+
+The independent configuration contains `current_sha256`, `predecessor` and `stage_failure` objects with `path` and `sha256`, and an optional `profile_sha256` for a closed synthetic database. Relative package paths resolve beside that configuration. Record the SHA-256 values from the approved builds before handing off the packages. Each setup needs its generated `.exe.json` sibling. Use build ordinals at or above any retained fixture history. The canonical receipt records the exact native fixture refusal and recovery steps. Published installation and shipping-package smoke retain their own scenario results.
+
 | Setup exit code | Meaning and recovery |
 | --- | --- |
 | 0 | Installed, repaired, or uninstalled successfully |

@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 
 use crate::{
     access_fixture::{AccessFixture, TraceCheck},
-    cli::{Lane, Options, catalog_cases, public_path},
+    cli::{Lane, Options, public_path},
     report::{CaseResult, Status, sha256},
 };
 
@@ -395,7 +395,7 @@ pub fn execute(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
             root,
             dir,
         )],
-        Lane::Install => run_install(options, dir),
+        Lane::Install => crate::install::run(options, root, dir),
         Lane::Live => vec![crate::live::run(options, root, dir)],
     }
 }
@@ -934,50 +934,6 @@ fn check_executable(path: &Path) -> Result<(), String> {
         return Err(wrong_format());
     }
     Ok(())
-}
-
-fn run_install(options: &Options, dir: &Path) -> Vec<CaseResult> {
-    let case = options.case.as_deref().unwrap_or("artifact");
-    let Some(artifact) = &options.artifact else {
-        return vec![CaseResult::new(case, Status::Fail, "Specify --artifact.")];
-    };
-    if !artifact.is_file() {
-        return vec![CaseResult::new(
-            case,
-            Status::Blocked,
-            "Candidate package is missing.",
-        )];
-    }
-    let identity = sha256(artifact).and_then(|digest| {
-        let fields = json!({
-            "sha256": digest,
-            "size_bytes": artifact.metadata()?.len(),
-            "evidence_class": "candidate inspected only"
-        });
-        fs::write(
-            dir.join("candidate.json"),
-            serde_json::to_vec_pretty(&fields)?,
-        )
-    });
-    if let Err(error) = identity {
-        return vec![CaseResult::new(case, Status::Fail, error.to_string())];
-    }
-    match options.case.as_deref() {
-        Some(id) => vec![blocked_install_case(id)],
-        None => catalog_cases(Lane::Install)
-            .map(blocked_install_case)
-            .collect(),
-    }
-}
-
-fn blocked_install_case(id: &str) -> CaseResult {
-    let mut result = CaseResult::new(
-        id,
-        Status::Blocked,
-        "No packaging recipe or trusted installer test adapter is available in Sprint 01.",
-    );
-    result.evidence = Some("candidate.json".into());
-    result
 }
 
 #[cfg(test)]

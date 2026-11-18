@@ -1,6 +1,7 @@
 mod access_fixture;
 mod catalog;
 mod cli;
+mod install;
 mod live;
 mod report;
 mod run;

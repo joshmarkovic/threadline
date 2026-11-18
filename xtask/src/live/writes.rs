@@ -163,12 +163,7 @@ fn report_matches(bytes: &[u8], status: Status, source: &str, allow_oauth: bool)
         || report["github_issue_id"] != ISSUE
         || report["issue_number"] != 1
         || report["credential_source"] != source
-        || report["status"]
-            != match status {
-                Status::Pass => "Pass",
-                Status::Blocked => "Blocked",
-                Status::Fail => "Fail",
-            }
+        || report["status"] != status.label()
     {
         return false;
     }
