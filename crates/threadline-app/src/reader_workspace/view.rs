@@ -664,9 +664,14 @@ impl ReaderWorkspace {
                     )
                     .child(self.observed_control(
                         "reader-search-submit",
-                        control("reader-search-submit", "Search downloaded").on_click(
-                            cx.listener(|this, _, window, cx| this.local_search(window, cx)),
-                        ),
+                        control("reader-search-submit", "Search downloaded").on_click(cx.listener(
+                            |this, _, window, cx| {
+                                #[cfg(feature = "e2e")]
+                                this.performance
+                                    .start(performance::Action::Search(this.list_generation + 1));
+                                this.local_search(window, cx);
+                            },
+                        )),
                         false,
                     ))
                     .child(
@@ -885,6 +890,8 @@ impl ReaderWorkspace {
                         format!("reader-result-{index}"),
                         control(format!("reader-result-{index}"), label).on_click(cx.listener(
                             move |this, _, window, cx| {
+                                #[cfg(feature = "e2e")]
+                                this.performance.start(performance::Action::Open(item.0));
                                 this.open(item, anchor.clone(), false, false, window, cx)
                             },
                         )),
@@ -984,6 +991,8 @@ impl ReaderWorkspace {
                             });
                         let name = format!("reader-tab-{index}-{position}");
                         let tab_id = tab.id.clone();
+                        #[cfg(feature = "e2e")]
+                        let item = tab.item;
                         let selected = pane.active == Some(position);
                         let accessibility_label = if selected {
                             format!("{label} · Active tab")
@@ -994,6 +1003,8 @@ impl ReaderWorkspace {
                             .selected(selected)
                             .accessibility_label(accessibility_label)
                             .on_click(cx.listener(move |this, _, window, cx| {
+                                #[cfg(feature = "e2e")]
+                                this.performance.start(performance::Action::Tab(item.0));
                                 this.select_tab(&tab_id, window, cx)
                             }));
                         self.observed_control(name, button, false)

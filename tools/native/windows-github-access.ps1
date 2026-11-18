@@ -30,13 +30,13 @@ function Wait-AccountControl([string]$Id) {
     }
 }
 
-function Click-AccountControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwatch]$InputClock) {
+function Click-AccountControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwatch]$InputClock, [hashtable]$InputTiming) {
     $state = Wait-AccountControl $Id
     if ($script:UseOwnedUiAutomation) {
         if ($Id -cnotin @('account-token', 'account-repository')) {
             # GPUI observations can publish before Windows receives the matching accessibility tree.
             for ($attempt = 0; $attempt -lt 12; $attempt++) {
-                if (Invoke-OwnedFixtureControl $Window $Id $InputClock) { return }
+                if (Invoke-OwnedFixtureControl $Window $Id $InputClock -InputTiming $InputTiming) { return }
                 Start-Sleep -Milliseconds 50
             }
         }
@@ -49,7 +49,12 @@ function Click-AccountControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwat
     $bounds = $state.bounds.PSObject.Properties[$Id].Value
     $center = To-ClientPoint ($bounds[0] + $bounds[2] / 2) ($bounds[1] + $bounds[3] / 2) $state.scale_factor
     if ($null -ne $InputClock) { $InputClock.Restart() }
+    if ($InputTiming) { $InputTiming.begin = [Diagnostics.Stopwatch]::GetTimestamp() }
     [ThreadlineWinInput]::ClickClient($Window, $center, [uint32]$script:app.Id, [uint32][Math]::Round(96 * $state.scale_factor))
+    if ($InputTiming) {
+        $InputTiming.returned = [Diagnostics.Stopwatch]::GetTimestamp()
+        $InputTiming.method = 'Win32 Click'
+    }
 }
 
 function Set-AccessPhase([string]$Phase) {

@@ -180,6 +180,34 @@ function Set-ReaderPerformanceQuery([IntPtr]$Window, [int]$Sample) {
     return $targetItem
 }
 
+function Get-ReaderTimingAttribution([hashtable]$InputTiming, [object]$State, [string]$Kind, [long]$Target, [long]$Observed) {
+    $frequency = [Diagnostics.Stopwatch]::Frequency
+    $details = [ordered]@{ input = $InputTiming.method; status = 'Unavailable' }
+    $begin = $InputTiming.begin
+    $returned = $InputTiming.returned
+    if (![Diagnostics.Stopwatch]::IsHighResolution -or $begin -le 0 -or $returned -lt $begin -or $Observed -lt $returned) {
+        return $details
+    }
+    $details.input_call_ms = 1000.0 * ($returned - $begin) / $frequency
+    $details.return_to_observation_ms = 1000.0 * ($Observed - $returned) / $frequency
+    $native = $State.cached_reader.PSObject.Properties['performance_timing']
+    if ($null -eq $native -or $null -eq $native.Value) { return $details }
+    $native = $native.Value
+    $handler = $native.handler_qpc
+    $paint = $native.painted_qpc
+    if ($native.frequency -ne $frequency -or $native.kind -cne $Kind -or $native.target -ne $Target -or
+        $handler -lt $begin -or $paint -lt $handler -or $Observed -lt $paint) {
+        $details.status = 'Uncorrelated'
+        return $details
+    }
+    $details.input_to_handler_ms = 1000.0 * ($handler - $begin) / $frequency
+    $details.handler_to_useful_paint_ms = 1000.0 * ($paint - $handler) / $frequency
+    $details.paint_to_observation_ms = 1000.0 * ($Observed - $paint) / $frequency
+    $details.paint_before_input_return = $paint -le $returned
+    $details.status = 'Correlated'
+    return $details
+}
+
 function Invoke-ReaderPerformance([IntPtr]$Window, [switch]$KeepOpen) {
     $initial = Wait-Reader 'twenty restored tabs across two offline panes' {
         param($reader)
@@ -194,24 +222,32 @@ function Invoke-ReaderPerformance([IntPtr]$Window, [switch]$KeepOpen) {
     $search = [System.Collections.Generic.List[double]]::new()
     $open = [System.Collections.Generic.List[double]]::new()
     $switch = [System.Collections.Generic.List[double]]::new()
+    $searchTiming = [System.Collections.Generic.List[object]]::new()
+    $openTiming = [System.Collections.Generic.List[object]]::new()
+    $switchTiming = [System.Collections.Generic.List[object]]::new()
+    $inputTiming = @{ method = $null; begin = 0L; returned = 0L }
     $generation = 0
     for ($sample = 0; $sample -lt 20; $sample++) {
         # These numbers identify distinct cached issues outside the twenty restored tabs.
         $targetItem = Set-ReaderPerformanceQuery $Window $sample
-        Click-AccountControl $Window 'reader-search-submit' $clock
+        Click-AccountControl $Window 'reader-search-submit' $clock $inputTiming
         $found = Wait-Reader 'the first local result page for the current query' {
             param($reader)
             $null -ne $reader.search_generation -and $reader.search_generation -gt $generation -and
                 $reader.search_results -gt 0 -and $reader.first_search_item -eq $targetItem
         } 5
         $search.Add($clock.Elapsed.TotalMilliseconds)
+        $observed = [Diagnostics.Stopwatch]::GetTimestamp()
         $generation = $found.cached_reader.search_generation
+        $searchTiming.Add((Get-ReaderTimingAttribution $inputTiming $found 'search' $generation $observed))
 
-        Click-AccountControl $Window 'reader-result-0' $clock
-        $null = Wait-Reader 'useful cached content in the newly opened item' {
+        Click-AccountControl $Window 'reader-result-0' $clock $inputTiming
+        $opened = Wait-Reader 'useful cached content in the newly opened item' {
             param($reader) $reader.active_item -eq $targetItem -and $reader.cached_content_ready
         } 5
         $open.Add($clock.Elapsed.TotalMilliseconds)
+        $observed = [Diagnostics.Stopwatch]::GetTimestamp()
+        $openTiming.Add((Get-ReaderTimingAttribution $inputTiming $opened 'open' $targetItem $observed))
         Click-AccountControl $Window 'reader-close-tab'
         $null = Wait-Reader 'the original twenty tabs after closing the measured item' {
             param($reader) ($reader.tab_counts -join ',') -ceq '10,10'
@@ -224,16 +260,24 @@ function Invoke-ReaderPerformance([IntPtr]$Window, [switch]$KeepOpen) {
     $previous = $before.cached_reader.active_item
     for ($sample = 0; $sample -lt 20; $sample++) {
         $position = ($sample + 1) % 2
-        Click-AccountControl $Window "reader-tab-0-$position" $clock
+        Click-AccountControl $Window "reader-tab-0-$position" $clock $inputTiming
         $after = Wait-Reader 'useful cached content in the other tab with both panes retained' {
             param($reader)
             $reader.active_item -ne $previous -and $reader.focused_pane -eq 0 -and
                 $reader.cached_content_ready -and ($reader.tab_counts -join ',') -ceq '10,10'
         } 5
         $switch.Add($clock.Elapsed.TotalMilliseconds)
+        $observed = [Diagnostics.Stopwatch]::GetTimestamp()
         $previous = $after.cached_reader.active_item
+        $switchTiming.Add((Get-ReaderTimingAttribution $inputTiming $after 'tab' $previous $observed))
     }
     $script:report.timing = 'Verified native UI Automation or owned Win32 activation to useful app observation. Query entry verified before timing. Polling requested at 5 ms.'
+    $script:report.attribution = [ordered]@{
+        source = 'Windows QueryPerformanceCounter. App paint callback precedes platform presentation.'
+        cached_open = $openTiming.ToArray()
+        local_search = $searchTiming.ToArray()
+        cached_tab_switch = $switchTiming.ToArray()
+    }
     $script:report.budgets = [ordered]@{
         cached_open = Get-ReaderBudget ($open.ToArray()) 100
         local_search = Get-ReaderBudget ($search.ToArray()) 200

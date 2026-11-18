@@ -26,6 +26,8 @@ mod history_view;
 mod media;
 mod merge_view;
 mod outbox;
+#[cfg(feature = "e2e")]
+pub(crate) mod performance;
 mod pr;
 mod pr_view;
 mod remote;
@@ -70,6 +72,8 @@ pub(crate) struct ReaderObservation {
     pub search_results: Option<usize>,
     pub search_generation: Option<u64>,
     pub first_search_item: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub performance_timing: Option<performance::PaintTiming>,
     pub comments_coverage: Option<String>,
     pub comment_fetch_state: Option<String>,
     pub comment_count: Option<usize>,
@@ -160,6 +164,8 @@ pub(crate) struct ReaderWorkspace {
     search: Entity<InputState>,
     search_hits: Option<Vec<SearchHit>>,
     search_reply: Option<u64>,
+    #[cfg(feature = "e2e")]
+    performance: performance::ReaderTiming,
     url: Entity<InputState>,
     saved_name: Entity<InputState>,
     author: Entity<InputState>,
@@ -367,6 +373,11 @@ impl ReaderWorkspace {
                 .is_some_and(|view| view.data.item.is_some()),
             search_results: self.search_hits.as_ref().map(Vec::len),
             search_generation: self.search_reply,
+            performance_timing: self.performance.ready(
+                active.map(|tab| tab.item.0),
+                cached.is_some_and(|view| view.data.item.is_some()),
+                self.search_reply,
+            ),
             first_search_item: self
                 .search_hits
                 .as_ref()
@@ -499,6 +510,8 @@ impl ReaderWorkspace {
             search,
             search_hits: None,
             search_reply: None,
+            #[cfg(feature = "e2e")]
+            performance: performance::ReaderTiming::new(),
             url,
             saved_name,
             author,

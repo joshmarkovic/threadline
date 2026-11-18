@@ -63,7 +63,7 @@ function Find-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [string]$Expecte
     }
 }
 
-function Invoke-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwatch]$InputClock, [string]$ExpectedName) {
+function Invoke-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwatch]$InputClock, [string]$ExpectedName, [hashtable]$InputTiming) {
     $element = Find-OwnedFixtureControl $Window $Id $ExpectedName
     if ($null -eq $element) { return $false }
     try {
@@ -81,12 +81,17 @@ function Invoke-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [Diagnostics.S
         Stop-Blocked 'The owned accessibility control changed before Invoke.'
     }
     if ($null -ne $InputClock) { $InputClock.Restart() }
+    if ($InputTiming) { $InputTiming.begin = [Diagnostics.Stopwatch]::GetTimestamp() }
     if ($activation.Invoke) {
         $activation.Pattern.Invoke()
         $kind = 'UIA InvokePattern'
     } else {
         $activation.Pattern.Select()
         $kind = 'UIA SelectionItemPattern'
+    }
+    if ($InputTiming) {
+        $InputTiming.returned = [Diagnostics.Stopwatch]::GetTimestamp()
+        $InputTiming.method = $kind
     }
     Add-Evidence 'Activate an owned accessibility control' ([ordered]@{ automation_id = $Id; input = $kind })
     return $true

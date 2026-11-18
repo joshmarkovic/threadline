@@ -212,6 +212,8 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_GITHUB_ADDR')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_SYNC')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_FIXTURE_AUTH')
+    $info.EnvironmentVariables.Remove('THREADLINE_E2E_READER_TIMING')
+    if ($ReaderProof -eq 'Performance') { $info.EnvironmentVariables['THREADLINE_E2E_READER_TIMING'] = '1' }
     if ($ToastProof -and $null -ne $script:toastFixture) {
         $info.EnvironmentVariables['THREADLINE_TEST_TOAST_TOKEN'] = $script:toastFixture.Token
     }

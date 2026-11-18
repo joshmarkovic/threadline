@@ -16,7 +16,7 @@ use tokio::runtime::Handle;
 use tokio::sync::watch;
 use tokio::task::JoinHandle;
 
-use crate::pane_content::DiscussionPane;
+use crate::{pane_content::DiscussionPane, reader_workspace::performance};
 
 #[derive(Clone)]
 pub(crate) struct Observer(Rc<RefCell<Recorder>>);
@@ -26,6 +26,7 @@ struct Recorder {
     startup_ms: Option<f64>,
     bounds: BTreeMap<Cow<'static, str>, [f32; 4]>,
     measurement: Option<Measurement>,
+    reader_timing: Option<performance::PaintTiming>,
     reports: watch::Sender<PendingReport>,
 }
 
@@ -124,6 +125,7 @@ impl Observer {
             startup_ms: None,
             bounds: BTreeMap::new(),
             measurement,
+            reader_timing: None,
             reports: writer.reports.clone(),
         })));
         (observer, writer)
@@ -219,8 +221,22 @@ impl Observer {
         .size_0()
     }
 
-    fn write(&self, snapshot: Snapshot, opening: Option<Bounds<Pixels>>, window: &Window) {
+    fn write(&self, mut snapshot: Snapshot, opening: Option<Bounds<Pixels>>, window: &Window) {
         let mut recorder = self.0.borrow_mut();
+        if let Some(timing) = snapshot
+            .cached_reader
+            .as_mut()
+            .and_then(|reader| reader.performance_timing.as_mut())
+        {
+            if let Some(painted) = recorder.reader_timing.filter(|last| {
+                last.handler_qpc == timing.handler_qpc && last.action == timing.action
+            }) {
+                *timing = painted;
+            } else {
+                timing.painted_qpc = performance::counter();
+                recorder.reader_timing = Some(*timing);
+            }
+        }
         let elapsed_ms = recorder.started.elapsed().as_secs_f64() * 1_000.;
         let startup_ms = if snapshot.ready {
             *recorder.startup_ms.get_or_insert(elapsed_ms)
