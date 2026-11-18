@@ -531,6 +531,7 @@ fn typed_discussion_and_timeline_preserve_metadata_partial_and_anchors() {
         .start_resource_fetch(key(ResourceFamily::Timeline), WalkMode::Full)
         .unwrap();
     let event = |key: &str, time| TimelineEntry {
+        linked_item: None,
         remote_key: key.into(),
         actor: None,
         event: "referenced".into(),
@@ -955,4 +956,130 @@ fn stable_image_blobs_are_scoped_bounded_and_clearable() {
             .unwrap()
             .is_none()
     );
+}
+
+#[test]
+fn issue_presentation_preserves_unknowns_versions_and_validated_timeline_sources() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open_profile(dir.path()).unwrap();
+    let a = store.ensure_account("github.com", 77).unwrap();
+    let r = store.ensure_repository(a, 15, "work", "repo").unwrap();
+    let mut row = page(4, "current", 100, None);
+    row.facets.presentation = IssuePresentation {
+        created_at_ms: Some(10),
+        milestone: Change::Value("Beta".into()),
+        reactions: Some(ReactionCounts {
+            positive: 4,
+            total: Some(4),
+            ..Default::default()
+        }),
+    };
+    let item = store
+        .commit_item_metadata(a, r, row, &Validators::default(), 1)
+        .unwrap();
+    let mut old = page(4, "old", 90, None);
+    old.facets.presentation.milestone = Change::Null;
+    old.facets.presentation.reactions = Some(ReactionCounts::default());
+    store
+        .commit_item_metadata(a, r, old, &Validators::default(), 2)
+        .unwrap();
+    let meta = store.reader_item_metadata(a, item).unwrap().unwrap();
+    assert_eq!(meta.created_at_ms, Some(10));
+    assert_eq!(meta.milestone, Change::Value("Beta".into()));
+    assert_eq!(meta.reactions.unwrap().positive, 4);
+    let mut recent = page(4, "current", 110, None);
+    recent.facets.presentation.milestone = Change::Null;
+    store
+        .commit_item_metadata(a, r, recent, &Validators::default(), 3)
+        .unwrap();
+    let link = LinkedItem {
+        owner: "work".into(),
+        repository: "repo".into(),
+        number: 4,
+        pull_request: false,
+        provider_repository_id: Some(15),
+        provider_issue_id: Some(4),
+    };
+    let key = ResourceKey {
+        account: a,
+        target: ResourceTarget::Item(item),
+        family: ResourceFamily::Timeline,
+    };
+    let progress = store.start_resource_fetch(key, WalkMode::Full).unwrap();
+    let event = TimelineEntry {
+        remote_key: "event-900".into(),
+        event: "cross-referenced".into(),
+        actor: None,
+        occurred_at_ms: None,
+        linked_item: Some(link.clone()),
+    };
+    store
+        .commit_timeline_page(
+            a,
+            item,
+            &progress,
+            TimelineInputPage {
+                events: vec![event.clone()],
+                next_cursor: None,
+                completed_validators: None,
+                fetched_at_ms: 10,
+            },
+        )
+        .unwrap();
+    drop(store);
+    let store = Store::open_profile(dir.path()).unwrap();
+    assert_eq!(
+        store.timeline_page(a, item, None, 10).unwrap().entries,
+        vec![event]
+    );
+    assert_eq!(
+        store
+            .reader_item_metadata(a, item)
+            .unwrap()
+            .unwrap()
+            .milestone,
+        Change::Null
+    );
+    assert_eq!(store.resolve_linked_item(a, &link).unwrap(), Some(item));
+    for bad in [
+        LinkedItem {
+            provider_repository_id: Some(99),
+            ..link.clone()
+        },
+        LinkedItem {
+            provider_issue_id: None,
+            ..link.clone()
+        },
+        LinkedItem {
+            provider_issue_id: Some(99),
+            ..link.clone()
+        },
+        LinkedItem {
+            pull_request: true,
+            ..link.clone()
+        },
+        LinkedItem {
+            owner: "unrelated".into(),
+            ..link.clone()
+        },
+    ] {
+        assert_eq!(store.resolve_linked_item(a, &bad).unwrap(), None);
+    }
+    assert!(
+        store
+            .resolve_linked_item(
+                a,
+                &LinkedItem {
+                    owner: "a/b".into(),
+                    ..link
+                }
+            )
+            .is_err()
+    );
+    let other = store.ensure_account("github.com", 102).unwrap();
+    assert!(store.reader_item_metadata(other, item).unwrap().is_none());
+    store.clear_cache(a).unwrap();
+    let cleared = store.reader_item_metadata(a, item).unwrap().unwrap();
+    assert_eq!(cleared.milestone, Change::Missing);
+    assert_eq!(cleared.reactions, None);
 }

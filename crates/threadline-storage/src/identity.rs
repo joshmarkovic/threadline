@@ -414,6 +414,13 @@ impl Store {
                         SELECT 1 FROM cached_resources c WHERE c.repository_id=items.repository_id AND c.family='repository-items' AND c.has_page=1)",
                 [account],
             )?;
+            tx.execute(
+                "DELETE FROM reader_issue_fields WHERE item_id IN (
+                     SELECT i.id FROM items i WHERE i.account_id=?1
+                     AND NOT EXISTS(SELECT 1 FROM issue_downloads d WHERE d.item_id=i.id AND d.state IN ('pending','active','complete'))
+                     AND NOT EXISTS(SELECT 1 FROM cached_resources c WHERE c.repository_id=i.repository_id AND c.family='repository-items' AND c.has_page=1))",
+                [account],
+            )?;
             Ok(())
         })
     }

@@ -154,7 +154,9 @@ fn reader_reply(
         "owner":{"login":"fixture-org"},"private":false,
         "permissions":{"pull":true,"push":false,"admin":false}});
     let issue = json!({"id":84,"node_id":"issue-84","number":41,"title":"Historical issue",
-        "state":"closed","body":null,"updated_at":TIME});
+        "state":"closed","body":null,"created_at":"2012-01-01T00:00:00Z","updated_at":TIME,
+        "milestone":{"title":"Original release"},"reactions":{"+1":1,"-1":0,"laugh":0,
+        "hooray":0,"confused":0,"heart":2,"rocket":0,"eyes":0,"total_count":3}});
     let comment = |id, updated_at, body: &str| {
         json!({
             "id":id,"node_id":format!("comment-{id}"),"user":{"login":"fixture-user"},
@@ -190,9 +192,12 @@ fn reader_reply(
             comment(11, NEW_TIME, "**updated digest**"),
             comment(12, TIME, "second reply")
         ])),
-        "/issues/41/timeline?per_page=20&page=1" => {
-            success(json!([{"event":"cross-referenced","node_id":"T_12"}]))
-        }
+        "/issues/41/timeline?per_page=20&page=1" => success(
+            json!([{"event":"cross-referenced","node_id":"T_12","source":{"type":"issue","issue":{
+                "id":85,"number":42,"url":"https://api.github.com/repos/fixture-org/public/issues/42",
+                "repository_url":"https://api.github.com/repos/fixture-org/public"
+            }}}]),
+        ),
         _ => return None,
     };
     Some(response)
@@ -476,6 +481,14 @@ async fn cache_reader_reopens_the_selected_public_repo_and_resumes_an_edited_com
         service.store.resource_state(body).unwrap().coverage,
         Coverage::Complete
     );
+    let details = service
+        .store
+        .reader_item_metadata(account, item)
+        .unwrap()
+        .unwrap();
+    assert_eq!(details.created_at_ms, Some(1_325_376_000_000));
+    assert_eq!(details.milestone, Change::Value("Original release".into()));
+    assert_eq!(details.reactions.unwrap().heart, 2);
 
     assert_eq!(
         reader.fetch_comments(account, item, &cancel).await.unwrap(),
@@ -510,6 +523,17 @@ async fn cache_reader_reopens_the_selected_public_repo_and_resumes_an_edited_com
         .unwrap();
     assert_eq!(timeline.entries.len(), 1);
     assert_eq!(timeline.entries[0].occurred_at_ms, None);
+    let linked = timeline.entries[0].linked_item.as_ref().unwrap();
+    assert_eq!(
+        (
+            linked.owner.as_str(),
+            linked.repository.as_str(),
+            linked.number
+        ),
+        ("fixture-org", "public", 42)
+    );
+    assert_eq!(linked.provider_issue_id, Some(85));
+    assert_eq!(linked.provider_repository_id, Some(73));
 
     drop(reader);
     drop(service);
@@ -519,6 +543,25 @@ async fn cache_reader_reopens_the_selected_public_repo_and_resumes_an_edited_com
     assert_eq!(
         reopened.store.resolve(account, locator).unwrap(),
         Some(item)
+    );
+    let reopened_details = reopened
+        .store
+        .reader_item_metadata(account, item)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        reopened_details.milestone,
+        Change::Value("Original release".into())
+    );
+    assert_eq!(
+        reopened
+            .store
+            .timeline_page(account, item, None, 20)
+            .unwrap()
+            .entries[0]
+            .linked_item
+            .as_ref(),
+        Some(linked)
     );
     assert!(
         resumed

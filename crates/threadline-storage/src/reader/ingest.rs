@@ -12,6 +12,7 @@ use rusqlite::{Transaction, params};
 /// None means the provider omitted this facet. An empty supplied list verifies zero matches.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ListFacets {
+    pub presentation: IssuePresentation,
     pub author: Option<String>,
     pub labels: Option<Vec<String>>,
     pub assignees: Option<Vec<String>>,
@@ -31,6 +32,7 @@ pub struct RepositoryListPage<'a> {
     pub fetched_at_ms: i64,
 }
 fn apply_facets(tx: &Transaction<'_>, item: ItemId, at: i64, facets: ListFacets) -> Result<()> {
+    super::metadata::save_presentation(tx, item, at, facets.presentation)?;
     for (category, values) in [
         ("author", facets.author.map(|s| vec![s])),
         ("label", facets.labels),

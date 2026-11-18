@@ -6,8 +6,8 @@ use serde::{Deserialize, Deserializer, de::DeserializeOwned};
 use crate::domain::{IssueApiId, ItemKind, ItemNumber};
 
 use super::{
-    AccessError, ConversationComment, GitHubReader, IssueSummary, PullRequestSummary, Reported,
-    TimelineEvent, malformed,
+    AccessError, ConversationComment, GitHubReader, IssueSummary, PullRequestSummary,
+    ReactionCounts, Reported, TimelineEvent, malformed,
 };
 
 #[derive(Deserialize)]
@@ -18,6 +18,42 @@ struct Author {
 #[derive(Deserialize)]
 struct Label {
     name: String,
+}
+
+#[derive(Deserialize)]
+struct Milestone {
+    title: String,
+}
+
+#[derive(Deserialize)]
+struct Reactions {
+    #[serde(rename = "+1")]
+    positive: Option<u64>,
+    #[serde(rename = "-1")]
+    negative: Option<u64>,
+    laugh: Option<u64>,
+    hooray: Option<u64>,
+    confused: Option<u64>,
+    heart: Option<u64>,
+    rocket: Option<u64>,
+    eyes: Option<u64>,
+    total_count: Option<u64>,
+}
+
+impl Reactions {
+    fn counts(self) -> Option<ReactionCounts> {
+        Some(ReactionCounts {
+            positive: self.positive?,
+            negative: self.negative?,
+            laugh: self.laugh?,
+            hooray: self.hooray?,
+            confused: self.confused?,
+            heart: self.heart?,
+            rocket: self.rocket?,
+            eyes: self.eyes?,
+            total: self.total_count,
+        })
+    }
 }
 
 #[derive(Deserialize)]
@@ -36,12 +72,16 @@ pub(super) struct Issue {
     #[serde(default, deserialize_with = "reported")]
     body: Reported<String>,
     state: State,
+    created_at: Option<String>,
     updated_at: String,
     user: Option<Author>,
     labels: Option<Vec<Label>>,
     assignees: Option<Vec<Author>>,
     pull_request: Option<serde_json::Map<String, serde_json::Value>>,
     repository_url: Option<String>,
+    #[serde(default, deserialize_with = "reported")]
+    milestone: Reported<Milestone>,
+    reactions: Option<Reactions>,
 }
 
 impl Issue {
@@ -67,6 +107,7 @@ impl Issue {
             title: self.title,
             body: self.body,
             closed: matches!(self.state, State::Closed),
+            created_at_ms: self.created_at.as_deref().map(millis).transpose()?,
             updated_at_ms: millis(&self.updated_at)?,
             author: self.user.map(|user| user.login),
             labels: self
@@ -75,6 +116,12 @@ impl Issue {
             assignees: self
                 .assignees
                 .map(|people| people.into_iter().map(|user| user.login).collect()),
+            milestone: match self.milestone {
+                Reported::Absent => Reported::Absent,
+                Reported::Null => Reported::Null,
+                Reported::Value(milestone) => Reported::Value(milestone.title),
+            },
+            reactions: self.reactions.and_then(Reactions::counts),
         })
     }
 }
@@ -164,6 +211,23 @@ pub(super) struct Timeline {
     sha: Option<String>,
     actor: Option<Author>,
     created_at: Option<String>,
+    source: Option<TimelineSource>,
+}
+
+#[derive(Deserialize)]
+struct TimelineSource {
+    #[serde(rename = "type")]
+    kind: Option<String>,
+    issue: Option<SourceIssue>,
+}
+
+#[derive(Deserialize)]
+struct SourceIssue {
+    id: Option<NonZeroU64>,
+    number: Option<NonZeroU64>,
+    url: Option<String>,
+    repository_url: Option<String>,
+    pull_request: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
 impl Timeline {
@@ -171,7 +235,12 @@ impl Timeline {
         self.event == "commented"
     }
 
-    pub(super) fn into_event(self, page: u32, index: usize) -> Result<TimelineEvent, AccessError> {
+    pub(super) fn into_event(
+        self,
+        reader: &GitHubReader<'_>,
+        page: u32,
+        index: usize,
+    ) -> Result<TimelineEvent, AccessError> {
         let kind = if self.event.len() <= 64
             && !self.event.is_empty()
             && self
@@ -192,12 +261,27 @@ impl Timeline {
         } else {
             None
         };
+        let linked_item = (kind == "cross-referenced")
+            .then_some(self.source)
+            .flatten()
+            .filter(|source| source.kind.as_deref() == Some("issue"))
+            .and_then(|source| {
+                let issue = source.issue?;
+                reader.linked_item(
+                    issue.url.as_deref()?,
+                    issue.repository_url.as_deref()?,
+                    ItemNumber::new(issue.number?),
+                    issue.pull_request.is_some(),
+                    issue.id.map(IssueApiId::new),
+                )
+            });
         Ok(TimelineEvent {
             stable_identity: stable_key.is_some(),
             key: stable_key.unwrap_or_else(|| format!("unsupported:{page}:{index}")),
             kind,
             actor: self.actor.map(|actor| actor.login),
             created_at_ms: self.created_at.as_deref().map(millis).transpose()?,
+            linked_item,
         })
     }
 }

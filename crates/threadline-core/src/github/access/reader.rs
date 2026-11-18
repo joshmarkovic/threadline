@@ -38,10 +38,26 @@ pub struct IssueSummary {
     pub title: String,
     pub body: Reported<String>,
     pub closed: bool,
+    pub created_at_ms: Option<i64>,
     pub updated_at_ms: i64,
     pub author: Option<String>,
     pub labels: Option<Vec<String>>,
     pub assignees: Option<Vec<String>>,
+    pub milestone: Reported<String>,
+    pub reactions: Option<ReactionCounts>,
+}
+
+#[derive(Clone, Eq, PartialEq)]
+pub struct ReactionCounts {
+    pub positive: u64,
+    pub negative: u64,
+    pub laugh: u64,
+    pub hooray: u64,
+    pub confused: u64,
+    pub heart: u64,
+    pub rocket: u64,
+    pub eyes: u64,
+    pub total: Option<u64>,
 }
 
 #[derive(Clone, Eq, PartialEq)]
@@ -76,6 +92,17 @@ pub struct TimelineEvent {
     pub actor: Option<String>,
     pub created_at_ms: Option<i64>,
     pub stable_identity: bool,
+    pub linked_item: Option<LinkedItem>,
+}
+
+/// A structured source issue reported by GitHub for a cross-reference event.
+#[derive(Clone, Eq, PartialEq)]
+pub struct LinkedItem {
+    pub route: RepositoryName,
+    pub number: ItemNumber,
+    pub pull_request: bool,
+    pub repository_id: Option<RepositoryApiId>,
+    pub issue_id: Option<IssueApiId>,
 }
 
 pub struct RemoteSearchPage {
@@ -238,7 +265,7 @@ impl GitHubReader<'_> {
             .into_iter()
             .enumerate()
             .filter(|(_, event)| !event.is_comment())
-            .map(|(index, event)| event.into_event(page, index))
+            .map(|(index, event)| event.into_event(self, page, index))
             .collect::<Result<_, _>>()?;
         Ok(Page {
             records,
@@ -343,21 +370,64 @@ impl GitHubReader<'_> {
         path.eq_ignore_ascii_case(&canonical) || path == numeric
     }
 
-    fn require_record_url(&self, url: &str, suffix: &str) -> Result<(), AccessError> {
-        let url = Url::parse(url).map_err(|_| malformed())?;
-        let base = Url::parse("https://api.github.com").expect("fixed API origin");
-        if (url.origin() == base.origin()
+    fn is_api_record_url(&self, url: &Url) -> bool {
+        let canonical = Url::parse("https://api.github.com").expect("fixed API origin");
+        (url.origin() == canonical.origin()
             || self.session.client.fixture && url.origin() == self.session.client.base.origin())
             && url.username().is_empty()
             && url.password().is_none()
             && url.query().is_none()
             && url.fragment().is_none()
-            && self.accepts_path(url.path(), suffix)
-        {
+    }
+
+    fn require_record_url(&self, url: &str, suffix: &str) -> Result<(), AccessError> {
+        let url = Url::parse(url).map_err(|_| malformed())?;
+        if self.is_api_record_url(&url) && self.accepts_path(url.path(), suffix) {
             Ok(())
         } else {
             Err(AccessError::received(AccessKind::IdentityMismatch, 200))
         }
+    }
+
+    fn linked_item(
+        &self,
+        issue_url: &str,
+        repository_url: &str,
+        number: ItemNumber,
+        pull_request: bool,
+        issue_id: Option<IssueApiId>,
+    ) -> Option<LinkedItem> {
+        let issue = Url::parse(issue_url).ok()?;
+        let repository = Url::parse(repository_url).ok()?;
+        if !self.is_api_record_url(&issue)
+            || !self.is_api_record_url(&repository)
+            || issue.origin() != repository.origin()
+        {
+            return None;
+        }
+        let mut parts = repository.path_segments()?;
+        if parts.next()? != "repos" {
+            return None;
+        }
+        let route = RepositoryName::new(parts.next()?, parts.next()?).ok()?;
+        if parts.next().is_some()
+            || !issue.path().eq_ignore_ascii_case(&format!(
+                "{}/issues/{}",
+                repository.path(),
+                number.get()
+            ))
+        {
+            return None;
+        }
+        let current = route.owner().eq_ignore_ascii_case(self.route.owner())
+            && route.name().eq_ignore_ascii_case(self.route.name());
+        Some(LinkedItem {
+            route,
+            number,
+            pull_request,
+            repository_id: current.then_some(self.repository),
+            issue_id,
+        })
     }
 }
 

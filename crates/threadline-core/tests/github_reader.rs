@@ -98,6 +98,8 @@ fn issue(number: u64, pr: bool) -> Value {
     if pr {
         issue["pull_request"] = json!({"url":format!("https://api.github.com/repos/fixture-org/private/pulls/{number}")});
         issue["body"] = Value::Null;
+        issue["milestone"] = Value::Null;
+        issue["reactions"] = json!({"heart": 9});
     }
     issue
 }
@@ -121,10 +123,15 @@ async fn older_closed_issues_and_prs_use_all_state_pagination_with_no_date_filte
         "<http://{}/repositories/71/issues?state=all&sort=created&direction=desc&per_page=20&page=2>; rel=\"next\"",
         sim.address
     );
+    let mut older = issue(41, false);
+    older["created_at"] = json!("2012-01-01T00:00:00Z");
+    older["milestone"] = json!({"title":"Earlier release"});
+    older["reactions"] = json!({"+1":2,"-1":0,"laugh":1,"hooray":0,"confused":0,"heart":3,
+        "rocket":0,"eyes":2,"total_count":8});
     sim.enqueue(
         Method::GET,
         &format!("{LIST}&page=1"),
-        ok(json!([issue(41, false)])).header(header::LINK, next),
+        ok(json!([older])).header(header::LINK, next),
     );
     sim.enqueue(
         Method::GET,
@@ -137,7 +144,21 @@ async fn older_closed_issues_and_prs_use_all_state_pagination_with_no_date_filte
     assert!(first.records[0].closed);
     assert!(matches!(first.records[0].body, Reported::Absent));
     assert!(first.records[0].updated_at_ms < 1_500_000_000_000);
+    assert_eq!(first.records[0].created_at_ms, Some(1_325_376_000_000));
     assert_eq!(first.records[0].author.as_deref(), Some("old-author"));
+    assert!(
+        matches!(&first.records[0].milestone, Reported::Value(title) if title == "Earlier release")
+    );
+    let reactions = first.records[0].reactions.as_ref().unwrap();
+    assert_eq!(
+        (
+            reactions.positive,
+            reactions.negative,
+            reactions.heart,
+            reactions.total
+        ),
+        (2, 0, 3, Some(8))
+    );
     let old_pr = reader
         .list(first.next_page.unwrap(), &cancel)
         .await
@@ -146,6 +167,8 @@ async fn older_closed_issues_and_prs_use_all_state_pagination_with_no_date_filte
     assert_eq!(old_pr.records[0].kind, ItemKind::PullRequest);
     assert_eq!(old_pr.records[0].issue_id.get(), 1042);
     assert!(matches!(old_pr.records[0].body, Reported::Null));
+    assert!(matches!(old_pr.records[0].milestone, Reported::Null));
+    assert!(old_pr.records[0].reactions.is_none());
     check_requests(&sim, 4);
 }
 
@@ -201,14 +224,50 @@ async fn pr_metadata_conversation_and_timeline_have_independent_endpoints() {
         ok(json!([
             {"event":"locked","id":100,"actor":{"login":"fixture-user"},"created_at":OLD_DATE},
             {"event":"commented","id":291,"body":"duplicate ordinary conversation"},
-            {"event":"cross-referenced","node_id":"T_7"}
+            {"event":"cross-referenced","node_id":"T_7","source":{"type":"issue","issue":{
+                "id":2050,"number":50,"url":"https://api.github.com/repos/another-org/public/issues/50",
+                "repository_url":"https://api.github.com/repos/another-org/public","pull_request":{}
+            }}},
+            {"event":"cross-referenced","node_id":"T_8","source":{"type":"issue","issue":{
+                "id":2051,"number":51,"url":"https://api.github.com/repos/fixture-org/private/issues/51",
+                "repository_url":"https://api.github.com/repos/fixture-org/private"
+            }}},
+            {"event":"cross-referenced","node_id":"T_9","source":{"type":"issue","issue":{"number":51}}},
+            {"event":"cross-referenced","node_id":"T_10","source":{"type":"issue","issue":{
+                "number":51,"url":"https://api.github.com/repos/fixture-org/private/issues/50",
+                "repository_url":"https://api.github.com/repos/fixture-org/private"
+            }}},
+            {"event":"cross-referenced","node_id":"T_11","source":{"type":"issue","issue":{
+                "number":51,"url":"https://outside.invalid/repos/fixture-org/private/issues/51",
+                "repository_url":"https://outside.invalid/repos/fixture-org/private"
+            }}}
         ])),
     );
     let timeline = reader.timeline(number(42), 1, &cancel).await.unwrap();
-    assert_eq!(timeline.records.len(), 2);
+    assert_eq!(timeline.records.len(), 6);
     assert_eq!(timeline.records[0].kind, "locked");
     assert_eq!(timeline.records[1].created_at_ms, None);
     assert!(timeline.records[1].stable_identity);
+    let cross_repo = timeline.records[1].linked_item.as_ref().unwrap();
+    assert_eq!(cross_repo.route.owner(), "another-org");
+    assert_eq!(cross_repo.route.name(), "public");
+    assert_eq!(cross_repo.number.get(), 50);
+    assert!(cross_repo.pull_request);
+    assert_eq!(cross_repo.repository_id, None);
+    assert_eq!(cross_repo.issue_id.unwrap().get(), 2050);
+    assert_eq!(
+        timeline.records[2]
+            .linked_item
+            .as_ref()
+            .unwrap()
+            .repository_id,
+        Some(repo_id())
+    );
+    assert!(
+        timeline.records[3..]
+            .iter()
+            .all(|event| event.linked_item.is_none())
+    );
     check_requests(&sim, 7);
 }
 

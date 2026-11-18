@@ -19,8 +19,9 @@ use threadline_storage::{
     Store, UtcMillis,
     access::{AccessProfile, AccessState},
     reader::{
-        DiscussionComment, DiscussionInputPage, ListFacets, ListSummary, RepositoryListPage,
-        TimelineEntry, TimelineInputPage, repository_list_key,
+        DiscussionComment, DiscussionInputPage, IssuePresentation, LinkedItem, ListFacets,
+        ListSummary, ReactionCounts, RepositoryListPage, TimelineEntry, TimelineInputPage,
+        repository_list_key,
     },
     resources::{
         Coverage, ResourceError, ResourceFamily, ResourceKey, ResourceProgress, ResourceTarget,
@@ -382,6 +383,16 @@ impl ReaderService {
                             event: event.kind,
                             actor: event.actor,
                             occurred_at_ms: event.created_at_ms,
+                            linked_item: event.linked_item.map(|link| LinkedItem {
+                                owner: link.route.owner().to_owned(),
+                                repository: link.route.name().to_owned(),
+                                number: link.number.get(),
+                                pull_request: link.pull_request,
+                                provider_repository_id: link
+                                    .repository_id
+                                    .map(RepositoryApiId::get),
+                                provider_issue_id: link.issue_id.map(|id| id.get()),
+                            }),
                         })
                         .collect(),
                     next_cursor: next.as_deref(),
@@ -616,6 +627,21 @@ fn issue(summary: IssueSummary) -> Result<ListSummary, ReaderError> {
             author: summary.author,
             labels: summary.labels,
             assignees: summary.assignees,
+            presentation: IssuePresentation {
+                created_at_ms: summary.created_at_ms,
+                milestone: field(summary.milestone),
+                reactions: summary.reactions.map(|counts| ReactionCounts {
+                    positive: counts.positive,
+                    negative: counts.negative,
+                    laugh: counts.laugh,
+                    hooray: counts.hooray,
+                    confused: counts.confused,
+                    heart: counts.heart,
+                    rocket: counts.rocket,
+                    eyes: counts.eyes,
+                    total: counts.total,
+                }),
+            },
             ..Default::default()
         },
     })
