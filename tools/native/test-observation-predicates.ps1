@@ -217,7 +217,9 @@ $script:fixtureText = $null
 $script:fixtureWrites = 0
 function Set-OwnedFixtureEditValue([IntPtr]$Window, [string]$Id, [string]$Name, [string]$Value) {
     if ($Window -ne 123 -or $Id -cne 'reader-issue-title-0' -or $Name -cne 'Issue title') {
-        throw 'Fixture editing did not target the expected owned field.'
+        if ($Window -ne 123 -or $Id -cne 'reader-search' -or $Name -cne 'Search downloaded content') {
+            throw 'Fixture editing did not target the expected owned field.'
+        }
     }
     $script:fixtureWrites++
     $script:fixtureText = $Value
@@ -234,6 +236,22 @@ try {
     $refused = $_.Exception.Message -like '*unknown synthetic field or value*'
 }
 if (!$refused -or $script:fixtureWrites -ne 1) { throw 'The native edit journey accepted an out-of-scope field.' }
+
+
+$script:observations.Clear()
+$script:observations.Enqueue([pscustomobject]@{ bounds = [pscustomobject]@{ 'reader-search' = @(1, 2, 20, 10) } })
+$script:fixtureWrites = 0
+for ($index = 0; $index -lt 20; $index++) {
+    $item = Set-ReaderPerformanceQuery 123 $index
+    if ($item -ne (1000 + 3 * $index) -or $script:fixtureText -cne "Investigate relay behavior $item") {
+        throw 'Wrong exact native benchmark search value.'
+    }
+}
+$refused = $false
+try { $null = Set-ReaderPerformanceQuery 123 20 } catch {
+    $refused = $_.Exception.Message -like '*Unknown Section 16 search*'
+}
+if (!$refused -or $script:fixtureWrites -ne 20) { throw 'The benchmark wrote an unauthorized search fixture.' }
 
 Write-Output 'Native observation predicate checks passed.'
 

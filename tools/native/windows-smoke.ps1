@@ -875,7 +875,7 @@ try {
         }
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
-    if ($AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'PullRequest', 'Writes', 'WriteSurface')) {
+    if ($AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'PullRequest', 'Writes', 'WriteSurface', 'Performance')) {
         Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
         . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
         $script:UseOwnedUiAutomation = $true

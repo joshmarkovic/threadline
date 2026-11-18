@@ -159,6 +159,27 @@ function Get-ReaderBudget([double[]]$Samples, [double]$Limit) {
     }
 }
 
+function Set-ReaderPerformanceQuery([IntPtr]$Window, [int]$Sample) {
+    if ($Sample -lt 0 -or $Sample -ge 20) { throw 'Unknown Section 16 search fixture index.' }
+    $targetItem = 1000 + 3 * $Sample
+    $query = "Investigate relay behavior $targetItem"
+    $id = 'reader-search'
+    $name = 'Search downloaded content'
+    $null = Wait-AccountControl $id
+    Wait-For 'the exact editable benchmark search field' {
+        Set-OwnedFixtureEditValue $Window $id $name $query
+    }
+    Wait-For 'the synthetic benchmark query in the native search field' {
+        $pattern = Get-OwnedFixtureEditPattern $Window $id $name
+        try {
+            $null -ne $pattern -and $pattern.Current.Value -ceq $query
+        } catch [Windows.Automation.ElementNotAvailableException] {
+            $false
+        }
+    }
+    return $targetItem
+}
+
 function Invoke-ReaderPerformance([IntPtr]$Window) {
     $initial = Wait-Reader 'twenty restored tabs across two offline panes' {
         param($reader)
@@ -176,10 +197,7 @@ function Invoke-ReaderPerformance([IntPtr]$Window) {
     $generation = 0
     for ($sample = 0; $sample -lt 20; $sample++) {
         # These numbers identify distinct cached issues outside the twenty restored tabs.
-        $targetItem = 1000 + 3 * $sample
-        Click-AccountControl $Window 'reader-search'
-        [ThreadlineWinInput]::Chord(@(0x11, 0x41))
-        [ThreadlineWinInput]::TypeText("Investigate relay behavior $targetItem")
+        $targetItem = Set-ReaderPerformanceQuery $Window $sample
         Click-AccountControl $Window 'reader-search-submit' $clock
         $found = Wait-Reader 'the first local result page for the current query' {
             param($reader)
@@ -215,7 +233,7 @@ function Invoke-ReaderPerformance([IntPtr]$Window) {
         $switch.Add($clock.Elapsed.TotalMilliseconds)
         $previous = $after.cached_reader.active_item
     }
-    $script:report.timing = 'Verified Win32 input to useful native app observation. Polling requested at 5 ms.'
+    $script:report.timing = 'Verified native UI Automation or owned Win32 activation to useful app observation. Query entry verified before timing. Polling requested at 5 ms.'
     $script:report.budgets = [ordered]@{
         cached_open = Get-ReaderBudget ($open.ToArray()) 100
         local_search = Get-ReaderBudget ($search.ToArray()) 200
