@@ -1,7 +1,7 @@
-function Wait-Account([string]$Description, [scriptblock]$Check) {
+function Wait-Account([string]$Description, [scriptblock]$AccountCheck) {
     return Wait-State $Description {
         param($state)
-        $null -ne $state.account_access -and !$state.account_access.busy -and (& $Check $state.account_access)
+        $null -ne $state.account_access -and !$state.account_access.busy -and (& $AccountCheck $state.account_access)
     }
 }
 

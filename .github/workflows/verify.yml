@@ -116,6 +116,9 @@ jobs:
       - name: Test registered notification target validation
         shell: powershell
         run: ./tools/native/test-target-selection.ps1
+      - name: Test native observation polling
+        shell: powershell
+        run: ./tools/native/test-observation-predicates.ps1
       - name: Install pinned Rust
         run: rustup toolchain install 1.98.1 --profile minimal
       - name: Run the in-process GPUI suite
