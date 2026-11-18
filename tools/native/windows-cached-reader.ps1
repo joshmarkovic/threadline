@@ -1,7 +1,8 @@
 function Wait-Reader([string]$Description, [scriptblock]$ReaderCheck, [int]$PollInterval = 45) {
     return Wait-State $Description {
         param($state)
-        $null -ne $state.cached_reader -and (& $ReaderCheck $state.cached_reader)
+        $cached = $state.PSObject.Properties['cached_reader']
+        $null -ne $cached -and $null -ne $cached.Value -and (& $ReaderCheck $cached.Value)
     } $PollInterval
 }
 

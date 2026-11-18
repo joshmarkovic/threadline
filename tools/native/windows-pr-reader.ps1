@@ -1,7 +1,8 @@
 function Wait-PrReader([string]$Description, [scriptblock]$PrReaderCheck) {
     return Wait-Reader $Description {
         param($reader)
-        $null -ne $reader.pull_request -and (& $PrReaderCheck $reader.pull_request $reader)
+        $property = $reader.PSObject.Properties['pull_request']
+        $null -ne $property -and $null -ne $property.Value -and (& $PrReaderCheck $property.Value $reader)
     }
 }
 

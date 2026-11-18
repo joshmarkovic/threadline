@@ -60,10 +60,12 @@ if (!$state.cached_reader.cached_content_ready -or $state.cached_reader.active_i
 }
 
 $script:observations.Clear()
+$script:observations.Enqueue([pscustomobject]@{ ready = $true })
 $script:observations.Enqueue([pscustomobject]@{ cached_reader = $null })
-$script:observations.Enqueue([pscustomobject]@{ cached_reader = @{ pull_request = $null } })
-$script:observations.Enqueue([pscustomobject]@{ cached_reader = @{ active_item = 1; pull_request = @{ head = 'old' } } })
-$script:observations.Enqueue([pscustomobject]@{ cached_reader = @{ active_item = 2; pull_request = @{ head = 'current' } } })
+$script:observations.Enqueue([pscustomobject]@{ cached_reader = [pscustomobject]@{ active_item = 1 } })
+$script:observations.Enqueue([pscustomobject]@{ cached_reader = [pscustomobject]@{ pull_request = $null } })
+$script:observations.Enqueue([pscustomobject]@{ cached_reader = [pscustomobject]@{ active_item = 1; pull_request = @{ head = 'old' } } })
+$script:observations.Enqueue([pscustomobject]@{ cached_reader = [pscustomobject]@{ active_item = 2; pull_request = @{ head = 'current' } } })
 $visited.Clear()
 $state = Wait-PrReader 'isolated pull request observation' {
     param($pr, $reader)
