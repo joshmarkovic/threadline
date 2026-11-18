@@ -36,6 +36,14 @@ const UNIT: &[CargoTest] = &[
         arguments: &["-p", "threadline-core", "--lib", "ut_007"],
     },
     CargoTest {
+        id: "UT-011",
+        arguments: &["-p", "threadline-storage", "--lib", "ut_011"],
+    },
+    CargoTest {
+        id: "UT-012",
+        arguments: &["-p", "threadline-core", "--lib", "ut_012"],
+    },
+    CargoTest {
         id: "UT-008",
         arguments: &["-p", "threadline-core", "--lib", "ut_008"],
     },
@@ -87,7 +95,15 @@ const UNIT: &[CargoTest] = &[
 const INTEGRATION: &[CargoTest] = &[
     CargoTest {
         id: "IT-006",
-        arguments: &["-p", "threadline-storage", "--test", "sync", "it_006"],
+        arguments: &[
+            "-p",
+            "threadline-storage",
+            "--test",
+            "sync",
+            "--test",
+            "pr",
+            "it_006",
+        ],
     },
     CargoTest {
         id: "IT-007",
@@ -111,6 +127,14 @@ const INTEGRATION: &[CargoTest] = &[
             "--lib",
             "accounts::tests::sync_worker_",
         ],
+    },
+    CargoTest {
+        id: "IT-016",
+        arguments: &["-p", "threadline-storage", "--test", "pr", "it_016"],
+    },
+    CargoTest {
+        id: "IT-017",
+        arguments: &["-p", "threadline-storage", "--test", "pr", "it_017"],
     },
     CargoTest {
         id: "IT-003",

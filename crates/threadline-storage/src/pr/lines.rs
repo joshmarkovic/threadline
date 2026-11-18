@@ -198,4 +198,35 @@ mod tests {
         assert!(!parse_hunks("@@ -2,4 +2,4 @@\n short").1);
         assert!(!parse_hunks("@@@ ambiguous").1);
     }
+    #[test]
+    fn ut_011_unicode_whitespace_and_line_endings_preserve_each_source_range() {
+        for line_ending in ["\n", "\r\n"] {
+            for removed in 0..5_u32 {
+                for added in 0..5_u32 {
+                    let mut lines = vec![format!("@@ -100,{} +40,{} @@", removed + 1, added + 1)];
+                    let mut expected = vec![];
+                    for old in 0..removed {
+                        lines.push("-\t café  ".into());
+                        expected.push((Some(100 + old), None));
+                    }
+                    for new in 0..added {
+                        lines.push("+  日本語".into());
+                        expected.push((None, Some(40 + new)));
+                    }
+                    lines.push(" closing line".into());
+                    expected.push((Some(100 + removed), Some(40 + added)));
+                    lines.push("\\ No newline at end of file".into());
+                    let (mapped, complete) = parse_hunks(&lines.join(line_ending));
+                    assert!(complete);
+                    assert_eq!(
+                        mapped
+                            .iter()
+                            .map(|line| (line.left, line.right))
+                            .collect::<Vec<_>>(),
+                        expected
+                    );
+                }
+            }
+        }
+    }
 }

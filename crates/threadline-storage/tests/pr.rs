@@ -408,7 +408,7 @@ fn it_017_actual_body_references_verify_original_identity_and_reject_delayed_evi
 }
 
 #[test]
-fn selected_offline_download_pins_one_revision_and_safe_retry_survives_restart() {
+fn it_016_selected_offline_download_pins_one_revision_and_safe_retry_survives_restart() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("offline.sqlite3");
     let store = Store::open(&path).unwrap();
@@ -585,7 +585,7 @@ fn selected_offline_download_pins_one_revision_and_safe_retry_survives_restart()
 }
 
 #[test]
-fn nested_inline_pages_keep_distinct_replies_anchors_and_category_baselines() {
+fn it_016_nested_inline_pages_keep_distinct_replies_anchors_and_category_baselines() {
     let dir = tempfile::tempdir().unwrap();
     let store = Store::open_profile(dir.path()).unwrap();
     let (a, _, pr) = setup(&store);
@@ -812,7 +812,7 @@ fn nested_inline_pages_keep_distinct_replies_anchors_and_category_baselines() {
 }
 
 #[test]
-fn it_016_scheduled_pr_pages_checkpoint_first_etag_and_reject_changed_access() {
+fn it_006_it_016_scheduled_pr_pages_checkpoint_first_etag_and_reject_changed_access() {
     use threadline_storage::sync::ReadPriority;
     let dir = tempfile::tempdir().unwrap();
     let store = Store::open_profile(dir.path()).unwrap();
