@@ -26,13 +26,26 @@ pub(super) async fn execute(
     account: AccountId,
     generation: u64,
 ) -> bool {
-    let Ok(Some(claim)) = blocking(store, move |store| {
+    let Ok(Some(job)) = blocking(store, move |store| {
         let now = UtcMillis::now()?.0;
-        store.claim_write(account, now, now.saturating_add(LEASE_MS))
+        if let Some(target) =
+            store.claim_write_reconciliation(account, now, now.saturating_add(90_000))?
+        {
+            return Ok(Some(WriteJob::Readback(target)));
+        }
+        Ok(store
+            .claim_write(account, now, now.saturating_add(LEASE_MS))?
+            .map(|claim| WriteJob::Mutation(Box::new(claim))))
     })
     .await
     else {
         return false;
+    };
+    let claim = match job {
+        WriteJob::Mutation(claim) => *claim,
+        WriteJob::Readback(target) => {
+            return reconcile(accounts, store, core, target, generation).await;
+        }
     };
     let cancel = core.start_read(generation, None);
     let dispatch = Dispatch {
@@ -61,7 +74,12 @@ pub(super) async fn execute(
     true
 }
 
-pub(super) async fn reconcile(
+enum WriteJob {
+    Mutation(Box<WriteClaim>),
+    Readback(ReconciliationTarget),
+}
+
+async fn reconcile(
     accounts: &AccountService,
     store: &Arc<Store>,
     core: &Shared,
@@ -76,10 +94,18 @@ pub(super) async fn reconcile(
         account: target.route.account,
         cancel: &cancel,
     };
-    let result = dispatch.reconcile(target).await;
+    let result = dispatch.reconcile(target.clone()).await;
     if let Err(error) = &result {
         let (reachability, reason, rate) = evidence(error);
         dispatch.record(reachability, reason, rate).await;
+        let _ = blocking(store, move |store| {
+            let now = UtcMillis::now()?.0;
+            let next = now
+                .saturating_add(60_000)
+                .max(floor(rate, reason, now).unwrap_or(now));
+            store.defer_write_reconciliation(&target, next)
+        })
+        .await;
     }
     core.finish_read();
     result.is_ok()
