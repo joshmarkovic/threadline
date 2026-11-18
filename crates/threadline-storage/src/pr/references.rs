@@ -114,10 +114,7 @@ impl Store {
     }
 
     /// Read one revision body and only the candidates derived from exactly those downloaded bytes.
-    pub fn pr_revision_context(
-        &self,
-        rev: &PrRevision,
-    ) -> Result<PrRevisionContext> {
+    pub fn pr_revision_context(&self, rev: &PrRevision) -> Result<PrRevisionContext> {
         self.read(|db|{
             let tx=db.unchecked_transaction()?;
             validate_revision(&tx,rev)?;
