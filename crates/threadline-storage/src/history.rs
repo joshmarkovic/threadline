@@ -8,6 +8,8 @@ use crate::{
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, num::NonZeroU64};
+mod comparisons;
+pub use comparisons::*;
 mod observations;
 pub use observations::*;
 mod views;
@@ -407,6 +409,33 @@ impl Store {
             )
         })
     }
+    /// Revisit missing ancestors after a provider-limited walk without discarding layout or cached rows.
+    pub fn retry_limited_history(
+        &self,
+        p: &AccessProfile,
+        repo: RepositoryId,
+        reference: &HistoryRef,
+    ) -> Result<bool> {
+        self.write(|tx| {
+            require_observation_profile(tx, p, repo)?;
+            let Some(tip) = ref_state(tx, repo, reference)?.and_then(|r| r.tip) else {
+                return Ok(false);
+            };
+            let id = tx
+                .query_row(
+                    "UPDATE history_series SET generation=generation+1,cursor=NULL,state='partial'
+                 WHERE account_id=? AND repository_id=? AND tip=? AND state='limited' RETURNING id",
+                    params![p.account, repo, tip.as_str()],
+                    |r| r.get::<_, i64>(0),
+                )
+                .optional()?;
+            if let Some(id) = id {
+                tx.execute("DELETE FROM history_page_cursors WHERE series_id=?", [id])?;
+            }
+            Ok(id.is_some())
+        })
+    }
+
     pub fn commit_history_page(
         &self,
         walk: &HistoryWalk,
@@ -438,14 +467,13 @@ impl Store {
                         AND generation=? AND cursor IS ? AND state IN ('new','partial')",params![walk.series,walk.profile.account,walk.repository,
                         walk.tip.as_str(),walk.generation,walk.cursor],|r|Ok((r.get::<_,i64>(0)?,r.get::<_,String>(1)?))).optional()?
                         .ok_or(Error::Conflict("History page checkpoint was superseded"))?;
-            if let Some(next) = next_cursor {
-                if tx.execute(
+            if let Some(next) = next_cursor
+                && tx.execute(
                     "INSERT INTO history_page_cursors VALUES(?,?) ON CONFLICT DO NOTHING",
                     params![walk.series, next],
                 )? != 1
                 {
                     return Err(Error::Conflict("Repeated historical page continuation"));
-                }
             }
             let mut frontier: Vec<Option<CommitOid>> = decode(&state.1)?;
             save_entries(tx, &walk.profile, walk.repository, entries)?;

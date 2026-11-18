@@ -247,3 +247,345 @@ fn it_006_branch_baseline_proves_new_commits_after_hydration_and_force_push_pres
             .any(|m| m.movement == RefMovement::Diverged)
     );
 }
+
+use threadline_storage::pr::{PatchEvidence, PrRecord, SourceSide};
+
+const PATCH: &str = "@@ -8,2 +12,2 @@\n same\n-old\n+new";
+fn file(path: &str, previous: Option<&str>, patch: PatchEvidence) -> PrRecord {
+    PrRecord::File {
+        path: path.to_owned(),
+        previous_path: previous.map(str::to_owned),
+        status: if previous.is_some() {
+            "renamed"
+        } else {
+            "modified"
+        }
+        .into(),
+        additions: Some(1),
+        deletions: Some(1),
+        patch,
+    }
+}
+fn options() -> ComparisonOptions {
+    ComparisonOptions {
+        ignore_whitespace: false,
+        context_lines: 3,
+    }
+}
+fn graph(s: &Store) -> (AccountId, RepositoryId, AccessProfile) {
+    let (a, r, _) = setup(s);
+    let p = select(s, a, r);
+    s.observe_history_ref(&p, r, &main_ref(), Some(&oid('f')), 10)
+        .unwrap();
+    let w = s.begin_history_page(&p, r, &main_ref()).unwrap().unwrap();
+    s.commit_history_page(
+        &w,
+        &[
+            commit('f', &['d', 'e']),
+            commit('e', &['c']),
+            commit('d', &['c']),
+            commit('c', &[]),
+        ],
+        None,
+        true,
+        11,
+    )
+    .unwrap();
+    (a, r, p)
+}
+#[test]
+fn it_006_comparison_exact_options_ordered_parent_and_rename_source_survive_offline_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = Store::open_profile(dir.path()).unwrap();
+    let (a, r, p) = graph(&s);
+    let direct = s
+        .comparison_for_parent(a, r, &oid('f'), Some(&oid('e')), options())
+        .unwrap();
+    let id = direct.diff_identity();
+    let w = s.begin_history_diff(&p, &direct).unwrap().unwrap();
+    let new = file("new.rs", Some("old.rs"), PatchEvidence::Text(PATCH.into()));
+    let send = |identity, base, files, at| HistoryDiffInput {
+        identity,
+        effective_base: base,
+        files,
+        next_cursor: None,
+        complete: true,
+        observed_at_ms: at,
+    };
+    let wrong = HistoryDiffIdentity {
+        options: ComparisonOptions {
+            ignore_whitespace: true,
+            ..options()
+        },
+        ..id.clone()
+    };
+    let left = oid('e');
+    assert!(
+        s.commit_history_diff_page(&w, send(&wrong, Some(&left), vec![new.clone()], 12))
+            .is_err()
+    );
+    let other_parent = oid('d');
+    assert!(
+        s.commit_history_diff_page(&w, send(&id, Some(&other_parent), vec![], 12))
+            .is_err()
+    );
+    s.commit_history_diff_page(
+        &w,
+        HistoryDiffInput {
+            identity: &id,
+            effective_base: Some(&left),
+            files: vec![new],
+            next_cursor: Some("second"),
+            complete: false,
+            observed_at_ms: 13,
+        },
+    )
+    .unwrap();
+    assert!(
+        s.commit_history_diff_page(&w, send(&id, Some(&left), vec![], 14))
+            .is_err()
+    );
+    drop(s);
+    let s = Store::open_profile(dir.path()).unwrap();
+    let w = s.begin_history_diff(&p, &direct).unwrap().unwrap();
+    assert_eq!(w.cursor.as_deref(), Some("second"));
+    let binary = file("deep/picture.png", None, PatchEvidence::Binary);
+    s.commit_history_diff_page(&w, send(&id, Some(&left), vec![binary.clone()], 15))
+        .unwrap();
+    let HistoryComparison::Parent { key, .. } = &direct else {
+        panic!("merge parent")
+    };
+    let old = s.load_comparison(a, key).unwrap().unwrap();
+    assert_eq!(
+        old[0],
+        ComparisonFile {
+            path: "new.rs".into(),
+            previous_path: Some("old.rs".into()),
+            patch: Some(PATCH.into())
+        }
+    );
+    assert_eq!(old[1].patch, None);
+    s.select_github_repository(a, r, false).unwrap();
+    let page = s.history_diff_page(a, &direct, None, 1).unwrap();
+    assert_eq!(page.coverage, HistoryCoverage::Complete);
+    assert_eq!(page.next_ordinal, Some(0));
+    let l = page.source_at(0, SourceSide::Left, 3).unwrap();
+    assert_eq!((l.oid, l.path, l.line), (oid('e'), "old.rs".to_owned(), 9));
+    let rline = page.source_at(0, SourceSide::Right, 4).unwrap();
+    assert_eq!(
+        (rline.oid, rline.path, rline.line),
+        (oid('f'), "new.rs".to_owned(), 13)
+    );
+    assert!(page.source_at(0, SourceSide::Right, 3).is_none());
+    let target = s
+        .history_diff_page_at_file(a, &direct, "deep/picture.png", 1)
+        .unwrap();
+    assert_eq!(target.files[0].record, binary);
+    assert!(target.source_at(1, SourceSide::Left, 2).is_none());
+    assert!(
+        s.history_diff_page_at_file(a, &direct, "missing.rs", 1)
+            .unwrap()
+            .files
+            .is_empty()
+    );
+    let outsider = s.ensure_account("github.com", 909).unwrap();
+    assert!(s.history_diff_page(outsider, &direct, None, 2).is_err());
+}
+#[test]
+fn it_006_root_merge_base_and_limited_patch_recovery_preserve_evidence() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = Store::open_profile(dir.path()).unwrap();
+    let (a, r, p) = graph(&s);
+    let root = s
+        .comparison_for_parent(a, r, &oid('c'), None, options())
+        .unwrap();
+    let root_walk = s.begin_history_diff(&p, &root).unwrap().unwrap();
+    s.commit_history_diff_page(
+        &root_walk,
+        HistoryDiffInput {
+            identity: &root.diff_identity(),
+            effective_base: None,
+            files: vec![],
+            next_cursor: None,
+            complete: true,
+            observed_at_ms: 12,
+        },
+    )
+    .unwrap();
+    let root_page = s.history_diff_page(a, &root, None, 4).unwrap();
+    assert_eq!(root_page.coverage, HistoryCoverage::Complete);
+    assert_eq!(root_page.identity.semantics, DiffSemantics::Root);
+    assert!(root_page.identity.base.is_none());
+    let pair = s
+        .comparison_between(
+            a,
+            r,
+            &oid('d'),
+            &oid('e'),
+            ComparisonMode::MergeBase,
+            options(),
+        )
+        .unwrap();
+    let reversed = s
+        .comparison_between(
+            a,
+            r,
+            &oid('e'),
+            &oid('d'),
+            ComparisonMode::MergeBase,
+            options(),
+        )
+        .unwrap();
+    let w = s.begin_history_diff(&p, &pair).unwrap().unwrap();
+    let id = pair.diff_identity();
+    let inp = |identity, base, patch, complete, at| HistoryDiffInput {
+        identity,
+        effective_base: base,
+        files: vec![file("new", Some("old"), patch)],
+        next_cursor: None,
+        complete,
+        observed_at_ms: at,
+    };
+    let reverse_id = reversed.diff_identity();
+    assert!(
+        s.commit_history_diff_page(
+            &w,
+            inp(&reverse_id, None, PatchEvidence::ApiCapped, false, 13)
+        )
+        .is_err()
+    );
+    s.commit_history_diff_page(
+        &w,
+        inp(
+            &id,
+            None,
+            PatchEvidence::Truncated("@@ -8,2 +12,2 @@\n same".into()),
+            false,
+            13,
+        ),
+    )
+    .unwrap();
+    let limited = s.history_diff_page(a, &pair, None, 10).unwrap();
+    assert_eq!(limited.coverage, HistoryCoverage::Limited);
+    assert!(limited.source_at(0, SourceSide::Left, 2).is_none());
+    assert_eq!(
+        limited.source_at(0, SourceSide::Right, 2).unwrap().oid,
+        oid('e')
+    );
+    assert!(s.begin_history_diff(&p, &pair).unwrap().is_none());
+    assert!(s.retry_limited_history_diff(&p, &pair).unwrap());
+    let restart = s.begin_history_diff(&p, &pair).unwrap().unwrap();
+    assert!(
+        s.commit_history_diff_page(&w, inp(&id, None, PatchEvidence::Binary, true, 14))
+            .is_err()
+    );
+    let base = oid('c');
+    assert!(
+        s.commit_history_diff_page(
+            &restart,
+            inp(&id, Some(&base), PatchEvidence::Binary, true, 14)
+        )
+        .is_err()
+    );
+    s.commit_history_diff_page(
+        &restart,
+        inp(
+            &id,
+            Some(&base),
+            PatchEvidence::Text(PATCH.into()),
+            true,
+            14,
+        ),
+    )
+    .unwrap();
+    let page = s.history_diff_page(a, &pair, None, 10).unwrap();
+    assert_eq!(page.source_at(0, SourceSide::Left, 3).unwrap().oid, base);
+    assert_eq!(page.files.len(), 1);
+    assert_eq!(
+        s.history_diff_page(a, &reversed, None, 1).unwrap().coverage,
+        HistoryCoverage::Missing
+    );
+}
+
+#[test]
+fn it_006_limited_ancestry_retries_without_changing_cached_row_ordinals_and_legacy_diffs_remain_downloaded()
+ {
+    let dir = tempfile::tempdir().unwrap();
+    let s = Store::open_profile(dir.path()).unwrap();
+    let (a, r, _) = setup(&s);
+    let p = select(&s, a, r);
+    s.observe_history_ref(&p, r, &main_ref(), Some(&oid('b')), 1)
+        .unwrap();
+    let first = s.begin_history_page(&p, r, &main_ref()).unwrap().unwrap();
+    s.commit_history_page(&first, &[commit('b', &['a'])], None, false, 2)
+        .unwrap();
+    let limited = s.history_page(a, r, &oid('b'), None, 10).unwrap();
+    assert_eq!(limited.coverage, HistoryCoverage::Limited);
+    assert!(s.retry_limited_history(&p, r, &main_ref()).unwrap());
+    let second = s.begin_history_page(&p, r, &main_ref()).unwrap().unwrap();
+    assert!(
+        s.commit_history_page(&first, &[commit('a', &[])], None, true, 3)
+            .is_err()
+    );
+    s.commit_history_page(
+        &second,
+        &[commit('b', &['a']), commit('a', &[])],
+        None,
+        true,
+        3,
+    )
+    .unwrap();
+    let full = s.history_page(a, r, &oid('b'), None, 10).unwrap();
+    assert_eq!(full.coverage, HistoryCoverage::Complete);
+    assert_eq!(
+        (full.rows[0].lane, full.rows[0].ordinal),
+        (limited.rows[0].lane, limited.rows[0].ordinal)
+    );
+    let parent = s
+        .comparison_for_parent(a, r, &oid('b'), Some(&oid('a')), options())
+        .unwrap();
+    let HistoryComparison::Parent { key, .. } = &parent else {
+        panic!("first parent expected")
+    };
+    s.save_comparison(
+        a,
+        key,
+        &[ComparisonFile {
+            path: "retained".into(),
+            previous_path: None,
+            patch: None,
+        }],
+    )
+    .unwrap();
+    let old = s
+        .history_diff_page_at_file(a, &parent, "retained", 1)
+        .unwrap();
+    assert_eq!(old.coverage, HistoryCoverage::Partial);
+    assert!(matches!(
+        old.files[0].record,
+        PrRecord::File {
+            patch: PatchEvidence::Unavailable,
+            ..
+        }
+    ));
+    let foreign = HistoryDiffIdentity {
+        repository: RepositoryId(r.0 + 1),
+        ..parent.diff_identity()
+    };
+    let w = s.begin_history_diff(&p, &parent).unwrap().unwrap();
+    assert!(
+        s.commit_history_diff_page(
+            &w,
+            HistoryDiffInput {
+                identity: &foreign,
+                effective_base: Some(&oid('a')),
+                files: vec![],
+                next_cursor: None,
+                complete: true,
+                observed_at_ms: 4
+            }
+        )
+        .is_err()
+    );
+    assert_eq!(s.history_diff_page(a, &parent, None, 1).unwrap(), old);
+}

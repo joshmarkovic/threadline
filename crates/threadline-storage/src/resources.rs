@@ -708,7 +708,52 @@ pub(crate) fn save_commits_in(
     Ok(())
 }
 
-fn comparison_id(conn: &Connection, key: &ComparisonKey) -> Result<Option<i64>> {
+pub(crate) fn save_comparison_in(
+    tx: &Transaction<'_>,
+    account: AccountId,
+    key: &ComparisonKey,
+    files: &[ComparisonFile],
+) -> Result<()> {
+    require_repository(tx, account, key.repository)?;
+    if let Some(id) = comparison_id(tx, key)? {
+        if comparison_files(tx, id)? != files {
+            return Err(Error::Conflict("immutable comparison contents changed"));
+        }
+        return Ok(());
+    }
+    let id = insert_comparison(tx, key)?;
+    let mut insert = tx.prepare_cached(
+                "INSERT INTO cached_comparison_files(comparison_id,file_index,path_label,previous_path_label,patch)
+                 VALUES (?1,?2,?3,?4,?5)",
+            )?;
+    for (index, file) in files.iter().enumerate() {
+        require_label(&file.path)?;
+        if let Some(previous) = &file.previous_path {
+            require_label(previous)?;
+        }
+        let index =
+            i64::try_from(index).map_err(|_| Error::InvalidInput("too many comparison files"))?;
+        insert.execute(params![
+            id,
+            index,
+            file.path,
+            file.previous_path,
+            file.patch
+        ])?;
+    }
+    Ok(())
+}
+
+pub(crate) fn insert_comparison(tx: &Transaction<'_>, key: &ComparisonKey) -> Result<i64> {
+    tx.execute(
+        "INSERT INTO cached_comparisons(repository_id,base_commit,head_commit,compare_mode,ignore_whitespace,context_lines)
+         VALUES (?,?,?,?,?,?)",
+        params![key.repository,key.base.as_str(),key.head.as_str(),key.mode as i64,key.ignore_whitespace,key.context_lines],
+    )?;
+    Ok(tx.last_insert_rowid())
+}
+
+pub(crate) fn comparison_id(conn: &Connection, key: &ComparisonKey) -> Result<Option<i64>> {
     Ok(conn.query_row(
         "SELECT id FROM cached_comparisons WHERE repository_id=?1 AND base_commit=?2 AND head_commit=?3
          AND compare_mode=?4 AND ignore_whitespace=?5 AND context_lines=?6",
@@ -717,7 +762,7 @@ fn comparison_id(conn: &Connection, key: &ComparisonKey) -> Result<Option<i64>> 
     ).optional()?)
 }
 
-fn comparison_files(conn: &Connection, id: i64) -> Result<Vec<ComparisonFile>> {
+pub(crate) fn comparison_files(conn: &Connection, id: i64) -> Result<Vec<ComparisonFile>> {
     query_many(
         conn,
         "SELECT path_label,previous_path_label,patch FROM cached_comparison_files WHERE comparison_id=?1 ORDER BY file_index",
@@ -795,32 +840,7 @@ impl Store {
         key: &ComparisonKey,
         files: &[ComparisonFile],
     ) -> Result<()> {
-        self.write(|tx| {
-            require_repository(tx, account, key.repository)?;
-            if let Some(id) = comparison_id(tx, key)? {
-                if comparison_files(tx, id)? != files {
-                    return Err(Error::Conflict("immutable comparison contents changed"));
-                }
-                return Ok(());
-            }
-            tx.execute(
-                "INSERT INTO cached_comparisons(repository_id,base_commit,head_commit,compare_mode,ignore_whitespace,context_lines)
-                 VALUES (?1,?2,?3,?4,?5,?6)",
-                params![key.repository.0,key.base.as_str(),key.head.as_str(),key.mode as i64,key.ignore_whitespace,key.context_lines],
-            )?;
-            let id = tx.last_insert_rowid();
-            let mut insert = tx.prepare_cached(
-                "INSERT INTO cached_comparison_files(comparison_id,file_index,path_label,previous_path_label,patch)
-                 VALUES (?1,?2,?3,?4,?5)",
-            )?;
-            for (index,file) in files.iter().enumerate() {
-                require_label(&file.path)?;
-                if let Some(previous) = &file.previous_path { require_label(previous)?; }
-                let index = i64::try_from(index).map_err(|_| Error::InvalidInput("too many comparison files"))?;
-                insert.execute(params![id,index,file.path,file.previous_path,file.patch])?;
-            }
-            Ok(())
-        })
+        self.write(|tx| save_comparison_in(tx, account, key, files))
     }
 
     pub fn load_comparison(
@@ -1188,6 +1208,7 @@ pub(crate) fn clear_resource_cache(tx: &Transaction<'_>, account: AccountId) -> 
         SELECT items.id FROM items JOIN repositories ON items.repository_id=repositories.id WHERE repositories.account_id=?1)",
         [account.0])?;
     for table in [
+        "history_diffs",
         "history_series",
         "cached_comparisons",
         "cached_commits",

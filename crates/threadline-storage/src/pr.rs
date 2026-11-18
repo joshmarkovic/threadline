@@ -15,6 +15,7 @@ mod model;
 pub use model::*;
 mod lines;
 mod records;
+pub(crate) use lines::file_mappings;
 pub use lines::{SourceLine, SourceLocation};
 pub(crate) use records::publish_page;
 

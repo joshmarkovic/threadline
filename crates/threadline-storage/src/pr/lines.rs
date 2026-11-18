@@ -99,7 +99,7 @@ fn parse_hunks(patch: &str) -> (Vec<SourceLine>, bool) {
     (rows, hunk && left.remaining == 0 && right.remaining == 0)
 }
 
-pub(super) fn file_mappings(record: &mut PrRecord) -> Vec<SourceLine> {
+pub(crate) fn file_mappings(record: &mut PrRecord) -> Vec<SourceLine> {
     let PrRecord::File {
         patch,
         additions,
