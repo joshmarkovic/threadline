@@ -140,46 +140,60 @@ impl Store {
         validators: &Validators,
         fetched_at_ms: i64,
     ) -> Result<ItemId> {
-        let updated = summary.update.remote_updated_at.0;
-        let supplied_metadata = matches!(summary.update.title, Change::Value(_))
-            && matches!(summary.update.closed, Change::Value(_));
-        let supplied_body = summary.update.body != Change::Missing;
         self.write(|tx| {
-            let item = identity::ingest_in(
-                tx,
+            commit_item_metadata_in(tx, account, repository, summary, validators, fetched_at_ms)
+        })
+    }
+}
+
+pub(crate) fn commit_item_metadata_in(
+    tx: &Transaction<'_>,
+    account: AccountId,
+    repository: RepositoryId,
+    summary: ListSummary,
+    validators: &Validators,
+    fetched_at_ms: i64,
+) -> Result<ItemId> {
+    let updated = summary.update.remote_updated_at.0;
+    let supplied_metadata = matches!(summary.update.title, Change::Value(_))
+        && matches!(summary.update.closed, Change::Value(_));
+    let supplied_body = summary.update.body != Change::Missing;
+    let item = identity::ingest_in(
+        tx,
+        account,
+        ItemLocator {
+            repository,
+            number: summary.number,
+        },
+        summary.update,
+    )?;
+    apply_facets(tx, item, updated, summary.facets)?;
+    let (title_at, closed_at, body_at): (Option<i64>, Option<i64>, Option<i64>) = tx.query_row(
+        "SELECT title_at,closed_at,body_at FROM items WHERE id=?",
+        [item],
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+    )?;
+    for (family, supplied, latest) in [
+        (
+            ResourceFamily::Metadata,
+            supplied_metadata,
+            title_at.max(closed_at),
+        ),
+        (ResourceFamily::Body, supplied_body, body_at),
+    ] {
+        if latest.is_some_and(|at| at > updated) || family == ResourceFamily::Body && !supplied {
+            continue;
+        }
+        let id = ensure_resource(
+            tx,
+            ResourceKey {
                 account,
-                ItemLocator {
-                    repository,
-                    number: summary.number,
-                },
-                summary.update,
-            )?;
-            apply_facets(tx, item, updated, summary.facets)?;
-            let (title_at, closed_at, body_at): (Option<i64>, Option<i64>, Option<i64>) =
-                tx.query_row("SELECT title_at,closed_at,body_at FROM items WHERE id=?", [item], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
-            for (family, supplied, latest) in [
-                (
-                    ResourceFamily::Metadata,
-                    supplied_metadata,
-                    title_at.max(closed_at),
-                ),
-                (ResourceFamily::Body, supplied_body, body_at),
-            ] {
-                if latest.is_some_and(|at| at > updated)
-                    || family == ResourceFamily::Body && !supplied
-                {
-                    continue;
-                }
-                let id = ensure_resource(
-                    tx,
-                    ResourceKey {
-                        account,
-                        target: ResourceTarget::Item(item),
-                        family,
-                    },
-                )?;
-                if supplied {
-                    tx.execute(
+                target: ResourceTarget::Item(item),
+                family,
+            },
+        )?;
+        if supplied {
+            tx.execute(
                         "UPDATE cached_resources SET coverage=2,fetch=0,error=NULL,last_page_at_ms=?2,last_fetch_at_ms=?2,last_validation_at_ms=?2,
                        etag=?3,last_modified=?4,revision=?5 WHERE id=?1 AND fetch!=1 AND (last_validation_at_ms IS NULL OR last_validation_at_ms<=?2)",
                         params![
@@ -190,11 +204,9 @@ impl Store {
                             validators.revision
                         ],
                     )?;
-                } else {
-                    tx.execute("UPDATE cached_resources SET coverage=max(coverage,1),last_page_at_ms=?2 WHERE id=?1 AND fetch!=1", [id, fetched_at_ms])?;
-                }
-            }
-            Ok(item)
-        })
+        } else {
+            tx.execute("UPDATE cached_resources SET coverage=max(coverage,1),last_page_at_ms=?2 WHERE id=?1 AND fetch!=1", [id, fetched_at_ms])?;
+        }
     }
+    Ok(item)
 }

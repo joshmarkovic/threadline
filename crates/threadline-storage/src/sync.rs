@@ -320,6 +320,45 @@ impl Store {
         })
     }
 
+    /// Publish the requested item's metadata, presentation and successful read deadline together.
+    pub fn commit_sync_item_metadata(
+        &self,
+        claim: &ReadClaim,
+        summary: crate::reader::ListSummary,
+        validators: &Validators,
+        now_ms: i64,
+        system_zone: &str,
+    ) -> Result<ItemId> {
+        self.write(|tx| {
+            require_claim(tx, claim, now_ms)?;
+            let target = claim
+                .target
+                .item
+                .ok_or(Error::InvalidInput("Item metadata requires an item claim"))?;
+            if claim.target.family != ResourceFamily::Metadata
+                || (!claim.target.revision.is_empty()
+                    && validators.revision.as_deref() != Some(&claim.target.revision))
+            {
+                return Err(Error::Conflict(
+                    "Metadata response does not match the requested revision",
+                ));
+            }
+            let item = crate::reader::commit_item_metadata_in(
+                tx,
+                claim.account,
+                claim.target.repository,
+                summary,
+                validators,
+                now_ms,
+            )?;
+            if item != target {
+                return Err(Error::Conflict("Metadata response belongs to another item"));
+            }
+            complete_in(tx, claim, now_ms, system_zone, validators)?;
+            Ok(item)
+        })
+    }
+
     pub fn fail_sync_read(
         &self,
         claim: &ReadClaim,

@@ -690,3 +690,58 @@ fn it_007_visible_subscriptions_replace_atomically_after_relaunch_without_waking
     assert!(s.unsubscribe_read(a, &target, "background-watch").unwrap());
     assert_eq!(s.next_sync_due(a, START + 3).unwrap(), None);
 }
+
+#[test]
+fn stale_visible_response_cannot_publish_another_item_or_change_cache_after_deselection() {
+    use threadline_storage::reader::ListSummary;
+    let dir = tempfile::tempdir().unwrap();
+    let s = Store::open_profile(dir.path()).unwrap();
+    let (a, r) = install(&s);
+    let item = s.ensure_placeholder(a, r, 10).unwrap();
+    let target = ReadTarget {
+        repository: r,
+        item: Some(item),
+        family: ResourceFamily::Metadata,
+        revision: String::new(),
+    };
+    s.subscribe_read(a, &target, "left", ReadPriority::Visible, START)
+        .unwrap();
+    let claim = s.claim_sync_read(a, START).unwrap().unwrap();
+    let row = |n| ListSummary {
+        number: n,
+        update: issue(n, START, false).update,
+        facets: Default::default(),
+    };
+    assert!(
+        s.commit_sync_item_metadata(&claim, row(500), &tag("a"), START + 1, "UTC")
+            .is_err()
+    );
+    assert!(
+        s.resolve(
+            a,
+            ItemLocator {
+                repository: r,
+                number: 500
+            }
+        )
+        .unwrap()
+        .is_none()
+    );
+    s.select_github_repository(a, r, false).unwrap();
+    s.select_github_repository(a, r, true).unwrap();
+    assert!(
+        s.commit_sync_item_metadata(&claim, row(10), &tag("a"), START + 2, "UTC")
+            .is_err()
+    );
+    assert_eq!(s.item(a, item).unwrap().unwrap().title, Change::Missing);
+    let fresh = s.claim_sync_read(a, START + 1000).unwrap().unwrap();
+    assert_eq!(
+        s.commit_sync_item_metadata(&fresh, row(10), &tag("a"), START + 1001, "UTC")
+            .unwrap(),
+        item
+    );
+    assert_eq!(
+        s.item(a, item).unwrap().unwrap().title,
+        Change::Value("Issue 10".into())
+    );
+}
