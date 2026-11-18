@@ -31,6 +31,8 @@ const ROW_H: f32 = 58.;
 pub(super) struct HistoryState {
     pub busy: bool,
     fetching: bool,
+    refreshing: bool,
+    refresh_pending: bool,
     repository: Option<RepositoryId>,
     request: u64,
     scroll: ScrollHandle,
@@ -43,6 +45,8 @@ impl Default for HistoryState {
         Self {
             busy: false,
             fetching: false,
+            refreshing: false,
+            refresh_pending: false,
             repository: None,
             request: 0,
             scroll: ScrollHandle::new(),
@@ -60,6 +64,15 @@ impl HistoryState {
             .as_ref()
             .and_then(|data| data.page.as_ref())
             .map_or(0, |page| page.rows.len())
+    }
+
+    pub(super) fn cached_ref_tip(&self, reference: &HistoryRef) -> Option<Option<&CommitOid>> {
+        self.data
+            .as_ref()?
+            .refs
+            .iter()
+            .find(|entry| &entry.reference == reference)
+            .map(|entry| entry.tip.as_ref())
     }
 
     pub(super) fn plan(&self) -> Option<&HistoryComparison> {
@@ -511,11 +524,61 @@ impl ReaderWorkspace {
                 }
                 Err(_) => this.status = Some("History could not be loaded or saved. The previous view remains available."),
             }
+            if std::mem::take(&mut this.history.refresh_pending) {
+                this.refresh_cached_history(window, cx);
+            }
             this.settle_departure(window, cx);
             this.drain_notification_inbox(window, cx);
             cx.notify();
         });
         cx.notify();
+    }
+
+    pub(super) fn refresh_cached_history(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.surface != Surface::History {
+            return;
+        }
+        let (Some(account), Some(repository)) = (self.account, self.history.repository) else {
+            return;
+        };
+        if self.history.busy || self.history.refreshing {
+            self.history.refresh_pending = true;
+            return;
+        }
+        let Some(data) = self.history.data.as_ref() else {
+            return;
+        };
+        let Some(tip) = data.view.as_ref().map(|view| view.tip.clone()) else {
+            self.load_history(repository, None, window, cx);
+            return;
+        };
+        let after = data.after;
+        let request = self.history.request;
+        self.history.refreshing = true;
+        self.launch(
+            window,
+            cx,
+            move |store| {
+                let refs = store.history_refs(account, repository, None, 100)?;
+                let page = store.history_page(account, repository, &tip, after, GRAPH_LIMIT)?;
+                Ok((refs, page))
+            },
+            move |this, result, window, cx| {
+                this.history.refreshing = false;
+                if this.surface == Surface::History
+                    && this.history.repository == Some(repository)
+                    && this.history.request == request
+                    && let Ok((refs, page)) = result
+                    && let Some(data) = this.history.data.as_mut()
+                {
+                    data.refs = refs;
+                    data.page = Some(page);
+                }
+                if std::mem::take(&mut this.history.refresh_pending) {
+                    this.refresh_cached_history(window, cx);
+                }
+            },
+        );
     }
 
     fn set_history_diff(&mut self, data: &HistoryData, cx: &mut Context<Self>) {

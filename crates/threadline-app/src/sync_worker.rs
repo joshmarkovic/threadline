@@ -35,6 +35,7 @@ pub(crate) struct SyncUpdate {
     pub(crate) connection: ConnectionSnapshot,
     pub(crate) status: Option<SyncStatus>,
     pub(crate) cache_generation: u64,
+    pub(crate) history_generation: u64,
     pub(crate) eligible_outbox: u64,
 }
 
@@ -87,6 +88,7 @@ impl SyncWorker {
             connection: observer.snapshot(Duration::ZERO),
             status: None,
             cache_generation: 0,
+            history_generation: 0,
             eligible_outbox: 0,
         });
         let core = Arc::new(Shared {
@@ -304,6 +306,7 @@ async fn run(
     let mut active_account = None;
     let mut bound = BoundReaders::default();
     let mut digest = 0u64;
+    let mut history_digest = 0u64;
     let mut requested = None;
     let mut enroll = true;
     let mut probe_retry = Duration::ZERO;
@@ -333,7 +336,7 @@ async fn run(
                     .reset_account(false);
                 bound = BoundReaders::default();
             }
-            publish(&core, &sender, None, digest);
+            publish(&core, &sender, None, digest, history_digest);
             let retry = local.is_err().then_some(Duration::from_secs(15));
             wait(&core, retry).await;
             enroll = true;
@@ -356,7 +359,7 @@ async fn run(
                 observer.set_offline(offline);
             }
         }
-        publish(&core, &sender, Some(&local), digest);
+        publish(&core, &sender, Some(&local), digest, history_digest);
         let deadline = core
             .observer
             .lock()
@@ -455,12 +458,20 @@ async fn run(
                         store.claim_sync_read(local.account, now)
                     })
                     .await
-                        && reads::execute(
+                    {
+                        let history =
+                            threadline_storage::sync::HistoryRead::from_target(&claim.target)
+                                .is_some();
+                        if reads::execute(
                             &accounts, &store, &core, &mut bound, &local, claim, generation,
                         )
                         .await
-                    {
-                        digest = digest.wrapping_add(1);
+                        {
+                            digest = digest.wrapping_add(1);
+                            if history {
+                                history_digest = history_digest.wrapping_add(1);
+                            }
+                        }
                     }
                     prefer_write = true;
                     // A competing write can change eligibility between the due check and claim.
@@ -543,6 +554,7 @@ fn publish(
     sender: &watch::Sender<SyncUpdate>,
     local: Option<&Local>,
     cache_generation: u64,
+    history_generation: u64,
 ) {
     let connection = core
         .observer
@@ -555,6 +567,7 @@ fn publish(
         status: local.map(|local| local.status.clone()),
         connection,
         cache_generation,
+        history_generation,
         eligible_outbox: if eligible {
             local.map_or(0, |local| local.waiting)
         } else {

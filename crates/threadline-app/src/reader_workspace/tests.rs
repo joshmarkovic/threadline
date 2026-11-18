@@ -1905,8 +1905,6 @@ fn history_view_selects_exact_parents_and_restores_an_offline_comparison(cx: &mu
             now + 1,
         )
         .unwrap();
-    store.sign_out_github_account(account, now + 2).unwrap();
-    store.set_dispatch_controls(account, true, false).unwrap();
 
     let (window, reader) = setup.open(cx);
     click(cx, window, "reader-history");
@@ -1981,6 +1979,60 @@ fn history_view_selects_exact_parents_and_restores_an_offline_comparison(cx: &mu
     assert_eq!(state.second, Some(oid('d')));
     assert!(state.parent.is_none());
 
+    // The shared history update changes labels in place while retaining this pinned comparison.
+    for (index, tip) in [Some(oid('a')), None].into_iter().enumerate() {
+        store
+            .observe_history_ref(
+                &profile,
+                repository,
+                &reference,
+                tip.as_ref(),
+                now + 2 + index as i64,
+            )
+            .unwrap();
+        let sequence = index as u64 + 1;
+        let connection = threadline_core::connectivity::ConnectivityObserver::new(1)
+            .snapshot(std::time::Duration::ZERO);
+        cx.update_window(window, |_, window, cx| {
+            reader.update(cx, |this, cx| {
+                this.update_sync(
+                    crate::sync_worker::SyncUpdate {
+                        account: Some(account),
+                        status: None,
+                        connection,
+                        cache_generation: sequence,
+                        history_generation: sequence,
+                        eligible_outbox: 0,
+                    },
+                    window,
+                    cx,
+                );
+            })
+        })
+        .unwrap();
+        until(cx, |cx| {
+            cx.read(|cx| reader.read(cx).history.cached_ref_tip(&reference) == Some(tip.as_ref()))
+        });
+        cx.read(|cx| {
+            let history = &reader.read(cx).history;
+            assert_eq!(history.cached_graph_rows(), 3);
+            assert!(
+                matches!(history.plan(), Some(HistoryComparison::Pair { key })
+                if key.base == oid('d') && key.head == oid('f'))
+            );
+        });
+        assert_eq!(
+            store
+                .history_view(account, repository, "reader-commit-history")
+                .unwrap()
+                .unwrap()
+                .state,
+            state
+        );
+    }
+
+    store.sign_out_github_account(account, now + 5).unwrap();
+    store.set_dispatch_controls(account, true, false).unwrap();
     let (reopened, restored) = setup.open(cx);
     click(cx, reopened, "reader-history");
     if repository_index != 0 {

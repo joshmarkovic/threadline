@@ -53,19 +53,24 @@ impl ReaderWorkspace {
         }
     }
 
-    fn update_sync(&mut self, update: SyncUpdate, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn update_sync(
+        &mut self,
+        update: SyncUpdate,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.account.is_none() || update.account != self.account {
             return;
         }
-        let published = self
-            .sync_update
-            .as_ref()
-            .map_or(0, |previous| previous.cache_generation);
+        let (published, history) = self.sync_update.as_ref().map_or((0, 0), |previous| {
+            (previous.cache_generation, previous.history_generation)
+        });
+        let history_changes = update.history_generation.saturating_sub(history);
+        let cache_changes = update.cache_generation.saturating_sub(published);
         let reached = update.connection.status == ConnectionStatus::Reachable
             && self.sync_update.as_ref().is_some_and(|previous| {
                 previous.connection.status == ConnectionStatus::Unreachable
             });
-        let changed = update.cache_generation > published;
         if let Some(panel) = self.sync_panel.as_ref() {
             panel.update(cx, |panel, cx| panel.set_status(update.status.clone(), cx));
         }
@@ -74,7 +79,10 @@ impl ReaderWorkspace {
             self.pr_resume_attempts.clear();
             self.resume_visible_pr_downloads(window, cx);
         }
-        if changed {
+        if history_changes > 0 {
+            self.refresh_cached_history(window, cx);
+        }
+        if cache_changes > history_changes {
             self.refresh_sidebar_counts(window, cx);
             if self.surface == Surface::Outbox {
                 self.show_outbox(false, window, cx);
