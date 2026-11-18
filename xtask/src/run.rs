@@ -1071,7 +1071,7 @@ mod tests {
         ])
         .unwrap();
         let dir = tempfile::tempdir().unwrap();
-        let outcomes = execute(&options, dir.path(), dir.path());
+        let outcomes = run_cargo_tests(&[], &options, dir.path(), dir.path());
         assert_eq!(outcomes.len(), 1);
         assert_eq!(outcomes[0].case, "UT-014");
         assert_eq!(outcomes[0].status, Status::Blocked);
