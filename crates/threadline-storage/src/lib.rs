@@ -8,6 +8,7 @@ pub mod fixtures;
 pub mod queue;
 pub mod reader;
 pub mod resources;
+pub mod sync;
 
 pub use threadline_core::domain::IssueApiId;
 

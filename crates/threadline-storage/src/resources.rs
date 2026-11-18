@@ -36,7 +36,7 @@ pub enum ResourceFamily {
 }
 
 impl ResourceFamily {
-    fn name(self) -> &'static str {
+    pub(crate) fn name(self) -> &'static str {
         match self {
             Self::Timeline => "timeline",
             Self::RepositoryItems => "repository-items",
