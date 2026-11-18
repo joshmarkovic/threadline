@@ -187,6 +187,7 @@ fn serve(
 
 fn answer(socket: &mut TcpStream, phase: Phase) -> io::Result<RequestEvidence> {
     let timeout = Some(Duration::from_secs(2));
+    socket.set_nonblocking(false)?;
     socket.set_read_timeout(timeout)?;
     socket.set_write_timeout(timeout)?;
     let (route, authorized) = read_request(socket)?;

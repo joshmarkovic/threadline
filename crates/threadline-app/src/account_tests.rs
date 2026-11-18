@@ -78,8 +78,13 @@ impl Drop for Simulator {
 }
 
 fn respond(mut stream: TcpStream, sso: bool, repository_id: u64) {
+    // Windows can inherit the nonblocking listener mode on an accepted socket.
+    stream.set_nonblocking(false).unwrap();
     stream
         .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    stream
+        .set_write_timeout(Some(Duration::from_secs(2)))
         .unwrap();
     let mut line = String::new();
     let mut input = BufReader::new(&mut stream);
