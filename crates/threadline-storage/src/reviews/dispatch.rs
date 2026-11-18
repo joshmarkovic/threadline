@@ -159,7 +159,7 @@ pub enum ReviewFailure {
     Ambiguous,
 }
 
-fn route(db: &Connection, account: AccountId, id: &str) -> Result<ReviewRoute> {
+pub(super) fn route(db: &Connection, account: AccountId, id: &str) -> Result<ReviewRoute> {
     let raw = db.query_row(
         "SELECT q.item_id,r.id,a.provider_user_id,r.provider_repository_id,v.pr_api_id,i.number,
            r.owner,r.name,p.credential_generation,b.base_oid,b.head_oid,b.id
@@ -421,7 +421,7 @@ impl Store {
                     dependencies: s.dependencies,
                 },
             )?;
-            if let Some(lease) = s.draft
+            if s.draft.is_some()
                 && let ReviewIntent::Reply { body, .. } = s.intent
             {
                 let saved = queue::read_operation(tx, rev.account, id)?.ok_or(Error::Corrupt)?;
@@ -430,7 +430,6 @@ impl Store {
                         "The submitted reply differs from the saved revision",
                     ));
                 }
-                let _ = lease;
             }
             tx.execute("INSERT INTO review_intents VALUES(?,?,?,?,?,?) ON CONFLICT(account_id,operation_id) DO NOTHING",
                         params![rev.account,id,rev.pr,rev.id,pr_id,s.submitted_at_ms])?;
@@ -454,7 +453,17 @@ impl Store {
             let Some(claim) = outbox::claim_in(tx, account, now, until, "review")? else {
                 return Ok(None);
             };
-            let route = route(tx, account, &claim.operation.id)?;
+            let route = match route(tx, account, &claim.operation.id) {
+                Ok(route)=>route,
+                Err(Error::Conflict(_))=>{
+                    tx.execute("UPDATE operations SET state='attention',reason='original_review_route_changed',
+                        lease_until=NULL WHERE account_id=? AND id=? AND attempt=?",
+                        params![account,claim.operation.id,claim.number])?;
+                    outbox::end_attempt(tx,account,&claim.operation.id,claim.number,"attention","original_review_route_changed")?;
+                    return Ok(None);
+                }
+                Err(error)=>return Err(error),
+            };
             let step = step(tx, &claim)?;
             Ok(Some(ReviewClaim { claim, route, step }))
         })
@@ -509,6 +518,56 @@ impl Store {
             Ok(ReviewAdmission::Send(ReviewTicket(Box::new(claim.clone()))))
         })
     }
+    pub fn fail_review_preflight(
+        &self,
+        claim: &ReviewClaim,
+        why: crate::writes::WritePreflightFailure,
+        now: i64,
+    ) -> Result<()> {
+        use crate::writes::WritePreflightFailure as Failure;
+        self.write(|tx|{
+            let op=&claim.claim.operation;
+            if !eligible(tx,claim,now)? || route(tx,op.account,&op.id)?!=claim.route{
+                return Err(Error::Conflict("The review preflight changed or expired"));
+            }
+            let (state,reason,floor)=match why {
+                Failure::Transient=>("queued","review_preflight_unreachable",None),
+                Failure::Throttled{not_before_ms}=>{
+                    crate::sync::server_floor_in(tx,op.account,not_before_ms)?;
+                    ("queued","review_preflight_throttled",Some(not_before_ms))
+                }
+                Failure::Unauthorized=>("attention","review_authentication_required",None),
+                Failure::Forbidden=>("attention","review_permission_denied",None),
+                Failure::Missing=>("attention","original_review_target_unavailable",None),
+                Failure::InvalidResponse=>("attention","invalid_review_preflight",None),
+            };
+            let attempt=u32::try_from(claim.attempt()).unwrap_or(u32::MAX);
+            let delay=threadline_core::sync::policy::retry_delay(attempt,std::time::Duration::ZERO)
+                .unwrap_or(std::time::Duration::from_secs(15*60));
+            let retry=now.saturating_add(i64::try_from(delay.as_millis()).unwrap_or(i64::MAX)).max(floor.unwrap_or(now));
+            tx.execute("INSERT INTO review_attempts(account_id,operation_id,attempt,observed_at,credential_generation,route,step,observed,outcome)
+                VALUES(?,?,?,?,?,?,?,'null',?)",params![op.account,op.id,claim.attempt(),now,claim.route.credential_generation,
+                encode(&claim.route)?,encode(&claim.step)?,reason])?;
+            finish_preflight(tx,claim,state,reason,if state=="queued"{retry}else{0})?;
+            Ok(())
+        })
+    }
+    /// Recheck an access failure once a new credential for the original actor and owner is installed.
+    pub fn resume_reviews(&self, account: AccountId, now: i64) -> Result<usize> {
+        self.write(|tx|{
+            let floor=crate::writes::deadline(tx,account)?.unwrap_or(now).max(now);
+            Ok(tx.execute("UPDATE operations AS q SET state='queued',retry_at=?2,reason='review_access_repaired'
+                WHERE q.account_id=?1 AND NOT q.cancel_requested AND q.state='attention'
+                  AND q.reason IN ('review_authentication_required','review_permission_denied')
+                  AND EXISTS(SELECT 1 FROM review_attempts e JOIN github_operation_scopes s
+                      ON s.account_id=e.account_id AND s.operation_id=e.operation_id
+                      JOIN github_access_profiles p ON p.account_id=s.account_id AND p.owner_scope=s.owner_scope
+                      JOIN operation_gates g ON g.account_id=s.account_id AND g.id=s.operation_id
+                      WHERE e.account_id=q.account_id AND e.operation_id=q.id AND e.attempt=q.attempt
+                        AND p.credential_generation>e.credential_generation AND g.hold IS NULL)",
+                params![account,floor])?)
+        })
+    }
     pub fn abandon_review_preflight(&self, claim: &ReviewClaim, now: i64) -> Result<bool> {
         self.write(|tx| finish_preflight(tx, claim, "queued", "review_preflight_interrupted", now))
     }
@@ -561,7 +620,7 @@ impl Store {
     }
 }
 
-fn sent(
+pub(super) fn sent(
     db: &Connection,
     account: AccountId,
     id: &str,
@@ -700,6 +759,12 @@ impl Store {
         self.write(|tx| {
             let (route, step) = sent(tx, account, id, attempt)?;
             let (kind, remote) = validate_result(&route, &step, response)?;
+            let acknowledged=tx.query_row("SELECT remote_id FROM review_accepted_ids
+                WHERE account_id=? AND operation_id=? AND attempt=?",params![account,id,attempt],|r|r.get::<_,String>(0)).optional()?;
+            if acknowledged.as_ref().is_some_and(|ack|ack!=&remote){
+                return Err(Error::Conflict("The review response contradicts the acknowledged remote identity"));
+            }
+
             let evidence = match proof {
                 ReviewProof::MutationResponse { request_id } if !request_id.trim().is_empty() => {
                     format!("GitHub request {request_id}")
@@ -760,6 +825,11 @@ impl Store {
     ) -> Result<()> {
         self.write(|tx| {
             sent(tx, account, id, attempt)?;
+            let accepted:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM review_accepted_ids WHERE account_id=?
+                AND operation_id=? AND attempt=?)",params![account,id,attempt],|r|r.get(0))?;
+            if accepted && !matches!(why,ReviewFailure::Ambiguous){
+                return Err(Error::Conflict("The accepted review or reply cannot be replayed"));
+            }
             match why {
                 ReviewFailure::Ambiguous => outbox::record_delivery_in(
                     tx,

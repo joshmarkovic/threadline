@@ -499,7 +499,11 @@ pub(crate) fn validate_revision(db: &Connection, rev: &PrRevision) -> Result<()>
     }
     Ok(())
 }
-pub(crate) fn family_id(db: &Connection, rev: &PrRevision, family: PrFamily) -> Result<Option<i64>> {
+pub(crate) fn family_id(
+    db: &Connection,
+    rev: &PrRevision,
+    family: PrFamily,
+) -> Result<Option<i64>> {
     validate_revision(db, rev)?;
     Ok(db
         .query_row(

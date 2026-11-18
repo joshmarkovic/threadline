@@ -153,6 +153,46 @@ impl Store {
     ) -> Result<InlineAnchor> {
         self.read(|db| capture(db, rev, path, side, first_patch_line, last_patch_line))
     }
+    /// Resolve a source selection through the retained unfiltered patch. Ambiguous or missing ranges cannot be submitted.
+    pub fn capture_inline_source_anchor(
+        &self,
+        rev: &PrRevision,
+        path: &str,
+        side: SourceSide,
+        first_source: u32,
+        last_source: u32,
+    ) -> Result<InlineAnchor> {
+        if first_source == 0 || last_source < first_source {
+            return Err(Error::InvalidInput("Invalid inclusive source-line range"));
+        }
+        self.read(|db| {
+            let tx = db.unchecked_transaction()?;
+            let record = stored_record(&tx, rev, PrFamily::Files, path)?
+                .ok_or(Error::Conflict("The selected file is not downloaded"))?;
+            let lookup = |source: u32| -> Result<u32> {
+                let mut matching = record.mappings.iter().filter(|m| match side {
+                    SourceSide::Left => m.left == Some(source),
+                    SourceSide::Right => m.right == Some(source),
+                });
+                let first = matching.next().ok_or(Error::Conflict(
+                    "The selected source line is absent from the downloaded comparison",
+                ))?;
+                if matching.next().is_some() {
+                    return Err(Error::Conflict("The selected source line is ambiguous"));
+                }
+                Ok(first.patch_line)
+            };
+            capture(
+                &tx,
+                rev,
+                path,
+                side,
+                lookup(first_source)?,
+                lookup(last_source)?,
+            )
+        })
+    }
+
     pub fn review_draft(&self, account: AccountId, id: &str) -> Result<Option<SavedReviewDraft>> {
         self.read(|db| load(db, account, id))
     }

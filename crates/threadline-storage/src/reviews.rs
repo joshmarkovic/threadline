@@ -12,6 +12,8 @@ use std::num::NonZeroU64;
 mod dispatch;
 mod drafts;
 pub use dispatch::*;
+mod recovery;
+pub use recovery::*;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ReviewEvent {

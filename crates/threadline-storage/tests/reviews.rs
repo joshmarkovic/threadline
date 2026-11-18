@@ -221,6 +221,24 @@ fn it_013_review_drafts_keep_original_multiline_anchors_after_eviction_force_pus
         .capture_inline_anchor(&original, "new.rs", SourceSide::Right, 4, 5)
         .unwrap();
     assert_eq!((right.first_line, right.last_line), (13, 14));
+    assert_eq!(
+        db.capture_inline_source_anchor(&original, "new.rs", SourceSide::Right, 13, 14)
+            .unwrap(),
+        right
+    );
+    assert_eq!(
+        db.capture_inline_source_anchor(&original, "new.rs", SourceSide::Left, 8, 9)
+            .unwrap(),
+        left
+    );
+    assert!(
+        db.capture_inline_source_anchor(&original, "new.rs", SourceSide::Right, 13, 60)
+            .is_err()
+    );
+    assert!(
+        db.capture_inline_source_anchor(&original, "new.rs", SourceSide::Right, 3, 4)
+            .is_err()
+    );
     assert_eq!(right.source_oid, original.head.as_str());
     assert!(right.original_hunk.contains("+again"));
     assert!(
@@ -507,4 +525,195 @@ fn it_013_thread_actions_require_original_thread_and_an_unchanged_authorized_rev
         36,
     )
     .unwrap();
+}
+
+#[test]
+fn it_011_cancelled_pending_review_keeps_issued_id_and_holds_dependents_while_other_pr_dispatches()
+{
+    let dir = tempfile::tempdir().unwrap();
+    let db = Store::open_profile(dir.path()).unwrap();
+    let (a, r) = setup(&db);
+    let first = rev(&db, a, r, 72, 'b', 20);
+    let dependent = rev(&db, a, r, 73, 'd', 21);
+    let independent = rev(&db, a, r, 74, 'e', 22);
+    let review_id = submit(
+        &db,
+        &first,
+        &ReviewIntent::Review(review(ReviewEvent::RequestChanges)),
+        &[],
+    );
+    let child = submit(
+        &db,
+        &dependent,
+        &ReviewIntent::Review(review(ReviewEvent::Approve)),
+        &[&review_id],
+    );
+    let reply = submit(
+        &db,
+        &independent,
+        &ReviewIntent::Reply {
+            thread_id: "THREAD".into(),
+            root_comment_id: n(600),
+            body: "check".into(),
+        },
+        &[],
+    );
+    let c = db.claim_review(a, 100, 300).unwrap().unwrap();
+    send(&db, &c, 101);
+    assert_eq!(
+        db.cancel_operation(a, &review_id).unwrap(),
+        CancelResult::MayAlreadyBeSent
+    );
+    let pending = response(
+        &c,
+        ReviewResult::Pending {
+            id: n(877),
+            author: n(80),
+            head: c.route.head.clone(),
+        },
+    );
+    db.confirm_review_step(
+        a,
+        &review_id,
+        c.attempt(),
+        ReviewProof::MutationResponse {
+            request_id: "pending-before-cancel",
+        },
+        &pending,
+        103,
+    )
+    .unwrap();
+    assert_eq!(db.receipts(a, &review_id).unwrap()[0].remote_id, "877");
+    assert_eq!(
+        db.operation(a, &review_id).unwrap().unwrap().state,
+        State::Cancelled
+    );
+    assert_eq!(
+        db.dispatch_hold(a, &child).unwrap().as_deref(),
+        Some("dependency")
+    );
+    drop(db);
+    let db = Store::open_profile(dir.path()).unwrap();
+    let c = db.claim_review(a, 1_200, 2_300).unwrap().unwrap();
+    assert_eq!(c.operation_id(), reply);
+    send(&db, &c, 1_201);
+    db.accept_review_object(a, &reply, c.attempt(), n(899), "reply-created")
+        .unwrap();
+    assert!(
+        db.record_review_failure(
+            a,
+            &reply,
+            c.attempt(),
+            ReviewFailure::Unsent { retry_at_ms: 1_210 },
+            1_209
+        )
+        .is_err()
+    );
+    assert!(db.claim_review_readback(a, 1_900, 2_900).unwrap().is_none());
+    let read = db.claim_review_readback(a, 2_300, 3_300).unwrap().unwrap();
+    assert_eq!(db.review_readback_profile(&read).unwrap().account, a);
+    assert_eq!(read.remote_id, n(899));
+    let observed = response(
+        &c,
+        ReviewResult::Reply {
+            id: n(899),
+            author: n(80),
+            root_comment_id: n(600),
+            body: "check".into(),
+        },
+    );
+    db.confirm_review_step(
+        a,
+        &reply,
+        c.attempt(),
+        ReviewProof::AcceptedObjectRead,
+        &observed,
+        2_301,
+    )
+    .unwrap();
+    assert_eq!(
+        db.operation(a, &reply).unwrap().unwrap().state,
+        State::Confirmed
+    );
+    assert!(db.next_review_due(a, 2_400).unwrap().is_none());
+}
+
+#[test]
+fn it_013_approval_rechecks_author_identity_and_rechecks_head_between_preflight_and_send() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Store::open_profile(dir.path()).unwrap();
+    let (a, r) = setup(&db);
+    let pr = rev(&db, a, r, 72, 'b', 20);
+    let first = submit(
+        &db,
+        &pr,
+        &ReviewIntent::Review(review(ReviewEvent::Approve)),
+        &[],
+    );
+    let c = db.claim_review(a, 30, 90).unwrap().unwrap();
+    let mut o = observation(&c, 31);
+    o.pr_author = Some(c.route.actor);
+    assert!(matches!(
+        db.authorize_review(&c, &o, 31).unwrap(),
+        ReviewAdmission::Held("cannot_review_own_or_unknown_author")
+    ));
+    db.cancel_operation(a, &first).unwrap();
+    let second = submit(
+        &db,
+        &pr,
+        &ReviewIntent::Review(review(ReviewEvent::RequestChanges)),
+        &[],
+    );
+    let c = db.claim_review(a, 33, 100).unwrap().unwrap();
+    let ReviewAdmission::Send(ticket) = db.authorize_review(&c, &observation(&c, 34), 34).unwrap()
+    else {
+        panic!("unexpected veto")
+    };
+    rev(&db, a, r, 72, 'f', 36);
+    assert!(!db.start_review_transport(&ticket, 37).unwrap());
+    let held = db.operation(a, &second).unwrap().unwrap();
+    assert_eq!(held.state, State::NeedsAttention);
+    assert_eq!(db.receipts(a, &second).unwrap().len(), 0);
+    assert!(db.claim_review(a, 105, 205).unwrap().is_none());
+}
+
+#[test]
+fn it_013_preflight_rate_floor_and_credential_hold_do_not_retry_a_denied_review_blindly() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Store::open_profile(dir.path()).unwrap();
+    let (a, r) = setup(&db);
+    let pr = rev(&db, a, r, 72, 'b', 20);
+    let op = submit(
+        &db,
+        &pr,
+        &ReviewIntent::Review(review(ReviewEvent::Comment)),
+        &[],
+    );
+    let c = db.claim_review(a, 30, 300).unwrap().unwrap();
+    db.fail_review_preflight(
+        &c,
+        threadline_storage::writes::WritePreflightFailure::Throttled {
+            not_before_ms: 30_000,
+        },
+        31,
+    )
+    .unwrap();
+    let next = db.next_review_due(a, 32).unwrap().unwrap();
+    assert!(next >= 30_000);
+    drop(db);
+    let db = Store::open_profile(dir.path()).unwrap();
+    assert!(db.claim_review(a, next - 1, next + 100).unwrap().is_none());
+    let c = db.claim_review(a, next, next + 1000).unwrap().unwrap();
+    db.fail_review_preflight(
+        &c,
+        threadline_storage::writes::WritePreflightFailure::Forbidden,
+        next + 1,
+    )
+    .unwrap();
+    assert_eq!(db.resume_reviews(a, next + 2).unwrap(), 0);
+    assert_eq!(
+        db.operation(a, &op).unwrap().unwrap().state,
+        State::NeedsAttention
+    );
+    assert!(db.next_review_due(a, next + 2).unwrap().is_none());
 }
