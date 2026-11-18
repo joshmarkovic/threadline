@@ -114,6 +114,7 @@ pub(crate) struct ReaderWorkspace {
     forward: Vec<ItemId>,
     layout: Workspace,
     layout_busy: bool,
+    surface_focus: FocusHandle,
     focus: Vec<FocusHandle>,
     focus_events: Vec<Subscription>,
     maximized: bool,
@@ -353,6 +354,7 @@ impl ReaderWorkspace {
             forward: Vec::new(),
             layout: empty_workspace(),
             layout_busy: false,
+            surface_focus: cx.focus_handle(),
             focus: Vec::new(),
             focus_events: Vec::new(),
             maximized: false,
@@ -443,10 +445,15 @@ impl ReaderWorkspace {
     }
 
     pub(crate) fn focus_active(&self, window: &mut Window) {
-        if let Some(focus) = self.focus.get(self.layout.focused_pane) {
-            let focus = focus.clone();
-            window.on_next_frame(move |window, cx| focus.focus(window, cx));
+        let focus = if self.surface == Surface::Browse {
+            self.focus
+                .get(self.layout.focused_pane)
+                .unwrap_or(&self.surface_focus)
+        } else {
+            &self.surface_focus
         }
+        .clone();
+        window.on_next_frame(move |window, cx| focus.focus(window, cx));
     }
 
     pub(crate) fn set_account(
@@ -778,7 +785,10 @@ impl ReaderWorkspace {
 
     fn show_outbox(&mut self, more: bool, window: &mut Window, cx: &mut Context<Self>) {
         let Some(account) = self.account else { return };
-        self.surface = Surface::Outbox;
+        if self.surface != Surface::Outbox {
+            self.surface = Surface::Outbox;
+            self.surface_focus.focus(window, cx);
+        }
         let after = if more {
             self.queue.last().map_or(0, |row| row.sequence)
         } else {
@@ -804,6 +814,7 @@ impl ReaderWorkspace {
     fn show_cache(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(account) = self.account else { return };
         self.surface = Surface::Storage;
+        self.surface_focus.focus(window, cx);
         self.launch(
             window,
             cx,
@@ -858,6 +869,7 @@ impl ReaderWorkspace {
             self.sync_panel = Some(panel);
         }
         self.surface = Surface::Sync;
+        self.surface_focus.focus(window, cx);
         cx.notify();
     }
 

@@ -1158,6 +1158,22 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
     assert!(loaded[0].verified_current);
     assert_eq!(read_account().unwrap()["active_user_id"], 101);
     assert_eq!(read_account().unwrap()["fixture_token_entered"], false);
+    simulator.sso.store(true, Ordering::Relaxed);
+    click("account-refresh", cx);
+    wait_form(cx, |cx| {
+        cx.update_window(window, |_, window, cx| window.render_frame(cx))
+            .unwrap();
+        read_account().is_some_and(|account| account["discovery"] == "RestrictedBySso")
+    });
+    cx.update_window(window, |_, window, cx| {
+        window.press("secondary-shift-a", cx)
+    })
+    .unwrap();
+    wait_form(cx, |cx| {
+        cx.update_window(window, |_, window, cx| window.render_frame(cx))
+            .unwrap();
+        read_account().is_some_and(|account| account["panel_open"] == false)
+    });
     runtime.block_on(writer.finish()).unwrap();
 }
 

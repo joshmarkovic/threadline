@@ -1368,7 +1368,7 @@ impl gpui_kit::Render for Workspace {
                     panel.update(cx, |panel, cx| panel.reload_local_profile(cx));
                 }
             }))
-            .on_action(cx.listener(|this, _: &CheckAccountAccess, _, cx| {
+            .on_action(cx.listener(|this, _: &CheckAccountAccess, window, cx| {
                 if this.reader.as_ref().is_some_and(|reader| {
                     reader
                         .read(cx)
@@ -1377,7 +1377,9 @@ impl gpui_kit::Render for Workspace {
                     return;
                 }
                 if let Some(panel) = this.accounts.as_ref() {
-                    panel.update(cx, |panel, cx| panel.refresh(cx));
+                    panel.update(cx, |panel, cx| {
+                        panel.refresh(this.accounts_open.then_some(window), cx)
+                    });
                 }
             }))
             .on_action(

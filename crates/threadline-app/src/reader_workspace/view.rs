@@ -1556,6 +1556,8 @@ impl Render for ReaderWorkspace {
         self.publish_visible_panes(compact || self.maximized);
         div()
             .id("reader-workspace")
+            .track_focus(&self.surface_focus)
+            .tab_stop(true)
             .key_context("ThreadlineReader")
             .size_full()
             .flex()

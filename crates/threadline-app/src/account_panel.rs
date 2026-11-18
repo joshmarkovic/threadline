@@ -41,6 +41,7 @@ pub(crate) struct AccountObservation {
 pub(crate) struct AccountPanel {
     service: AccountService,
     runtime: tokio::runtime::Handle,
+    focus: gpui_kit::FocusHandle,
     route: Entity<InputState>,
     token: Entity<InputState>,
     renew: Option<AccessProfile>,
@@ -56,7 +57,7 @@ pub(crate) struct AccountPanel {
     #[cfg(feature = "e2e")]
     input_issue: Option<crate::accounts::AccountInputIssue>,
     #[cfg(feature = "e2e")]
-    _route_observation: Option<gpui_kit::Subscription>,
+    route_observation: Option<gpui_kit::Subscription>,
     #[cfg(feature = "e2e")]
     token_observation: Option<gpui_kit::Subscription>,
 }
@@ -87,6 +88,7 @@ impl AccountPanel {
         let mut panel = Self {
             service,
             runtime,
+            focus: cx.focus_handle(),
             route,
             token,
             renew: None,
@@ -102,11 +104,11 @@ impl AccountPanel {
             #[cfg(feature = "e2e")]
             input_issue: None,
             #[cfg(feature = "e2e")]
-            _route_observation: route_observation,
+            route_observation,
             #[cfg(feature = "e2e")]
             token_observation,
         };
-        panel.launch(AccountCommand::Load, cx);
+        panel.launch(AccountCommand::Load, None, cx);
         panel
     }
 
@@ -119,7 +121,7 @@ impl AccountPanel {
     }
 
     pub(crate) fn reload_local_profile(&mut self, cx: &mut Context<Self>) {
-        self.launch(AccountCommand::Load, cx);
+        self.launch(AccountCommand::Load, None, cx);
     }
 
     pub(crate) fn clear_token(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -199,9 +201,17 @@ impl AccountPanel {
         self.service.fixture
     }
 
-    fn launch(&mut self, command: AccountCommand, cx: &mut Context<Self>) {
+    fn launch(
+        &mut self,
+        command: AccountCommand,
+        window: Option<&mut Window>,
+        cx: &mut Context<Self>,
+    ) {
         if self.busy {
             return;
+        }
+        if let Some(window) = window {
+            self.focus.focus(window, cx);
         }
         self.busy = true;
         self.message = None;
@@ -264,6 +274,7 @@ impl AccountPanel {
                 pat,
                 renew,
             },
+            Some(window),
             cx,
         );
     }
@@ -282,7 +293,7 @@ impl AccountPanel {
             .find(|profile| Some(profile.account) == self.view.active)
     }
 
-    pub(crate) fn refresh(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn refresh(&mut self, window: Option<&mut Window>, cx: &mut Context<Self>) {
         let Some(profile) = self.current_profile().cloned() else {
             return;
         };
@@ -301,6 +312,7 @@ impl AccountPanel {
                 repository,
                 requested,
             },
+            window,
             cx,
         );
     }
@@ -369,7 +381,10 @@ impl AccountPanel {
                             Button::new("account-cancel")
                                 .label("Cancel check")
                                 .small()
-                                .on_click(cx.listener(|panel, _, _, _| panel.cancel.cancel())),
+                                .on_click(cx.listener(|panel, _, window, cx| {
+                                    panel.focus.focus(window, cx);
+                                    panel.cancel.cancel();
+                                })),
                         )
                     })
                     .child(
@@ -405,9 +420,14 @@ impl AccountPanel {
                         .on_click(cx.listener(move |panel, _, window, cx| {
                             panel.route =
                                 cx.new(|cx| InputState::new(window, cx).placeholder("owner/name"));
+                            #[cfg(feature = "e2e")]
+                            if panel.service.fixture {
+                                panel.route_observation =
+                                    Some(cx.observe(&panel.route, |_, _, cx| cx.notify()));
+                            }
                             panel.clear_token(window, cx);
                             panel.renew = None;
-                            panel.launch(AccountCommand::Switch(account), cx)
+                            panel.launch(AccountCommand::Switch(account), Some(window), cx)
                         })),
                 )
             })
@@ -431,7 +451,9 @@ impl AccountPanel {
                                     .small()
                                     .accessibility_id("account-refresh")
                                     .disabled(self.busy || self.view.offline)
-                                    .on_click(cx.listener(|panel, _, _, cx| panel.refresh(cx))),
+                                    .on_click(cx.listener(|panel, _, window, cx| {
+                                        panel.refresh(Some(window), cx)
+                                    })),
                             ),
                         )
                         .child(
@@ -446,12 +468,13 @@ impl AccountPanel {
                                     .small()
                                     .accessibility_id("account-offline")
                                     .disabled(self.busy)
-                                    .on_click(cx.listener(move |panel, _, _, cx| {
+                                    .on_click(cx.listener(move |panel, _, window, cx| {
                                         panel.launch(
                                             AccountCommand::SetOffline {
                                                 account,
                                                 offline: !panel.view.offline,
                                             },
+                                            Some(window),
                                             cx,
                                         )
                                     })),
@@ -465,8 +488,12 @@ impl AccountPanel {
                                     .small()
                                     .accessibility_id("account-sign-out")
                                     .disabled(self.busy)
-                                    .on_click(cx.listener(move |panel, _, _, cx| {
-                                        panel.launch(AccountCommand::SignOut(account), cx)
+                                    .on_click(cx.listener(move |panel, _, window, cx| {
+                                        panel.launch(
+                                            AccountCommand::SignOut(account),
+                                            Some(window),
+                                            cx,
+                                        )
                                     })),
                             ),
                         ),
@@ -593,7 +620,7 @@ impl AccountPanel {
                         .small()
                         .accessibility_id(id)
                         .disabled(self.busy || (!repo.selected && !can_refresh))
-                        .on_click(cx.listener(move |panel, _, _, cx| {
+                        .on_click(cx.listener(move |panel, _, window, cx| {
                             if repo.selected
                                 && let Some(account) = account
                             {
@@ -602,6 +629,7 @@ impl AccountPanel {
                                         account,
                                         repository: repo.id,
                                     },
+                                    Some(window),
                                     cx,
                                 );
                             } else if let Some(profile) = profile.clone() {
@@ -610,6 +638,7 @@ impl AccountPanel {
                                         profile,
                                         repository: repo.clone(),
                                     },
+                                    Some(window),
                                     cx,
                                 );
                             }
@@ -655,6 +684,8 @@ impl Render for AccountPanel {
             .collect::<Vec<_>>();
         div()
             .id("account-panel")
+            .track_focus(&self.focus)
+            .tab_stop(true)
             .role(Role::Group)
             .aria_label("GitHub account and repositories")
             .w_full()
