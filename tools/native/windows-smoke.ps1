@@ -960,9 +960,6 @@ try {
     $coldMs = $clock.Elapsed.TotalMilliseconds
     $report.native_window = $window.ToInt64()
     $report.dpi = [ThreadlineWinInput]::GetDpiForWindow($window)
-    if ($AccessibilityProof -and $report.dpi -lt 144) {
-        Stop-Blocked 'Run native high-DPI acceptance on a Windows fixture display already configured for 150% scale or higher.'
-    }
     if (!$script:UseOwnedUiAutomation) { Set-WindowFocus $window }
     $report.loaded_modules = @($app.Modules | ForEach-Object { $_.ModuleName } | Sort-Object -Unique)
     if ($report.loaded_modules | Where-Object { $_ -match '^(lib)?(webkit|wry|electron|cef|chromium|msedgewebview2)' }) {
@@ -1028,8 +1025,13 @@ try {
             retained = $true
         })
         if ($AccessibilityProof) {
-            $report.automated_checks_passed = $true
+            $report.native_input_verified = $true
+            $report.high_dpi_verified = $report.dpi -ge 144
+            $report.automated_checks_passed = $report.high_dpi_verified
             $report.manual_screen_reader_and_visual = 'Pending'
+            if (!$report.high_dpi_verified) {
+                Stop-Blocked 'Native keyboard, focus, exact Unicode clipboard and owned UI Automation passed at the recorded DPI. Repeat at 150% or higher and retain signed human visual and screen-reader observations.'
+            }
             Stop-Blocked 'Native keyboard, focus, exact Unicode clipboard, high DPI and owned UI Automation passed. Signed human visual and screen-reader observations are pending.'
         }
         $report.detail = 'Exercised the native window, Markdown selection, independent focus and tabs, review input, and both splitters.'
