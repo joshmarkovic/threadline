@@ -12,7 +12,9 @@ use crate::{
 pub use discussion::*;
 pub use downloads::*;
 pub use images::*;
+mod metadata;
 pub use ingest::*;
+pub use metadata::*;
 use rusqlite::{Connection, OptionalExtension, Row, params, params_from_iter, types::Value};
 pub use search::*;
 use serde::{Deserialize, Serialize};

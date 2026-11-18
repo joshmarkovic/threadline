@@ -676,6 +676,11 @@ fn direct_metadata_and_terminal_partial_are_independent_from_body_and_prior_list
         ..Default::default()
     };
     let item = store.commit_item_metadata(a, r, incoming, &v, 101).unwrap();
+    let first = store.reader_item_metadata(a, item).unwrap().unwrap();
+    assert_eq!(first.title, Change::Value("metadata only".into()));
+    assert_eq!(first.body, Change::Missing);
+    assert_eq!((first.title_at_ms, first.body_at_ms), (Some(10), None));
+    assert_eq!(first.assignees, None);
     let key = |family| ResourceKey {
         account: a,
         target: ResourceTarget::Item(item),
@@ -697,7 +702,15 @@ fn direct_metadata_and_terminal_partial_are_independent_from_body_and_prior_list
     );
     let mut empty = page(70, "unchanged", 11, None);
     empty.update.body = Change::Null;
+    empty.facets.assignees = Some(vec![]);
     store.commit_item_metadata(a, r, empty, &v, 102).unwrap();
+    let updated = store.reader_item_metadata(a, item).unwrap().unwrap();
+    assert_eq!(updated.body, Change::Null);
+    assert_eq!(
+        (updated.remote_updated_at_ms, updated.body_at_ms),
+        (Some(11), Some(11))
+    );
+    assert_eq!(updated.assignees, Some(vec![]));
     assert_eq!(
         store
             .resource_state(key(ResourceFamily::Body))
