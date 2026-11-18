@@ -78,6 +78,8 @@ pub(crate) struct Snapshot {
     pub notifications_submitted: u32,
     pub notification_com_activations: u32,
     pub activations: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_access: Option<crate::account_panel::AccountObservation>,
 }
 
 #[derive(Serialize)]

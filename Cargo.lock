@@ -7168,6 +7168,7 @@ dependencies = [
  "threadline-platform",
  "threadline-storage",
  "tokio",
+ "zeroize",
 ]
 
 [[package]]

@@ -1,3 +1,5 @@
+mod account_panel;
+mod accounts;
 mod fixtures;
 #[cfg(windows)]
 mod notification_commands;
@@ -115,7 +117,7 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
     };
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
-        .enable_time()
+        .enable_all()
         .build()?;
     // Resolve and migrate the database on a worker before exposing any workspace
     // state. Close the failed launch without showing a substitute workspace.

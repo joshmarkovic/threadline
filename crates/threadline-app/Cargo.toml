@@ -19,6 +19,7 @@ threadline-core = { path = "../threadline-core" }
 threadline-platform = { path = "../threadline-platform" }
 threadline-storage = { path = "../threadline-storage" }
 tokio = { version = "1", features = ["rt-multi-thread", "time", "sync"] }
+zeroize = "1"
 
 [dev-dependencies]
 gpui-kit = { version = "=0.10.0", features = ["test-support"] }

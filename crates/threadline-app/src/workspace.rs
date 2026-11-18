@@ -22,11 +22,15 @@ use threadline_core::{
 };
 use threadline_platform::{Activation, PlatformControls, PlatformEvent};
 
-use crate::fixtures::{HISTORY, LINKED_BODIES, PR_BODIES, PRIMARY_PR, SECONDARY_PR};
 #[cfg(feature = "e2e")]
 use crate::observation::{Observer, Snapshot};
 use crate::palette::Palette;
 use crate::pane_content::{DiscussionPane, ReviewDiff, markdown, pane_size};
+use crate::{
+    account_panel::AccountPanel,
+    accounts::AccountService,
+    fixtures::{HISTORY, LINKED_BODIES, PR_BODIES, PRIMARY_PR, SECONDARY_PR},
+};
 
 const GUTTER: f32 = 8.;
 const WORKSPACE_INSET: f32 = 12.;
@@ -40,6 +44,7 @@ actions!(
         FocusDraft,
         CycleTab,
         ToggleContext,
+        ToggleAccounts,
         GrowLeft,
         ShrinkLeft,
         GrowContext,
@@ -55,12 +60,13 @@ actions!(threadline, [SendTestNotification]);
 pub fn bind_shortcuts(cx: &mut App) {
     let context =
         Rc::new(KeyBindingContextPredicate::parse("Threadline").expect("valid workspace context"));
-    let shortcuts: [(&str, Box<dyn Action>); 11] = [
+    let shortcuts: [(&str, Box<dyn Action>); 12] = [
         ("secondary-1", Box::new(FocusLeft)),
         ("secondary-2", Box::new(FocusRight)),
         ("secondary-f", Box::new(FocusDraft)),
         ("ctrl-tab", Box::new(CycleTab)),
         ("secondary-shift-l", Box::new(ToggleContext)),
+        ("secondary-shift-a", Box::new(ToggleAccounts)),
         ("secondary-left", Box::new(ShrinkLeft)),
         ("secondary-right", Box::new(GrowLeft)),
         ("secondary-shift-left", Box::new(ShrinkContext)),
@@ -158,6 +164,8 @@ struct PrTab {
 pub struct Workspace {
     seed: u64,
     runtime: tokio::runtime::Handle,
+    accounts: Option<Entity<AccountPanel>>,
+    accounts_open: bool,
     platform: Option<PlatformControls>,
     tray_enabled: bool,
     platform_status: Option<String>,
@@ -213,6 +221,17 @@ impl Workspace {
             }));
         }
         let focused = if open_review { Pane::Right } else { Pane::Left };
+        let accounts = crate::profile_store(cx)
+            .and_then(AccountService::new)
+            .map(|service| cx.new(|cx| AccountPanel::new(service, runtime.clone(), window, cx)));
+        #[cfg(feature = "e2e")]
+        if let Some(panel) = accounts.as_ref() {
+            subscriptions.push(cx.observe(panel, |this, _, cx| {
+                if this.observer.is_some() {
+                    cx.notify();
+                }
+            }));
+        }
         let initial_focus = focus[focused.index()].clone();
         window.defer(cx, move |window, cx| initial_focus.focus(window, cx));
         let reviews = std::array::from_fn(|index| {
@@ -233,6 +252,8 @@ impl Workspace {
         Self {
             seed,
             runtime,
+            accounts,
+            accounts_open: false,
             platform: None,
             tray_enabled: false,
             platform_status: None,
@@ -262,6 +283,24 @@ impl Workspace {
             review.diff.update(cx, |diff, cx| diff.set_files(files, cx));
         }
         self.diff_loaded = true;
+        cx.notify();
+    }
+
+    fn toggle_accounts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(panel) = self.accounts.as_ref() else {
+            return;
+        };
+        self.accounts_open = !self.accounts_open;
+        if self.accounts_open {
+            panel.update(cx, |this, cx| {
+                #[cfg(feature = "e2e")]
+                this.observe_bounds(self.observer.clone());
+                this.focus_form(window, cx);
+            });
+        } else {
+            panel.update(cx, |panel, cx| panel.clear_token(window, cx));
+            self.focus[self.focused.index()].focus(window, cx);
+        }
         cx.notify();
     }
 
@@ -581,6 +620,31 @@ impl Workspace {
                     .flex()
                     .items_center()
                     .gap_2()
+                    .child(
+                        div()
+                            .relative()
+                            .child(
+                                if self.accounts_open {
+                                    button("account-close", "Close accounts")
+                                } else {
+                                    button("account-open", "Accounts")
+                                }
+                                .accessibility_id(if self.accounts_open {
+                                    "account-close"
+                                } else {
+                                    "account-open"
+                                })
+                                .disabled(self.accounts.is_none())
+                                .on_click(cx.listener(
+                                    |this, _, window, cx| this.toggle_accounts(window, cx),
+                                )),
+                            )
+                            .children(self.observed_bounds(if self.accounts_open {
+                                "account-close"
+                            } else {
+                                "account-open"
+                            })),
+                    )
                     .child(
                         button("load-preview", "Load preview")
                             .accessibility_id("load-preview")
@@ -1072,6 +1136,11 @@ impl gpui_kit::Render for Workspace {
                 }
             }))
             .on_action(
+                cx.listener(|this, _: &ToggleAccounts, window, cx| {
+                    this.toggle_accounts(window, cx)
+                }),
+            )
+            .on_action(
                 cx.listener(|this, _: &ShrinkLeft, _, cx| {
                     this.nudge(Divider::Workspace, -0.03, cx)
                 }),
@@ -1120,17 +1189,22 @@ impl gpui_kit::Render for Workspace {
             });
         let window_content = window_content
             .child(self.toolbar(palette, cx))
-            .child(
-                div()
-                    .flex_1()
-                    .flex()
-                    .min_h_0()
-                    .min_w_0()
-                    .p(px(WORKSPACE_INSET))
-                    .child(self.pane(Pane::Left, compact, palette, cx))
-                    .child(self.divider(Divider::Workspace, palette, cx))
-                    .child(self.pane(Pane::Right, compact, palette, cx)),
-            )
+            .when(self.accounts_open, |content| {
+                content.child(div().flex_1().min_h_0().children(self.accounts.clone()))
+            })
+            .when(!self.accounts_open, |content| {
+                content.child(
+                    div()
+                        .flex_1()
+                        .flex()
+                        .min_h_0()
+                        .min_w_0()
+                        .p(px(WORKSPACE_INSET))
+                        .child(self.pane(Pane::Left, compact, palette, cx))
+                        .child(self.divider(Divider::Workspace, palette, cx))
+                        .child(self.pane(Pane::Right, compact, palette, cx)),
+                )
+            })
             .child(self.status_bar(palette));
         #[cfg(feature = "e2e")]
         let window_content =
@@ -1177,6 +1251,10 @@ impl Workspace {
             notifications_submitted: self.notifications_submitted,
             notification_com_activations: self.notification_com_activations,
             activations: self.activations,
+            account_access: self
+                .accounts
+                .as_ref()
+                .and_then(|panel| panel.read(cx).observation(self.accounts_open)),
         }
     }
 }
