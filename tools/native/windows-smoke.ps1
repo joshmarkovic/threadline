@@ -8,7 +8,7 @@ param(
     [switch]$PlatformProof,
     [switch]$ToastProof,
     [switch]$AccessProof,
-    [ValidateSet('Offline', 'Resume', 'Performance', 'LargeWorkspace', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface')][string]$ReaderProof,
+    [ValidateSet('Offline', 'Resume', 'Performance', 'PerformancePhysical', 'LargeWorkspace', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface')][string]$ReaderProof,
     [switch]$AccessibilityProof,
     [string]$AccessAddress,
     [string]$AccessPhaseFile,
@@ -29,7 +29,7 @@ $reportName = if ($Measure) {
     'toast-native.json'
 } elseif ($AccessProof) {
     'github-access-native.json'
-} elseif ($ReaderProof -eq 'Performance') {
+} elseif ($ReaderProof -in @('Performance', 'PerformancePhysical')) {
     'reader-performance.json'
 } elseif ($ReaderProof -eq 'LargeWorkspace') {
     'large-workspace-native.json'
@@ -220,7 +220,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_FIXTURE_AUTH')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_READER_TIMING')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_READER_IDLE')
-    if ($ReaderProof -in @('Performance', 'LargeWorkspace')) { $info.EnvironmentVariables['THREADLINE_E2E_READER_TIMING'] = '1' }
+    if ($ReaderProof -in @('Performance', 'PerformancePhysical', 'LargeWorkspace')) { $info.EnvironmentVariables['THREADLINE_E2E_READER_TIMING'] = '1' }
     if ($ReaderIdle) { $info.EnvironmentVariables['THREADLINE_E2E_READER_IDLE'] = '1' }
     if ($ToastProof -and $null -ne $script:toastFixture) {
         $info.EnvironmentVariables['THREADLINE_TEST_TOAST_TOKEN'] = $script:toastFixture.Token
@@ -909,10 +909,10 @@ try {
         }
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
-    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface', 'Performance', 'LargeWorkspace')) {
+    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface', 'Performance', 'PerformancePhysical', 'LargeWorkspace')) {
         Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
         . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
-        $script:UseOwnedUiAutomation = !$AccessibilityProof
+        $script:UseOwnedUiAutomation = !$AccessibilityProof -and $ReaderProof -ne 'PerformancePhysical'
         $report.driver = 'Windows PowerShell / owned UI Automation and guarded Win32 SendInput'
     }
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
@@ -926,7 +926,7 @@ try {
     $firstProfile = Join-Path $ProfileDir ('initial-' + [guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $firstProfile -Force
     if ($ReaderProof -eq 'Offline') { Initialize-ReaderProfile $firstProfile 'small' }
-    if ($ReaderProof -in @('Performance', 'LargeWorkspace')) { Initialize-ReaderProfile $firstProfile 'section-16' }
+    if ($ReaderProof -in @('Performance', 'PerformancePhysical', 'LargeWorkspace')) { Initialize-ReaderProfile $firstProfile 'section-16' }
     if ($script:UseSeededFixtureAuth) {
         $fixturePhase = switch ($ReaderProof) {
             Resume { 'reader-failure' }
@@ -984,6 +984,7 @@ try {
             Offline { Invoke-OfflineReaderProof $window $firstProfile }
             Resume { Invoke-ReaderResumeProof $window $firstProfile }
             Performance { Invoke-ReaderPerformance $window }
+            PerformancePhysical { Invoke-ReaderPerformance $window -Physical }
             LargeWorkspace { Invoke-LargeWorkspaceProof $window $firstProfile $coldMs }
             Sync { Invoke-SyncProof $window $firstProfile }
             NotificationSchedule { Invoke-NotificationScheduleProof $window $firstProfile }

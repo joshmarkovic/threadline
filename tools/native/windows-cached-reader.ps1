@@ -164,15 +164,21 @@ function Get-ReaderBudget([double[]]$Samples, [double]$Limit) {
     }
 }
 
-function Set-ReaderPerformanceQuery([IntPtr]$Window, [int]$Sample) {
+function Set-ReaderPerformanceQuery([IntPtr]$Window, [int]$Sample, [switch]$Physical) {
     if ($Sample -lt 0 -or $Sample -ge 20) { throw 'Unknown Section 16 search fixture index.' }
     $targetItem = 1000 + 3 * $Sample
     $query = "Investigate relay behavior $targetItem"
     $id = 'reader-search'
     $name = 'Search downloaded content'
     $null = Wait-AccountControl $id
-    Wait-For 'the exact editable benchmark search field' {
-        Set-OwnedFixtureEditValue $Window $id $name $query
+    if ($Physical) {
+        Click-AccountControl $Window $id
+        Assert-ReaderPerformanceSearchFocus $Window
+        [ThreadlineWinInput]::ReplaceFixtureText($Window, [uint32]$script:app.Id, $query)
+    } else {
+        Wait-For 'the exact editable benchmark search field' {
+            Set-OwnedFixtureEditValue $Window $id $name $query
+        }
     }
     Wait-For 'the synthetic benchmark query in the native search field' {
         $pattern = Get-OwnedFixtureEditPattern $Window $id $name
@@ -183,6 +189,25 @@ function Set-ReaderPerformanceQuery([IntPtr]$Window, [int]$Sample) {
         }
     }
     return $targetItem
+}
+
+function Assert-ReaderPerformanceSearchFocus([IntPtr]$Window) {
+    $id = 'reader-search'
+    $name = 'Search downloaded content'
+    if ([ThreadlineWinInput]::GetForegroundWindow() -ne $Window -or !(Test-OwnedFixtureWindow $Window)) {
+        Stop-Blocked 'Physical reader timing requires the exact Threadline window in the foreground.'
+    }
+    try {
+        Wait-For 'keyboard focus on the exact owned search editor' {
+            $element = Find-OwnedFixtureControl $Window $id $name -Edit
+            $null -ne $element -and $element.Current.HasKeyboardFocus
+        } 1500 25
+    } catch {
+        Stop-Blocked 'The exact owned search editor did not confirm keyboard focus.'
+    }
+    if ([ThreadlineWinInput]::GetForegroundWindow() -ne $Window) {
+        Stop-Blocked 'The physical reader timing window lost foreground before key input.'
+    }
 }
 
 function Get-ReaderTimingAttribution([hashtable]$InputTiming, [object]$State, [string]$Kind, [long]$Target, [long]$Observed) {
@@ -213,7 +238,7 @@ function Get-ReaderTimingAttribution([hashtable]$InputTiming, [object]$State, [s
     return $details
 }
 
-function Invoke-ReaderPerformance([IntPtr]$Window, [switch]$KeepOpen) {
+function Invoke-ReaderPerformance([IntPtr]$Window, [switch]$KeepOpen, [switch]$Physical) {
     $initial = Wait-Reader 'twenty restored tabs across two offline panes' {
         param($reader)
         $reader.offline -and $reader.signed_out -and $reader.cached_content_ready -and
@@ -234,8 +259,17 @@ function Invoke-ReaderPerformance([IntPtr]$Window, [switch]$KeepOpen) {
     $generation = 0
     for ($sample = 0; $sample -lt 20; $sample++) {
         # These numbers identify distinct cached issues outside the twenty restored tabs.
-        $targetItem = Set-ReaderPerformanceQuery $Window $sample
-        Click-AccountControl $Window 'reader-search-submit' $clock $inputTiming
+        $targetItem = Set-ReaderPerformanceQuery $Window $sample -Physical:$Physical
+        if ($Physical) {
+            Assert-ReaderPerformanceSearchFocus $Window
+            $clock.Restart()
+            $inputTiming.begin = [Diagnostics.Stopwatch]::GetTimestamp()
+            [ThreadlineWinInput]::Chord(@(0x0D))
+            $inputTiming.returned = [Diagnostics.Stopwatch]::GetTimestamp()
+            $inputTiming.method = 'Win32 Enter'
+        } else {
+            Click-AccountControl $Window 'reader-search-submit' $clock $inputTiming
+        }
         $found = Wait-Reader 'the first local result page for the current query' {
             param($reader)
             $null -ne $reader.search_generation -and $reader.search_generation -gt $generation -and
@@ -276,7 +310,11 @@ function Invoke-ReaderPerformance([IntPtr]$Window, [switch]$KeepOpen) {
         $previous = $after.cached_reader.active_item
         $switchTiming.Add((Get-ReaderTimingAttribution $inputTiming $after 'tab' $previous $observed))
     }
-    $script:report.timing = 'Verified native UI Automation or owned Win32 activation to useful app observation. Query entry verified before timing. Polling requested at 5 ms.'
+    $script:report.timing = if ($Physical) {
+        'Owned physical Enter or Win32 click to useful app observation. Query entry verified before timing. Polling requested at 5 ms.'
+    } else {
+        'Verified native UI Automation or owned Win32 activation to useful app observation. Query entry verified before timing. Polling requested at 5 ms.'
+    }
     $script:report.attribution = [ordered]@{
         source = 'Windows QueryPerformanceCounter. App paint callback precedes platform presentation.'
         cached_open = $openTiming.ToArray()

@@ -602,7 +602,7 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
             return vec![crate::activity::run(id, options, root, dir)];
         }
         Some(id) => {
-            let mode = if id == "S04-READER-PERF" {
+            let mode = if matches!(id, "S04-READER-PERF" | "S12-PHYSICAL-READER") {
                 Some(NativeMode::WindowsReaderPerformance)
             } else {
                 WINDOWS_CASES
@@ -839,6 +839,9 @@ fn native_driver(
     let reader_proof = match mode {
         NativeMode::WindowsReaderOffline => Some("Offline"),
         NativeMode::WindowsReaderResume => Some("Resume"),
+        NativeMode::WindowsReaderPerformance if id == "S12-PHYSICAL-READER" => {
+            Some("PerformancePhysical")
+        }
         NativeMode::WindowsReaderPerformance => Some("Performance"),
         NativeMode::WindowsLargeWorkspace => Some("LargeWorkspace"),
         NativeMode::WindowsSync => Some("Sync"),

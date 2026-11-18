@@ -664,14 +664,9 @@ impl ReaderWorkspace {
                     )
                     .child(self.observed_control(
                         "reader-search-submit",
-                        control("reader-search-submit", "Search downloaded").on_click(cx.listener(
-                            |this, _, window, cx| {
-                                #[cfg(feature = "e2e")]
-                                this.performance
-                                    .start(performance::Action::Search(this.list_generation + 1));
-                                this.local_search(window, cx);
-                            },
-                        )),
+                        control("reader-search-submit", "Search downloaded").on_click(
+                            cx.listener(|this, _, window, cx| this.local_search(window, cx)),
+                        ),
                         false,
                     ))
                     .child(

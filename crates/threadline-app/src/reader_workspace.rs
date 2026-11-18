@@ -973,6 +973,9 @@ impl ReaderWorkspace {
         let generation = self.list_generation;
         self.list_busy = true;
         self.search_reply = None;
+        #[cfg(feature = "e2e")]
+        self.performance
+            .start(performance::Action::Search(generation));
         let scope = self.scope;
         self.launch(
             window,

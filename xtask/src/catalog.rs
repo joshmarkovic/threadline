@@ -98,6 +98,7 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
             | "E2E-003"
             | "E2E-004"
             | "S04-READER-PERF"
+            | "S12-PHYSICAL-READER"
             | "E2E-014"
             | "S04-READ-TRANSPORT"
             | "S04-CACHED-STORE"
@@ -163,7 +164,9 @@ pub fn associations(case: &str) -> Associations {
             "AC-01;AC-02;AC-03;AC-90",
         ),
         "S03-ACCESS-STORAGE" => ("AUTH-06;AUTH-11;CACHE-08;OUTBOX-09;TEST-03", "AC-67;AC-90"),
-        "S04-READER-PERF" => ("CACHE-01;SEARCH-01;WORKSPACE-08;TEST-08", "AC-35"),
+        "S04-READER-PERF" | "S12-PHYSICAL-READER" => {
+            ("CACHE-01;SEARCH-01;WORKSPACE-08;TEST-08", "AC-35")
+        }
         "S04-READ-TRANSPORT" => (
             "CACHE-05;ISSUE-01;SEARCH-02;SEARCH-03;TEST-03",
             "AC-07;AC-08;AC-09",
