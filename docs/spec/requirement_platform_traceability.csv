@@ -326,7 +326,7 @@ GRAPH-06,linux,Linux release,10,14,14,yes,Planned,Actual target evidence require
 GRAPH-07,windows,Windows first release,10,10,12,yes,Planned,Future option: record object-cache deferral. No clone or bare-object cache is mandatory.,
 GRAPH-07,macos,macOS release,10,13,13,yes,Planned,Future option: record object-cache deferral. No clone or bare-object cache is mandatory.,
 GRAPH-07,linux,Linux release,10,14,14,yes,Planned,Future option: record object-cache deferral. No clone or bare-object cache is mandatory.,
-NOTIFY-01,windows,Windows first release,11,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,Windows Notification Center opened PR 72 in the running process. Persistent activity and notification rules remain due in Sprint 11. ../reports/evidence/windows-11-release/registered-notification.json
+NOTIFY-01,windows,Windows first release,11,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Windows Notification Center opened PR 72 in the running process. ../reports/evidence/windows-11-release/registered-notification.json Local Windows feed fallback, retained draft and native registration. ../reports/sprint-11.md"
 NOTIFY-01,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-01,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-02,windows,Windows first release,05,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Durable policy, SQLite scheduler, real update feeds and native Windows control evidence. docs/reports/sprint-05.md"
@@ -341,7 +341,7 @@ NOTIFY-04,linux,Linux release,10,14,14,yes,Planned,Actual target evidence requir
 NOTIFY-05,windows,Windows first release,11,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-05,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-05,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-NOTIFY-06,windows,Windows first release,11,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+NOTIFY-06,windows,Windows first release,11,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Local Windows feed fallback, retained draft and native registration. ../reports/sprint-11.md"
 NOTIFY-06,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-06,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-07,windows,Windows first release,11,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -380,7 +380,7 @@ NOTIFY-17,linux,Linux release,11,14,14,yes,Planned,Actual target evidence requir
 NOTIFY-18,windows,Windows first release,11,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-18,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-18,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-NOTIFY-19,windows,Windows first release,11,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+NOTIFY-19,windows,Windows first release,11,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Local Windows feed fallback, retained draft and native registration. ../reports/sprint-11.md"
 NOTIFY-19,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-19,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-20,windows,Windows first release,11,11,12,yes,Planned,Required extensible ingestion boundary; hosted relay and always-on infrastructure remain deferred.,
@@ -479,10 +479,10 @@ UX-02,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; 
 INSTALL-01,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Documented projected one-to-three-command prebuilt installer paths. ../reports/sprint-12.md. The Windows x64 local per-user installer and its installed-process smoke passed.
 INSTALL-01,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-01,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-INSTALL-02,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Documented candidate architecture, version, channel, and compatibility fields. ../reports/sprint-12.md. Local package version, build ordinal, target and payload digest were checked on Windows build 22631."
+INSTALL-02,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Documented candidate architecture, version, channel, and compatibility fields. ../reports/sprint-12.md. Local package version, build ordinal, target and payload digest were checked on Windows build 22631. Native development bootstrap accepted Microsoft-signed fixture bytes and rejected an unsigned setup and incorrect manifest pin. ../reports/evidence/sprint-12/bootstrap-windows.json"
 INSTALL-02,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-02,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-INSTALL-03,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Documented publisher identity and artifact digest policy. ../reports/sprint-12.md. The local fixture verifier accepted its pinned test identity and rejected a modified package and wrong pin.
+INSTALL-03,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Documented publisher identity and artifact digest policy. ../reports/sprint-12.md. The local fixture verifier accepted its pinned test identity and rejected a modified package and wrong pin. Native development bootstrap accepted Microsoft-signed fixture bytes and rejected an unsigned setup and incorrect manifest pin. ../reports/evidence/sprint-12/bootstrap-windows.json
 INSTALL-03,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-03,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-04,windows,Windows first release,02,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-12.md. The installed schema 9 predecessor and schema 10 candidate retained nine ordered table projections.

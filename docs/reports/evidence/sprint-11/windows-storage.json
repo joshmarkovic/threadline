@@ -1,0 +1,38 @@
+{
+  "source_revision": "8a22b8d339d1a93882f7a74e02e7514a514dff89",
+  "os": "Windows 11 x64",
+  "executables": {
+    "threadline_storage": {
+      "sha256": "254d8cb33a856251c43f5265b2a953d06156a74eb2d0e983fd9be6c6f9f28b46",
+      "passed": 13
+    },
+    "merges": {
+      "sha256": "05e27bc1d108004944321391fa8033a5d56dac2dfe6a2c812a7c9251cff85c23",
+      "passed": 6
+    },
+    "durability": {
+      "sha256": "c4fbae02e868c0d431484efe98fbd08332bfd952c91a2fad0326e8414f95a901",
+      "passed": 10
+    },
+    "notifications": {
+      "sha256": "dac25715d54a632971c4b3c395539c87c9419f0536b442146f3cb9554f64a9a2",
+      "passed": 2
+    },
+    "identity": {
+      "sha256": "b222b4d4bb53f19fb05f35f1cbdf14552577aba440f1b2d6dbf574e8b3c8ec8e",
+      "passed": 8
+    },
+    "sync": {
+      "sha256": "63cff402ec05991473065fe38b072669cca51e119a7afd589143cd292c9c6bbf",
+      "passed": 9
+    }
+  },
+  "passed": 48,
+  "cases": {
+    "UT-014": 1,
+    "UT-015": 1,
+    "IT-018": 3,
+    "IT-019": 3
+  },
+  "log_sha256": "7a7481d2805e37eddb167a739178f1770170a8eff70c37a6244c89ada2420ece"
+}

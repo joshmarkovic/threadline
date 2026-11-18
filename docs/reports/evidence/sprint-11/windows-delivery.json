@@ -1,0 +1,82 @@
+{
+  "installed_app_source": "1ddd9c8375c0c45df658e8dddc06964b03b882e4",
+  "local_package_build": 9,
+  "fallback_copy": {
+    "run": "e2e-1795043904404-44360",
+    "case": "E2E-018",
+    "status": "Pass",
+    "exit_code": 0,
+    "driver_source": "dd0f6a4a8bfc1093e233cfec2185fca83b13765d",
+    "source_dirty": false,
+    "fixture": "threadline-s11-installed-fixture-v1",
+    "seed": 12345,
+    "host": "Microsoft Windows [Version 10.0.22631.7652]",
+    "architecture": "x86_64",
+    "app_sha256": "f23723610de33d329087f6f28fe4dc41f024affc474469763f18933426bfc8e7",
+    "fixture_helper_sha256": "aec0c61f15b311d880c2e3fb42c606e4d3d3971a61dbd4e0cfdf70c48d5709a3",
+    "result_sha256": "43e1066e5c4233222005faebfdd2d9c1dc4b8f5dcffdfc02ff34e34fc357ce14",
+    "native_report_sha256": "90c5a7411a2403122e0f723c3dc966b68a02a6f674e67f1aa783875263a9ea94",
+    "fixture_archived": true,
+    "steps": [
+      "Create an isolated synthetic account with both network queues paused, a local draft on issue 41 and unseen activity on issue 42",
+      "Start the same executable outside its registered path; all 37 events reach the feed without a native group",
+      "Snooze and mark read through owned feed controls; retain the original unrelated draft"
+    ],
+    "final_observation": {
+      "event_count": 37,
+      "feed_count": 37,
+      "os_feed_only": 37,
+      "snoozed_targets": 1,
+      "read_count": 1,
+      "group_count": 0,
+      "selected_issue": 41,
+      "draft_preserved": true,
+      "draft_tab_preserved": true
+    }
+  },
+  "first_installed_cold_attempt": {
+    "run": "e2e-1795043832222-45572",
+    "case": "E2E-012",
+    "status": "Blocked",
+    "exit_code": 78,
+    "driver_source": "dd0f6a4a8bfc1093e233cfec2185fca83b13765d",
+    "source_dirty": false,
+    "fixture": "threadline-s11-installed-fixture-v1",
+    "seed": 12345,
+    "host": "Microsoft Windows [Version 10.0.22631.7652]",
+    "architecture": "x86_64",
+    "app_sha256": "f23723610de33d329087f6f28fe4dc41f024affc474469763f18933426bfc8e7",
+    "fixture_helper_sha256": "aec0c61f15b311d880c2e3fb42c606e4d3d3971a61dbd4e0cfdf70c48d5709a3",
+    "result_sha256": "f436d55350d5765ae416a3776d42dbaab94e23daa5b303923aec0fa8a5caafd7",
+    "native_report_sha256": "f5bb0e190c43f673c101e8af27c21da3d78173e1b2f3134b871e019fdd8fe17f",
+    "fixture_archived": true,
+    "steps": [
+      "Create an isolated synthetic account with both network queues paused, a local draft on issue 41 and unseen activity on issue 42"
+    ],
+    "final_observation": {
+      "event_count": 37,
+      "feed_count": 37,
+      "os_feed_only": 37,
+      "snoozed_targets": 0,
+      "read_count": 0,
+      "group_count": 0,
+      "selected_issue": 41,
+      "draft_preserved": true,
+      "draft_tab_preserved": true
+    }
+  },
+  "read_only_registered_sender": {
+    "installed_target_exists": "true",
+    "merged_registry_command": "true",
+    "user_registry_command": "true",
+    "merged_registry_extended_command": "false",
+    "exact_rust_shortcut": "true",
+    "before_process_id_create_notifier": "true",
+    "before_process_id_sender_setting_hresult": "0x80070490",
+    "with_process_id_create_notifier": "true",
+    "with_process_id_sender_setting_hresult": "0x80070490"
+  },
+  "probe_sha256": "18df6db96b2cc02ac4e30f7c6e23f0b5ab836a3b844cebaf3e2a0c97f201361c",
+  "probe_source_sha256": "3da8e777dfbe2e73bf09ca54b4756c92ed0e6acffb7438ea956a824c64157b64",
+  "probe_log_sha256": "aad680021bc19504136648b33ab19837b4be6ac24adeb51042d4840668c4d193"
+}

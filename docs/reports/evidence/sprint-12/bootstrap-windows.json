@@ -1,0 +1,43 @@
+{
+  "source_revision": "43a288a7ea1325ab29d06ad96fea6f1a5f7509e2",
+  "os": "Windows 11 x64 build 22631",
+  "bootstrap_sha256": "b1c3ee8dec56588e3acad744af7bf24d022ad5a95ff40fde8d67e9fe384476e8",
+  "configuration": "Fixture HTTPS origin and independently recorded Microsoft leaf certificate",
+  "arguments": [
+    "--version",
+    "1.2.3",
+    "--channel",
+    "stable",
+    "--manifest-sha256",
+    "<independent digest>",
+    "--offline-dir",
+    "<fixture directory>",
+    "--verify-only"
+  ],
+  "positive_manifest_sha256": "516843805500b3db8fe4114412a6415d9e8c56f52f997192970b4928c2deacb0",
+  "unsigned_fixture_manifest_sha256": "47f7b849fa93082b58766dd0698658e035012b536cf18c77eab895db04f6f980",
+  "approved_publisher_sha256": "f2540c63525e9566ffbbe630b860674a115ce2ce14dd8399ed53c376c920912f",
+  "signed_sdk_tool_sha256": "0d0189af3356554a462c2a60d0d59f6006b68d743f5c0cc93c530b083706f075",
+  "observations": [
+    {
+      "fixture": "signed",
+      "exit_code": 0,
+      "message": "Verified Threadline 1.2.3 (stable) for Windows x64.",
+      "stdout_or_stderr_sha256": "32250171251d8a7ba09b68fa1155a6c674d8ac4c7dda95fe9a1f3382b40031f4"
+    },
+    {
+      "fixture": "unsigned",
+      "exit_code": 1,
+      "message": "Windows could not verify the installer against the configured Threadline publisher. Use the trusted signed release.",
+      "stdout_or_stderr_sha256": "18c97f03d5a0998b59aac9c80df6dd7c27c4df02398b9760a9a41e481743b811"
+    },
+    {
+      "fixture": "bad-digest",
+      "exit_code": 1,
+      "message": "The release manifest failed its independently supplied digest.",
+      "stdout_or_stderr_sha256": "f5a3ddadd674204cf421cfaf88e4940aab1d2d31e0694284724a5507d4e0ad5b"
+    }
+  ],
+  "setup_launched": false,
+  "production_publication": "Pending"
+}

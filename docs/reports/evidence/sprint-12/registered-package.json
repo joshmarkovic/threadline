@@ -1,0 +1,21 @@
+{
+  "build_8": {
+    "setup_sha256": "03ad9ee01dc259f320e2f8640f884d25dce95473479ced5c3d457a7fda55ed16",
+    "exit_code": 16,
+    "registered": false,
+    "retained_highest_build": 7,
+    "operation": "Stage notification registration",
+    "user_policy": "RemoteSigned",
+    "source_receipt_sha256": "7aef0ed0347b39225331ceebe1d69c1ad3e6d94e0c66b3a0b7e07259085739d5"
+  },
+  "build_9": {
+    "registered": true,
+    "version": "0.1.0-local.9",
+    "build": 9,
+    "sha256": "f23723610de33d329087f6f28fe4dc41f024affc474469763f18933426bfc8e7",
+    "shortcut_matches": true,
+    "com_matches": true,
+    "aumid_matches": true
+  },
+  "source_receipt_sha256": "eebaa5114ec6bd6c144216e262863ec786560e305212df24eee358a0956fe938"
+}
