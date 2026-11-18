@@ -1,6 +1,7 @@
 //! Runs the shared SQLite read schedule on the application's Tokio runtime.
 
 mod reads;
+mod writes;
 
 use std::{
     collections::HashMap,
@@ -237,6 +238,8 @@ struct Local {
     waiting: u64,
     profiles: Vec<AccessProfile>,
     next_read: Option<i64>,
+    next_write: Option<i64>,
+    reconciliation: Option<threadline_storage::writes::ReconciliationTarget>,
 }
 
 impl Local {
@@ -265,6 +268,16 @@ impl Local {
                 .collect(),
             next_read: if network {
                 store.next_sync_due(account, now)?
+            } else {
+                None
+            },
+            next_write: if network {
+                store.next_write_due(account, now)?
+            } else {
+                None
+            },
+            reconciliation: if network {
+                store.write_reconciliations(account, 1)?.pop()
             } else {
                 None
             },
@@ -299,6 +312,9 @@ async fn run(
     let mut requested = None;
     let mut enroll = true;
     let mut probe_retry = Duration::ZERO;
+    let mut prefer_write = true;
+    let mut was_reachable = false;
+    let mut reconcile_after = Duration::ZERO;
     while !core.shutdown.is_cancelled() {
         let Ok(now) = UtcMillis::now() else {
             break;
@@ -338,6 +354,9 @@ async fn run(
                 bound = BoundReaders::default();
                 requested = Some(ProbeTrigger::Startup);
                 probe_retry = Duration::ZERO;
+                was_reachable = false;
+                prefer_write = true;
+                reconcile_after = Duration::ZERO;
             } else {
                 observer.set_offline(offline);
             }
@@ -350,12 +369,27 @@ async fn run(
             .next_stale_at(elapsed);
         let mut next = deadline.map(|due| due.saturating_sub(elapsed));
         if network && !offline {
+            let status = core
+                .observer
+                .lock()
+                .expect("connectivity observer")
+                .snapshot(elapsed)
+                .status;
+            let reachable = status == ConnectionStatus::Reachable;
+            if reachable && !was_reachable {
+                let account = local.account;
+                let _ = blocking(&store, move |store| store.resume_writes(account, now)).await;
+                reconcile_after = elapsed;
+            }
+            was_reachable = reachable;
             let floor = elapsed
                 .saturating_add(until(now, local.status.budget_not_before_ms.unwrap_or(now)));
             if let Some(profile) = local.probe_profile() {
                 let (chosen, due) = {
                     let mut observer = core.observer.lock().expect("connectivity observer");
-                    let waiting = local.waiting != 0;
+                    let waiting = local.waiting != 0
+                        || local.next_write.is_some()
+                        || local.reconciliation.is_some();
                     let due = if requested.is_some() {
                         Some(floor)
                     } else {
@@ -378,6 +412,12 @@ async fn run(
                     let attempted =
                         probe(&accounts, &store, &core, &mut bound, profile, id, &cancel).await;
                     core.finish_read();
+                    if attempted == ProbeResult::Authenticated {
+                        let account = local.account;
+                        let _ =
+                            blocking(&store, move |store| store.resume_writes(account, now)).await;
+                        reconcile_after = elapsed;
+                    }
                     if attempted != ProbeResult::Deferred {
                         requested = None;
                     }
@@ -394,6 +434,39 @@ async fn run(
                     next = earliest(next, due.saturating_sub(elapsed));
                 }
             }
+            let write_allowed = status != ConnectionStatus::Unreachable;
+            let write_ready = write_allowed && local.next_write.is_some_and(|due| due <= now);
+            if write_allowed && let Some(target) = local.reconciliation.clone() {
+                let delay = reconcile_after.saturating_sub(elapsed);
+                if delay.is_zero() && (prefer_write || local.next_read.is_none_or(|due| due > now))
+                {
+                    let confirmed =
+                        writes::reconcile(&accounts, &store, &core, target, generation).await;
+                    if confirmed {
+                        digest = digest.wrapping_add(1);
+                    } else {
+                        reconcile_after = core
+                            .started
+                            .elapsed()
+                            .saturating_add(Duration::from_secs(60));
+                    }
+                    prefer_write = false;
+                    enroll = false;
+                    continue;
+                }
+                next = earliest(next, delay);
+            }
+            if write_ready && (prefer_write || local.next_read.is_none_or(|due| due > now)) {
+                if writes::execute(&accounts, &store, &core, local.account, generation).await {
+                    digest = digest.wrapping_add(1);
+                }
+                prefer_write = false;
+                enroll = wait(&core, Some(Duration::from_millis(250))).await;
+                continue;
+            }
+            if write_allowed && let Some(due) = local.next_write {
+                next = earliest(next, until(now, due));
+            }
             if let Some(due) = local.next_read {
                 let delay = until(now, due);
                 if delay.is_zero() {
@@ -408,6 +481,7 @@ async fn run(
                     {
                         digest = digest.wrapping_add(1);
                     }
+                    prefer_write = true;
                     // A competing write can change eligibility between the due check and claim.
                     enroll = wait(&core, Some(Duration::from_millis(250))).await;
                     continue;
@@ -421,6 +495,7 @@ async fn run(
 
 #[derive(PartialEq, Eq)]
 enum ProbeResult {
+    Authenticated,
     Attempted,
     Deferred,
     Unavailable,
@@ -467,7 +542,7 @@ async fn probe(
                 .sessions
                 .insert(profile.credential_ref.clone(), Arc::new(session));
             hold(store, account, Some(rate), None).await;
-            ProbeResult::Attempted
+            ProbeResult::Authenticated
         }
         Err(error) => {
             let (reachability, reason, rate) = evidence(&error);

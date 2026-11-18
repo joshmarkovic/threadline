@@ -13,6 +13,7 @@ use super::{
 #[derive(Deserialize)]
 struct Author {
     login: String,
+    id: Option<NonZeroU64>,
 }
 
 #[derive(Deserialize)]
@@ -261,6 +262,7 @@ impl Comment {
         Ok(ConversationComment {
             id: self.id,
             node_id: opaque_id(self.node_id)?,
+            author_id: self.user.as_ref().and_then(|author| author.id),
             author: self.user.map(|author| author.login),
             body: self.body,
             created_at_ms: millis(&self.created_at)?,

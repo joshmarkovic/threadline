@@ -98,6 +98,7 @@ pub struct ConversationComment {
     pub id: NonZeroU64,
     pub node_id: String,
     pub author: Option<String>,
+    pub author_id: Option<NonZeroU64>,
     pub body: String,
     pub created_at_ms: i64,
     pub updated_at_ms: i64,

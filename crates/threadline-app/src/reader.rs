@@ -35,6 +35,8 @@ use crate::sync_worker::{blocking, hold};
 
 pub(crate) mod pr_reads;
 pub(crate) use pr_reads::PrSourceRequest;
+mod write_choices;
+pub(crate) use write_choices::values as write_values;
 
 #[derive(Clone, Debug)]
 pub(crate) enum ReaderError {
@@ -333,6 +335,20 @@ impl ReaderService {
                 .await?;
             self.check_item(&scope, item, locator, cancel)?;
             let next = page.next_page.map(|next| next.to_string());
+            let observed_at = UtcMillis::now()?.0;
+            let authors: Vec<_> = page
+                .records
+                .iter()
+                .filter_map(|comment| {
+                    comment.author_id.map(|author_id| {
+                        threadline_storage::writes::CommentAuthorObservation {
+                            comment_id: comment.id,
+                            author_id,
+                            observed_at_ms: observed_at,
+                        }
+                    })
+                })
+                .collect();
             let comments = DiscussionInputPage {
                 comments: page
                     .records
@@ -352,7 +368,7 @@ impl ReaderService {
                     next.as_deref()
                 },
                 completed_validators: None,
-                fetched_at_ms: UtcMillis::now()?.0,
+                fetched_at_ms: observed_at,
             };
             if page.sso_limited {
                 self.store.commit_discussion_partial(
@@ -365,6 +381,14 @@ impl ReaderService {
             } else {
                 self.store
                     .commit_discussion_page(account, item, &progress, comments)?;
+            }
+            if !authors.is_empty() {
+                self.store.record_comment_authors(
+                    &scope.profile,
+                    scope.repository,
+                    item,
+                    &authors,
+                )?;
             }
             Ok(PageStatus::from_next(page.next_page, page.sso_limited))
         }

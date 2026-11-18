@@ -804,3 +804,7 @@ impl CredentialStore for FixtureVault {
 #[cfg(test)]
 #[path = "account_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "write_tests.rs"]
+mod write_tests;

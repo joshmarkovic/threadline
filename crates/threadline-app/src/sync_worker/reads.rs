@@ -327,6 +327,7 @@ fn observed_comment(row: UpdatedComment) -> ObservedComment {
         created_at_ms,
         updated_at_ms,
         body,
+        ..
     } = row.comment;
     ObservedComment {
         number: row.issue.get(),
