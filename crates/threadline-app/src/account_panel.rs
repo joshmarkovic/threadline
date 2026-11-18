@@ -144,6 +144,11 @@ impl AccountPanel {
         })
     }
 
+    #[cfg(feature = "e2e")]
+    pub(crate) fn uses_isolated_fixture(&self) -> bool {
+        self.service.fixture
+    }
+
     fn launch(&mut self, command: AccountCommand, cx: &mut Context<Self>) {
         if self.busy {
             return;

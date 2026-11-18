@@ -126,6 +126,8 @@ pub(crate) struct ReaderWorkspace {
     pending_draft: Option<String>,
     editor_to_focus: Option<String>,
     departure: Option<Departure>,
+    #[cfg(feature = "e2e")]
+    observer: Option<crate::observation::Observer>,
     status: Option<&'static str>,
 }
 
@@ -296,6 +298,8 @@ impl ReaderWorkspace {
             pending_draft: None,
             editor_to_focus: None,
             departure: None,
+            #[cfg(feature = "e2e")]
+            observer: None,
             status: None,
         };
         reader.ensure_focus_handles(MAX_PANES, window, cx);

@@ -201,6 +201,18 @@ pub struct Workspace {
 }
 
 impl Workspace {
+    #[cfg(feature = "e2e")]
+    pub(crate) fn set_observer(&mut self, observer: Option<Observer>, cx: &mut Context<Self>) {
+        if let Some(reader) = self.reader.as_ref()
+            && self
+                .accounts
+                .as_ref()
+                .is_some_and(|panel| panel.read(cx).uses_isolated_fixture())
+        {
+            reader.update(cx, |reader, cx| reader.set_observer(observer.clone(), cx));
+        }
+        self.observer = observer;
+    }
     pub fn new(
         window: &mut Window,
         cx: &mut Context<Self>,

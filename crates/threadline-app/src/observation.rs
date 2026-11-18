@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::io;
@@ -23,7 +24,7 @@ pub(crate) struct Observer(Rc<RefCell<Recorder>>);
 struct Recorder {
     started: Instant,
     startup_ms: Option<f64>,
-    bounds: BTreeMap<&'static str, [f32; 4]>,
+    bounds: BTreeMap<Cow<'static, str>, [f32; 4]>,
     measurement: Option<Measurement>,
     reports: watch::Sender<PendingReport>,
 }
@@ -91,7 +92,7 @@ struct Report<'a> {
     pid: u32,
     scale_factor: f32,
     startup_ms: f64,
-    bounds: &'a BTreeMap<&'static str, [f32; 4]>,
+    bounds: &'a BTreeMap<Cow<'static, str>, [f32; 4]>,
     scroll_frame_times_ms: &'a [f64],
     #[serde(skip_serializing_if = "Option::is_none")]
     scroll_frame_phases: Option<&'a [FramePhases]>,
@@ -140,7 +141,29 @@ impl Observer {
                     .0
                     .borrow_mut()
                     .bounds
-                    .insert(name, logical_bounds(bounds));
+                    .insert(Cow::Borrowed(name), logical_bounds(bounds));
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .inset_0()
+    }
+
+    pub(crate) fn visible_control_bounds(&self, name: String) -> impl IntoElement {
+        let observer = self.clone();
+        canvas(
+            move |bounds, window, _| {
+                let mask = window.content_mask();
+                if bounds.size.width.as_f32() > 0.
+                    && bounds.size.height.as_f32() > 0.
+                    && mask.bounds.contains(&bounds.center())
+                {
+                    observer
+                        .0
+                        .borrow_mut()
+                        .bounds
+                        .insert(Cow::Owned(name), logical_bounds(bounds));
+                }
             },
             |_, _, _, _| {},
         )
@@ -205,7 +228,7 @@ impl Observer {
             ..
         } = &mut *recorder;
         if let Some(opening) = opening {
-            bounds.insert("markdown_copy", logical_bounds(opening));
+            bounds.insert(Cow::Borrowed("markdown_copy"), logical_bounds(opening));
         }
         if let Some(measurement) = measurement {
             measurement.collect();

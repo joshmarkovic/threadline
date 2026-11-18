@@ -592,3 +592,55 @@ fn ui_008_keyboard_find_panes_and_multiline_editor_have_accessible_identity(
         "Keyboard draft\nLine two"
     );
 }
+
+#[gpui_kit::test]
+fn ui_008_observed_reader_controls_follow_the_visible_panes(cx: &mut TestAppContext) {
+    let setup = ReaderHarness::seeded();
+    let (window, reader) = setup.open(cx);
+    until(cx, |cx| {
+        cx.read(|cx| !reader.read(cx).list_busy && !reader.read(cx).rows.is_empty())
+    });
+    let (observation, writer) = crate::observation::Observer::new(
+        setup._directory.path().join("bounds.json"),
+        std::time::Instant::now(),
+        false,
+        setup.runtime.handle(),
+    );
+    cx.update_window(window, |_, window, cx| {
+        reader.update(cx, |reader, cx| {
+            reader.set_observer(Some(observation.clone()), cx)
+        });
+        observation.begin_frame();
+        window.render_frame(cx);
+    })
+    .unwrap();
+    for control in [
+        "reader-search",
+        "reader-search-submit",
+        "reader-result-0",
+        "reader-tab-0-0",
+        "reader-tab-1-0",
+        "reader-close-tab",
+    ] {
+        let bounds = observation
+            .test_control_bounds(control)
+            .unwrap_or_else(|| panic!("missing visible {control}"));
+        assert!(bounds[2] > 0. && bounds[3] > 0.);
+    }
+    click(cx, window, "reader-maximize-pane");
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).maximized && !reader.read(cx).layout_busy)
+    });
+    cx.update_window(window, |_, window, cx| {
+        observation.begin_frame();
+        window.render_frame(cx);
+    })
+    .unwrap();
+    let hidden = cx.read(|cx| 1 - reader.read(cx).layout.focused_pane);
+    assert!(
+        observation
+            .test_control_bounds(&format!("reader-tab-{hidden}-0"))
+            .is_none()
+    );
+    setup.runtime.block_on(writer.finish()).unwrap();
+}

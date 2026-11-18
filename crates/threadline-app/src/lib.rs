@@ -189,7 +189,7 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
                         Workspace::new(window, cx, seed, handle, open_review, feasibility_fixture);
                     #[cfg(feature = "e2e")]
                     {
-                        workspace.observer = observer;
+                        workspace.set_observer(observer, cx);
                     }
                     workspace.connect_platform(controls, events, window, cx);
                     if let Some(patches) = patches {
