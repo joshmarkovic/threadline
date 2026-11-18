@@ -11,6 +11,8 @@ The Windows 11 x64 local installer passed ten setup and recovery checks on build
 
 The canonical matrix ran in 64-bit Windows PowerShell using `tools/windows/test-local-lifecycle.ps1` with all three setup paths, their expected SHA-256 values and the preseeded profile digest. The independently recorded output contains the package hashes and the exit code for each step. The installer and harness are recorded at source `95f9066`. [Lifecycle driver](../../tools/windows/test-local-lifecycle.ps1) · [Local build and recovery commands](../../tools/windows/README.md) · [Trust and native app receipts](evidence/sprint-12/local-package.json)
 
+The canonical `cargo xtask test install --case S12-LOCAL-PACKAGE --artifact <candidate> --local-fixture <manifest>` run passed all ten setup steps on clean `5de91d4`. PowerShell 5.1 installed local builds 6 and 7 and retained the seeded schema 12 database digest across the failure and uninstall checks. [Canonical install runner receipt](evidence/sprint-12/canonical-local-install.json)
+
 ## Installed application and retained state
 
 The offline fixture held 30 items, 90 comments, 20 tabs, one draft, ten Outbox operations and one step receipt. Opening the installed candidate from `1ba4fff` after the installed predecessor from `8d93bc1` moved the database from schema 9 to 10. Nine ordered projections matched, including those for queue payloads, tab state, cached resources and local credential metadata. There were zero synchronization preference rows. The receipt gives the selected SQL columns and both hashes for every projection. [Database comparison](evidence/sprint-12/retained-profile.json)

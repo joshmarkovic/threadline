@@ -1,0 +1,7 @@
+# Sprint 08 pull request reviews
+
+The authorized comment-only review on disposable PR 2 was verified at its exact source location. The initial command created and submitted review `5966002272` on the expected head, both with HTTP 200. It exited with a failure when the inline-comment list response omitted the source position. The subsequent command used read-only requests and verified inline comment `4621559781` on the right side of line 5 of `docs/fixtures/review-checklist.md`. Both receipts identify the same review and immutable head. [Initial LIVE-003 submission](evidence/sprint-08/review-submit.json) · [Read-only LIVE-003 verification](evidence/sprint-08/review-readback.json)
+
+The committed client for the write was `6ba6ce8`. The readback client was `6090e0c`. Both ran on WSL Linux using the existing CLI OAuth credential. LIVE-003 covers the comment-only path. Approval, requesting changes and dedicated PAT authentication were untested in this live scenario.
+
+On Windows 11 x64 at `f17e39c`, three local HTTP tests and six real SQLite review tests passed. They checked the selected revision, source lines, exact pending-review ID, cancellation, thread/reply identity, uncertainty and recovery. The tested HTTP transport did not contact GitHub. Native editor scenarios E2E-007 and E2E-008 have separate Windows evidence requirements. [Windows test identities and results](evidence/sprint-08/windows-regressions.json) · [Sprint requirements](../spec/sprints/sprint_08_pr_reviews.md)

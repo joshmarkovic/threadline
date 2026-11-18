@@ -1,6 +1,6 @@
 # Sprint 04 cached workspace
 
-Threadline reopened the Section 16 fixture on Windows 11 while signed out and offline. The development app restored two panes with ten tabs each, displayed four downloaded comments for the active item and showed 900 unresolved actions. The Windows reference run recorded the rendered workspace. On a separate small fixture, the external Windows driver saved a draft, quit, reopened the same profile and recovered the exact draft. The partial-download journey and the three cached-navigation timing gates remain open. [Native and portable receipts](evidence/sprint-04/verification.json) · [Sprint requirements and acceptance](../spec/sprints/sprint_04_cached_workspace.md)
+Threadline reopened the Section 16 fixture on Windows 11 while signed out and offline. The development app restored two panes with ten tabs each, displayed four downloaded comments for the active item and showed 900 unresolved actions. The Windows reference run recorded the rendered workspace. On a separate small fixture, the external Windows driver saved a draft, quit, reopened the same profile and recovered the exact draft. The Windows partial-download journey also passed after a failed page and a separate-process restart. The three cached-navigation timing gates remain open. [Native and portable receipts](evidence/sprint-04/verification.json) · [Sprint requirements and acceptance](../spec/sprints/sprint_04_cached_workspace.md)
 
 ## Reader and verification
 

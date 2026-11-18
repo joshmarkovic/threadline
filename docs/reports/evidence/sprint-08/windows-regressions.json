@@ -1,0 +1,59 @@
+{
+  "source_revision": "f17e39c705dd08dbc23ab29ba3b6bbfafb4b237d",
+  "host": "Windows 11 x64",
+  "layer": "Rust integration; real SQLite or local HTTP",
+  "raw_sha256": "5261d513610813f2c73ecb9df2c5d471615573118b27268e92f7ef8ab8642d89",
+  "suites": [
+    {
+      "target": "github_merge",
+      "passed": 1,
+      "cases": [
+        "it_014_direct_merge_requires_known_policy_and_sends_exact_compare_and_swap_head"
+      ]
+    },
+    {
+      "target": "github_review_writes",
+      "passed": 3,
+      "cases": [
+        "it_011_lost_submit_response_allows_exact_readback_without_sending_again",
+        "it_011_pinned_pending_review_receipt_required_before_exact_review_submission",
+        "it_013_wrong_actor_revision_and_thread_guard_keep_exact_review_scope"
+      ]
+    },
+    {
+      "target": "merges",
+      "passed": 6,
+      "cases": [
+        "it_014_base_branch_advance_uses_fresh_checks_but_an_explicit_retarget_requires_new_consent",
+        "it_009_it_014_uncertain_merge_only_reads_back_original_pr_never_replays_or_claims_an_external_merge",
+        "it_014_changed_head_or_rejected_queue_never_retargets_or_retries_a_different_method",
+        "it_014_offline_merge_pins_head_method_and_duplicate_view_then_requires_known_direct_rules",
+        "it_015_renewed_original_credential_can_resume_confirmed_own_merge_without_changing_scope",
+        "it_015_two_wal_connections_cannot_send_review_and_merge_concurrently"
+      ]
+    },
+    {
+      "target": "reviews",
+      "passed": 6,
+      "cases": [
+        "it_011_confirmed_pending_review_identity_survives_crash_and_final_event_never_recreates_review",
+        "it_011_cancelled_pending_review_keeps_issued_id_and_holds_dependents_while_other_pr_dispatches",
+        "it_013_approval_rechecks_author_identity_and_rechecks_head_between_preflight_and_send",
+        "it_013_preflight_rate_floor_and_credential_hold_do_not_retry_a_denied_review_blindly",
+        "it_013_review_drafts_keep_original_multiline_anchors_after_eviction_force_push_and_restart",
+        "it_013_thread_actions_require_original_thread_and_an_unchanged_authorized_revision"
+      ]
+    },
+    {
+      "target": "history",
+      "passed": 5,
+      "cases": [
+        "it_006_branch_baseline_proves_new_commits_after_hydration_and_force_push_preserves_old_view",
+        "it_006_comparison_exact_options_ordered_parent_and_rename_source_survive_offline_restart",
+        "it_006_limited_ancestry_retries_without_changing_cached_row_ordinals_and_legacy_diffs_remain_downloaded",
+        "it_006_history_checkpoints_layout_boundaries_and_exact_parents_survive_restart",
+        "it_006_root_merge_base_and_limited_patch_recovery_preserve_evidence"
+      ]
+    }
+  ]
+}

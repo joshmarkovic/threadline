@@ -1,0 +1,78 @@
+{
+  "source_revision": "5de91d4253f91165a7dc91aa52ef2a163d1a89bc",
+  "source_dirty": false,
+  "status": "Pass",
+  "exit_code": 0,
+  "case": "S12-LOCAL-PACKAGE",
+  "fixture_revision": "s12-windows-local-installer-v1",
+  "windows_version": "Microsoft Windows [Version 10.0.22631.7652]",
+  "shell": "Windows PowerShell 5.1",
+  "candidate_build": 7,
+  "predecessor_build": 6,
+  "seeded_profile": {
+    "schema": 12,
+    "retained_sha256": "071747249798f836c4371b2ed255d7a61019007cbd26816c2b48ffffc0152323"
+  },
+  "candidate": {
+    "evidence_class": "candidate inspected only",
+    "sha256": "ad47b906d5557d53d1d0ef601cd07ec4f0c471411fa2ebf3a89eac7c56ec0e8a",
+    "size_bytes": 9987057
+  },
+  "matrix": {
+    "channel": "local-fixture",
+    "target": "x86_64-pc-windows-msvc",
+    "windows_build": "22631",
+    "predecessor_setup_sha256": "6569fe69e88924690129fd23088e07755cf11e93e063c20ca67fd85c81fea472",
+    "current_setup_sha256": "ad47b906d5557d53d1d0ef601cd07ec4f0c471411fa2ebf3a89eac7c56ec0e8a",
+    "staged_fault_setup_sha256": "9336ffc57c8a7941f42c1a3fe9f996042fb072bc063efeced6a425c53297c925",
+    "preseeded_profile_checked": true,
+    "completed_steps": [
+      {
+        "step": "install_predecessor",
+        "exit_code": 0
+      },
+      {
+        "step": "repair_predecessor",
+        "exit_code": 0
+      },
+      {
+        "step": "refuse_locked_executable",
+        "exit_code": 14
+      },
+      {
+        "step": "fail_staged_write",
+        "exit_code": 16
+      },
+      {
+        "step": "upgrade_after_failures",
+        "exit_code": 0
+      },
+      {
+        "step": "repair_current",
+        "exit_code": 0
+      },
+      {
+        "step": "refuse_installed_downgrade",
+        "exit_code": 12
+      },
+      {
+        "step": "uninstall_retains_profile",
+        "exit_code": 0
+      },
+      {
+        "step": "refuse_downgrade_after_uninstall",
+        "exit_code": 12
+      },
+      {
+        "step": "reinstall_current",
+        "exit_code": 0
+      }
+    ]
+  },
+  "source_sha256": {
+    "windows-local-lifecycle.json": "1fc45908e925dff277d1ddfda86c6de2d3d600771d1aca7f6685e5a0180b0f9c",
+    "candidate.json": "7b3a37bb42e9df2d310b59ef6e0cf9055674f877f17259fcb8ec516500696ea5",
+    "result.json": "03ddbd4fdb35b738a69ebf42bbd9b3be04e3f347a12043666ee193b08c65a0c0",
+    "junit.xml": "b9d3d7dd00adc50c2329db959b11a2a176bf57b36e7414bec9a045f2c65d791b"
+  }
+}
