@@ -2,7 +2,7 @@ use super::{remote::RemoteFamily, *};
 use crate::palette::Palette;
 use gpui_kit::{
     AnyElement, App, ClickEvent, Div, InteractiveElement, IntoElement, ParentElement, Render, Role,
-    StatefulInteractiveElement, Styled,
+    StatefulInteractiveElement, Styled, TestSupportExt,
     component::{
         Disableable, Selectable, Sizable,
         button::Button,
@@ -867,6 +867,7 @@ impl ReaderWorkspace {
             });
         div()
             .id(format!("reader-pane-{index}"))
+            .test_support()
             .role(Role::Group)
             .aria_label(format!("Pane {}", index + 1))
             .track_focus(&self.focus[index])
@@ -966,6 +967,7 @@ impl ReaderWorkspace {
             .filter(|editor| editor.tab_id == tab.id);
         let content = div()
             .id(format!("reader-conversation-{pane}"))
+            .test_support()
             .role(Role::Group)
             .aria_label("Downloaded conversation")
             .track_scroll(&view.scroll)
@@ -1410,6 +1412,7 @@ impl Render for ReaderWorkspace {
             .child(
                 div()
                     .id("reader-connection")
+                    .test_support()
                     .role(Role::Status)
                     .aria_label(connection_details.clone())
                     .p_2()
@@ -1548,8 +1551,8 @@ fn rail(
                 .justify_between()
                 .gap_2()
                 .child(label)
-                .children(count.filter(|count| count.known > 0).map(|count| {
-                    let number = count.known.to_string();
+                .children(count.and_then(KnownCount::badge).map(|count| {
+                    let number = count.to_string();
                     let size = (13. + number.len() as f32 * 7.).max(23.);
                     div()
                         .size(px(size))
@@ -1686,6 +1689,7 @@ fn resource_problem(label: &str, state: &ResourceState, palette: Palette) -> imp
     let accessible = format!("{label}. {problem}. Downloaded content remains available.");
     div()
         .id(format!("{label}-resource-problem"))
+        .test_support()
         .role(Role::Status)
         .aria_label(accessible.clone())
         .text_xs()

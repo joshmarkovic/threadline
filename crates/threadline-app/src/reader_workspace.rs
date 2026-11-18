@@ -20,7 +20,7 @@ use threadline_storage::{
 mod drafts;
 mod media;
 mod remote;
-#[cfg(test)]
+#[cfg(all(test, feature = "e2e"))]
 mod tests;
 mod view;
 pub(crate) use view::bind_shortcuts;
@@ -124,6 +124,7 @@ pub(crate) struct ReaderWorkspace {
     queue: Vec<QueueRow>,
     drafts: HashMap<String, drafts::Editor>,
     pending_draft: Option<String>,
+    editor_to_focus: Option<String>,
     departure: Option<Departure>,
     status: Option<&'static str>,
 }
@@ -293,6 +294,7 @@ impl ReaderWorkspace {
             queue: Vec::new(),
             drafts: HashMap::new(),
             pending_draft: None,
+            editor_to_focus: None,
             departure: None,
             status: None,
         };
@@ -413,6 +415,7 @@ impl ReaderWorkspace {
             self.search_hits = None;
             self.search_reply = None;
             self.pending_draft = None;
+            self.editor_to_focus = None;
             self.counts = None;
             self.coverage = None;
             self.cache = None;
@@ -835,6 +838,7 @@ impl ReaderWorkspace {
             move |store| store.save_reader_layout(account, &state, maximized),
             move |this, result, window, cx| {
                 this.layout_busy = false;
+                let editor_to_focus = this.editor_to_focus.take();
                 match result {
                     Ok(()) => {
                         this.layout = layout;
@@ -852,6 +856,10 @@ impl ReaderWorkspace {
                         });
                         this.load_visible(window, cx);
                         this.restore_active_draft(window, cx);
+                        if let Some(editor) = editor_to_focus.and_then(|id| this.drafts.get(&id)) {
+                            let focus = editor.view.focus_handle(cx);
+                            window.on_next_frame(move |window, cx| focus.focus(window, cx));
+                        }
                     }
                     Err(_) => {
                         this.status =

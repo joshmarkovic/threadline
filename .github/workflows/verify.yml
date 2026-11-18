@@ -9,6 +9,10 @@ on:
         description: Run native smoke on the registered interactive Windows 11 reference desktop
         type: boolean
         default: false
+      windows_reader_performance:
+        description: Measure cached reader opening, search and tab switching on hosted Windows
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -135,6 +139,9 @@ jobs:
       - name: Resume a partial discussion after restart
         if: ${{ !cancelled() }}
         run: cargo xtask test e2e --suite full --case E2E-004 --binary target/release/threadline.exe --report-dir artifacts/cached-reader
+      - name: Measure cached reader interactions on hosted Windows
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.windows_reader_performance }}
+        run: cargo xtask test e2e --suite full --case S04-READER-PERF --binary target/release/threadline.exe --report-dir artifacts/cached-reader
       - name: Exercise the real Windows protected store
         if: ${{ !cancelled() }}
         run: cargo xtask test integration --case IT-020 --report-dir artifacts/github-access

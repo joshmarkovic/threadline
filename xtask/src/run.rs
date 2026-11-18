@@ -159,10 +159,45 @@ const INTEGRATION: &[CargoTest] = &[
         ],
     },
 ];
-const UI: &[CargoTest] = &[CargoTest {
-    id: "S01-GPUI",
-    arguments: &["-p", "threadline-app", "--test", "feasibility_ui"],
-}];
+const UI: &[CargoTest] = &[
+    CargoTest {
+        id: "S01-GPUI",
+        arguments: &["-p", "threadline-app", "--test", "feasibility_ui"],
+    },
+    CargoTest {
+        id: "UI-002",
+        arguments: &[
+            "-p",
+            "threadline-app",
+            "--features",
+            "e2e",
+            "--lib",
+            "ui_002_",
+        ],
+    },
+    CargoTest {
+        id: "UI-003",
+        arguments: &[
+            "-p",
+            "threadline-app",
+            "--features",
+            "e2e",
+            "--lib",
+            "ui_003_",
+        ],
+    },
+    CargoTest {
+        id: "UI-008",
+        arguments: &[
+            "-p",
+            "threadline-app",
+            "--features",
+            "e2e",
+            "--lib",
+            "ui_008_",
+        ],
+    },
+];
 const WINDOWS_CREDENTIALS: CargoTest = CargoTest {
     id: "IT-020",
     arguments: &[

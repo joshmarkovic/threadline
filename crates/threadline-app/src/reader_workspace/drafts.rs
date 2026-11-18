@@ -181,7 +181,6 @@ impl ReaderWorkspace {
         let id = format!("{kind_key}-{}", tab.item.0);
         if let Some(editor) = self.drafts.get(&id) {
             let target = editor.tab_id.clone();
-            let focus = editor.view.clone();
             let mut layout = self.layout.clone();
             if let Some((pane, position)) = layout.panes.iter().enumerate().find_map(|(pane, p)| {
                 p.tabs
@@ -192,8 +191,8 @@ impl ReaderWorkspace {
                 layout.focused_pane = pane;
                 layout.panes[pane].active = Some(position);
                 layout.panes[pane].tabs[position].view.draft = Some(id.clone());
+                self.editor_to_focus = Some(id);
                 self.save_layout(layout, window, cx);
-                window.on_next_frame(move |window, cx| focus.focus_handle(cx).focus(window, cx));
             }
             return;
         }
@@ -331,10 +330,10 @@ impl ReaderWorkspace {
                     .flat_map(|pane| &mut pane.tabs)
                     .find(|candidate| candidate.id == tab.id)
                 {
-                    slot.view.draft = Some(id);
+                    slot.view.draft = Some(id.clone());
                 }
+                this.editor_to_focus = Some(id);
                 this.save_layout(layout, window, cx);
-                window.on_next_frame(move |window, cx| editor.focus_handle(cx).focus(window, cx));
             },
         );
     }
