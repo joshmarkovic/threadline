@@ -7,6 +7,14 @@ on:
         description: Successful main push run of Build and test with the Windows desktop test artifact
         required: true
         type: string
+      notification_ocr:
+        description: Run the one-shot visual notification diagnostic on the trusted diagnostic branch
+        type: boolean
+        default: false
+      high_dpi:
+        description: Try normal Display scaling once on the disposable hosted diagnostic desktop
+        type: boolean
+        default: false
 
 permissions:
   actions: read
@@ -15,7 +23,10 @@ permissions:
 jobs:
   replay:
     name: Hosted Windows Server x64 desktop replay
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      ((!inputs.notification_ocr && !inputs.high_dpi && github.ref == 'refs/heads/main') ||
+      ((inputs.notification_ocr || inputs.high_dpi) && github.ref == 'refs/heads/jm/windows-notification-ocr'))
     runs-on: windows-2025
     timeout-minutes: 20
     steps:
@@ -86,7 +97,7 @@ jobs:
           $null = New-Item -ItemType Directory -Path $evidence
           Copy-Item -LiteralPath $manifestPath -Destination $evidence
       - name: Measure renderer and scrolling
-        if: ${{ !cancelled() && steps.verified.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.verified.outcome == 'success' && !inputs.notification_ocr && !inputs.high_dpi }}
         timeout-minutes: 6
         shell: pwsh
         run: |
@@ -97,7 +108,7 @@ jobs:
             -Measure -BudgetFile ./docs/architecture/windows-budgets.json
           exit $LASTEXITCODE
       - name: Check Windows tray and notification activation
-        if: ${{ !cancelled() && steps.verified.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.verified.outcome == 'success' && !inputs.notification_ocr && !inputs.high_dpi }}
         timeout-minutes: 6
         shell: pwsh
         run: |
@@ -106,13 +117,66 @@ jobs:
           & powershell.exe -NoLogo -NoProfile -NonInteractive -Sta -File ./tools/native/windows-smoke.ps1 `
             -Binary $binary -ProfileDir $profile -ReportDir artifacts/windows-hosted-replay/shell -PlatformProof
           exit $LASTEXITCODE
+      - uses: actions/checkout@v4
+        id: diagnostic_driver
+        if: >-
+          ${{ (inputs.notification_ocr || inputs.high_dpi) && steps.verified.outcome == 'success' &&
+          runner.environment == 'github-hosted' && runner.os == 'Windows' && runner.arch == 'X64' }}
+        with:
+          ref: ${{ github.sha }}
+          path: diagnostic-driver
+          persist-credentials: false
+      - name: Probe the exact synthetic notification using local Windows OCR
+        if: >-
+          ${{ inputs.notification_ocr && steps.verified.outcome == 'success' &&
+          runner.environment == 'github-hosted' && runner.os == 'Windows' && runner.arch == 'X64' }}
+        timeout-minutes: 4
+        shell: pwsh
+        env:
+          THREADLINE_HOSTED_NOTIFICATION_OCR: opt-in-replay
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
+          SOURCE_RUN_ID: ${{ steps.source.outputs.run_id }}
+        run: |
+          $revision = git -C diagnostic-driver rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $revision -cne $env:GITHUB_SHA) { throw 'The supplemental OCR driver does not match the dispatch revision.' }
+          @{
+            diagnostic_driver_revision = $revision
+            artifact_source_revision = $env:SOURCE_COMMIT
+            artifact_source_run = $env:SOURCE_RUN_ID
+            workflow_run = $env:GITHUB_RUN_ID
+            evidence_class = 'GitHub-hosted Windows Server notification diagnostic'
+          } | ConvertTo-Json | Set-Content -LiteralPath 'artifacts/windows-hosted-replay/diagnostic-driver.json'
+          $binary = Join-Path $env:RUNNER_TEMP 'threadline-replay-binary/threadline.exe'
+          $profile = Join-Path $env:RUNNER_TEMP 'threadline-replay-ocr-profile'
+          & powershell.exe -NoLogo -NoProfile -NonInteractive -Sta -File ./diagnostic-driver/tools/native/windows-smoke.ps1 `
+            -Binary $binary -ProfileDir $profile -ReportDir artifacts/windows-hosted-replay/ocr -PlatformProof -HostedNotificationOcr
+          exit $LASTEXITCODE
+      - name: Try a normal high-DPI display scale once
+        if: ${{ !cancelled() && inputs.high_dpi && steps.diagnostic_driver.outcome == 'success' }}
+        timeout-minutes: 4
+        shell: pwsh
+        env:
+          THREADLINE_HOSTED_HIGH_DPI: opt-in-replay
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
+        run: |
+          $diagnostic = git -C diagnostic-driver rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $diagnostic -cne $env:GITHUB_SHA) { throw 'The display helper does not match the dispatch revision.' }
+          $source = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $source -cne $env:SOURCE_COMMIT) { throw 'The unchanged smoke driver does not match the executable source.' }
+          $binary = Join-Path $env:RUNNER_TEMP 'threadline-replay-binary/threadline.exe'
+          & powershell.exe -NoLogo -NoProfile -NonInteractive -Sta -File ./diagnostic-driver/tools/native/windows-hosted-high-dpi.ps1 `
+            -Binary $binary -NativeDriver ./tools/native/windows-smoke.ps1 -ReportDir artifacts/windows-hosted-replay/high-dpi
+          exit $LASTEXITCODE
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: hosted-windows-server-replay
           path: |
             artifacts/windows-hosted-replay/build.json
+            artifacts/windows-hosted-replay/diagnostic-driver.json
             artifacts/windows-hosted-replay/*/*.json
             artifacts/windows-hosted-replay/measure/measurement.png
             artifacts/windows-hosted-replay/shell/platform-activated.png
+            artifacts/windows-hosted-replay/high-dpi/launch.png
+            artifacts/windows-hosted-replay/high-dpi/interaction.png
           if-no-files-found: ignore

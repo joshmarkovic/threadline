@@ -8,6 +8,7 @@ param(
     [switch]$PlatformProof,
     [switch]$ManualTrayClick,
     [switch]$ManualNotificationClick,
+    [switch]$HostedNotificationOcr,
     [string]$Artifact,
     [string]$BudgetFile
 )
@@ -44,6 +45,7 @@ $reportFile = Join-Path $ReportDir 'ui-observation.json'
 $blocked = $false
 $clipboardBackup = $null
 $copiedClipboardSequence = $null
+$script:hostedOcrCaptureEnabled = $false
 
 function Get-FileSha256 {
     param([string]$Path)
@@ -518,6 +520,18 @@ function Invoke-PlatformProof([IntPtr]$Window) {
     [ThreadlineWinInput]::Chord(@(0x11, 0x32))
     [ThreadlineWinInput]::Chord(@(0x11, 0x09))
     $before = Wait-State 'second PR before notification delivery' { param($state) $state.right_tab -eq 68 }
+    if ($HostedNotificationOcr) {
+        $corner = New-Object ThreadlineWinInput+Rect
+        if (![ThreadlineWinInput]::GetHostedNotificationCorner($Window, [ref]$corner)) {
+            Stop-Blocked 'The hosted display did not provide a bounded notification corner.'
+        }
+        $baseline = Read-HostedNotificationCorner $corner
+        if ($baseline.ExactTitle -or $baseline.ExactBody -or $baseline.Matches.Count -ne 0) {
+            Stop-Blocked 'The synthetic notification title or body was already present in the baseline.'
+        }
+        Add-Evidence 'Baseline the hosted notification corner in memory' (
+            [ordered]@{ exact_fixture_title = $false; exact_fixture_body = $false; pixel_width = ($corner.Right - $corner.Left); pixel_height = ($corner.Bottom - $corner.Top) })
+    }
     Invoke-ToolbarClick $Window 'test-notification'
     try {
         $shown = Wait-State 'NIN_BALLOONSHOW callback from the Windows shell' { param($state) $state.notifications_shown -gt $before.notifications_shown }
@@ -525,7 +539,12 @@ function Invoke-PlatformProof([IntPtr]$Window) {
         Stop-Blocked 'The Windows shell did not report showing the test banner. Inspect Windows session, app notification rules and Do not disturb.'
     }
     Add-Evidence 'Windows shell confirmed the test banner displayed' $shown.notifications_shown
-    if ($ManualNotificationClick) {
+    if ($HostedNotificationOcr) {
+        if ($shown.notifications_shown -ne ($before.notifications_shown + 1)) {
+            Stop-Blocked 'Windows did not show exactly one new synthetic notification.'
+        }
+        Invoke-HostedOcrToastClick $corner
+    } elseif ($ManualNotificationClick) {
         Write-Host 'Click the visible Threadline review banner while it remains displayed.'
     } else {
         $banner = Wait-ShellControl 'Threadline review'
@@ -542,11 +561,14 @@ function Invoke-PlatformProof([IntPtr]$Window) {
         Stop-Blocked 'The actual Windows banner click was not observed by the running app.'
     }
     if ($activated.pid -ne $script:app.Id) { throw 'Notification opened an unexpected process.' }
+    if ($HostedNotificationOcr -and $activated.activations -ne ($before.activations + 1)) {
+        throw 'The hosted notification diagnostic expected exactly one activation.'
+    }
     Add-Evidence 'Click the actual Windows notification and open the review in the original process' ([ordered]@{ pid = $activated.pid; right_tab = $activated.right_tab })
     Set-WindowFocus $Window
     Invoke-ToolbarClick $Window 'tray-toggle'
     $null = Wait-State 'tray opt-out acknowledgment' { param($state) !$state.tray_enabled }
-    Crop-Screenshot $Window 'platform-activated.png'
+    if (!$HostedNotificationOcr) { Crop-Screenshot $Window 'platform-activated.png' }
     [ThreadlineWinInput]::Chord(@(0x12, 0x73))
     Wait-For 'close without tray to exit the process' { $script:app.HasExited }
     if ($script:app.ExitCode -ne 0) { throw "Threadline exited with code $($script:app.ExitCode)." }
@@ -602,6 +624,14 @@ function Invoke-Measurement([IntPtr]$Window, [double]$ColdMs) {
 
 try {
     if ($Measure -and $PlatformProof) { throw 'Select one native evidence mode per run.' }
+    if ($HostedNotificationOcr -and (
+        !$PlatformProof -or $ManualNotificationClick -or $ManualTrayClick -or
+        $env:GITHUB_ACTIONS -cne 'true' -or $env:GITHUB_EVENT_NAME -cne 'workflow_dispatch' -or
+        $env:RUNNER_ENVIRONMENT -cne 'github-hosted' -or $env:RUNNER_OS -cne 'Windows' -or $env:RUNNER_ARCH -cne 'X64' -or
+        $env:GITHUB_REF -cne 'refs/heads/jm/windows-notification-ocr' -or
+        $env:GITHUB_WORKFLOW_REF -cnotmatch '/\.github/workflows/windows-hosted-replay\.yml@refs/heads/jm/windows-notification-ocr$' -or
+        $env:THREADLINE_HOSTED_NOTIFICATION_OCR -cne 'opt-in-replay'
+    )) { Stop-Blocked 'The OCR probe is available only to the explicitly dispatched GitHub-hosted diagnostic.' }
     if ($report.session_id -eq 0 -or ![Environment]::UserInteractive) {
         Stop-Blocked 'The driver needs an unlocked interactive Windows desktop outside Session 0.'
     }
@@ -619,6 +649,17 @@ try {
     $report.binary_sha256 = Get-FileSha256 $Binary
     $report.executable_bytes = (Get-Item -LiteralPath $Binary).Length
     $operatingSystem = Get-CimInstance Win32_OperatingSystem
+    if ($HostedNotificationOcr) {
+        if ($operatingSystem.ProductType -ne 3 -or $operatingSystem.Caption -notmatch 'Windows Server 2025') {
+            Stop-Blocked 'The hosted OCR probe requires Windows Server 2025.'
+        }
+        . (Join-Path $PSScriptRoot 'windows-hosted-notification-ocr.ps1')
+        try { Initialize-HostedOcrEngine } catch { Stop-Blocked 'The hosted image did not supply usable Windows en-US OCR.' }
+        Test-HostedOcrEngine
+        $script:hostedOcrCaptureEnabled = $true
+        Add-Evidence 'Verify local OCR using only synthetic in-memory fixtures' (
+            [ordered]@{ wrapped_exact_match = $true; wrong_body_rejected = $true; duplicate_detected = $true })
+    }
     $report.windows_product = $operatingSystem.Caption
     $report.os_version = $operatingSystem.Version
     $platform = Get-CimInstance Win32_ComputerSystem
@@ -681,7 +722,7 @@ try {
     $report.status = if ($blocked) { 'Blocked' } else { 'Fail' }
     $report.detail = $_.Exception.Message
     $report.driver_location = $_.InvocationInfo.PositionMessage
-    if ($app -and !$app.HasExited -and $app.MainWindowHandle -ne [IntPtr]::Zero) {
+    if (!$HostedNotificationOcr -and $app -and !$app.HasExited -and $app.MainWindowHandle -ne [IntPtr]::Zero) {
         try {
             if ([ThreadlineWinInput]::GetForegroundWindow() -eq $app.MainWindowHandle) {
                 Crop-Screenshot $app.MainWindowHandle 'failure.png'

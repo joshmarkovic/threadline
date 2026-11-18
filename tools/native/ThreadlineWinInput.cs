@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 
 public static class ThreadlineWinInput
@@ -9,6 +12,7 @@ public static class ThreadlineWinInput
     private const uint KeyUp = 2;
     private const uint LeftDown = 2;
     private const uint LeftUp = 4;
+    private const int HostedCaptureFreshnessMs = 500;
     private static readonly int InputSize = Marshal.SizeOf(typeof(Input));
 
     public static IntPtr TargetWindow { get; set; }
@@ -18,6 +22,14 @@ public static class ThreadlineWinInput
 
     [StructLayout(LayoutKind.Sequential)]
     public struct Rect { public int Left, Top, Right, Bottom; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MonitorInfo
+    {
+        public int Size;
+        public Rect Monitor, WorkArea;
+        public uint Flags;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct KeyboardInput
@@ -78,8 +90,26 @@ public static class ThreadlineWinInput
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetCursorPos(int x, int y);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetCursorPos(out Point point);
+
     [DllImport("user32.dll")]
     private static extern IntPtr WindowFromPoint(Point point);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr window, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr window, StringBuilder name, int capacity);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr window, out Rect bounds);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
@@ -267,6 +297,103 @@ public static class ThreadlineWinInput
         if (!SetCursorPos(point.X, point.Y)) throw new Win32Exception(Marshal.GetLastWin32Error());
         RequireShellTarget(point, shellProcess);
         ClickPointer(requireFocus: false);
+    }
+
+    public static bool GetHostedNotificationCorner(IntPtr testWindow, out Rect corner)
+    {
+        corner = new Rect();
+        var monitor = MonitorFromWindow(testWindow, 0);
+        var info = new MonitorInfo { Size = Marshal.SizeOf(typeof(MonitorInfo)) };
+        if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref info)) return false;
+        corner = info.WorkArea;
+        corner.Left = Math.Max(corner.Left, corner.Right - 512);
+        corner.Top = Math.Max(corner.Top, corner.Bottom - 300);
+        return corner.Right > corner.Left && corner.Bottom > corner.Top;
+    }
+
+    public sealed class HostedToast
+    {
+        public IntPtr Window;
+        public uint ProcessId;
+        public string WindowClass;
+    }
+
+    public static HostedToast FindHostedToast(Point point)
+    {
+        var window = GetAncestor(WindowFromPoint(point), 2);
+        if (window == IntPtr.Zero || !IsWindowVisible(window)) return null;
+        Rect bounds;
+        if (!GetWindowRect(window, out bounds) || bounds.Right <= bounds.Left || bounds.Bottom <= bounds.Top ||
+            bounds.Right - bounds.Left > 600 || bounds.Bottom - bounds.Top > 380) return null;
+
+        var name = new StringBuilder(128);
+        if (GetClassName(window, name, name.Capacity) == 0) return null;
+        string windowClass = name.ToString();
+        if (windowClass != "Windows.UI.NotificationToastWindow" && windowClass != "Windows.UI.Core.CoreWindow" &&
+            windowClass != "ToastWnd" && windowClass != "tooltips_class32") return null;
+
+        uint processId = WindowProcessId(window);
+        if (!IsHostedShellProcess(processId)) return null;
+        return new HostedToast { Window = window, ProcessId = processId, WindowClass = windowClass };
+    }
+
+    private static bool IsHostedShellProcess(uint processId)
+    {
+        if (processId == 0) return false;
+        var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        try
+        {
+            using (var process = Process.GetProcessById((int)processId))
+            {
+                string image = process.MainModule.FileName;
+                string host = Path.GetFileName(image);
+                if (String.Equals(image, Path.Combine(windows, "explorer.exe"), StringComparison.OrdinalIgnoreCase))
+                    return true;
+                return image.StartsWith(Path.Combine(windows, "SystemApps") + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) &&
+                    (String.Equals(host, "ShellExperienceHost.exe", StringComparison.OrdinalIgnoreCase) ||
+                        String.Equals(host, "ShellHost.exe", StringComparison.OrdinalIgnoreCase));
+            }
+        }
+        catch (Win32Exception) { return false; }
+        catch (InvalidOperationException) { return false; }
+        catch (ArgumentException) { return false; }
+    }
+
+    public static bool ClickHostedToast(Point point, HostedToast expected, long capturedAt, long deadline)
+    {
+        if (!IsHostedCaptureFresh(capturedAt, deadline, Stopwatch.GetTimestamp())) return false;
+        RequireHostedToast(point, expected);
+        if (!IsHostedCaptureFresh(capturedAt, deadline, Stopwatch.GetTimestamp())) return false;
+        if (!SetCursorPos(point.X, point.Y)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        Point actual = RequireHostedCursor(point);
+        RequireHostedToast(actual, expected);
+        RequireHostedCursor(actual);
+        if (!IsHostedCaptureFresh(capturedAt, deadline, Stopwatch.GetTimestamp())) return false;
+        ClickPointer(requireFocus: false);
+        return true;
+    }
+
+    private static bool IsHostedCaptureFresh(long capturedAt, long deadline, long now)
+    {
+        return capturedAt > 0 && now >= capturedAt && now < deadline &&
+            now - capturedAt < Stopwatch.Frequency * HostedCaptureFreshnessMs / 1000;
+    }
+
+    private static Point RequireHostedCursor(Point expected)
+    {
+        Point actual;
+        if (!GetCursorPos(out actual)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        if (actual.X != expected.X || actual.Y != expected.Y)
+            throw new InvalidOperationException("The actual cursor did not remain at the verified notification point.");
+        return actual;
+    }
+
+    private static void RequireHostedToast(Point point, HostedToast expected)
+    {
+        var current = FindHostedToast(point);
+        if (current == null || current.Window != expected.Window || current.ProcessId != expected.ProcessId ||
+            current.WindowClass != expected.WindowClass)
+            throw new InvalidOperationException("The verified native notification window no longer owns the click point.");
     }
 
     private static void RequireShellTarget(Point point, uint shellProcess)
