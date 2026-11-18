@@ -36,9 +36,10 @@ impl WriteFixture {
         let sent = Arc::new(AtomicUsize::new(0));
         let (stopping, writes) = (stop.clone(), sent.clone());
         let server = thread::spawn(move || {
+            let merged = AtomicBool::new(false);
             while !stopping.load(Ordering::Acquire) {
                 match listener.accept() {
-                    Ok((stream, _)) => serve(stream, &writes),
+                    Ok((stream, _)) => serve(stream, &writes, &merged),
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                         thread::sleep(Duration::from_millis(2))
                     }
@@ -67,7 +68,7 @@ impl Drop for WriteFixture {
     }
 }
 
-fn serve(mut stream: TcpStream, writes: &AtomicUsize) {
+fn serve(mut stream: TcpStream, writes: &AtomicUsize, merged: &AtomicBool) {
     stream.set_nonblocking(false).unwrap();
     stream
         .set_read_timeout(Some(Duration::from_secs(2)))
@@ -119,6 +120,16 @@ fn serve(mut stream: TcpStream, writes: &AtomicUsize) {
                 "repository_url":"https://api.github.com/repos/fixture-org/private"
             }),
         ),
+        ("GET", "/repositories/71/pulls/42") if merged.load(Ordering::SeqCst) => (
+            "200 OK",
+            json!({
+                "id":420,"node_id":"PR_420","number":42,"title":"Fixture review","state":"closed","body":"",
+                "updated_at":"2023-01-01T00:00:00Z","merged":true,"locked":false,"draft":false,
+                "user":{"id":75,"login":"fixture-author"},"merged_by":{"id":41,"login":"fixture-user"},
+                "base":{"sha":"a".repeat(40),"ref":"main","repo":{"id":71,"node_id":"repo-fixture"}},
+                "head":{"sha":"b".repeat(40),"ref":"topic"}
+            }),
+        ),
         ("GET", "/repositories/71/pulls/42") => (
             "200 OK",
             json!({
@@ -155,23 +166,35 @@ fn serve(mut stream: TcpStream, writes: &AtomicUsize) {
         ("POST", "/graphql") => {
             let payload: Value = serde_json::from_slice(&data).unwrap();
             assert_eq!(payload["variables"], json!({"id":"PR_420"}));
-            assert!(
-                payload["query"]
-                    .as_str()
-                    .unwrap()
-                    .starts_with("query ThreadlineMergePolicy")
-            );
-            (
-                "200 OK",
-                json!({"data":{"node":{
-                    "id":"PR_420","number":42,"baseRefName":"main","baseRefOid":"a".repeat(40),
-                    "headRefOid":"b".repeat(40),"state":"OPEN","isDraft":false,"merged":false,
-                    "mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","reviewDecision":"APPROVED",
-                    "mergeQueue":null,"repository":{"id":"repo-fixture","viewerPermission":"WRITE",
-                        "mergeCommitAllowed":true,"squashMergeAllowed":true,"rebaseMergeAllowed":false}
-                }}}),
-            )
+            let query = payload["query"].as_str().unwrap();
+            let mut proof = json!({
+                "id":"PR_420","number":42,"baseRefName":"main","baseRefOid":"a".repeat(40),
+                "headRefOid":"b".repeat(40),"state":"OPEN","isDraft":false,"merged":false,
+                "mergeable":"MERGEABLE","mergeStateStatus":"UNSTABLE","reviewDecision":null,
+                "mergeQueue":null,"repository":{"id":"repo-fixture","viewerPermission":"WRITE",
+                    "mergeCommitAllowed":true,"squashMergeAllowed":true,"rebaseMergeAllowed":false}
+            });
+            if query.starts_with("query ThreadlineMergedPull") {
+                proof["state"] = "MERGED".into();
+                proof["merged"] = true.into();
+                proof["mergeCommit"] = json!({"oid":"c".repeat(40)});
+                proof["mergedBy"] = json!({"__typename":"User","databaseId":41});
+            } else if query.starts_with("query ThreadlineOptionalMergeChecks") {
+                proof["isMergeQueueEnabled"] = false.into();
+                proof["baseRef"] = json!({"name":"main","target":{"oid":"a".repeat(40)},"branchProtectionRule":null});
+                proof["commits"] = json!({"nodes":[{"commit":{"oid":"b".repeat(40),
+                    "statusCheckRollup":{"contexts":{"totalCount":1,"pageInfo":{"hasNextPage":false},
+                        "nodes":[{"__typename":"CheckRun","isRequired":false}]}}}}]});
+            } else {
+                assert!(query.starts_with("query ThreadlineMergePolicy"));
+            }
+            ("200 OK", json!({"data":{"node":proof}}))
         }
+        ("GET", "/repos/fixture-org/private/branches/main") => (
+            "200 OK",
+            json!({"name":"main","commit":{"sha":"a".repeat(40)},"protected":false,
+                "protection":{"required_status_checks":{"enforcement_level":"off","contexts":[],"checks":[]}}}),
+        ),
         ("PUT", "/repos/fixture-org/private/pulls/42/merge") => {
             let payload: Value = serde_json::from_slice(&data).unwrap();
             assert_eq!(
@@ -179,6 +202,7 @@ fn serve(mut stream: TcpStream, writes: &AtomicUsize) {
                 json!({"sha":"b".repeat(40),"merge_method":"squash"})
             );
             assert_eq!(writes.fetch_add(1, Ordering::SeqCst), 0);
+            merged.store(true, Ordering::SeqCst);
             ("200 OK", json!({"merged":true,"sha":"c".repeat(40)}))
         }
         ("POST", "/repos/fixture-org/private/issues/42/comments") => {

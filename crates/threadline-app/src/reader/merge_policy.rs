@@ -53,10 +53,36 @@ impl ReaderService {
         }
         self.check_item(&scope, revision.pr, item.locator, cancel)?;
         self.admit(account, cancel).await?;
-        let (observed, rate) = self
+        let (mut observed, rate) = self
             .response(account, writer.observe_merge_policy(&pull, cancel).await)
             .await?;
         self.merge_rate(account, rate).await;
+        if observed.needs_optional_checks() {
+            self.check_item(&scope, revision.pr, item.locator, cancel)?;
+            self.admit(account, cancel).await?;
+            let (proof, rate) = self
+                .response(
+                    account,
+                    writer
+                        .observe_optional_merge_checks(&pull, &observed, cancel)
+                        .await,
+                )
+                .await?;
+            self.merge_rate(account, rate).await;
+            if let Some(proof) = proof {
+                self.check_item(&scope, revision.pr, item.locator, cancel)?;
+                self.admit(account, cancel).await?;
+                let rate = self
+                    .response(
+                        account,
+                        writer
+                            .confirm_optional_merge_checks(&pull, &mut observed, proof, cancel)
+                            .await,
+                    )
+                    .await?;
+                self.merge_rate(account, rate).await;
+            }
+        }
         self.check_item(&scope, revision.pr, item.locator, cancel)?;
         if self
             .store

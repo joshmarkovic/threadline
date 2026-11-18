@@ -53,18 +53,23 @@ pub(super) async fn execute(dispatch: &Dispatch<'_>, job: Job) {
             }
         }
         Job::Readback(target) => {
-            if let Err(error) = readback(dispatch, &target).await {
-                let (reachability, reason, rate) = evidence(&error);
-                dispatch.record(reachability, reason, rate).await;
-                let _ = blocking(dispatch.store, move |store| {
-                    let now = UtcMillis::now()?.0;
-                    let due = now
-                        .saturating_add(60_000)
-                        .max(floor(rate, reason, now).unwrap_or(now));
-                    store.defer_merge_readback(&target, due)
-                })
-                .await;
-            }
+            let (delay, reason, rate) = match readback(dispatch, &target).await {
+                Ok(true) => return,
+                Ok(false) => (5_000, None, None),
+                Err(error) => {
+                    let (reachability, reason, rate) = evidence(&error);
+                    dispatch.record(reachability, reason, rate).await;
+                    (60_000, reason, rate)
+                }
+            };
+            let _ = blocking(dispatch.store, move |store| {
+                let now = UtcMillis::now()?.0;
+                let due = now
+                    .saturating_add(delay)
+                    .max(floor(rate, reason, now).unwrap_or(now));
+                store.defer_merge_readback(&target, due)
+            })
+            .await;
         }
     }
 }
@@ -106,10 +111,28 @@ async fn run(dispatch: &Dispatch<'_>, claim: &MergeClaim) -> Result<(), ReaderEr
         );
     let policy = if exact {
         dispatch.budget(admit.clone()).await?;
-        let (observed, rate) = writer.observe_merge_policy(&pull, dispatch.cancel).await?;
+        let (mut observed, rate) = writer.observe_merge_policy(&pull, dispatch.cancel).await?;
         dispatch
             .record(Reachability::ReceivedResponse, None, Some(rate))
             .await;
+        if observed.needs_optional_checks() {
+            dispatch.budget(admit.clone()).await?;
+            let (proof, rate) = writer
+                .observe_optional_merge_checks(&pull, &observed, dispatch.cancel)
+                .await?;
+            dispatch
+                .record(Reachability::ReceivedResponse, None, Some(rate))
+                .await;
+            if let Some(proof) = proof {
+                dispatch.budget(admit.clone()).await?;
+                let rate = writer
+                    .confirm_optional_merge_checks(&pull, &mut observed, proof, dispatch.cancel)
+                    .await?;
+                dispatch
+                    .record(Reachability::ReceivedResponse, None, Some(rate))
+                    .await;
+            }
+        }
         Some(observed)
     } else {
         None
@@ -183,28 +206,13 @@ async fn run(dispatch: &Dispatch<'_>, claim: &MergeClaim) -> Result<(), ReaderEr
         match outcome {
             Ok(receipt) => {
                 let merge_oid = CommitOid::parse(&receipt.merge_oid)?;
-                let confirmed = merged(route, merge_oid.clone(), None);
-                if store
-                    .confirm_merge(
-                        route.account,
-                        operation,
-                        attempt,
-                        MergeProof::MutationResponse {
-                            request_id: &receipt.request_id,
-                        },
-                        &confirmed,
-                        now,
-                    )
-                    .is_err()
-                {
-                    store.accept_merge(
-                        route.account,
-                        operation,
-                        attempt,
-                        &receipt.request_id,
-                        Some(&merge_oid),
-                    )?;
-                }
+                store.accept_merge(
+                    route.account,
+                    operation,
+                    attempt,
+                    &receipt.request_id,
+                    Some(&merge_oid),
+                )?;
             }
             Err(error) => {
                 store.record_merge_failure(
@@ -222,7 +230,7 @@ async fn run(dispatch: &Dispatch<'_>, claim: &MergeClaim) -> Result<(), ReaderEr
     Ok(())
 }
 
-async fn readback(dispatch: &Dispatch<'_>, target: &MergeReadback) -> Result<(), ReaderError> {
+async fn readback(dispatch: &Dispatch<'_>, target: &MergeReadback) -> Result<bool, ReaderError> {
     let saved = target.clone();
     let admit = move |store: &Store, _now| store.merge_readback_profile(&saved);
     let profile = dispatch.budget(admit.clone()).await?;
@@ -238,7 +246,9 @@ async fn readback(dispatch: &Dispatch<'_>, target: &MergeReadback) -> Result<(),
         .await?;
     let route = &target.route;
     let writer = bind(dispatch, &session, route).await?;
-    dispatch.admit_reconciliation(&profile, admit).await?;
+    dispatch
+        .admit_reconciliation(&profile, admit.clone())
+        .await?;
     let (pull, rate) = writer
         .observe_pull_for_review(
             route
@@ -256,11 +266,24 @@ async fn readback(dispatch: &Dispatch<'_>, target: &MergeReadback) -> Result<(),
     if dispatch.cancel.is_cancelled() {
         return Err(ReaderError::Cancelled);
     }
-    if !pull.is_merged() || pull.head() != route.head {
+    if pull.head() != route.head {
         return Err(ReaderError::ScopeChanged);
     }
-    let oid = CommitOid::parse(pull.merge_oid().ok_or(ReaderError::InvalidIdentity)?)?;
-    let observed = merged(route, oid, pull.merged_by());
+    if !pull.is_merged() {
+        return Ok(false);
+    }
+    dispatch.admit_reconciliation(&profile, admit).await?;
+    let (proof, rate) = writer.observe_merged_pull(&pull, dispatch.cancel).await?;
+    dispatch
+        .record(Reachability::ReceivedResponse, None, Some(rate))
+        .await;
+    if dispatch.cancel.is_cancelled() {
+        return Err(ReaderError::Cancelled);
+    }
+    let Some(proof) = proof.filter(|proof| proof.actor.is_some()) else {
+        return Ok(false);
+    };
+    let observed = merged(route, CommitOid::parse(&proof.oid)?, proof.actor);
     let target = target.clone();
     blocking(dispatch.store, move |store| {
         if store.merge_readback_profile(&target)? != profile {
@@ -278,7 +301,7 @@ async fn readback(dispatch: &Dispatch<'_>, target: &MergeReadback) -> Result<(),
         )
     })
     .await?;
-    Ok(())
+    Ok(true)
 }
 
 async fn bind<'a>(
