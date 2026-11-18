@@ -134,7 +134,6 @@ enum Problem {
 struct RepositoryCheck<'a> {
     route: &'a RepositoryName,
     prior: Option<(RepositoryId, RepositoryApiId)>,
-    private: bool,
 }
 
 impl From<threadline_storage::Error> for Problem {
@@ -178,6 +177,32 @@ impl AccountService {
             github: GitHubClient::production().ok()?,
             fixture: false,
         })
+    }
+
+    pub(crate) fn reader_store(&self) -> Arc<Store> {
+        self.store.clone()
+    }
+
+    pub(crate) async fn reader_session(
+        &self,
+        profile: &AccessProfile,
+        cancel: &Cancellation,
+    ) -> Result<GitHubSession, crate::reader::ReaderError> {
+        use crate::reader::ReaderError;
+
+        let reference = credential_ref(profile).map_err(|_| ReaderError::CredentialUnavailable)?;
+        let pat = Pat(self
+            .credentials
+            .read(&reference)?
+            .ok_or(ReaderError::CredentialUnavailable)?);
+        let token = pat
+            .token()
+            .map_err(|_| ReaderError::CredentialUnavailable)?;
+        let owner = OwnerScope::new(&profile.owner_scope)?;
+        Ok(self
+            .github
+            .authenticate(token, owner, Some(profile.user_id), cancel)
+            .await?)
     }
 
     pub(crate) async fn execute(
@@ -360,7 +385,6 @@ impl AccountService {
             Some(RepositoryCheck {
                 route: &route,
                 prior: known,
-                private: true,
             }),
             false,
             cancel,
@@ -455,14 +479,12 @@ impl AccountService {
                 .map(|(route, repo)| RepositoryCheck {
                     route,
                     prior: Some((repo.id, RepositoryApiId::new(repo.provider_id))),
-                    private: repo.private == Some(true),
                 });
         let checked = match (listed_target, requested_route.as_ref()) {
             (Some(target), _) => Some(target),
             (None, Some(route)) => Some(RepositoryCheck {
                 route,
                 prior: self.known_repository(profile.account, route)?,
-                private: true,
             }),
             (None, None) => None,
         };
@@ -483,20 +505,9 @@ impl AccountService {
         let mut reachability = Reachability::ReceivedResponse;
         let mut access = AccessState::Unchecked;
         let mut checked_repo = None;
-        if let Some(RepositoryCheck {
-            route,
-            prior,
-            private,
-        }) = target.as_ref()
-        {
+        if let Some(RepositoryCheck { route, prior }) = target.as_ref() {
             let expected = prior.map(|(_, provider_id)| provider_id);
-            let result = if *private {
-                session
-                    .verify_private_repository(route, expected, cancel)
-                    .await
-            } else {
-                session.repository(route, expected, cancel).await
-            };
+            let result = session.repository(route, expected, cancel).await;
             check_cancel(cancel)?;
             match result {
                 Ok(repo) => {

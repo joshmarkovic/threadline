@@ -7,6 +7,7 @@ mod notification_commands;
 mod observation;
 mod palette;
 mod pane_content;
+mod reader;
 mod workspace;
 
 #[cfg(windows)]

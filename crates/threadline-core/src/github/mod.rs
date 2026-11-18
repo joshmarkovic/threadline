@@ -1,4 +1,5 @@
 mod access;
+pub mod attachments;
 mod rest;
 mod scripted;
 
