@@ -38,15 +38,40 @@ ShowUninstDetails show
   !macro StageNotificationHelper
     InitPluginsDir
     SetOutPath "$PLUGINSDIR"
-    File /oname=notification-registration.ps1 "${ACTIVITY_SCRIPT}"
-    File /oname=ThreadlineToastShortcut.cs "${SHELL_LINK_HELPER}"
+    File /oname=Threadline.NotificationRegistration.exe "${ACTIVITY_HELPER}"
   !macroend
   !macro NotificationRegistration Mode Failure
-    nsExec::ExecToStack /TIMEOUT=45000 '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -File "$PLUGINSDIR\notification-registration.ps1" -Mode ${Mode} -Channel ${NotificationChannel} -App "$INSTDIR\threadline.exe" -Link "$SMPROGRAMS\${Product}.lnk" -Scratch "$PLUGINSDIR"'
-    Pop $0
-    Pop $1
-    StrCmp $0 0 +2
+    ClearErrors
+    ExecWait '"$PLUGINSDIR\Threadline.NotificationRegistration.exe" ${Mode} ${NotificationChannel}' $0
+    ${If} ${Errors}
+      StrCpy $0 27
+    ${EndIf}
+    ${If} $0 != 0
+      StrCpy $NotificationCode $0
+      ${Switch} $0
+        ${Case} 21
+          StrCpy $NotificationDetail "The temporary notification snapshot or shortcut failed verification."
+          ${Break}
+        ${Case} 22
+          StrCpy $NotificationDetail "An existing Start shortcut or notification entry belongs to another target."
+          ${Break}
+        ${Case} 23
+        ${Case} 24
+          StrCpy $NotificationDetail "Windows denied access to this user's Start menu, registry or staging folder. Check permissions or organization policy."
+          ${Break}
+        ${Case} 25
+          StrCpy $NotificationDetail "Windows Shell could not save or verify the application shortcut."
+          ${Break}
+        ${Case} 26
+          StrCpy $NotificationDetail "A notification staging file could not be read or written. Check available space and permissions."
+          ${Break}
+        ${Default}
+          StrCpy $NotificationCode 27
+          StrCpy $NotificationDetail "Windows could not run the setup notification helper. Check application control policy and Windows .NET Framework."
+      ${EndSwitch}
+      DetailPrint "Notification ${Mode} failed ($NotificationCode). $NotificationDetail"
       Goto ${Failure}
+    ${EndIf}
   !macroend
 !endif
 
@@ -59,6 +84,10 @@ UninstPage uninstConfirm
 UninstPage instfiles
 
 Var LockHandle
+!ifdef REGISTER_ACTIVITY
+Var NotificationDetail
+Var NotificationCode
+!endif
 Var ResultCode
 Var PriorBuild
 Var PendingBuild
@@ -77,6 +106,14 @@ Var RollbackFailed
   MessageBox MB_OK|MB_ICONSTOP "${explanation}" /SD IDOK
   SetErrorLevel ${code}
   Quit
+!macroend
+
+!macro ReportRegistrationFailure
+  !ifdef REGISTER_ACTIVITY
+    ${If} $NotificationDetail != ""
+      !insertmacro MessageAndStop $NotificationCode "$NotificationDetail"
+    ${EndIf}
+  !endif
 !macroend
 
 !macro LockInstaller
@@ -299,9 +336,7 @@ Section "Install Threadline" SEC_INSTALL
   WriteRegDWORD HKCU "${Registration}" "PendingBuild" ${PACKAGE_BUILD}
   IfErrors commit_failure
   SetOutPath "$INSTDIR"
-  !ifdef REGISTER_ACTIVITY
-    !insertmacro NotificationRegistration Apply commit_failure
-  !else
+  !ifndef REGISTER_ACTIVITY
     CreateShortCut "$SMPROGRAMS\${Product}.lnk" "$INSTDIR\threadline.exe"
     IfErrors commit_failure
   !endif
@@ -311,6 +346,9 @@ Section "Install Threadline" SEC_INSTALL
   System::Call 'kernel32::MoveFileExW(w "$INSTDIR\${Stage}\candidate.exe", w "$INSTDIR\threadline.exe", i 9) i.r0'
   StrCmp $0 0 busy_failure
   StrCpy $AppReplaced 1
+  !ifdef REGISTER_ACTIVITY
+    !insertmacro NotificationRegistration Apply commit_failure
+  !endif
   ClearErrors
   WriteRegStr HKCU "${Registration}" "DisplayName" "${Product}"
   WriteRegStr HKCU "${Registration}" "DisplayVersion" "${PACKAGE_VERSION}"
@@ -336,6 +374,7 @@ Section "Install Threadline" SEC_INSTALL
   Goto finished
 
   stage_failure:
+  !insertmacro ReportRegistrationFailure
   !insertmacro MessageAndStop 16 "Setup could not stage the complete update. Free disk space or check permissions and rerun."
 
   busy_failure:
@@ -344,6 +383,7 @@ Section "Install Threadline" SEC_INSTALL
 
   commit_failure:
   Call Rollback
+  !insertmacro ReportRegistrationFailure
   !insertmacro MessageAndStop 16 "Setup could not finish replacing files or registration. Check free space and permissions, then rerun the same installer."
 
   finished:
@@ -391,8 +431,10 @@ Function Rollback
   ${EndIf}
   ClearErrors
   ${If} $PriorLocation == ""
+    !ifndef REGISTER_ACTIVITY
     IfFileExists "$SMPROGRAMS\${Product}.lnk" 0 +2
       Delete "$SMPROGRAMS\${Product}.lnk"
+    !endif
     DeleteRegKey HKCU "${Registration}"
   ${Else}
     WriteRegStr HKCU "${Registration}" "DisplayVersion" "$PriorVersion"
@@ -442,10 +484,11 @@ Section "Uninstall"
   remove_shortcut:
   !ifdef REGISTER_ACTIVITY
     !insertmacro NotificationRegistration Remove uninstall_restore
-  !endif
+  !else
   ClearErrors
   Delete "$SMPROGRAMS\${Product}.lnk"
   IfErrors uninstall_restore
+  !endif
   ClearErrors
   DeleteRegKey HKCU "${Registration}"
   IfErrors uninstall_restore
@@ -473,6 +516,7 @@ Section "Uninstall"
     CreateShortCut "$SMPROGRAMS\${Product}.lnk" "$INSTDIR\threadline.exe"
   !endif
   uninstall_failure:
+  !insertmacro ReportRegistrationFailure
   !insertmacro MessageAndStop 16 "The application files or Start menu entry could not be updated. Check the per-user installation permissions and retry uninstalling."
 
   uninstall_busy:

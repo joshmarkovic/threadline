@@ -114,9 +114,21 @@ if [[ $channel != local-fixture ]]; then
         "-DPUBLISHER_VERIFIER=$staging/verify-publisher.exe")
 fi
 
+notification_hash=null
 if [[ $schema != null && $schema -ge 14 ]]; then
-    compile_defines+=(-DREGISTER_ACTIVITY=1 "-DACTIVITY_SCRIPT=$recipe_dir/notification-registration.ps1"
-        "-DSHELL_LINK_HELPER=$recipe_dir/../native/ThreadlineToastShortcut.cs")
+    activity_helper=${THREADLINE_NOTIFICATION_HELPER:-"$(dirname -- "$payload")/Threadline.NotificationRegistration.exe"}
+    [[ -f $activity_helper && -r $activity_helper ]] ||
+        fail 'Build Threadline.NotificationRegistration.exe with tools/windows/build-notification-helper.ps1 and place it beside the application or set THREADLINE_NOTIFICATION_HELPER.'
+    cp -- "$activity_helper" "$staging/Threadline.NotificationRegistration.exe"
+    assert_x64_pe "$staging/Threadline.NotificationRegistration.exe"
+    read -r notification_sha _ < <(sha256sum -- "$staging/Threadline.NotificationRegistration.exe")
+    if [[ $channel != local-fixture ]]; then
+        expected_helper=$(jq -er '.notification_helper_sha256 | strings | select(test("^[0-9a-f]{64}$"))' "$signer_config") ||
+            fail 'Supply the recorded SHA-256 of the notification helper.'
+        [[ $notification_sha == "$expected_helper" ]] || fail 'The notification helper does not match its recorded digest.'
+    fi
+    notification_hash="\"$notification_sha\""
+    compile_defines+=(-DREGISTER_ACTIVITY=1 "-DACTIVITY_HELPER=$staging/Threadline.NotificationRegistration.exe")
 fi
 "$makensis_path" -V3 -WX -INPUTCHARSET UTF8 \
     "${compile_defines[@]}" "-DPACKAGE_VERSION=$version" "-DPACKAGE_BUILD=$build" \
@@ -135,6 +147,7 @@ if [[ $channel == local-fixture ]]; then
         '  "publisher_verification": "unsigned local fixture",' \
         "  \"fixture_fault\": \"$fault\"," \
         "  \"current_schema\": $schema," \
+        "  \"notification_helper_sha256\": $notification_hash," \
         "  \"size\": $setup_size," \
         "  \"sha256\": \"$setup_hash\"," \
         "  \"app_sha256\": \"$app_hash\"" \
@@ -144,13 +157,13 @@ else
         --arg publisher "$publisher" --arg pin "$publisher_pin" --arg signer "$signer_reference" \
         --arg unsignedHash "$setup_hash" --arg appHash "$app_hash" --arg verifierHash "$verifier_hash" \
         --argjson build "$build" --argjson size "$setup_size" --argjson schema "$schema" \
-        --argjson oldest "$oldest_schema" '{
+        --argjson oldest "$oldest_schema" --argjson notificationHash "$notification_hash" '{
             status: "publication_pending", target: "x86_64-pc-windows-msvc", minimum_os: "Windows 11 x64 build 22000",
             version: $version, channel: $channel, artifact_url: $url, package_build: $build,
             publisher_display: $publisher, publisher_certificate_sha256: $pin, signer_reference: $signer,
             current_schema: $schema, oldest_supported_schema: $oldest,
             unsigned_size: $size, unsigned_sha256: $unsignedHash, app_sha256: $appHash,
-            publisher_verifier_sha256: $verifierHash
+            publisher_verifier_sha256: $verifierHash, notification_helper_sha256: $notificationHash
         }' > "$staging/setup.json"
 fi
 mv -f -- "$staging/threadline-package.exe" "$output_parent/$output_name"

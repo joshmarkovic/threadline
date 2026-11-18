@@ -136,6 +136,24 @@ public static class ThreadlineToastShortcut
         finally { Marshal.FinalReleaseComObject(link); }
     }
 
+    public static bool TargetsExecutable(string linkPath, string sender)
+    {
+        if (!File.Exists(linkPath)) return false;
+        object link = new ShellLink();
+        try
+        {
+            ((IPersistFile)link).Load(linkPath, 0);
+            var shell = (IShellLinkW)link;
+            var target = new StringBuilder(32768);
+            var arguments = new StringBuilder(32768);
+            shell.GetPath(target, target.Capacity, IntPtr.Zero, 4);
+            shell.GetArguments(arguments, arguments.Capacity);
+            return arguments.Length == 0 && target.Length > 0
+                && String.Equals(Path.GetFullPath(target.ToString()), Path.GetFullPath(sender), StringComparison.OrdinalIgnoreCase);
+        }
+        finally { Marshal.FinalReleaseComObject(link); }
+    }
+
     public static bool LinkHasActivator(string linkPath, Guid expected)
     {
         if (!File.Exists(linkPath)) return false;

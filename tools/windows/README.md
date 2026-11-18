@@ -10,7 +10,13 @@ export NSISDIR=/path/to/pinned/nsis/usr/share/nsis
 tools/windows/build-installer.sh --fixture /path/to/threadline.exe /output/Threadline-Local-2.exe 0.1.0-local.2 2 10
 ```
 
-The example uses local build ordinal 2 and schema 10. Use the actual version and schema from the chosen source revision. The sibling `.exe.json` records the setup and exact installed executable digests. Verify the former against the separately recorded digest from the build before running the local fixture. Launch setup normally or with `/S` and wait for completion. Start the app through **Threadline Installer Test** in the Start menu. Use the Windows installed-apps entry or `Uninstall.exe` in the fixture directory to uninstall. The fixture retains `HKCU\Software\Threadline.InstallTest` build history to reject older test packages after uninstall.
+The example uses local build ordinal 2 and schema 10. For schema 14 and later, build the notification registration helper in 64-bit Windows PowerShell. Place it beside the app or set `THREADLINE_NOTIFICATION_HELPER` to its path before running the package builder. For release staging, record the build output digest as `notification_helper_sha256` in the reviewed signer configuration. Setup embeds the compiled helper. It registers the current user's Start shortcut and activation command after placing the app in its final directory.
+
+```powershell
+.\tools\windows\build-notification-helper.ps1 -Output .\Threadline.NotificationRegistration.exe
+```
+
+Use the actual version and schema from the chosen source revision. The sibling `.exe.json` records the setup and exact installed executable digests. Verify the former against the separately recorded digest from the build before running the local fixture. Launch setup normally or with `/S` and wait for completion. Start the app through **Threadline Installer Test** in the Start menu. Use the Windows installed-apps entry or `Uninstall.exe` in the fixture directory to uninstall. The fixture retains `HKCU\Software\Threadline.InstallTest` build history to reject older test packages after uninstall.
 
 Run the canonical local case from a native Windows checkout with the fixture uninstalled.
 
@@ -33,6 +39,9 @@ The independent configuration contains `current_sha256`, `predecessor` and `stag
 | 18 | The Windows PowerShell prerequisite or verification failed. Review the local policy or permission error |
 | 19 | Setup kept staging files after a rollback was interrupted. Release open files and rerun the same setup |
 | 20 | Windows could not verify the approved publisher. Obtain the trusted signed package |
+| 21–22 | Windows could not verify the staged shortcut or snapshot, or an existing shortcut or sender has a different target. Inspect the named entry and rerun the matching setup |
+| 23–24 | Windows denied access to the current user's Start menu, registry or staging folder. Check permissions and organization policy |
+| 25–27 | Windows Shell could not save the shortcut (25), staging file access failed (26), or the installed .NET Framework could not run the helper (27). See setup details |
 
 Build an explicit staging failure fixture with `THREADLINE_SETUP_FIXTURE_FAULT=stage-write` before the same build command. It exits before replacing a working installation and marks the injection in its manifest. Test a real open-file refusal by holding the installed fixture executable open without delete sharing. Compare installed hashes and registered version after each failure. For an upgrade against retained state, install an actual predecessor executable built from a source revision with a known schema. Seed the local test profile, close it, install the candidate, and open the installed executable against that same profile. Record the exact payloads and the application’s migration evidence.
 
