@@ -64,6 +64,36 @@ if (Test-OwnedAutomationProperties $control 'reader-tab-0-0' 41) {
 
 $resultA = "Pull request fixture-org/private #42 $([char]0x00b7) First fixture pull request"
 $resultB = "Pull request fixture-org/private #43 $([char]0x00b7) Second fixture pull request"
+function Get-OwnedFixtureActivation($Element, [string]$Id) { return $Element.Activation }
+function New-FixtureRow([string]$Name, [bool]$Offscreen, [bool]$Actionable) {
+    [pscustomobject]@{
+        Current = [pscustomobject]@{
+            ProcessId = 41; AutomationId = 'reader-result-0'; Name = $Name
+            IsOffscreen = $Offscreen; IsEnabled = $true
+            BoundingRectangle = @{ Width = 80; Height = 24 }
+        }
+        Activation = if ($Actionable) { [pscustomobject]@{ Invoke = $true } } else { $null }
+    }
+}
+$realRow = New-FixtureRow $resultA $false $true
+$otherRepresentations = @(
+    (New-FixtureRow $resultA $true $true)
+    (New-FixtureRow $resultB $false $true)
+    (New-FixtureRow $resultA $false $false)
+)
+if ($null -ne (Select-UniqueOwnedFixtureControl $otherRepresentations 'reader-result-0' 41 $resultA) -or
+    (Select-UniqueOwnedFixtureControl ($otherRepresentations + $realRow) 'reader-result-0' 41 $resultA) -ne $realRow) {
+    throw 'Native PR selection did not isolate the visible actionable exact-name row.'
+}
+function Stop-Blocked([string]$Message) { throw [InvalidOperationException]::new($Message) }
+$refused = $false
+try {
+    $null = Select-UniqueOwnedFixtureControl @($realRow, (New-FixtureRow $resultA $false $true)) 'reader-result-0' 41 $resultA
+} catch [InvalidOperationException] {
+    $refused = $_.Exception.Message -like '*multiple eligible controls*'
+}
+if (!$refused) { throw 'Native PR selection accepted two independently actionable exact-name rows.' }
+
 $serverOrder = @(
     [pscustomobject]@{ Id = 'reader-result-0'; Name = $resultB }
     [pscustomobject]@{ Id = 'reader-result-1'; Name = $resultA }

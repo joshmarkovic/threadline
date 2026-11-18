@@ -31,7 +31,7 @@ function Activate-FixturePr([IntPtr]$Window, [string]$Prefix, [int]$Number, [str
         })
         $choices = @(
             foreach ($candidate in $ids) {
-                $node = Find-OwnedFixtureControl $Window $candidate
+                $node = Find-OwnedFixtureControl $Window $candidate $expectedName
                 if ($null -ne $node) { [pscustomobject]@{ Id = $candidate; Name = $node.Current.Name } }
             }
         )
