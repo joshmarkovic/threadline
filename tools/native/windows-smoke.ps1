@@ -196,22 +196,23 @@ function Wait-SettledLayout([string]$Description, [scriptblock]$Check) {
     return $stable.state
 }
 
-function Get-ThreadlineArguments([string]$Observation, [switch]$OpenReview, [string]$SeedReader) {
+function Get-ThreadlineArguments([string]$Observation, [switch]$OpenReview, [string]$SeedReader, [switch]$SeedQuietEvent) {
     $arguments = '--e2e-report "' + $Observation + '"'
     if ($SeedReader) { return "--e2e-seed-reader $SeedReader $arguments" }
+    if ($SeedQuietEvent) { return "--e2e-seed-notification $arguments" }
     if (!$AccessProof -and !$ReaderProof) { $arguments += ' --fixture-s01' }
     if ($Measure) { $arguments += ' --measure' }
     if ($OpenReview) { $arguments += ' --open-review' }
     return $arguments
 }
 
-function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenReview, [string]$SeedReader, [switch]$ReaderIdle) {
+function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenReview, [string]$SeedReader, [switch]$ReaderIdle, [switch]$SeedQuietEvent) {
     $info = New-Object System.Diagnostics.ProcessStartInfo
     $info.FileName = $script:Binary
     $info.UseShellExecute = $false
     $info.CreateNoWindow = $true
     $info.WorkingDirectory = $Profile
-    $info.Arguments = Get-ThreadlineArguments $Observation -OpenReview:$OpenReview -SeedReader $SeedReader
+    $info.Arguments = Get-ThreadlineArguments $Observation -OpenReview:$OpenReview -SeedReader $SeedReader -SeedQuietEvent:$SeedQuietEvent
     $info.EnvironmentVariables['THREADLINE_PROFILE_DIR'] = $Profile
     $info.EnvironmentVariables['THREADLINE_TEST_SEED'] = $Seed.ToString([Globalization.CultureInfo]::InvariantCulture)
     $info.EnvironmentVariables.Remove('THREADLINE_TEST_TOAST_TOKEN')
@@ -918,7 +919,7 @@ try {
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
     if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'DirectMerge')) { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
     if ($ReaderProof -in @('PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge')) { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
-    if ($ReaderProof -in @('ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface')) { . (Join-Path $PSScriptRoot 'windows-issue-writes.ps1') }
+    if ($ReaderProof -in @('NotificationSchedule', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface')) { . (Join-Path $PSScriptRoot 'windows-issue-writes.ps1') }
     if ($ReaderProof -in @('ReviewDraft', 'ReviewContext')) { . (Join-Path $PSScriptRoot 'windows-review-context.ps1') }
     if ($ReaderProof -eq 'DirectMerge') { . (Join-Path $PSScriptRoot 'windows-merge.ps1') }
     if ($ReaderProof -eq 'CredentialBoundary') { . (Join-Path $PSScriptRoot 'windows-credential-boundary.ps1') }

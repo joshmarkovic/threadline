@@ -62,6 +62,7 @@ enum Phase {
     SyncService,
     SyncThrottle,
     SyncTransport,
+    SyncNotificationSend,
     PrLoad,
     PrDelay,
     PrRelease,
@@ -94,6 +95,7 @@ impl Phase {
             "sync-service" => Ok(Self::SyncService),
             "sync-throttle" => Ok(Self::SyncThrottle),
             "sync-transport" => Ok(Self::SyncTransport),
+            "sync-notification-send" => Ok(Self::SyncNotificationSend),
             "pr-load" => Ok(Self::PrLoad),
             "pr-delay" => Ok(Self::PrDelay),
             "pr-release" => Ok(Self::PrRelease),
@@ -277,6 +279,11 @@ fn complete_reader_resume(records: &[RequestEvidence]) -> bool {
 }
 
 fn complete_notification_schedule(records: &[RequestEvidence]) -> bool {
+    let writes: Vec<_> = records
+        .iter()
+        .filter(|entry| matches!(entry.route, Route::CommentCreated | Route::CommentReplyLost))
+        .map(|entry| (entry.phase, entry.route, entry.status))
+        .collect();
     records.iter().all(|entry| {
         entry.fixture_authorization
             && entry.route != Route::Unexpected
@@ -287,6 +294,11 @@ fn complete_notification_schedule(records: &[RequestEvidence]) -> bool {
             records.iter().any(|entry| {
                 entry.phase == Phase::SyncLive && entry.route == route && entry.status == 200
             })
+        })
+        && writes == [(Phase::SyncNotificationSend, Route::CommentCreated, 201)]
+        && !records.iter().any(|entry| {
+            entry.phase == Phase::SyncNotificationSend
+                && matches!(entry.route, Route::UpdatedItems | Route::UpdatedComments)
         })
         && records.iter().any(|entry| {
             entry.phase == Phase::SyncService && entry.route == Route::User && entry.status == 503
@@ -497,6 +509,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
                 phase,
                 Phase::WriteOnline
                     | Phase::WriteDrop
+                    | Phase::SyncNotificationSend
                     | Phase::CredentialReady
                     | Phase::CredentialOther
                     | Phase::CredentialReturn

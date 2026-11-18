@@ -93,18 +93,18 @@ function Open-NotificationSchedule([IntPtr]$Window) {
     }
 }
 
-function Wait-FixtureQuietSchedule {
+function Wait-FixtureQuietSchedule([int]$StartMinute, [int]$EndMinute) {
     return Wait-Reader 'the exact independent quiet-hours schedule' {
         param($reader)
         $schedule = $reader.notification.quiet_hours
         $reader.notification.saved -and $null -ne $schedule -and $schedule.weekdays -eq 127 -and
-            $schedule.start_minute -eq 1290 -and $schedule.end_minute -eq 375 -and $schedule.timezone -ceq 'UTC'
+            $schedule.start_minute -eq $StartMinute -and $schedule.end_minute -eq $EndMinute -and $schedule.timezone -ceq 'UTC'
     }
 }
 
 function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
     Wait-SeededFixtureAccount
-    $initial = Wait-Sync 'the normal authenticated issue and comment polling before pauses' {
+    $null = Wait-Sync 'the normal authenticated issue and comment polling before pauses' {
         param($sync)
         $sync.connection -ceq 'Reachable' -and $sync.cache_generation -ge 2 -and !$sync.controls.work_offline -and
             !$sync.controls.pause_background -and !$sync.controls.pause_queued_actions -and !$sync.controls.notification_quiet
@@ -113,11 +113,18 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
     Wait-For 'the native Enable quiet hours control' {
         Invoke-OwnedFixtureControl $Window 'notifications-quiet' $null 'Enable quiet hours'
     }
+    # Choose a bounded UTC window containing this entire isolated test.
+    $now = [DateTime]::UtcNow
+    $minutes = $now.Hour * 60 + $now.Minute
+    $startMinute = ($minutes + 1320) % 1440
+    $endMinute = ($minutes + 180) % 1440
+    $start = [DateTime]::Today.AddMinutes($startMinute).ToString('HH:mm', [Globalization.CultureInfo]::InvariantCulture)
+    $end = [DateTime]::Today.AddMinutes($endMinute).ToString('HH:mm', [Globalization.CultureInfo]::InvariantCulture)
     Wait-For 'the quiet-hours start input' {
-        Set-OwnedFixtureEditValue $Window 'notifications-quiet-start' 'Quiet hours start, HH:MM' '21:30'
+        Set-OwnedFixtureEditValue $Window 'notifications-quiet-start' 'Quiet hours start, HH:MM' $start
     }
     Wait-For 'the quiet-hours end input' {
-        Set-OwnedFixtureEditValue $Window 'notifications-quiet-end' 'Quiet hours end, HH:MM' '06:15'
+        Set-OwnedFixtureEditValue $Window 'notifications-quiet-end' 'Quiet hours end, HH:MM' $end
     }
     Wait-For 'the quiet-hours time zone input' {
         Set-OwnedFixtureEditValue $Window 'notifications-quiet-zone' 'IANA time zone, blank for local' 'UTC'
@@ -125,12 +132,18 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
     Wait-For 'the native Save quiet hours control' {
         Invoke-OwnedFixtureControl $Window 'notifications-save-quiet' $null 'Save quiet hours'
     }
-    $saved = Wait-FixtureQuietSchedule
+    $saved = Wait-FixtureQuietSchedule $startMinute $endMinute
     $current = $saved.cached_reader.shared_sync.controls
     if ($current.work_offline -or $current.pause_background -or $current.pause_queued_actions -or $current.notification_quiet) {
         throw 'Saving quiet hours changed an independent synchronization control.'
     }
     Add-Evidence 'Save independent notification quiet hours using native fields' $saved.cached_reader.notification.quiet_hours
+    Wait-For 'the native feed and popup default' {
+        Invoke-OwnedFixtureControl $Window 'notifications-default-2' $null 'Feed and popup'
+    }
+    $null = Wait-Reader 'popup normally allowed while the current quiet schedule is active' {
+        param($reader) $reader.notification.saved -and $reader.notification.popup_default
+    }
 
     Open-SyncSettings $Window
     Click-AccountControl $Window 'sync-pause-background'
@@ -146,9 +159,19 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
         param($sync) $sync.controls.work_offline -and $sync.connection -ceq 'Offline'
     }
     Set-AccessPhase 'sync-offline'
-    $restarted = Restart-Reader $Profile
+    $restarted = Restart-Reader $Profile -SeedQuietEvent
+    Wait-For 'the exact seeded event stays in native Activity because quiet hours suppress popup and sound' {
+        $observed = Read-Observation
+        if ($null -ne $observed -and $null -ne $observed.cached_reader -and
+            $observed.cached_reader.notification.isolated_quiet_event_feed_only) { return $true }
+        $null = Invoke-OwnedFixtureControl $restarted 'reader-activity' $null 'Activity'
+        return $false
+    } 8000 300
+    Add-Evidence 'Observe the isolated event in the native feed with the exact Quiet Hours decision' ([ordered]@{
+        delivery = 'FeedOnly'; popup_suppressed_by = 'QuietHours'; sound = $false
+    })
     Open-NotificationSchedule $restarted
-    $restored = Wait-FixtureQuietSchedule
+    $restored = Wait-FixtureQuietSchedule $startMinute $endMinute
     $controls = $restored.cached_reader.shared_sync.controls
     if (!$controls.work_offline -or !$controls.pause_background -or !$controls.pause_queued_actions -or $controls.notification_quiet) {
         throw 'The independent quiet-hours and synchronization preferences did not survive a separate process.'
@@ -162,6 +185,9 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
         param($sync) !$sync.controls.work_offline -and $sync.controls.pause_background -and $sync.controls.pause_queued_actions
     }
     Wait-SeededFixtureAccount
+    $null = Wait-Reader 'the eligible queued fixture is retained while the queue is specifically paused' {
+        param($reader) !$reader.offline -and $reader.outbox -eq 1
+    }
     Set-AccessPhase 'sync-service'
     Click-AccountControl $restarted 'sync-check-now'
     $null = Wait-Sync 'explicit provider check still executes with both default pauses and quiet hours' {
@@ -169,7 +195,13 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
             $sync.controls.pause_background -and $sync.controls.pause_queued_actions -and !$sync.controls.work_offline
     }
     Open-NotificationSchedule $restarted
-    $null = Wait-FixtureQuietSchedule
+    $null = Wait-FixtureQuietSchedule $startMinute $endMinute
+    Wait-For 'restore the native feed-only delivery default' {
+        Invoke-OwnedFixtureControl $restarted 'notifications-default-1' $null 'Feed only'
+    }
+    $null = Wait-Reader 'future fixture events use the safe feed-only default' {
+        param($reader) $reader.notification.saved -and !$reader.notification.popup_default
+    }
     Wait-For 'the exact account quiet-hours toggle' {
         Invoke-OwnedFixtureControl $restarted 'notifications-quiet' $null 'Enable quiet hours'
     }
@@ -179,7 +211,19 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
         $reader.notification.saved -and $null -eq $reader.notification.quiet_hours -and
             $sync.pause_background -and $sync.pause_queued_actions -and !$sync.work_offline
     }
+    Set-AccessPhase 'sync-notification-send'
+    Open-SyncSettings $restarted
+    Click-AccountControl $restarted 'sync-pause-outbox'
+    $null = Wait-Sync 'only queued actions resumed while background reads stay paused' {
+        param($sync) !$sync.controls.work_offline -and !$sync.controls.pause_queued_actions -and $sync.controls.pause_background
+    }
+    Click-AccountControl $restarted 'reader-outbox'
+    Click-AccountControl $restarted 'reader-outbox-filter-history'
+    Inspect-WriteFixtureAction $restarted 0 'Confirmed'
+    $null = Wait-Reader 'the original eligible fixture action left the pending count after acknowledgement' {
+        param($reader) $reader.outbox -eq 0 -and !$reader.offline
+    }
+    Add-Evidence 'Resume one queued action independently of paused background polling' 'Confirmed'
     Stop-ThroughUi
-    $script:report.settings_and_transport_passed = $true
-    Stop-Blocked 'The native settings and isolated provider controls passed. A separate quiet-hours notification delivery observation and the eligible queued-action control still need target evidence.'
+    $script:report.detail = 'Windows quiet hours kept the seeded native activity in the feed while independent native synchronization controls held network requests and the queued action. Explicit checking and queue resumption were each verified against saved preferences and loopback requests.'
 }

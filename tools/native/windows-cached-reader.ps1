@@ -31,11 +31,31 @@ function Initialize-ReaderProfile([string]$Profile, [string]$Scale) {
     Add-Evidence 'Seed the isolated profile with the application and bundled SQLite' $receipt
 }
 
-function Restart-Reader([string]$Profile, [hashtable]$Startup) {
+function Restart-Reader([string]$Profile, [hashtable]$Startup, [switch]$SeedQuietEvent) {
     Stop-ThroughUi
     $script:app.Dispose()
     $script:app = $null
     $before = Get-IsolatedSqlite $Profile
+    if ($SeedQuietEvent) {
+        if ($ReaderProof -cne 'NotificationSchedule') { throw 'Only the isolated notification schedule can seed this event.' }
+        $receipt = Join-Path $script:ReportDir 'notification-schedule-fixture.json'
+        $seeder = Start-Threadline $Profile $receipt -SeedQuietEvent
+        try {
+            if (!$seeder.WaitForExit(10000)) {
+                $seeder.Kill()
+                [void]$seeder.WaitForExit(3000)
+                throw 'The notification schedule fixture did not finish.'
+            }
+            if ($seeder.ExitCode -ne 0) { throw 'The app rejected the isolated quiet-event profile.' }
+            $seeded = [IO.File]::ReadAllText($receipt) | ConvertFrom-Json
+            if ($seeded.fixture_revision -cne 's11-native-notification-schedule-v1' -or
+                $seeded.queued -ne 1 -or $seeded.events -ne 1) {
+                throw 'The isolated schedule fixture did not report one event and one queued action.'
+            }
+        } finally {
+            $seeder.Dispose()
+        }
+    }
     $script:reportFile = Join-Path $script:ReportDir 'reader-restart-observation.json'
     if ($Startup) { $startupClock = [Diagnostics.Stopwatch]::StartNew() }
     $script:app = Start-Threadline $Profile $script:reportFile -ReaderIdle:([bool]$Startup)

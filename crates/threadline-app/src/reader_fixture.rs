@@ -3,24 +3,38 @@
 use std::{fs::OpenOptions, io::BufWriter, path::PathBuf};
 
 use threadline_storage::{
-    Store,
+    ItemKind, Store, UtcMillis,
+    access::AccessState,
     fixtures::{Scale, populate_reader},
+    notifications::DeliveryMode,
+    resources::ActivityEvent,
+    writes::{WriteIntent, WriteSubmission},
 };
 
 pub fn run() -> Option<Result<(), String>> {
     let mut arguments = std::env::args_os().skip(1);
-    if arguments.next()?.as_os_str() != "--e2e-seed-reader" {
+    let action = arguments.next()?;
+    let quiet_notification = action == "--e2e-seed-notification";
+    if !quiet_notification && action != "--e2e-seed-reader" {
         return None;
     }
     Some((|| {
-        let scale = match arguments
-            .next()
-            .as_deref()
-            .and_then(std::ffi::OsStr::to_str)
-        {
-            Some("small") => Scale::Small,
-            Some("section-16") => Scale::Section16,
-            _ => return Err("Select small or section-16 for the reader fixture.".to_owned()),
+        let scale = if quiet_notification {
+            None
+        } else {
+            Some(
+                match arguments
+                    .next()
+                    .as_deref()
+                    .and_then(std::ffi::OsStr::to_str)
+                {
+                    Some("small") => Scale::Small,
+                    Some("section-16") => Scale::Section16,
+                    _ => {
+                        return Err("Select small or section-16 for the reader fixture.".to_owned());
+                    }
+                },
+            )
         };
         if arguments.next().as_deref() != Some(std::ffi::OsStr::new("--e2e-report")) {
             return Err("An absolute E2E report path is required.".into());
@@ -37,6 +51,9 @@ pub fn run() -> Option<Result<(), String>> {
             .map(PathBuf::from)
             .filter(|path| path.is_absolute())
             .ok_or("An explicit isolated profile is required.")?;
+        let Some(scale) = scale else {
+            return seed_quiet_notification(profile, report);
+        };
         let seed: u64 = match std::env::var("THREADLINE_TEST_SEED") {
             Ok(seed) => seed.parse().map_err(|_| "Invalid reader fixture seed.")?,
             Err(std::env::VarError::NotPresent) => 12345,
@@ -44,6 +61,149 @@ pub fn run() -> Option<Result<(), String>> {
         };
         seed_profile(profile, scale, seed, report)
     })())
+}
+
+fn seed_quiet_notification(profile: PathBuf, report: PathBuf) -> Result<(), String> {
+    use threadline_core::domain::RepositoryName;
+    const EVENT: &str = "synthetic-quiet-activity-v1";
+    let scope_error = "The quiet-hours fixture requires an owned, offline loopback profile and active UTC quiet hours.";
+    let canonical = profile.canonicalize().map_err(|_| scope_error)?;
+    let disposable = canonical
+        .file_name()
+        .and_then(|name| name.to_str())
+        .and_then(|name| name.strip_prefix("initial-"))
+        .is_some_and(|id| id.len() == 32 && id.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        && canonical
+            .parent()
+            .and_then(|path| path.file_name())
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with("threadline-e2e-"));
+    let loopback = std::env::var("THREADLINE_E2E_GITHUB_ADDR")
+        .ok()
+        .and_then(|address| address.parse::<std::net::SocketAddrV4>().ok())
+        .is_some_and(|address| {
+            *address.ip() == std::net::Ipv4Addr::LOCALHOST && address.port() > 0
+        });
+    let database = canonical.join("threadline.sqlite3");
+    let offline_phase = canonical.parent().is_some_and(|root| {
+        let phase = root.join("access-fixture-phase.txt");
+        std::fs::symlink_metadata(&phase)
+            .is_ok_and(|entry| entry.file_type().is_file() && entry.len() == 12)
+            && std::fs::read(phase).is_ok_and(|contents| contents == b"sync-offline")
+    });
+    if !loopback
+        || !disposable
+        || !offline_phase
+        || !std::fs::symlink_metadata(database).is_ok_and(|entry| entry.file_type().is_file())
+    {
+        return Err(scope_error.into());
+    }
+    let store = Store::open_profile(&canonical).map_err(|_| scope_error)?;
+    let account = store
+        .active_github_account()
+        .map_err(|_| scope_error)?
+        .ok_or(scope_error)?;
+    let access = store
+        .github_access_profile(account, "fixture-org")
+        .map_err(|_| scope_error)?
+        .ok_or(scope_error)?;
+    let mut repositories = store
+        .github_repository_views(account)
+        .map_err(|_| scope_error)?;
+    if repositories.len() != 1
+        || access.user_id.get() != 41
+        || access.login != "fixture-user"
+        || access.access != AccessState::Readable
+    {
+        return Err(scope_error.into());
+    }
+    let repo = repositories.pop().expect("one scoped repository");
+    if repo.owner != "fixture-org"
+        || repo.name != "private"
+        || repo.provider_id.get() != 71
+        || !repo.selected
+        || repo.private != Some(true)
+    {
+        return Err(scope_error.into());
+    }
+    let controls = store
+        .sync_settings(account)
+        .map_err(|_| scope_error)?
+        .controls;
+    let notifications = store
+        .notification_settings(account)
+        .map_err(|_| scope_error)?;
+    let now = UtcMillis::now().map_err(|_| scope_error)?.0;
+    let minute = (now / 60_000).rem_euclid(1440) as u16;
+    let active_quiet = notifications.quiet_hours.is_some_and(|hours| {
+        let active = if hours.start_minute < hours.end_minute {
+            (hours.start_minute..hours.end_minute).contains(&minute)
+        } else {
+            minute >= hours.start_minute || minute < hours.end_minute
+        };
+        hours.timezone.as_deref() == Some("UTC") && hours.weekdays == 127 && active
+    });
+    if !controls.work_offline
+        || !controls.pause_background
+        || !controls.pause_queued_actions
+        || controls.notification_quiet
+        || notifications.fallback != DeliveryMode::Popup
+        || !active_quiet
+    {
+        return Err(scope_error.into());
+    }
+    let route = RepositoryName::new("fixture-org", "private").map_err(|_| scope_error)?;
+    let item = store
+        .resolve_downloaded_route(account, &route, 41, Some(ItemKind::Issue))
+        .map_err(|_| scope_error)?
+        .ok_or(scope_error)?;
+    if !store
+        .queue_page(account, 0, 1)
+        .map_err(|_| scope_error)?
+        .is_empty()
+    {
+        return Err(scope_error.into());
+    }
+    let output = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(report)
+        .map_err(|_| scope_error)?;
+    let operation = store.new_operation_id().map_err(|_| scope_error)?;
+    store
+        .submit_write(
+            account,
+            WriteSubmission {
+                id: &operation,
+                item,
+                intent: &WriteIntent::CreateComment {
+                    body: "Threadline S07 explicitly queued comment.".into(),
+                },
+                draft: None,
+                dependencies: &[],
+                submitted_at_ms: now,
+            },
+        )
+        .map_err(|_| "Could not seed the isolated typed Outbox action.")?;
+    if !store
+        .record_activity_event(
+            account,
+            EVENT,
+            &ActivityEvent {
+                repository: repo.id,
+                item: Some(item),
+                kind: "comment_created".into(),
+                revision: None,
+                occurred_at_ms: Some(now),
+                observed_at_ms: now,
+            },
+        )
+        .map_err(|_| "Could not seed the isolated activity event.")?
+    {
+        return Err("The fixture activity was already present.".into());
+    }
+    serde_json::to_writer(output, &serde_json::json!({"fixture_revision":"s11-native-notification-schedule-v1", "queued":1, "events":1}))
+        .map_err(|_| "Could not write isolated schedule fixture receipt.".into())
 }
 
 fn seed_profile(profile: PathBuf, scale: Scale, seed: u64, report: PathBuf) -> Result<(), String> {

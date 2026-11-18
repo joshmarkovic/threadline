@@ -1005,11 +1005,7 @@ fn native_driver(
             }
             (Status::Pass, NativeMode::WindowsReaderResume) => TraceCheck::ReaderResume,
             (Status::Pass, NativeMode::WindowsSync) => TraceCheck::SyncJourney,
-            (Status::Blocked, NativeMode::WindowsNotificationSchedule)
-                if details
-                    .as_ref()
-                    .is_some_and(|json| json["settings_and_transport_passed"] == true) =>
-            {
+            (Status::Pass, NativeMode::WindowsNotificationSchedule) => {
                 TraceCheck::NotificationSchedule
             }
             (Status::Pass, NativeMode::WindowsPullRequest) => TraceCheck::PullRequestJourney,

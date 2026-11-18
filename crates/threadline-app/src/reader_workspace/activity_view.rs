@@ -39,6 +39,8 @@ pub(crate) struct NotificationObservation {
     preferences: bool,
     saved: bool,
     quiet_hours: Option<QuietHours>,
+    popup_default: bool,
+    isolated_quiet_event_feed_only: bool,
 }
 
 fn notification_tab_anchor(anchor: &str) -> std::borrow::Cow<'_, str> {
@@ -223,6 +225,20 @@ impl ReaderWorkspace {
                 .settings
                 .as_ref()
                 .and_then(|saved| saved.quiet_hours.clone()),
+            popup_default: self
+                .activity
+                .settings
+                .as_ref()
+                .is_some_and(|settings| settings.fallback == DeliveryMode::Popup),
+            isolated_quiet_event_feed_only: self.surface == Surface::Activity
+                && self.activity.feed.iter().any(|entry| {
+                    entry.event_key == "synthetic-quiet-activity-v1"
+                        && entry.decision.mode == DeliveryMode::FeedOnly
+                        && entry.decision.reasons.contains(
+                            &threadline_storage::notifications::DecisionReason::QuietHours,
+                        )
+                        && !entry.decision.sound
+                }),
         }
     }
 

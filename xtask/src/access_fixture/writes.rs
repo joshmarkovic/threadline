@@ -9,7 +9,9 @@ pub(super) fn post(phase: Phase, path: &str, payload: &Value) -> Route {
         return Route::Unexpected;
     }
     match phase {
-        Phase::WriteOnline | Phase::CredentialReturn if *payload == json!({"body":CONFIRMED}) => {
+        Phase::WriteOnline | Phase::CredentialReturn | Phase::SyncNotificationSend
+            if *payload == json!({"body":CONFIRMED}) =>
+        {
             Route::CommentCreated
         }
         Phase::WriteDrop if *payload == json!({"body":UNKNOWN}) => Route::CommentReplyLost,
@@ -22,6 +24,7 @@ pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
         phase,
         Phase::WriteOnline
             | Phase::WriteDrop
+            | Phase::SyncNotificationSend
             | Phase::CredentialReady
             | Phase::CredentialOther
             | Phase::CredentialReturn
