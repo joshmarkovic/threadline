@@ -271,7 +271,7 @@ impl Local {
                 None
             },
             next_write: if network {
-                store.next_write_due(account, now)?
+                writes::due(store, account, now)?
             } else {
                 None
             },
@@ -307,6 +307,7 @@ async fn run(
     let mut enroll = true;
     let mut probe_retry = Duration::ZERO;
     let mut prefer_write = true;
+    let mut prefer_review = true;
     let mut was_reachable = false;
     while !core.shutdown.is_cancelled() {
         let Ok(now) = UtcMillis::now() else {
@@ -349,6 +350,7 @@ async fn run(
                 probe_retry = Duration::ZERO;
                 was_reachable = false;
                 prefer_write = true;
+                prefer_review = true;
             } else {
                 observer.set_offline(offline);
             }
@@ -370,7 +372,7 @@ async fn run(
             let reachable = status == ConnectionStatus::Reachable;
             if reachable && !was_reachable {
                 let account = local.account;
-                let _ = blocking(&store, move |store| store.resume_writes(account, now)).await;
+                let _ = blocking(&store, move |store| writes::resume(store, account, now)).await;
             }
             was_reachable = reachable;
             let floor = elapsed
@@ -403,8 +405,8 @@ async fn run(
                     core.finish_read();
                     if attempted == ProbeResult::Authenticated {
                         let account = local.account;
-                        let _ =
-                            blocking(&store, move |store| store.resume_writes(account, now)).await;
+                        let _ = blocking(&store, move |store| writes::resume(store, account, now))
+                            .await;
                     }
                     if attempted != ProbeResult::Deferred {
                         requested = None;
@@ -425,9 +427,19 @@ async fn run(
             let write_allowed = status != ConnectionStatus::Unreachable;
             let write_ready = write_allowed && local.next_write.is_some_and(|due| due <= now);
             if write_ready && (prefer_write || local.next_read.is_none_or(|due| due > now)) {
-                if writes::execute(&accounts, &store, &core, local.account, generation).await {
+                if writes::execute(
+                    &accounts,
+                    &store,
+                    &core,
+                    local.account,
+                    generation,
+                    prefer_review,
+                )
+                .await
+                {
                     digest = digest.wrapping_add(1);
                 }
+                prefer_review = !prefer_review;
                 prefer_write = false;
                 enroll = wait(&core, Some(Duration::from_millis(250))).await;
                 continue;

@@ -11,8 +11,11 @@ use std::{
 use threadline_core::connectivity::ProbeTrigger;
 use threadline_storage::{
     Change, IssueClassification, IssueRecord, ItemLocator, ItemRepresentation, ItemUpdate,
-    UtcMillis,
+    PullRequestRecord, PullRequestUpdate, UtcMillis,
+    pr::PrHeader,
     queue::State,
+    resources::CommitOid,
+    reviews::{ReviewDraft, ReviewEvent, ReviewIntent, ReviewSubmission},
     writes::{WriteIntent, WriteSubmission},
 };
 
@@ -97,6 +100,12 @@ fn serve(mut stream: TcpStream, writes: &AtomicUsize) {
     input.read_exact(&mut data).unwrap();
     let repo = json!({"id":71,"node_id":"repo-fixture","name":"private","owner":{"login":"fixture-org"},
         "private":true,"permissions":{"pull":true,"push":true,"admin":false}});
+    let pending_review = |state| {
+        json!({
+            "id":91,"state":state,"user":{"id":41,"login":"fixture-user"},"commit_id":"b".repeat(40),
+            "pull_request_url":"https://api.github.com/repos/fixture-org/private/pulls/42"
+        })
+    };
     let (status, response) = match (method.as_str(), path.as_str()) {
         ("GET", "/user") => ("200 OK", json!({"id":41,"login":"fixture-user"})),
         ("GET", "/repos/fixture-org/private") => ("200 OK", repo),
@@ -109,6 +118,39 @@ fn serve(mut stream: TcpStream, writes: &AtomicUsize) {
                 "repository_url":"https://api.github.com/repos/fixture-org/private"
             }),
         ),
+        ("GET", "/repositories/71/pulls/42") => (
+            "200 OK",
+            json!({
+                "id":420,"node_id":"PR_420","number":42,"title":"Fixture review","state":"open","body":"",
+                "updated_at":"2023-01-01T00:00:00Z","merged":false,"locked":false,"draft":false,"user":{"id":75,"login":"fixture-author"},
+                "base":{"sha":"a".repeat(40),"ref":"main","repo":{"id":71,"node_id":"repo-fixture"}},
+                "head":{"sha":"b".repeat(40),"ref":"topic"}
+            }),
+        ),
+        ("GET", "/repos/fixture-org/private/pulls/42/reviews?per_page=100&page=1") => {
+            ("200 OK", json!([]))
+        }
+        ("GET", "/repos/fixture-org/private/pulls/42/reviews/91") => {
+            ("200 OK", pending_review("PENDING"))
+        }
+        ("POST", "/repos/fixture-org/private/pulls/42/reviews") => {
+            let payload: Value = serde_json::from_slice(&data).unwrap();
+            assert_eq!(
+                payload,
+                json!({"commit_id":"b".repeat(40),"body":"Fixture durable review","comments":[]})
+            );
+            assert_eq!(writes.fetch_add(1, Ordering::SeqCst), 0);
+            ("200 OK", pending_review("PENDING"))
+        }
+        ("POST", "/repos/fixture-org/private/pulls/42/reviews/91/events") => {
+            let payload: Value = serde_json::from_slice(&data).unwrap();
+            assert_eq!(
+                payload,
+                json!({"event":"COMMENT","body":"Fixture durable review"})
+            );
+            assert_eq!(writes.fetch_add(1, Ordering::SeqCst), 1);
+            ("200 OK", pending_review("COMMENTED"))
+        }
         ("POST", "/repos/fixture-org/private/issues/42/comments") => {
             let payload: Value = serde_json::from_slice(&data).unwrap();
             let body = payload["body"].as_str().unwrap();
@@ -132,6 +174,126 @@ fn serve(mut stream: TcpStream, writes: &AtomicUsize) {
     };
     let response = response.to_string();
     write!(stream,"HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nX-GitHub-Request-Id: TEST:92:F\r\n\r\n{response}",response.len()).unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn review_dispatch_preserves_pending_provider_id_and_submits_exact_original_head() {
+    const OPERATION: &str = "60000000-0000-4000-8000-000000000075";
+    let fixture = WriteFixture::start();
+    let dir = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open_profile(dir.path()).unwrap());
+    let accounts = AccountService {
+        store: store.clone(),
+        credentials: Arc::new(FixtureVault::default()),
+        github: GitHubClient::loopback(fixture.address).unwrap(),
+        fixture: true,
+    };
+    let reply = accounts
+        .execute(
+            AccountCommand::Connect {
+                repository: "fixture-org/private".into(),
+                pat: Pat::from_input("threadline-test-fixture".into()),
+                renew: None,
+            },
+            &Cancellation::new(),
+        )
+        .await;
+    assert!(reply.github_error.is_none());
+    let account = reply.view.active.unwrap();
+    let repository = reply.view.repositories[0].id;
+    store
+        .select_github_repository(account, repository, true)
+        .unwrap();
+    let base = CommitOid::parse(&"a".repeat(40)).unwrap();
+    let head = CommitOid::parse(&"b".repeat(40)).unwrap();
+    let now = UtcMillis::now().unwrap();
+    let item = store
+        .ingest(
+            account,
+            ItemLocator {
+                repository,
+                number: 42,
+            },
+            ItemUpdate {
+                representation: ItemRepresentation::PullRequest(PullRequestRecord {
+                    id: 420.try_into().unwrap(),
+                    node_id: None,
+                    details: PullRequestUpdate {
+                        merged: Change::Value(false),
+                        base_oid: Change::Value(base.as_str().into()),
+                        head_oid: Change::Value(head.as_str().into()),
+                        merge_oid: Change::Missing,
+                    },
+                }),
+                remote_updated_at: now,
+                title: Change::Value("Fixture review".into()),
+                body: Change::Null,
+                closed: Change::Value(false),
+            },
+        )
+        .unwrap();
+    let rev = store
+        .record_pr_revision(
+            account,
+            item,
+            &base,
+            &head,
+            None,
+            &PrHeader::default(),
+            now.0,
+        )
+        .unwrap();
+    store
+        .update_sync_settings(account, |s| {
+            s.controls.pause_background = true;
+            s.controls.work_offline = true;
+        })
+        .unwrap();
+    store
+        .submit_review(
+            &rev,
+            ReviewSubmission {
+                id: OPERATION,
+                intent: &ReviewIntent::Review(ReviewDraft {
+                    event: ReviewEvent::Comment,
+                    summary: "Fixture durable review".into(),
+                    comments: vec![],
+                }),
+                draft: None,
+                dependencies: &[],
+                submitted_at_ms: now.0,
+            },
+        )
+        .unwrap();
+    let worker = SyncWorker::start_fixture(accounts, &tokio::runtime::Handle::current());
+    worker.wake(Some(ProbeTrigger::Startup));
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(fixture.sent.load(Ordering::SeqCst), 0);
+    store
+        .update_sync_settings(account, |s| s.controls.work_offline = false)
+        .unwrap();
+    worker.wake(Some(ProbeTrigger::NetworkChanged));
+    let completed = tokio::time::timeout(Duration::from_secs(28), async {
+        loop {
+            let operation = store.operation(account, OPERATION).unwrap().unwrap();
+            if operation.state == State::Confirmed {
+                return operation;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(fixture.sent.load(Ordering::SeqCst), 2);
+    assert_eq!(completed.state, State::Confirmed);
+    let receipts = store.receipts(account, OPERATION).unwrap();
+    assert_eq!(
+        receipts
+            .iter()
+            .map(|receipt| (receipt.step.as_str(), receipt.remote_id.as_str()))
+            .collect::<Vec<_>>(),
+        [("create_pending_review", "91"), ("submit_review", "91")]
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
