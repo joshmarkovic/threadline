@@ -39,11 +39,11 @@ pub struct PrPageIdentity<'a> {
 }
 
 #[derive(Serialize, Deserialize)]
-struct StoredRecord {
+pub(crate) struct StoredRecord {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    mappings: Vec<SourceLine>,
+    pub(crate) mappings: Vec<SourceLine>,
     ordinal: i64,
-    record: PrRecord,
+    pub(crate) record: PrRecord,
     search: String,
 }
 
@@ -424,7 +424,7 @@ fn revision_body_in(
     };
     Ok((body, stamp))
 }
-fn current_in(
+pub(crate) fn current_in(
     db: &Connection,
     account: AccountId,
     pr: ItemId,
@@ -443,7 +443,7 @@ fn current_in(
     };
     Ok(revision_in(db, account, pr, id)?.map(|(rev, header)| (rev, header, stamp)))
 }
-fn revision_in(
+pub(crate) fn revision_in(
     db: &Connection,
     account: AccountId,
     pr: ItemId,
@@ -481,7 +481,7 @@ fn revision_in(
     })
     .transpose()
 }
-fn validate_revision(db: &Connection, rev: &PrRevision) -> Result<()> {
+pub(crate) fn validate_revision(db: &Connection, rev: &PrRevision) -> Result<()> {
     let saved = revision_in(db, rev.account, rev.pr, rev.id)?
         .ok_or(Error::NotFound)?
         .0;
@@ -499,7 +499,7 @@ fn validate_revision(db: &Connection, rev: &PrRevision) -> Result<()> {
     }
     Ok(())
 }
-fn family_id(db: &Connection, rev: &PrRevision, family: PrFamily) -> Result<Option<i64>> {
+pub(crate) fn family_id(db: &Connection, rev: &PrRevision, family: PrFamily) -> Result<Option<i64>> {
     validate_revision(db, rev)?;
     Ok(db
         .query_row(

@@ -9,6 +9,7 @@ pub mod pr;
 pub mod queue;
 pub mod reader;
 pub mod resources;
+pub mod reviews;
 pub mod sync;
 pub mod writes;
 

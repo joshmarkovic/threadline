@@ -166,7 +166,7 @@ impl Store {
         if lease_until <= now {
             return Err(Error::InvalidInput("claim lease must end after start"));
         }
-        self.write(|tx| claim_in(tx, account, now, lease_until, false))
+        self.write(|tx| claim_in(tx, account, now, lease_until, "legacy"))
     }
     pub fn finish_validation(&self, claim: &Claim, outcome: Validation<'_>) -> Result<()> {
         let (state, reason, at) = match outcome {
@@ -329,13 +329,13 @@ pub(crate) fn end_attempt(
 
 fn reject_typed(tx: &Transaction<'_>, account: AccountId, id: &str) -> Result<()> {
     let typed: bool = tx.query_row(
-        "SELECT EXISTS(SELECT 1 FROM write_intents WHERE account_id=? AND operation_id=?)",
+        "SELECT EXISTS(SELECT 1 FROM mutation_families WHERE account_id=? AND operation_id=?)",
         params![account, id],
         |row| row.get(0),
     )?;
     if typed {
         return Err(Error::Conflict(
-            "Submitted issue and comment writes require typed preflight and response evidence",
+            "Submitted mutations require typed preflight and response evidence",
         ));
     }
     Ok(())
@@ -345,12 +345,13 @@ pub(crate) fn claim_in(
     account: AccountId,
     now: i64,
     lease_until: i64,
-    typed: bool,
+    family: &str,
 ) -> Result<Option<Claim>> {
     let id: Option<String> = tx
                 .query_row("SELECT q.id FROM operations q JOIN operation_gates g USING(account_id,id)
                 WHERE q.account_id=? AND q.state='queued' AND q.cancel_requested=0 AND q.retry_at<=?2 AND g.hold IS NULL
-                AND EXISTS(SELECT 1 FROM write_intents w WHERE w.account_id=q.account_id AND w.operation_id=q.id)=?3 ORDER BY q.sequence LIMIT 1", params![account, now, typed], |r| r.get(0))
+                AND COALESCE((SELECT family FROM mutation_families w WHERE w.account_id=q.account_id AND w.operation_id=q.id),'legacy')=?3
+                ORDER BY q.sequence LIMIT 1", params![account, now, family], |r| r.get(0))
                 .optional()?;
     let Some(id) = id else { return Ok(None) };
     let number = tx.query_row("UPDATE operations SET state='validating',reason=NULL,attempt=attempt+1,lease_until=? WHERE account_id=? AND id=? RETURNING attempt", params![lease_until, account, id], |r| {

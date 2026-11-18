@@ -147,7 +147,7 @@ fn resolved_comment(
     }
 }
 
-fn deadline(db: &Connection, account: AccountId) -> Result<Option<i64>> {
+pub(crate) fn deadline(db: &Connection, account: AccountId) -> Result<Option<i64>> {
     let write: Option<i64> = db
         .query_row(
             "SELECT not_before FROM write_timing WHERE account_id=?",
@@ -234,7 +234,7 @@ impl Store {
             if deadline(tx, account)?.is_some_and(|floor| floor > now) {
                 return Ok(None);
             }
-            let Some(claim) = dispatch::claim_in(tx, account, now, lease_until, true)? else {
+            let Some(claim) = dispatch::claim_in(tx, account, now, lease_until, "issue")? else {
                 return Ok(None);
             };
             let route = load_route(tx, account, &claim.operation.id)?;

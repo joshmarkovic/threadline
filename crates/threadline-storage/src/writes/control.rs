@@ -271,7 +271,7 @@ impl Store {
                 return Err(Error::Conflict("The mutation has no accepted preflight"));
             }
             let floor = deadline(tx, claim.route.account)?;
-            let sending:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM operations o JOIN write_intents w
+            let sending:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM operations o JOIN mutation_families w
                         ON w.account_id=o.account_id AND w.operation_id=o.id WHERE o.account_id=? AND o.state='sending')",
                         [claim.route.account],|r|r.get(0))?;
             if sending || floor.is_some_and(|t| t > now) {
