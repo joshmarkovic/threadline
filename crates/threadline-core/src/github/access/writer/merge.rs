@@ -66,11 +66,15 @@ pub struct VerifiedMergePolicy {
     base: String,
     head: String,
     value: MergeEligibility,
+    needs_optional_checks: bool,
 }
 
 impl VerifiedMergePolicy {
     pub fn eligibility(&self) -> &MergeEligibility {
         &self.value
+    }
+    pub fn needs_optional_checks(&self) -> bool {
+        self.needs_optional_checks
     }
 }
 
@@ -95,6 +99,47 @@ pub struct DirectMergeFailure {
 
 const POLICY: &str = "query ThreadlineMergePolicy($id:ID!) { node(id:$id) { ... on PullRequest { id number baseRefName baseRefOid headRefOid state isDraft merged mergeable mergeStateStatus reviewDecision mergeQueue { id } repository { id viewerPermission mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed } } } }";
 
+const OPTIONAL_CHECKS: &str = "query ThreadlineOptionalMergeChecks($id:ID!) { node(id:$id) { ... on PullRequest { id number baseRefName baseRefOid headRefOid repository { id } isMergeQueueEnabled mergeStateStatus reviewDecision state isDraft merged mergeable baseRef { name target { oid } branchProtectionRule { id } } commits(last:1) { nodes { commit { oid statusCheckRollup { contexts(first:100) { totalCount pageInfo { hasNextPage } nodes { __typename ... on CheckRun { isRequired(pullRequestId:$id) } ... on StatusContext { isRequired(pullRequestId:$id) } } } } } } } } } }";
+
+pub struct OptionalChecks {
+    actor: NonZeroU64,
+    repository: RepositoryApiId,
+    pull: NonZeroU64,
+    base: String,
+    head: String,
+    contexts: usize,
+}
+
+impl OptionalChecks {
+    pub fn contexts(&self) -> usize {
+        self.contexts
+    }
+}
+
+fn all_check_contexts_optional(node: &serde_json::Value, expected_head: &str) -> Option<usize> {
+    let Some([entry]) = node
+        .pointer("/commits/nodes")
+        .and_then(serde_json::Value::as_array)
+        .map(Vec::as_slice)
+    else {
+        return None;
+    };
+    let commit = &entry["commit"];
+    let contexts = &commit["statusCheckRollup"]["contexts"];
+    let rows = contexts["nodes"].as_array()?;
+    (commit["oid"].as_str() == Some(expected_head)
+        && contexts["pageInfo"]["hasNextPage"] == false
+        && (1..=100).contains(&rows.len())
+        && contexts["totalCount"].as_u64() == Some(rows.len() as u64)
+        && rows.iter().all(|row| {
+            matches!(
+                row["__typename"].as_str(),
+                Some("CheckRun" | "StatusContext")
+            ) && row["isRequired"] == false
+        }))
+    .then_some(rows.len())
+}
+
 #[derive(Deserialize)]
 struct MergeResponse {
     merged: bool,
@@ -107,10 +152,36 @@ impl GitHubWriter<'_> {
         pull: &VerifiedPull,
         cancel: &CancellationToken,
     ) -> Result<(VerifiedMergePolicy, RateLimit), AccessError> {
+        let (node, rate) = self.merge_graph(pull, POLICY, cancel).await?;
+        let value = decode_policy(&node);
+        Ok((
+            VerifiedMergePolicy {
+                actor: self.actor(),
+                repository: self.repository(),
+                pull: pull.id(),
+                base: pull.base().to_owned(),
+                head: pull.head().to_owned(),
+                needs_optional_checks: node["mergeStateStatus"] == "UNSTABLE"
+                    && node
+                        .get("reviewDecision")
+                        .is_some_and(serde_json::Value::is_null)
+                    && value.queue == QueueRequirement::NotRequired,
+                value,
+            },
+            rate,
+        ))
+    }
+
+    async fn merge_graph(
+        &self,
+        pull: &VerifiedPull,
+        query: &str,
+        cancel: &CancellationToken,
+    ) -> Result<(serde_json::Value, RateLimit), AccessError> {
         self.check_pull(pull)?;
-        let body = serde_json::json!({"query":POLICY,"variables":{"id":pull.node_id()}});
+        let body = serde_json::json!({"query":query,"variables":{"id":pull.node_id()}});
         let session = self.session;
-        let (response, headers): (serde_json::Value, _) = request(
+        let (mut response, headers): (serde_json::Value, _) = request(
             &session.client,
             &session.token,
             &session.scope,
@@ -127,7 +198,7 @@ impl GitHubWriter<'_> {
             return Err(AccessError::received(AccessKind::MalformedResponse, 200));
         }
         let node = response
-            .pointer("/data/node")
+            .pointer_mut("/data/node")
             .filter(|node| node.is_object())
             .ok_or_else(|| AccessError::received(AccessKind::MissingOrInaccessible, 200))?;
         if node["id"].as_str() != Some(pull.node_id())
@@ -139,17 +210,106 @@ impl GitHubWriter<'_> {
         {
             return Err(AccessError::received(AccessKind::IdentityMismatch, 200));
         }
+        Ok((node.take(), RateLimit::from_headers(&headers)))
+    }
+
+    pub async fn observe_optional_merge_checks(
+        &self,
+        pull: &VerifiedPull,
+        policy: &VerifiedMergePolicy,
+        cancel: &CancellationToken,
+    ) -> Result<(Option<OptionalChecks>, RateLimit), AccessError> {
+        if !policy.needs_optional_checks || !self.matches_policy(pull, policy) {
+            return Err(AccessError::local(AccessKind::WrongScope));
+        }
+        let (node, rate) = self.merge_graph(pull, OPTIONAL_CHECKS, cancel).await?;
+        let unprotected = node["isMergeQueueEnabled"] == false
+            && node["mergeStateStatus"] == "UNSTABLE"
+            && node
+                .get("reviewDecision")
+                .is_some_and(serde_json::Value::is_null)
+            && node["state"] == "OPEN"
+            && node["isDraft"] == false
+            && node["merged"] == false
+            && node["mergeable"] == "MERGEABLE"
+            && node["baseRef"]["name"].as_str() == pull.base_ref()
+            && node["baseRef"]["target"]["oid"].as_str() == Some(pull.base())
+            && node["baseRef"]
+                .get("branchProtectionRule")
+                .is_some_and(serde_json::Value::is_null);
+        let optional = all_check_contexts_optional(&node, pull.head()).filter(|_| unprotected);
         Ok((
-            VerifiedMergePolicy {
+            optional.map(|contexts| OptionalChecks {
                 actor: self.actor(),
                 repository: self.repository(),
                 pull: pull.id(),
-                base: pull.base().to_owned(),
-                head: pull.head().to_owned(),
-                value: decode_policy(node),
-            },
-            RateLimit::from_headers(&headers),
+                base: pull.base().into(),
+                head: pull.head().into(),
+                contexts,
+            }),
+            rate,
         ))
+    }
+
+    pub async fn confirm_optional_merge_checks(
+        &self,
+        pull: &VerifiedPull,
+        policy: &mut VerifiedMergePolicy,
+        proof: OptionalChecks,
+        cancel: &CancellationToken,
+    ) -> Result<RateLimit, AccessError> {
+        if !policy.needs_optional_checks
+            || !self.matches_policy(pull, policy)
+            || (
+                proof.actor,
+                proof.repository,
+                proof.pull,
+                proof.base.as_str(),
+                proof.head.as_str(),
+            ) != (
+                self.actor(),
+                self.repository(),
+                pull.id(),
+                pull.base(),
+                pull.head(),
+            )
+        {
+            return Err(AccessError::local(AccessKind::WrongScope));
+        }
+        let name = pull
+            .base_ref()
+            .ok_or_else(|| AccessError::local(AccessKind::WrongScope))?;
+        let mut url = Url::parse("https://api.github.com/branches").expect("GitHub branch URL");
+        url.path_segments_mut()
+            .expect("hierarchical branch URL")
+            .push(name);
+        let (branch, headers): (serde_json::Value, _) = self.get(&url.path()[1..], cancel).await?;
+        if branch["name"].as_str() != Some(name)
+            || branch["commit"]["sha"].as_str() != Some(pull.base())
+        {
+            return Err(AccessError::received(AccessKind::IdentityMismatch, 200));
+        }
+        let required = &branch["protection"]["required_status_checks"];
+        if branch["protected"] == false
+            && required["enforcement_level"] == "off"
+            && ["contexts", "checks"]
+                .into_iter()
+                .all(|field| required[field].as_array().is_some_and(Vec::is_empty))
+        {
+            policy.needs_optional_checks = false;
+            policy.value.checks = MergeGate::Satisfied;
+            policy.value.reviews = MergeGate::Satisfied;
+            policy.value.branch_rules = MergeGate::Satisfied;
+        }
+        Ok(RateLimit::from_headers(&headers))
+    }
+
+    fn matches_policy(&self, pull: &VerifiedPull, policy: &VerifiedMergePolicy) -> bool {
+        policy.actor == self.actor()
+            && policy.repository == self.repository()
+            && policy.pull == pull.id()
+            && policy.base == pull.base()
+            && policy.head == pull.head()
     }
 
     /// Use only the documented synchronous merge endpoint. GitHub must compare the supplied head.
@@ -170,13 +330,7 @@ impl GitHubWriter<'_> {
         };
         self.check_pull(pull)
             .map_err(|_| unsent(DirectMergeRejection::Other, AccessKind::WrongScope))?;
-        if expected_head != pull.head()
-            || policy.actor != self.actor()
-            || policy.repository != self.repository()
-            || policy.pull != pull.id()
-            || policy.base != pull.base()
-            || policy.head != expected_head
-        {
+        if expected_head != pull.head() || !self.matches_policy(pull, policy) {
             return Err(unsent(
                 DirectMergeRejection::HeadChanged,
                 AccessKind::IdentityMismatch,

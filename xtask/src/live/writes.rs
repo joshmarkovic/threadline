@@ -247,7 +247,7 @@ fn report_matches(bytes: &[u8], status: Status, source: &str, allow_oauth: bool)
         && steps.len() == expected.len()
 }
 
-fn only_keys(value: &Value, expected: &[&str]) -> bool {
+pub(super) fn only_keys(value: &Value, expected: &[&str]) -> bool {
     value.as_object().is_some_and(|object| {
         object.len() == expected.len() && expected.iter().all(|key| object.contains_key(*key))
     })

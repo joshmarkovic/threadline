@@ -246,14 +246,14 @@ fn matches_receipt(bytes: &[u8], status: Status, allow_oauth: bool, readback_onl
         && evidence["failure"].is_null()
 }
 
-fn safe_code(value: &Value) -> bool {
+pub(super) fn safe_code(value: &Value) -> bool {
     value.is_null()
         || value
             .as_u64()
             .is_some_and(|code| (100..=599).contains(&code))
 }
 
-fn request_id(value: &Value) -> bool {
+pub(super) fn request_id(value: &Value) -> bool {
     value.as_str().is_some_and(|s| {
         !s.is_empty()
             && s.len() <= 160

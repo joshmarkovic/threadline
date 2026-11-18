@@ -12,6 +12,8 @@ pub struct VerifiedPull {
     pub(super) node_id: String,
     pub(super) base: String,
     pub(super) base_ref: Option<String>,
+    pub(super) head_ref: Option<String>,
+    pub(super) head_repository: Option<RepositoryApiId>,
     pub(super) head: String,
     pub(super) open: bool,
     pub(super) merged: bool,
@@ -31,6 +33,12 @@ impl VerifiedPull {
     }
     pub fn node_id(&self) -> &str {
         &self.node_id
+    }
+    pub fn head_ref(&self) -> Option<&str> {
+        self.head_ref.as_deref()
+    }
+    pub fn head_repository(&self) -> Option<RepositoryApiId> {
+        self.head_repository
     }
     pub fn base_ref(&self) -> Option<&str> {
         self.base_ref.as_deref()

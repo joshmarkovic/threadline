@@ -93,6 +93,7 @@ pub struct PullPresentation {
     pub merged_at_ms: Option<i64>,
     pub changed_files: Option<u64>,
     base_repository_id: Option<RepositoryApiId>,
+    pub(super) head_repository_id: Option<RepositoryApiId>,
     base_repository_node: Option<String>,
 }
 

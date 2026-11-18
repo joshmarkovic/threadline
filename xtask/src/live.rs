@@ -16,6 +16,7 @@ const EXPECTED_REPOSITORY_ID: u64 = 1_462_273_296;
 const CASE: &str = "LIVE-001";
 const EVIDENCE: &str = "github-read.json";
 
+mod merges;
 mod reviews;
 mod writes;
 
@@ -47,6 +48,9 @@ pub(crate) fn run(options: &Options, root: &Path, dir: &Path) -> CaseResult {
     let case = options.case.as_deref().unwrap_or(CASE);
     if case == "LIVE-002" {
         return writes::run(options, root, dir);
+    }
+    if case == "LIVE-004" {
+        return merges::run(options, root, dir);
     }
     if case == "LIVE-003" {
         return reviews::run(options, root, dir);

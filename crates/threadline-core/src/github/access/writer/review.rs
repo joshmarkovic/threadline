@@ -148,6 +148,8 @@ impl GitHubWriter<'_> {
                 node_id: details.node_id.clone(),
                 base: details.base_oid.clone(),
                 base_ref: details.presentation.base_ref.clone(),
+                head_ref: details.presentation.head_ref.clone(),
+                head_repository: details.presentation.head_repository_id,
                 head: details.head_oid.clone(),
                 open: !details.closed && !details.merged,
                 merged: details.merged,

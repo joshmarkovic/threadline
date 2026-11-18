@@ -200,6 +200,10 @@ impl PullRequest {
                 author: self.user.map(|user| user.login),
                 base_ref: self.base.name,
                 head_ref: self.head.name,
+                head_repository_id: self
+                    .head
+                    .repo
+                    .map(|repo| crate::domain::RepositoryApiId::new(repo.id)),
                 draft: self.draft,
                 requested_reviewers: self
                     .requested_reviewers

@@ -5,7 +5,7 @@ pub const USAGE: &str =
 cargo xtask test e2e --suite <smoke|full> [--binary PATH] [--case ID] [--seed N] [--report-dir DIR]
 cargo xtask test install --artifact PATH [--local-fixture TRUSTED_JSON] [--case ID] [--report-dir DIR]
 cargo xtask test live --repo OWNER/REPO --case LIVE-001 [--credential-stdin [--allow-existing-cli-oauth]] [--first-issue-pr-page] [--report-dir DIR]
-cargo xtask test live --repo OWNER/REPO --case LIVE-003 [--allow-live-writes | --readback-only] --credential-stdin [--allow-existing-cli-oauth] [--report-dir DIR]
+cargo xtask test live --repo OWNER/REPO --case <LIVE-003|LIVE-004> [--allow-live-writes | --readback-only] --credential-stdin [--allow-existing-cli-oauth] [--report-dir DIR]
 cargo xtask measure windows [--binary PATH] [--artifact PATH] [--seed N] [--report-dir DIR]";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -173,10 +173,12 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
     }
     if options.readback_only
         && (lane != Lane::Live
-            || options.case.as_deref() != Some("LIVE-003")
+            || !matches!(options.case.as_deref(), Some("LIVE-003" | "LIVE-004"))
             || options.allow_live_writes)
     {
-        return Err("--readback-only requires LIVE-003 without write authorization.".into());
+        return Err(
+            "--readback-only requires LIVE-003 or LIVE-004 without write authorization.".into(),
+        );
     }
     Ok(options)
 }

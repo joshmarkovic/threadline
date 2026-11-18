@@ -12,6 +12,12 @@ use tokio::net::TcpListener;
 use tokio::sync::{Notify, watch};
 use tokio::task::JoinHandle;
 
+struct GraphNode {
+    operation: &'static str,
+    id: &'static str,
+    cursor: Option<Option<&'static str>>,
+}
+
 pub struct Reply {
     status: StatusCode,
     headers: HeaderMap,
@@ -21,7 +27,7 @@ pub struct Reply {
     pub expected_etag: Option<&'static str>,
     pub expected_modified: Option<&'static str>,
     pub graph_repository: Option<(&'static str, &'static str)>,
-    graph_node: Option<(&'static str, &'static str, Option<&'static str>)>,
+    graph_node: Option<GraphNode>,
     expected_json: Option<serde_json::Value>,
 }
 
@@ -67,7 +73,20 @@ impl Reply {
         id: &'static str,
         cursor: Option<&'static str>,
     ) -> Self {
-        self.graph_node = Some((operation, id, cursor));
+        self.graph_node = Some(GraphNode {
+            operation,
+            id,
+            cursor: Some(cursor),
+        });
+        self
+    }
+    #[allow(dead_code)]
+    pub fn graph_node_without_cursor(mut self, operation: &'static str, id: &'static str) -> Self {
+        self.graph_node = Some(GraphNode {
+            operation,
+            id,
+            cursor: None,
+        });
         self
     }
 }
@@ -197,14 +216,18 @@ async fn serve_reply(State(shared): State<Arc<Shared>>, request: Request) -> Res
                         .get(header::CONTENT_TYPE)
                         .is_some_and(|v| v == "application/json")
             });
-            let graph_node = expected.graph_node.is_none_or(|(operation, id, cursor)| {
+            let graph_node = expected.graph_node.as_ref().is_none_or(|graph| {
                 let Some(body) = &json_body else {
                     return false;
                 };
-                body["variables"] == serde_json::json!({"id":id,"cursor":cursor})
-                    && body["query"]
-                        .as_str()
-                        .is_some_and(|query| query.starts_with(&format!("query {operation}(")))
+                let expected = match graph.cursor {
+                    Some(cursor) => serde_json::json!({"id":graph.id,"cursor":cursor}),
+                    None => serde_json::json!({"id":graph.id}),
+                };
+                body["variables"] == expected
+                    && body["query"].as_str().is_some_and(|query| {
+                        query.starts_with(&format!("query {}(", graph.operation))
+                    })
                     && headers
                         .get(header::CONTENT_TYPE)
                         .is_some_and(|value| value == "application/json")
