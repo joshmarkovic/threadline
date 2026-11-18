@@ -200,6 +200,7 @@ pub struct PrTabView {
     pub context_mode: PrContextMode,
     pub diff_mode: PrDiffMode,
     pub context_scroll: u32,
+    pub issue_scroll: u32,
     pub code_scroll: u32,
     pub section: PrSection,
     pub context_collapsed: bool,
