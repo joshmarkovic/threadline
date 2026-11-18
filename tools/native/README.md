@@ -78,6 +78,8 @@ powershell.exe -NoProfile -Sta -File $driver -Binary $binary -ReportDir $evidenc
 
 This artifact is for development tests. Keep the completed report with `build.json`. The included `windows-budgets.json` supplies the budget for a separate run with `-Measure -BudgetFile .\windows-budgets.json`.
 
+To replay a development build on hosted Windows Server x64, dispatch **Hosted Windows desktop replay** from `main` and select the ID of a successful **Build and test** push run on `main`. Download `hosted-windows-server-replay` for the original measurement and shell reports. Keep this hosted evidence separate from the Windows 11 reference desktop results. Package measurement still requires a candidate installer.
+
 ## Windows measurements
 
 ```powershell

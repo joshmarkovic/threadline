@@ -1,0 +1,118 @@
+name: Hosted Windows desktop replay
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Successful main push run of Build and test with the Windows desktop test artifact
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  replay:
+    name: Hosted Windows Server x64 desktop replay
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - name: Verify the originating workflow run
+        id: source
+        shell: pwsh
+        env:
+          BUILD_RUN_ID: ${{ inputs.build_run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ($env:BUILD_RUN_ID -cnotmatch '^[1-9][0-9]{0,19}$') { throw 'Enter a numeric workflow run ID.' }
+          $json = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:BUILD_RUN_ID"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read the originating workflow run.' }
+          $run = $json | ConvertFrom-Json
+          if (
+            [string]$run.id -cne $env:BUILD_RUN_ID -or
+            [string]$run.repository.id -cne $env:GITHUB_REPOSITORY_ID -or
+            [string]$run.head_repository.id -cne $env:GITHUB_REPOSITORY_ID -or
+            $run.path -cne '.github/workflows/verify.yml' -or
+            $run.event -cne 'push' -or $run.head_branch -cne 'main' -or
+            $run.status -cne 'completed' -or $run.conclusion -cne 'success' -or
+            $run.head_sha -cnotmatch '^[0-9a-f]{40}$'
+          ) { throw 'Select a successful Build and test workflow run from a push to main in this repository.' }
+          "run_id=$($run.id)" >> $env:GITHUB_OUTPUT
+          "commit=$($run.head_sha)" >> $env:GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-reference-test-build
+          path: ${{ runner.temp }}/threadline-replay-binary
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.source.outputs.run_id }}
+      - name: Verify the development executable
+        id: verified
+        shell: pwsh
+        env:
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
+          SOURCE_RUN_ID: ${{ steps.source.outputs.run_id }}
+        run: |
+          $actualCommit = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $actualCommit -cne $env:SOURCE_COMMIT) { throw 'Driver checkout does not match the originating commit.' }
+          $bundle = Join-Path $env:RUNNER_TEMP 'threadline-replay-binary'
+          $manifestPath = Join-Path $bundle 'build.json'
+          $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+          if (
+            [string]$manifest.workflow_run -cne $env:SOURCE_RUN_ID -or
+            $manifest.source_revision -cne $env:SOURCE_COMMIT -or
+            $manifest.target -cne 'x86_64-pc-windows-msvc' -or
+            $manifest.build -cne 'release with e2e feature' -or
+            $manifest.executable_sha256 -cnotmatch '^[0-9a-f]{64}$'
+          ) { throw 'The development build manifest does not match the verified run.' }
+          $algorithm = [Security.Cryptography.SHA256]::Create()
+          try {
+            $stream = [IO.File]::OpenRead((Join-Path $bundle 'threadline.exe'))
+            try {
+              $bytes = $stream.Length
+              $digest = [BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+            } finally { $stream.Dispose() }
+          } finally { $algorithm.Dispose() }
+          if ($digest -cne $manifest.executable_sha256 -or $bytes -ne $manifest.executable_bytes) {
+            throw 'The executable does not match its manifest digest and length.'
+          }
+          $evidence = 'artifacts/windows-hosted-replay'
+          $null = New-Item -ItemType Directory -Path $evidence
+          Copy-Item -LiteralPath $manifestPath -Destination $evidence
+      - name: Measure renderer and scrolling
+        if: ${{ !cancelled() && steps.verified.outcome == 'success' }}
+        timeout-minutes: 6
+        shell: pwsh
+        run: |
+          $binary = Join-Path $env:RUNNER_TEMP 'threadline-replay-binary/threadline.exe'
+          $profile = Join-Path $env:RUNNER_TEMP 'threadline-replay-measure-profile'
+          & powershell.exe -NoLogo -NoProfile -NonInteractive -Sta -File ./tools/native/windows-smoke.ps1 `
+            -Binary $binary -ProfileDir $profile -ReportDir artifacts/windows-hosted-replay/measure `
+            -Measure -BudgetFile ./docs/architecture/windows-budgets.json
+          exit $LASTEXITCODE
+      - name: Check Windows tray and notification activation
+        if: ${{ !cancelled() && steps.verified.outcome == 'success' }}
+        timeout-minutes: 6
+        shell: pwsh
+        run: |
+          $binary = Join-Path $env:RUNNER_TEMP 'threadline-replay-binary/threadline.exe'
+          $profile = Join-Path $env:RUNNER_TEMP 'threadline-replay-shell-profile'
+          & powershell.exe -NoLogo -NoProfile -NonInteractive -Sta -File ./tools/native/windows-smoke.ps1 `
+            -Binary $binary -ProfileDir $profile -ReportDir artifacts/windows-hosted-replay/shell -PlatformProof
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hosted-windows-server-replay
+          path: |
+            artifacts/windows-hosted-replay/build.json
+            artifacts/windows-hosted-replay/*/*.json
+            artifacts/windows-hosted-replay/measure/measurement.png
+            artifacts/windows-hosted-replay/shell/platform-activated.png
+          if-no-files-found: ignore
