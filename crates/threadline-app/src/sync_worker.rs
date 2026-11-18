@@ -2,6 +2,7 @@
 
 mod reads;
 mod writes;
+pub(crate) use writes::translate_merge_policy;
 
 use std::{
     collections::HashMap,
@@ -307,7 +308,7 @@ async fn run(
     let mut enroll = true;
     let mut probe_retry = Duration::ZERO;
     let mut prefer_write = true;
-    let mut prefer_review = true;
+    let mut next_write_family = 0;
     let mut was_reachable = false;
     while !core.shutdown.is_cancelled() {
         let Ok(now) = UtcMillis::now() else {
@@ -350,7 +351,7 @@ async fn run(
                 probe_retry = Duration::ZERO;
                 was_reachable = false;
                 prefer_write = true;
-                prefer_review = true;
+                next_write_family = 0;
             } else {
                 observer.set_offline(offline);
             }
@@ -433,13 +434,13 @@ async fn run(
                     &core,
                     local.account,
                     generation,
-                    prefer_review,
+                    next_write_family,
                 )
                 .await
                 {
                     digest = digest.wrapping_add(1);
                 }
-                prefer_review = !prefer_review;
+                next_write_family = (next_write_family + 1) % writes::ACTION_FAMILIES;
                 prefer_write = false;
                 enroll = wait(&core, Some(Duration::from_millis(250))).await;
                 continue;

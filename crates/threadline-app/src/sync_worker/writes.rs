@@ -17,9 +17,12 @@ use crate::reader::write_values as values;
 
 use super::*;
 
+mod merges;
+pub(crate) use merges::translate as translate_merge_policy;
 mod reviews;
 
 const LEASE_MS: i64 = 180_000;
+pub(super) const ACTION_FAMILIES: usize = 3;
 
 pub(super) fn due(
     store: &Store,
@@ -30,6 +33,7 @@ pub(super) fn due(
         .next_write_due(account, now)?
         .into_iter()
         .chain(store.next_review_due(account, now)?)
+        .chain(store.next_merge_due(account, now)?)
         .min())
 }
 
@@ -40,6 +44,7 @@ pub(super) fn resume(
 ) -> threadline_storage::Result<()> {
     store.resume_writes(account, now)?;
     store.resume_reviews(account, now)?;
+    store.resume_merges(account, now)?;
     Ok(())
 }
 
@@ -49,26 +54,23 @@ pub(super) async fn execute(
     core: &Shared,
     account: AccountId,
     generation: u64,
-    prefer_review: bool,
+    preferred: usize,
 ) -> bool {
     let Ok(Some(job)) = blocking(store, move |store| {
         let now = UtcMillis::now()?.0;
-        if prefer_review && let Some(job) = reviews::claim(store, account, now)? {
-            return Ok(Some(WriteJob::Review(Box::new(job))));
+        for offset in 0..ACTION_FAMILIES {
+            let job = match (preferred + offset) % ACTION_FAMILIES {
+                0 => claim_issue(store, account, now)?,
+                1 => {
+                    reviews::claim(store, account, now)?.map(|job| WriteJob::Review(Box::new(job)))
+                }
+                _ => merges::claim(store, account, now)?.map(|job| WriteJob::Merge(Box::new(job))),
+            };
+            if job.is_some() {
+                return Ok(job);
+            }
         }
-        if let Some(target) =
-            store.claim_write_reconciliation(account, now, now.saturating_add(90_000))?
-        {
-            return Ok(Some(WriteJob::Readback(target)));
-        }
-        if let Some(claim) = store.claim_write(account, now, now.saturating_add(LEASE_MS))? {
-            return Ok(Some(WriteJob::Mutation(Box::new(claim))));
-        }
-        Ok(if prefer_review {
-            None
-        } else {
-            reviews::claim(store, account, now)?.map(|job| WriteJob::Review(Box::new(job)))
-        })
+        Ok(None)
     })
     .await
     else {
@@ -89,6 +91,19 @@ pub(super) async fn execute(
                 cancel: &cancel,
             };
             reviews::execute(&dispatch, *job).await;
+            core.finish_read();
+            return true;
+        }
+        WriteJob::Merge(job) => {
+            let cancel = core.start_read(generation, None);
+            let dispatch = Dispatch {
+                accounts,
+                store,
+                core,
+                account,
+                cancel: &cancel,
+            };
+            merges::execute(&dispatch, *job).await;
             core.finish_read();
             return true;
         }
@@ -124,6 +139,22 @@ enum WriteJob {
     Mutation(Box<WriteClaim>),
     Readback(ReconciliationTarget),
     Review(Box<reviews::Job>),
+    Merge(Box<merges::Job>),
+}
+
+fn claim_issue(
+    store: &Store,
+    account: AccountId,
+    now: i64,
+) -> threadline_storage::Result<Option<WriteJob>> {
+    if let Some(target) =
+        store.claim_write_reconciliation(account, now, now.saturating_add(90_000))?
+    {
+        return Ok(Some(WriteJob::Readback(target)));
+    }
+    Ok(store
+        .claim_write(account, now, now.saturating_add(LEASE_MS))?
+        .map(|claim| WriteJob::Mutation(Box::new(claim))))
 }
 
 async fn reconcile(

@@ -12,7 +12,8 @@ use threadline_core::connectivity::ProbeTrigger;
 use threadline_storage::{
     Change, IssueClassification, IssueRecord, ItemLocator, ItemRepresentation, ItemUpdate,
     PullRequestRecord, PullRequestUpdate, UtcMillis,
-    pr::PrHeader,
+    merges::{Gate, MergeMethod, MergePolicy, MergeSubmission, QueueRequirement},
+    pr::{PrHeader, PrRevision},
     queue::State,
     resources::CommitOid,
     reviews::{ReviewDraft, ReviewEvent, ReviewIntent, ReviewSubmission},
@@ -151,6 +152,35 @@ fn serve(mut stream: TcpStream, writes: &AtomicUsize) {
             assert_eq!(writes.fetch_add(1, Ordering::SeqCst), 1);
             ("200 OK", pending_review("COMMENTED"))
         }
+        ("POST", "/graphql") => {
+            let payload: Value = serde_json::from_slice(&data).unwrap();
+            assert_eq!(payload["variables"], json!({"id":"PR_420"}));
+            assert!(
+                payload["query"]
+                    .as_str()
+                    .unwrap()
+                    .starts_with("query ThreadlineMergePolicy")
+            );
+            (
+                "200 OK",
+                json!({"data":{"node":{
+                    "id":"PR_420","number":42,"baseRefName":"main","baseRefOid":"a".repeat(40),
+                    "headRefOid":"b".repeat(40),"state":"OPEN","isDraft":false,"merged":false,
+                    "mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","reviewDecision":"APPROVED",
+                    "mergeQueue":null,"repository":{"id":"repo-fixture","viewerPermission":"WRITE",
+                        "mergeCommitAllowed":true,"squashMergeAllowed":true,"rebaseMergeAllowed":false}
+                }}}),
+            )
+        }
+        ("PUT", "/repos/fixture-org/private/pulls/42/merge") => {
+            let payload: Value = serde_json::from_slice(&data).unwrap();
+            assert_eq!(
+                payload,
+                json!({"sha":"b".repeat(40),"merge_method":"squash"})
+            );
+            assert_eq!(writes.fetch_add(1, Ordering::SeqCst), 0);
+            ("200 OK", json!({"merged":true,"sha":"c".repeat(40)}))
+        }
         ("POST", "/repos/fixture-org/private/issues/42/comments") => {
             let payload: Value = serde_json::from_slice(&data).unwrap();
             let body = payload["body"].as_str().unwrap();
@@ -176,16 +206,14 @@ fn serve(mut stream: TcpStream, writes: &AtomicUsize) {
     write!(stream,"HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nX-GitHub-Request-Id: TEST:92:F\r\n\r\n{response}",response.len()).unwrap();
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn review_dispatch_preserves_pending_provider_id_and_submits_exact_original_head() {
-    const OPERATION: &str = "60000000-0000-4000-8000-000000000075";
-    let fixture = WriteFixture::start();
-    let dir = tempfile::tempdir().unwrap();
-    let store = Arc::new(Store::open_profile(dir.path()).unwrap());
+async fn prepare_fixture_pr(
+    store: &Arc<Store>,
+    address: std::net::SocketAddr,
+) -> (AccountService, PrRevision) {
     let accounts = AccountService {
         store: store.clone(),
         credentials: Arc::new(FixtureVault::default()),
-        github: GitHubClient::loopback(fixture.address).unwrap(),
+        github: GitHubClient::loopback(address).unwrap(),
         fixture: true,
     };
     let reply = accounts
@@ -239,10 +267,25 @@ async fn review_dispatch_preserves_pending_provider_id_and_submits_exact_origina
             &base,
             &head,
             None,
-            &PrHeader::default(),
+            &PrHeader {
+                base_ref: Some("main".into()),
+                ..PrHeader::default()
+            },
             now.0,
         )
         .unwrap();
+    (accounts, rev)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn review_dispatch_preserves_pending_provider_id_and_submits_exact_original_head() {
+    const OPERATION: &str = "60000000-0000-4000-8000-000000000075";
+    let fixture = WriteFixture::start();
+    let dir = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open_profile(dir.path()).unwrap());
+    let (accounts, rev) = prepare_fixture_pr(&store, fixture.address).await;
+    let account = rev.account;
+    let now = UtcMillis::now().unwrap();
     store
         .update_sync_settings(account, |s| {
             s.controls.pause_background = true;
@@ -294,6 +337,83 @@ async fn review_dispatch_preserves_pending_provider_id_and_submits_exact_origina
             .collect::<Vec<_>>(),
         [("create_pending_review", "91"), ("submit_review", "91")]
     );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn merge_dispatch_rechecks_preflight_and_records_one_exact_head() {
+    const OPERATION: &str = "60000000-0000-4000-8000-000000000076";
+    let fixture = WriteFixture::start();
+    let dir = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open_profile(dir.path()).unwrap());
+    let (accounts, rev) = prepare_fixture_pr(&store, fixture.address).await;
+    let account = rev.account;
+    let now = UtcMillis::now().unwrap().0;
+    let profile = store
+        .github_access_profile(account, "fixture-org")
+        .unwrap()
+        .unwrap();
+    let cached = MergePolicy {
+        allowed_methods: Some([MergeMethod::Squash].into_iter().collect()),
+        viewer_permission: threadline_storage::writes::Permission::Allowed,
+        open: Some(true),
+        draft: Some(false),
+        merged: Some(false),
+        mergeable: Some(true),
+        queue: QueueRequirement::NotRequired,
+        checks: Gate::Satisfied,
+        reviews: Gate::Satisfied,
+        branch_rules: Gate::Satisfied,
+    };
+    store
+        .record_merge_policy(&profile, &rev, &cached, now)
+        .unwrap();
+    store
+        .update_sync_settings(account, |settings| {
+            settings.controls.pause_background = true;
+            settings.controls.work_offline = true;
+        })
+        .unwrap();
+    store
+        .submit_merge(
+            &rev,
+            MergeSubmission {
+                id: OPERATION,
+                method: MergeMethod::Squash,
+                dependencies: &[],
+                submitted_at_ms: now,
+            },
+        )
+        .unwrap();
+    let worker = SyncWorker::start_fixture(accounts, &tokio::runtime::Handle::current());
+    worker.wake(Some(ProbeTrigger::Startup));
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(fixture.sent.load(Ordering::SeqCst), 0);
+    store
+        .update_sync_settings(account, |settings| settings.controls.work_offline = false)
+        .unwrap();
+    worker.wake(Some(ProbeTrigger::NetworkChanged));
+    tokio::time::timeout(Duration::from_secs(27), async {
+        loop {
+            let operation = store.operation(account, OPERATION).unwrap().unwrap();
+            assert!(!matches!(
+                operation.state,
+                State::NeedsAttention | State::OutcomeUnknown
+            ));
+            if operation.state == State::Confirmed {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let receipt = store.confirmed_merge(account, OPERATION).unwrap().unwrap();
+    assert_eq!(receipt.expected_head.as_str(), rev.head.as_str());
+    assert_eq!(receipt.merge_oid.as_str(), "c".repeat(40));
+    assert!(receipt.own_action);
+    worker.wake(Some(ProbeTrigger::CheckNow));
+    tokio::time::sleep(Duration::from_millis(180)).await;
+    assert_eq!(fixture.sent.load(Ordering::SeqCst), 1);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

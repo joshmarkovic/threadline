@@ -35,6 +35,7 @@ use crate::sync_worker::{blocking, hold};
 
 pub(crate) mod pr_reads;
 pub(crate) use pr_reads::PrSourceRequest;
+mod merge_policy;
 mod write_choices;
 pub(crate) use write_choices::values as write_values;
 
