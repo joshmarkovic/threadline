@@ -1,0 +1,86 @@
+{
+  "channel": "local-fixture",
+  "target": "x86_64-pc-windows-msvc",
+  "windows_build": 22631,
+  "source": "725632e",
+  "setup_sha256": "32384f2f7f3d3745d3e62f3af1b42a363c149d2e80c31b80412f86dc3c180678",
+  "setup_bytes": 9989450,
+  "install": {
+    "original_sha256": "ac819cd540a8d6ced5edd53318f8cb8b60ad5d0da584933844082a76dc608696",
+    "observed": {
+      "exitCode": 0,
+      "installedHash": "FD41377F8724D664C7C45E3E1289C050FC7CD33852F2DC1020A334D2D3C0C9C8",
+      "installedVersion": "0.1.0-local.5",
+      "installedBuild": 5,
+      "shortcutMatches": true,
+      "registeredLocationMatches": true,
+      "localDataPresent": true
+    }
+  },
+  "crosspane": {
+    "original_sha256": "a5118b447f07dc72310ed569e01fd3b6181806a3beb6622952e085839662d023",
+    "observed": {
+      "installed_executable_sha256": "fd41377f8724d664c7c45e3e1289c050fc7cd33852f2dc1020a334d2d3c0c9c8",
+      "owned_window": true,
+      "tab_automation_id": "reader-tab-1-1",
+      "selected_before_invocation": false,
+      "tab_invoke_supported": true,
+      "tab_invoke_attempts": 1,
+      "tab_activated": true,
+      "orderly_exit": true
+    }
+  },
+  "expected_active_issue_after_invocation": 6,
+  "closed_database": {
+    "user_version": 12,
+    "ordered_projections": {
+      "items": {
+        "rows": 30,
+        "schema_12_sha256": "7a61313417f1af9232a8a5f1c78f8a92a264bcec35fd9e85992abf427ce6cd48"
+      },
+      "drafts": {
+        "rows": 1,
+        "schema_12_sha256": "e2c7011b376e27b37b9c19962a672abaddea2d76a49cee65acb6776b84622e1d"
+      },
+      "operations": {
+        "rows": 10,
+        "schema_12_sha256": "d845211810028f8fe0b81083a95cddcf81fcac7fd8447a77cd8f1fe1d13b7710"
+      },
+      "receipts": {
+        "rows": 1,
+        "schema_12_sha256": "921af72bd3d120454abbd655b61600ca92759e32e405c3839a2b51ea3c2d9d88"
+      },
+      "dispatch": {
+        "rows": 1,
+        "schema_12_sha256": "0a7e58150268e978346b814d0f51633a4ed5ebe529ed49d7822e501bbe472030"
+      },
+      "resources": {
+        "rows": 150,
+        "schema_12_sha256": "fd8f9a108a0a94f983141839b1e9b5407fd70efc3c349559d430f8c5dd76d23a"
+      },
+      "credentials": {
+        "rows": 1,
+        "schema_12_sha256": "644e56048e9789a1e5c7b4ff489842728c00705c5100aa0fb5178214d1c702b4"
+      },
+      "tabs": {
+        "rows": 20,
+        "schema_12_sha256": "9034dee932f4f91327727cdd67faaddb42889ea01e6fd4a9fded9f7891826e45"
+      },
+      "sync": {
+        "rows": 0,
+        "schema_12_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "pre_upgrade_backups_seen": [
+      9,
+      10
+    ]
+  },
+  "release_verifier": {
+    "matrix_setup_sha256": "41bbe48a67e874bc7b44a7e1dca864bd5a283a24ceb1368a41d35d06091820de",
+    "exit_code": 1,
+    "windows_powershell": "5.1",
+    "original_log_sha256": "02aed251ba678bbe0d853141cfcb282de61f1ad6ac4b1690ac98529a039ebfdf",
+    "message": "Windows did not verify a trusted Authenticode signature for the installer."
+  }
+}
