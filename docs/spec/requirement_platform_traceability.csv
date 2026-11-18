@@ -80,31 +80,31 @@ AUTH-11,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required
 BROWSE-01,windows,Windows first release,03,05,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 BROWSE-01,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 BROWSE-01,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-BROWSE-02,windows,Windows first release,04,04,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+BROWSE-02,windows,Windows first release,04,04,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 BROWSE-02,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 BROWSE-02,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-BROWSE-03,windows,Windows first release,04,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+BROWSE-03,windows,Windows first release,04,06,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 BROWSE-03,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 BROWSE-03,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-BROWSE-04,windows,Windows first release,04,08,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+BROWSE-04,windows,Windows first release,04,08,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 BROWSE-04,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 BROWSE-04,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 BROWSE-05,windows,Windows first release,04,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 BROWSE-05,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 BROWSE-05,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-WORKSPACE-01,windows,Windows first release,04,04,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+WORKSPACE-01,windows,Windows first release,04,04,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 WORKSPACE-01,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-01,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-WORKSPACE-02,windows,Windows first release,04,04,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+WORKSPACE-02,windows,Windows first release,04,04,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 WORKSPACE-02,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-02,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-WORKSPACE-03,windows,Windows first release,04,04,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+WORKSPACE-03,windows,Windows first release,04,04,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 WORKSPACE-03,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-03,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-WORKSPACE-04,windows,Windows first release,04,04,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+WORKSPACE-04,windows,Windows first release,04,04,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 WORKSPACE-04,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-04,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-WORKSPACE-05,windows,Windows first release,04,10,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+WORKSPACE-05,windows,Windows first release,04,10,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 WORKSPACE-05,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-05,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-06,windows,Windows first release,07,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -113,31 +113,31 @@ WORKSPACE-06,linux,Linux release,07,14,14,yes,Planned,Actual target evidence req
 WORKSPACE-07,windows,Windows first release,07,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-07,macos,macOS release,07,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-07,linux,Linux release,07,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-WORKSPACE-08,windows,Windows first release,04,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+WORKSPACE-08,windows,Windows first release,04,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 WORKSPACE-08,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-08,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-WORKSPACE-09,windows,Windows first release,04,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+WORKSPACE-09,windows,Windows first release,04,09,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 WORKSPACE-09,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-09,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-10,windows,Windows first release,05,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-10,macos,macOS release,05,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-10,linux,Linux release,05,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-WORKSPACE-11,windows,Windows first release,04,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+WORKSPACE-11,windows,Windows first release,04,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 WORKSPACE-11,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-11,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-WORKSPACE-12,windows,Windows first release,04,08,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+WORKSPACE-12,windows,Windows first release,04,08,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 WORKSPACE-12,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-12,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-SEARCH-01,windows,Windows first release,04,08,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+SEARCH-01,windows,Windows first release,04,08,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 SEARCH-01,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 SEARCH-01,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-SEARCH-02,windows,Windows first release,04,04,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+SEARCH-02,windows,Windows first release,04,04,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 SEARCH-02,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 SEARCH-02,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-SEARCH-03,windows,Windows first release,04,04,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+SEARCH-03,windows,Windows first release,04,04,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 SEARCH-03,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 SEARCH-03,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-SEARCH-04,windows,Windows first release,04,04,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+SEARCH-04,windows,Windows first release,04,04,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 SEARCH-04,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 SEARCH-04,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-01,windows,Windows first release,04,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -179,16 +179,16 @@ CACHE-12,linux,Linux release,04,14,14,yes,Planned,Actual target evidence require
 CACHE-13,windows,Windows first release,02,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-02.md Normal-exit storage contract and persistent sign-out holds. Later workflows extend the restart matrix.
 CACHE-13,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-13,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-OFFLINE-01,windows,Windows first release,04,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+OFFLINE-01,windows,Windows first release,04,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 OFFLINE-01,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OFFLINE-01,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OFFLINE-02,windows,Windows first release,07,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OFFLINE-02,macos,macOS release,07,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OFFLINE-02,linux,Linux release,07,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-OFFLINE-03,windows,Windows first release,04,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+OFFLINE-03,windows,Windows first release,04,06,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 OFFLINE-03,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OFFLINE-03,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-OFFLINE-04,windows,Windows first release,04,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+OFFLINE-04,windows,Windows first release,04,09,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 OFFLINE-04,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OFFLINE-04,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 SYNC-01,windows,Windows first release,05,05,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -224,7 +224,7 @@ SYNC-10,linux,Linux release,05,14,14,yes,Planned,Actual target evidence required
 SYNC-11,windows,Windows first release,05,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 SYNC-11,macos,macOS release,05,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 SYNC-11,linux,Linux release,05,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-CONNECT-01,windows,Windows first release,04,05,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+CONNECT-01,windows,Windows first release,04,05,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 CONNECT-01,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CONNECT-01,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CONNECT-02,windows,Windows first release,03,05,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -233,10 +233,10 @@ CONNECT-02,linux,Linux release,03,14,14,yes,Planned,Actual target evidence requi
 CONNECT-03,windows,Windows first release,05,07,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CONNECT-03,macos,macOS release,05,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CONNECT-03,linux,Linux release,05,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-ISSUE-01,windows,Windows first release,04,04,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+ISSUE-01,windows,Windows first release,04,04,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 ISSUE-01,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 ISSUE-01,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-ISSUE-02,windows,Windows first release,04,04,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+ISSUE-02,windows,Windows first release,04,04,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
 ISSUE-02,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 ISSUE-02,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 ISSUE-03,windows,Windows first release,07,07,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,

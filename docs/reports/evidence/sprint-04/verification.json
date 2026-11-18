@@ -1,0 +1,660 @@
+{
+  "format": 1,
+  "portable": [
+    {
+      "source_revision": "36736f9e398085c7ca0f1c6f22937b4e2bfd7c97",
+      "source_dirty": false,
+      "lane": "integration",
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "Wayland and X11 environment"
+      },
+      "fixture_revision": "mixed",
+      "cargo_lock_sha256": "584e42711991ccc37920795250a65808db013864573a1692ff71a141ca97b586",
+      "seed": 12345,
+      "status": "Pass",
+      "exit_code": 0,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "integration",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "source_result_sha256": "3b4ba9571f517c332516a9b3d8a3c26f6e4dce2f8e408a4e7e2ad9a68d234854",
+      "cases": [
+        {
+          "case": "IT-003",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "SEARCH-01",
+            "SEARCH-04",
+            "DATA-08",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-09",
+            "AC-53"
+          ],
+          "fixture_revision": "s04-reader-v1"
+        },
+        {
+          "case": "S01-SIMULATOR",
+          "status": "Pass",
+          "tests_passed": 5,
+          "requirement_ids": [
+            "FND-04",
+            "TEST-03",
+            "TEST-05"
+          ],
+          "acceptance_ids": [
+            "AC-90"
+          ],
+          "fixture_revision": "s01-feasibility-v1"
+        },
+        {
+          "case": "S01-PLATFORM",
+          "status": "Pass",
+          "tests_passed": 4,
+          "requirement_ids": [
+            "PORT-02",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-83"
+          ],
+          "fixture_revision": "s01-feasibility-v1"
+        },
+        {
+          "case": "IT-001",
+          "status": "Pass",
+          "tests_passed": 8,
+          "requirement_ids": [
+            "FND-03",
+            "DATA-01",
+            "DATA-05",
+            "DATA-06",
+            "DATA-07",
+            "DATA-09",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-50",
+            "AC-51",
+            "AC-55",
+            "AC-90"
+          ],
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "IT-002",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "CACHE-05",
+            "SYNC-11",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-08",
+            "AC-90"
+          ],
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "S02-RESOURCE-CONTRACTS",
+          "status": "Pass",
+          "tests_passed": 3,
+          "requirement_ids": [
+            "CACHE-03",
+            "CACHE-05",
+            "CACHE-09",
+            "CACHE-10",
+            "SYNC-11",
+            "NOTIFY-15"
+          ],
+          "acceptance_ids": [
+            "AC-07",
+            "AC-08",
+            "AC-90"
+          ],
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "S02-DURABILITY",
+          "status": "Pass",
+          "tests_passed": 10,
+          "requirement_ids": [
+            "CACHE-07",
+            "CACHE-13",
+            "OUTBOX-10",
+            "DATA-01",
+            "TEST-03",
+            "TEST-05"
+          ],
+          "acceptance_ids": [
+            "AC-10",
+            "AC-68",
+            "AC-73",
+            "AC-74",
+            "AC-92"
+          ],
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "S02-DISK-FULL",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "OUTBOX-01",
+            "OUTBOX-10",
+            "TEST-03",
+            "TEST-05"
+          ],
+          "acceptance_ids": [
+            "AC-58",
+            "AC-92"
+          ],
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "S02-FIXTURES",
+          "status": "Pass",
+          "tests_passed": 2,
+          "requirement_ids": [
+            "TEST-02",
+            "TEST-03",
+            "TEST-05"
+          ],
+          "acceptance_ids": [
+            "AC-35",
+            "AC-90"
+          ],
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "IT-004",
+          "status": "Pass",
+          "tests_passed": 5,
+          "requirement_ids": [
+            "FND-05",
+            "AUTH-04",
+            "AUTH-05",
+            "CACHE-05",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-01",
+            "AC-02",
+            "AC-03",
+            "AC-90"
+          ],
+          "fixture_revision": "s03-github-access-v1"
+        },
+        {
+          "case": "IT-005",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "AUTH-01",
+            "AUTH-03",
+            "AUTH-06",
+            "TEST-03",
+            "TEST-05"
+          ],
+          "acceptance_ids": [],
+          "fixture_revision": "s03-github-access-v1"
+        },
+        {
+          "case": "S03-ACCOUNT-PROFILES",
+          "status": "Pass",
+          "tests_passed": 4,
+          "requirement_ids": [
+            "AUTH-04",
+            "AUTH-05",
+            "AUTH-06",
+            "AUTH-11",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-01",
+            "AC-02",
+            "AC-03",
+            "AC-90"
+          ],
+          "fixture_revision": "s03-github-access-v1"
+        },
+        {
+          "case": "S03-ACCESS-STORAGE",
+          "status": "Pass",
+          "tests_passed": 2,
+          "requirement_ids": [
+            "AUTH-06",
+            "AUTH-11",
+            "CACHE-08",
+            "OUTBOX-09",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-67",
+            "AC-90"
+          ],
+          "fixture_revision": "s03-github-access-v1"
+        },
+        {
+          "case": "S04-READ-TRANSPORT",
+          "status": "Pass",
+          "tests_passed": 7,
+          "requirement_ids": [
+            "CACHE-05",
+            "ISSUE-01",
+            "SEARCH-02",
+            "SEARCH-03",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-07",
+            "AC-08",
+            "AC-09"
+          ],
+          "fixture_revision": "s04-reader-v1"
+        },
+        {
+          "case": "S04-CACHED-STORE",
+          "status": "Pass",
+          "tests_passed": 11,
+          "requirement_ids": [
+            "CACHE-03",
+            "CACHE-05",
+            "OFFLINE-03",
+            "SEARCH-01",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-06",
+            "AC-07",
+            "AC-08",
+            "AC-09"
+          ],
+          "fixture_revision": "s04-reader-v1"
+        },
+        {
+          "case": "S04-READ-SERVICE",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "CACHE-03",
+            "CACHE-05",
+            "OFFLINE-03",
+            "SEARCH-01",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-06",
+            "AC-07",
+            "AC-08",
+            "AC-09"
+          ],
+          "fixture_revision": "s04-reader-v1"
+        }
+      ]
+    },
+    {
+      "source_revision": "36736f9e398085c7ca0f1c6f22937b4e2bfd7c97",
+      "source_dirty": false,
+      "lane": "ui",
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "Wayland and X11 environment"
+      },
+      "fixture_revision": "s01-feasibility-v1",
+      "cargo_lock_sha256": "584e42711991ccc37920795250a65808db013864573a1692ff71a141ca97b586",
+      "seed": 12345,
+      "status": "Pass",
+      "exit_code": 0,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "ui",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "source_result_sha256": "b4f3395796364460b319930929994d45527a0cee3b01e85cc59b0206cbcc3cac",
+      "cases": [
+        {
+          "case": "S01-GPUI",
+          "status": "Pass",
+          "tests_passed": 3,
+          "requirement_ids": [
+            "FND-02",
+            "TEST-04"
+          ],
+          "acceptance_ids": [
+            "AC-84"
+          ],
+          "fixture_revision": "s01-feasibility-v1"
+        },
+        {
+          "case": "UI-002",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "WORKSPACE-01",
+            "WORKSPACE-02",
+            "WORKSPACE-04",
+            "WORKSPACE-07",
+            "TEST-04"
+          ],
+          "acceptance_ids": [
+            "AC-42",
+            "AC-43",
+            "AC-44",
+            "AC-45",
+            "AC-46",
+            "AC-47"
+          ]
+        },
+        {
+          "case": "UI-003",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "CACHE-03",
+            "CACHE-04",
+            "CONNECT-01",
+            "UX-02",
+            "TEST-04"
+          ],
+          "acceptance_ids": [
+            "AC-07",
+            "AC-23",
+            "AC-57"
+          ]
+        },
+        {
+          "case": "UI-008",
+          "status": "Pass",
+          "tests_passed": 2,
+          "requirement_ids": [
+            "WORKSPACE-12",
+            "UX-01",
+            "TEST-04"
+          ],
+          "acceptance_ids": [
+            "AC-38",
+            "AC-49"
+          ]
+        }
+      ]
+    },
+    {
+      "source_revision": "36736f9e398085c7ca0f1c6f22937b4e2bfd7c97",
+      "source_dirty": false,
+      "lane": "unit",
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "Wayland and X11 environment"
+      },
+      "fixture_revision": "mixed",
+      "cargo_lock_sha256": "584e42711991ccc37920795250a65808db013864573a1692ff71a141ca97b586",
+      "seed": 12345,
+      "status": "Pass",
+      "exit_code": 0,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "unit",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "source_result_sha256": "b50041add75706d51a7b5eb41046946b9119b87b030c36f2eb6531d578f6d556",
+      "cases": [
+        {
+          "case": "UT-008",
+          "status": "Pass",
+          "tests_passed": 2,
+          "requirement_ids": [
+            "CONNECT-01",
+            "CONNECT-02",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-57"
+          ],
+          "fixture_revision": "s04-reader-v1"
+        },
+        {
+          "case": "UT-013",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "WORKSPACE-03",
+            "WORKSPACE-05",
+            "FND-06",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-05",
+            "AC-42",
+            "AC-45"
+          ],
+          "fixture_revision": "s04-reader-v1"
+        },
+        {
+          "case": "UT-018",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "BROWSE-05",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-81"
+          ],
+          "fixture_revision": "s04-reader-v1"
+        },
+        {
+          "case": "UT-021",
+          "status": "Pass",
+          "tests_passed": 24,
+          "requirement_ids": [
+            "TEST-01",
+            "TEST-02",
+            "TEST-08"
+          ],
+          "acceptance_ids": [
+            "AC-89"
+          ],
+          "fixture_revision": "s01-feasibility-v1"
+        },
+        {
+          "case": "S01-CORE",
+          "status": "Pass",
+          "tests_passed": 14,
+          "requirement_ids": [
+            "FND-04",
+            "DATA-05",
+            "DATA-06",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-89"
+          ],
+          "fixture_revision": "s01-feasibility-v1"
+        },
+        {
+          "case": "S01-DIFF-FIXTURE",
+          "status": "Pass",
+          "tests_passed": 9,
+          "requirement_ids": [
+            "FND-02",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-89"
+          ],
+          "fixture_revision": "s01-feasibility-v1"
+        },
+        {
+          "case": "UT-001",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "DATA-05",
+            "DATA-06",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-50"
+          ],
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "UT-003",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "DATA-07",
+            "CACHE-09",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-51",
+            "AC-52"
+          ],
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "UT-004",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "CACHE-03",
+            "CACHE-04",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-07"
+          ],
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "UT-009",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "OUTBOX-01",
+            "OUTBOX-02",
+            "OUTBOX-07",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-60",
+            "AC-61"
+          ],
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "UT-010",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "AUTH-03",
+            "OUTBOX-09",
+            "TEST-02"
+          ],
+          "acceptance_ids": [
+            "AC-67"
+          ],
+          "fixture_revision": "s03-github-access-v1"
+        },
+        {
+          "case": "UT-020",
+          "status": "Pass",
+          "tests_passed": 1,
+          "requirement_ids": [
+            "AUTH-07",
+            "DATA-03",
+            "TEST-02",
+            "TEST-05"
+          ],
+          "acceptance_ids": [],
+          "fixture_revision": "s03-github-access-v1"
+        }
+      ]
+    }
+  ],
+  "native_reader": {
+    "os": "Windows 11 Enterprise 23H2 x64",
+    "dpi": 144,
+    "scale_factor": 1.5,
+    "product_binary_sha256": "e7459578f36cec45cc14fe2c8300d50fecdf39a0746e6598245195a456d99edc",
+    "source_observation_sha256": "27f53e4c8b719ff30c2fe4d1d14d49ef60db4a7d2f9d0a6b50fb70920498d438",
+    "ready": true,
+    "painted_controls": 37,
+    "reader": {
+      "cached_content_ready": true,
+      "active_item": 3,
+      "pane_count": 2,
+      "tab_counts": [
+        10,
+        10
+      ],
+      "focused_pane": 1,
+      "comment_count": 4,
+      "comments_coverage": "Complete",
+      "comment_fetch_state": "Idle",
+      "outbox": 900,
+      "signed_out": true,
+      "offline": true
+    },
+    "fixture": {
+      "fixture_revision": "s04-reader-v1",
+      "seed": 12345,
+      "scale": "section-16",
+      "account_id": 1,
+      "repository_id": 1,
+      "discussion_item": 1,
+      "review_item": 3,
+      "items": 50000,
+      "comments": 250000,
+      "open_tabs": 20,
+      "outbox_count": 1000,
+      "offline": true
+    },
+    "scope": "Native launch and cached content observation. No pointer or keyboard action is established by this receipt."
+  },
+  "native_component_tests": {
+    "os": "Windows 11 x64",
+    "source_result_sha256": "de0643bcba2046575dd5d979b00673de125341ad02e5c93b3a73cbc31a708917",
+    "passed": [
+      "reader_workspace::media::tests::image_controls_identify_references_and_keep_missing_or_unsupported_media_explicit",
+      "reader_workspace::tests::ui_002_independent_panes_share_one_editor_and_reopen_same_draft",
+      "reader_workspace::tests::ui_003_partial_error_and_unseen_conversation_keep_cached_panes_visible",
+      "reader_workspace::tests::ui_008_cached_markdown_and_native_editor_survive_immediate_orderly_exit",
+      "reader_workspace::tests::ui_008_keyboard_find_panes_and_multiline_editor_have_accessible_identity"
+    ]
+  }
+}

@@ -1,5 +1,5 @@
 acceptance_id,platform,platform_closure_sprint,release_gate_sprint,applicable,status,scope_reason,evidence
-AC-01,windows,04,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-01,windows,04,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Designated private repository reached using CLI OAuth. Real organization single sign-on is unverified. docs/reports/sprint-04.md
 AC-01,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-01,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-02,windows,03,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Actionable approval and validated SSO action passed in provider tests. Real organization SSO and the complete external Windows account journey remain open. docs/reports/sprint-03.md
@@ -8,25 +8,25 @@ AC-02,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-03,windows,03,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,The simulator returns partial discovery across pages and the controller retains that state. External Windows GUI confirmation remains open. docs/reports/sprint-03.md
 AC-03,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-03,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-04,windows,04,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-04,windows,04,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,The reader supports cached and provider reads. Native historical browsing remains unverified. docs/reports/sprint-04.md
 AC-04,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-04,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-05,windows,06,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-05,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-05,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-06,windows,04,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-06,windows,04,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Product rendered the signed-out offline Section 16 workspace. Native draft restoration journey remains open. docs/reports/sprint-04.md
 AC-06,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-06,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-07,windows,04,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-07,windows,04,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,SQLite and GPUI tests verify incomplete discussion coverage and recovery. docs/reports/sprint-04.md
 AC-07,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-07,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-08,windows,04,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-08,windows,04,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,SQLite integration exercises pagination recovery across restart. docs/reports/sprint-04.md
 AC-08,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-08,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-09,windows,04,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-09,windows,04,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,IT-003 verifies real downloaded-content FTS. The external local and remote search journey remains open. docs/reports/sprint-04.md
 AC-09,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-09,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-10,windows,04,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-10,windows,04,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Storage integration verifies clear-cache retains the draft and Outbox fixtures. Later writer sprints extend the retained types. docs/reports/sprint-04.md
 AC-10,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-10,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-11,windows,05,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
@@ -122,10 +122,10 @@ AC-40,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-41,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-41,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-41,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-42,windows,04,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-42,windows,04,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows restored two populated panes. UI-002 exercises independent tabs and draft ownership. docs/reports/sprint-04.md
 AC-42,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-42,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-43,windows,04,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-43,windows,04,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,GPUI exercises independent panes and partial errors. The full external controls journey remains open. docs/reports/sprint-04.md
 AC-43,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-43,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-44,windows,06,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
@@ -134,7 +134,7 @@ AC-44,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-45,windows,09,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-45,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-45,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-46,windows,04,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-46,windows,04,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Native launch restored 20 tabs offline. A component test verifies orderly exit during editing. docs/reports/sprint-04.md
 AC-46,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-46,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-47,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
@@ -143,7 +143,7 @@ AC-47,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-48,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-48,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-48,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-49,windows,04,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-49,windows,04,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,UI-008 exercises keyboard controls and editor identity. Full external focus/accessibility evidence remains open. docs/reports/sprint-04.md
 AC-49,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-49,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-50,windows,02,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"../reports/sprint-02.md Shared namespace, distinct provider IDs, concurrent ingestion and verified transfers in actual SQLite."

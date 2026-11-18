@@ -1,0 +1,112 @@
+{
+  "format": 1,
+  "live": {
+    "source_revision": "76a09c8813158893243bbc9d2956982f8a1e57bd",
+    "source_dirty": false,
+    "fixture_revision": "s03-live-read-allowlist-v1",
+    "command": {
+      "program": "xtask",
+      "argv": [
+        "test",
+        "live",
+        "--repo",
+        "<repository>",
+        "--case",
+        "LIVE-001",
+        "--credential-stdin",
+        "--allow-existing-cli-oauth",
+        "--first-issue-pr-page",
+        "--report-dir",
+        "<report-dir>"
+      ],
+      "redacted": true
+    },
+    "status": "Blocked",
+    "exit_code": 78,
+    "dogfood": {
+      "authenticated_user": {
+        "http_status": 200,
+        "matched": true
+      },
+      "credential_kind": "existing_cli_oauth",
+      "credential_source": "stdin_pipe",
+      "dogfood_read": "Pass",
+      "expected_github_repository_id": 1462273296,
+      "expected_github_user_id": 52184130,
+      "graphql_repository_read": {
+        "complete": true,
+        "errors": [],
+        "http_status": 200,
+        "immutable_node_matched": true
+      },
+      "issue_pr_page": {
+        "coverage": "complete",
+        "has_next_page": false,
+        "http_status": 200,
+        "issues": 0,
+        "oldest_age_days": null,
+        "page": 1,
+        "pull_requests": 0,
+        "records": 0,
+        "status": "Pass"
+      },
+      "private_repository_read": {
+        "http_status": 200,
+        "immutable_id_matched": true,
+        "private": true,
+        "repository_metadata_read": "verified",
+        "write_grants": "unverified"
+      },
+      "reason": "read_proven_with_cli_oauth_pat_unverified",
+      "repository": "joshmarkovic/threadline",
+      "scenario": "LIVE-001",
+      "sso_challenge": "no_explicit_challenge_observed",
+      "status": "Blocked"
+    },
+    "source_result_sha256": "13092ca75a3281fffc5ee176be40f0a5391e97dbb327bea1af9cb4c6def40aa8",
+    "source_http_receipt_sha256": "c18c8c76b5729a69a72893b169532084a04473b4d75997c44bac6efe254e4a8f"
+  },
+  "windows_external": [
+    {
+      "source_revision": "f42b1233a046dd4a3735402f57f471e07f93dcc1",
+      "source_dirty": false,
+      "status": "Fail",
+      "exit_code": 1,
+      "case": "E2E-003",
+      "actions": [
+        "Seed the isolated profile with the application and bundled SQLite",
+        "Attempt focus through a verified native pointer target",
+        "Type and save a local Markdown draft offline"
+      ],
+      "binary_sha256": "e7459578f36cec45cc14fe2c8300d50fecdf39a0746e6598245195a456d99edc",
+      "source_result_sha256": "6a915cfff7feb73e3f1bbd20d2c7f954a0e37128e29726b55faba197ee34c6d2",
+      "native_sha256": "5a0f1015199ec673c4b55ab0705619e66940524f9a8826a0ec64e97da1a57938",
+      "relaunch": {
+        "matching_draft_sha256": "8feca84e766104606481f760813ce90e1fe9136c95b4c05d315bdc0326a43062",
+        "distinct_process": true,
+        "active_draft_chars": 26,
+        "active_item": 3,
+        "active_draft_saved": true,
+        "offline": true,
+        "signed_out": true,
+        "cached_content_ready": true
+      },
+      "termination": "The driver could not open the running process\u2019s SQLite file using its chosen file sharing mode."
+    },
+    {
+      "source_revision": "88219543f327b8f3ce1f049022ca06c140745b6f",
+      "source_dirty": false,
+      "status": "Blocked",
+      "exit_code": 78,
+      "case": "E2E-003",
+      "actions": [
+        "Seed the isolated profile with the application and bundled SQLite",
+        "Attempt focus through a verified native pointer target"
+      ],
+      "binary_sha256": "e7459578f36cec45cc14fe2c8300d50fecdf39a0746e6598245195a456d99edc",
+      "source_result_sha256": "cb441ef4f05dfaaeae32e194239e5a57399bc028ebaef091db043b6dd89f8b4b",
+      "native_sha256": "30b0d33ba65e411ba727ccff3cb007708f69ac6d1da71d248e889591094048a4",
+      "termination": "The native foreground guard could not verify focus for the journey."
+    }
+  ]
+}
