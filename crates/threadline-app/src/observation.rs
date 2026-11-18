@@ -75,6 +75,8 @@ pub(crate) struct Snapshot {
     pub preview_state: &'static str,
     pub tray_enabled: bool,
     pub notifications_shown: u32,
+    pub notifications_submitted: u32,
+    pub notification_com_activations: u32,
     pub activations: u32,
 }
 

@@ -49,6 +49,9 @@ actions!(
     ]
 );
 
+#[cfg(all(windows, feature = "e2e"))]
+actions!(threadline, [SendTestNotification]);
+
 pub fn bind_shortcuts(cx: &mut App) {
     let context =
         Rc::new(KeyBindingContextPredicate::parse("Threadline").expect("valid workspace context"));
@@ -73,6 +76,19 @@ pub fn bind_shortcuts(cx: &mut App) {
         })
         .collect();
     cx.bind_keys(bindings);
+    #[cfg(all(windows, feature = "e2e"))]
+    {
+        let notification_test = KeyBinding::load(
+            "ctrl-shift-f9",
+            Box::new(SendTestNotification),
+            Some(context),
+            false,
+            None,
+            cx,
+        )
+        .expect("valid native notification test shortcut");
+        cx.bind_keys([notification_test]);
+    }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -146,6 +162,8 @@ pub struct Workspace {
     tray_enabled: bool,
     platform_status: Option<String>,
     notifications_shown: u32,
+    notifications_submitted: u32,
+    notification_com_activations: u32,
     activations: u32,
     focused: Pane,
     focus: [FocusHandle; 2],
@@ -219,6 +237,8 @@ impl Workspace {
             tray_enabled: false,
             platform_status: None,
             notifications_shown: 0,
+            notifications_submitted: 0,
+            notification_com_activations: 0,
             activations: 0,
             focused,
             focus,
@@ -304,6 +324,11 @@ impl Workspace {
                 self.notifications_shown += 1;
                 self.platform_status = Some("Windows accepted the test notification.".into());
             }
+            PlatformEvent::NotificationSubmitted => {
+                self.notifications_submitted += 1;
+                self.platform_status = Some("Submitted the test notification to Windows.".into());
+            }
+            PlatformEvent::NotificationComActivated => self.notification_com_activations += 1,
             PlatformEvent::Quit => cx.quit(),
             PlatformEvent::Wake | PlatformEvent::NetworkChanged => return,
             PlatformEvent::Error(error) => self.platform_status = Some(error.to_string()),
@@ -346,6 +371,15 @@ impl Workspace {
             });
         })
         .detach();
+    }
+
+    fn send_test_notification(&mut self, cx: &mut Context<Self>) {
+        if let Some(platform) = &self.platform
+            && let Err(error) = platform.notify_open_review()
+        {
+            self.platform_status = Some(error.to_string());
+            cx.notify();
+        }
     }
 
     fn focus_pane(&mut self, pane: Pane, window: &mut Window, cx: &mut Context<Self>) {
@@ -563,12 +597,7 @@ impl Workspace {
                                     .disabled(!can_notify)
                                     .accessibility_id("test-notification")
                                     .on_click(cx.listener(|this, _, _, cx| {
-                                        if let Some(platform) = &this.platform
-                                            && let Err(error) = platform.notify_open_review()
-                                        {
-                                            this.platform_status = Some(error.to_string());
-                                            cx.notify();
-                                        }
+                                        this.send_test_notification(cx)
                                     })),
                             )
                             .children(self.observed_bounds("test-notification")),
@@ -1080,6 +1109,10 @@ impl gpui_kit::Render for Workspace {
                 cx.listener(|this, _, _, _| this.drag = None),
             );
         // Register before any descendant scroller can claim the capture phase.
+        #[cfg(all(windows, feature = "e2e"))]
+        let window_content = window_content.on_action(
+            cx.listener(|this, _: &SendTestNotification, _, cx| this.send_test_notification(cx)),
+        );
         #[cfg(feature = "e2e")]
         let window_content = window_content
             .when_some(self.observer.as_ref(), |content, observer| {
@@ -1141,6 +1174,8 @@ impl Workspace {
             },
             tray_enabled: self.tray_enabled,
             notifications_shown: self.notifications_shown,
+            notifications_submitted: self.notifications_submitted,
+            notification_com_activations: self.notification_com_activations,
             activations: self.activations,
         }
     }

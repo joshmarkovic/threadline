@@ -7116,6 +7116,8 @@ name = "threadline-platform"
 version = "0.1.0"
 dependencies = [
  "tokio",
+ "windows 0.62.2",
+ "windows-core 0.62.2",
  "windows-sys 0.61.2",
 ]
 
