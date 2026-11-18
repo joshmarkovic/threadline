@@ -213,6 +213,10 @@ fn it_009_timeout_and_cancel_never_replay_identity_free_matches_and_accepted_cre
     let db = Store::open_profile(dir.path()).unwrap();
     let pending = db.write_reconciliations(a, 20).unwrap();
     assert_eq!(pending[0].comment_id, id(378));
+    assert_eq!(db.reconciliation_profile(&pending[0]).unwrap().account, a);
+    let mut wrong = pending[0].clone();
+    wrong.comment_id = id(399);
+    assert!(db.reconciliation_profile(&wrong).is_err());
     let mut observed = remote("accepted", 2_013);
     observed.id = id(378);
     db.confirm_write(
@@ -678,4 +682,21 @@ fn it_011_cached_author_proof_is_bound_to_original_comment_and_cannot_change_act
         Some(id(81))
     );
     assert_eq!(reopened.comment_author_id(a, other, id(377)).unwrap(), None);
+}
+
+#[test]
+fn it_010_interrupted_preflight_releases_only_the_exact_unsent_attempt() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Store::open_profile(dir.path()).unwrap();
+    let (a, r, item) = setup(&db);
+    submit(&db, a, item, &edit(), 5);
+    let claim = db.claim_write(a, 6, 10000).unwrap().unwrap();
+    db.set_repository_paused(a, r, true).unwrap();
+    assert!(db.abandon_write_preflight(&claim, 7).unwrap());
+    assert!(db.claim_write(a, 8, 10000).unwrap().is_none());
+    db.set_repository_paused(a, r, false).unwrap();
+    let next = db.claim_write(a, 9, 10000).unwrap().unwrap();
+    assert!(!db.abandon_write_preflight(&claim, 10).unwrap());
+    ticket(&db, &next, &obs(&next, 11), 11);
+    assert!(!db.abandon_write_preflight(&next, 12).unwrap());
 }

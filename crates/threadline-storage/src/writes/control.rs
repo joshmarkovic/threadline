@@ -145,6 +145,52 @@ impl Store {
         })
     }
 
+    /// Release only a still-unsent preflight, including when the account has just gone offline.
+    pub fn abandon_write_preflight(&self, claim: &WriteClaim, now: i64) -> Result<bool> {
+        self.write(|tx| {
+            let original = &claim.claim.operation;
+            let changed = tx.execute(
+                "UPDATE operations SET state='queued', reason='preflight_interrupted',
+                       retry_at=?4, lease_until=NULL
+                 WHERE account_id=?1 AND id=?2 AND attempt=?3 AND state='validating' AND cancel_requested=0
+                   AND EXISTS(SELECT 1 FROM operation_attempts a WHERE a.account_id=?1
+                     AND a.operation_id=?2 AND a.attempt=?3 AND a.sending_at IS NULL)",
+                params![original.account,original.id,claim.attempt(),now],
+            )?;
+            if changed == 1 {
+                dispatch::end_attempt(tx, original.account, &original.id, claim.attempt(), "queued", "preflight_interrupted")?;
+            }
+            Ok(changed == 1)
+        })
+    }
+
+    /// Bind a read-only lookup to the same accepted comment and original actor, including after credential renewal.
+    pub fn reconciliation_profile(
+        &self,
+        target: &ReconciliationTarget,
+    ) -> Result<crate::access::AccessProfile> {
+        self.read(|db| {
+            let tx = db.unchecked_transaction()?;
+            let raw: Option<String> = tx.query_row(
+                "SELECT e.route FROM write_accepted_objects a JOIN write_evidence e USING(account_id,operation_id,attempt)
+                 JOIN operations o ON o.account_id=a.account_id AND o.id=a.operation_id AND o.attempt=a.attempt
+                 JOIN operation_gates g ON g.account_id=o.account_id AND g.id=o.id
+                 WHERE a.account_id=?1 AND o.id=?2 AND a.attempt=?3 AND a.remote_id=?4 AND a.kind='comment'
+                   AND o.state IN ('waiting','unknown') AND g.hold IS NULL",
+                params![target.route.account,target.operation_id,target.attempt,target.comment_id.to_string()],
+                |r|r.get(0),
+            ).optional()?;
+            let original: WriteRoute = decode(&raw.ok_or(Error::Conflict("No eligible accepted comment for this attempt"))?)?;
+            let current=load_route(&tx,target.route.account,&target.operation_id)?;
+            let mut expected=original.clone();
+            expected.credential_generation=current.credential_generation;
+            if original!=target.route || current!=expected {
+                return Err(Error::Conflict("The accepted comment no longer belongs to this original route"));
+            }
+            crate::access::profile(&tx,current.account,&current.owner)?.ok_or(Error::NotFound)
+        })
+    }
+
     pub fn fail_write_preflight(
         &self,
         claim: &WriteClaim,
