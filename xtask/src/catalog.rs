@@ -34,6 +34,9 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if matches!(case, "UT-017" | "IT-014" | "IT-015") {
         return Some("s09-direct-merge-v1");
     }
+    if case == "S10-HISTORY-MONITOR" {
+        return Some("s10-history-monitor-v1");
+    }
     if matches!(case, "UT-016" | "S10-HISTORY-HTTP") {
         return Some("s10-history-dag-v1");
     }
@@ -164,6 +167,7 @@ pub fn associations(case: &str) -> Associations {
             "AC-13;AC-15;AC-62;AC-67",
         ),
         "S10-HISTORY-HTTP" => ("GRAPH-01;GRAPH-02;GRAPH-03;TEST-03", "AC-24;AC-25;AC-26"),
+        "S10-HISTORY-MONITOR" => ("NOTIFY-04;SYNC-03;TEST-03", "AC-39;AC-54"),
         "S05-FEED-HTTP" => ("SYNC-05;SYNC-06;SYNC-07;SYNC-10;TEST-03", "AC-12;AC-54"),
         "S05-SYNC-WORKER" => (
             "SYNC-02;SYNC-03;SYNC-09;NOTIFY-13;TEST-03",

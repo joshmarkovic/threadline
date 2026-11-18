@@ -218,6 +218,26 @@ fn reader_reply(
             "state":"open","updated_at":TIME,"repository_url":"https://api.github.com/repos/fixture-org/private"}),
         ));
     }
+    let main = json!({"name":"main","commit":{"sha":"a".repeat(40)}});
+    if target == "/repositories/73/branches/main" {
+        return Some(success(main));
+    }
+    if target == "/repositories/73/branches?per_page=20&page=1" {
+        return Some(success(json!([
+            main,
+            {"name":"release/one","commit":{"sha":"c".repeat(40)}},
+            {"name":"unselected","commit":{"sha":"d".repeat(40)}}
+        ])));
+    }
+    for digit in ['a', 'b', 'c'] {
+        let sha = digit.to_string().repeat(40);
+        if target == format!("/repositories/73/commits?sha={sha}&per_page=20&page=1") {
+            return Some(success(json!([{
+                "sha":sha,"parents":[],"commit":{"message":"Pinned fixture commit",
+                "author":{"name":"Fixture Git author","date":TIME},"committer":{"date":TIME}}
+            }])));
+        }
+    }
     if target == "/repositories/73/pulls/42" {
         return Some(success(
             json!({"id":420,"node_id":"P_42","number":42,"title":"Review fixture","body":"Closes fixture-org/private#12",
@@ -757,6 +777,148 @@ async fn sync_worker_waits_for_hydration_and_restored_offline_then_observes_both
         );
     }
     assert_eq!(simulator.requests.load(Ordering::Relaxed), before + 4);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn monitored_history_fetches_only_selected_refs_and_caches_pinned_ancestry() {
+    use crate::sync_worker::SyncWorker;
+    use threadline_core::connectivity::{ConnectionStatus, ProbeTrigger};
+    use threadline_storage::{
+        history::{HistoryMonitoring, HistoryRef},
+        resources::CommitOid,
+    };
+
+    let simulator = Simulator::start_with_reader(true);
+    let dir = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open_profile(dir.path()).unwrap());
+    let service = AccountService {
+        store: store.clone(),
+        credentials: Arc::new(FixtureVault::default()),
+        github: GitHubClient::loopback(simulator.address).unwrap(),
+        fixture: true,
+    };
+    let cancel = Cancellation::new();
+    let connected = service
+        .execute(
+            AccountCommand::Connect {
+                repository: "fixture-org/private".into(),
+                pat: Pat::from_input("threadline-test-fixture".into()),
+                renew: None,
+            },
+            &cancel,
+        )
+        .await;
+    assert!(connected.github_error.is_none());
+    let account = connected.view.active.unwrap();
+    let public = connected
+        .view
+        .repositories
+        .iter()
+        .find(|row| row.name == "public")
+        .unwrap()
+        .clone();
+    let repository = public.id;
+    let selected = service
+        .execute(
+            AccountCommand::Select {
+                profile: connected.view.profiles[0].clone(),
+                repository: public,
+            },
+            &cancel,
+        )
+        .await;
+    assert!(selected.github_error.is_none());
+    for private in selected
+        .view
+        .repositories
+        .iter()
+        .filter(|row| row.selected && row.id != repository)
+    {
+        store
+            .select_github_repository(account, private.id, false)
+            .unwrap();
+    }
+    let pull = std::num::NonZeroU64::new(42).unwrap();
+    store
+        .set_history_monitoring(
+            account,
+            repository,
+            &HistoryMonitoring {
+                default_branch: Some("main".into()),
+                branch_patterns: ["release/*".into()].into(),
+                followed_prs: [pull].into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let mut settings = store.sync_settings(account).unwrap();
+    settings.schedule.timezone = Some("UTC".into());
+    settings.controls.work_offline = true;
+    store.save_sync_settings(account, &settings).unwrap();
+    let before = simulator.requests.load(Ordering::Relaxed);
+    let worker = SyncWorker::start_fixture(service, &tokio::runtime::Handle::current());
+    let mut updates = worker.watch();
+    tokio::time::timeout(
+        Duration::from_secs(3),
+        updates.wait_for(|state| {
+            state.account == Some(account) && state.connection.status == ConnectionStatus::Offline
+        }),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    worker.wake(Some(ProbeTrigger::Startup));
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(simulator.requests.load(Ordering::Relaxed), before);
+    settings.controls.work_offline = false;
+    store.save_sync_settings(account, &settings).unwrap();
+    worker.interrupt(Some(ProbeTrigger::CheckNow));
+    let expected = [
+        (HistoryRef::Branch("main".into()), 'a'),
+        (HistoryRef::Branch("release/one".into()), 'c'),
+        (HistoryRef::FollowedPr(pull), 'b'),
+    ];
+    tokio::time::timeout(Duration::from_secs(25), async {
+        loop {
+            let complete = expected.iter().all(|(reference, digit)| {
+                let oid = CommitOid::parse(&digit.to_string().repeat(40)).unwrap();
+                store
+                    .history_ref(account, repository, reference)
+                    .unwrap()
+                    .is_some_and(|row| row.tip.as_ref() == Some(&oid))
+                    && store
+                        .history_entry(account, repository, &oid)
+                        .unwrap()
+                        .is_some()
+            });
+            if complete {
+                break;
+            }
+            updates.changed().await.unwrap();
+        }
+    })
+    .await
+    .unwrap_or_else(|_| {
+        panic!(
+            "History did not arrive: {:?} {:?}",
+            store.history_refs(account, repository, None, 20).unwrap(),
+            store.sync_status(account).unwrap()
+        );
+    });
+    assert_eq!(
+        store
+            .history_refs(account, repository, None, 20)
+            .unwrap()
+            .len(),
+        expected.len()
+    );
+    assert!(
+        store
+            .history_ref_moves(account, repository, 0, 20)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(simulator.requests.load(Ordering::Relaxed) > before);
 }
 
 #[tokio::test]

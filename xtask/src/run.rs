@@ -159,6 +159,8 @@ const INTEGRATION: &[CargoTest] = &[
             "pr",
             "--test",
             "history",
+            "--test",
+            "history_monitor",
             "it_006",
         ],
     },
@@ -169,6 +171,15 @@ const INTEGRATION: &[CargoTest] = &[
     CargoTest {
         id: "S10-HISTORY-HTTP",
         arguments: &["-p", "threadline-core", "--test", "github_history"],
+    },
+    CargoTest {
+        id: "S10-HISTORY-MONITOR",
+        arguments: &[
+            "-p",
+            "threadline-app",
+            "--lib",
+            "accounts::tests::monitored_history_",
+        ],
     },
     CargoTest {
         id: "S05-FEED-HTTP",

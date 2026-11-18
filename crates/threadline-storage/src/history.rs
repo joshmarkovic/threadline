@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, num::NonZeroU64};
 mod comparisons;
 pub use comparisons::*;
-mod observations;
+pub(crate) mod observations;
 pub use observations::*;
 mod views;
 pub use views::*;
@@ -444,63 +444,7 @@ impl Store {
         complete: bool,
         at: i64,
     ) -> Result<()> {
-        if entries.len() > 100
-            || next_cursor.is_some_and(|s| s.is_empty() || s.len() > 4096)
-            || complete && next_cursor.is_some()
-        {
-            return Err(Error::InvalidInput(
-                "History pages require bounded records and a consistent continuation",
-            ));
-        }
-        self.write(|tx| {
-            require_observation_profile(tx, &walk.profile, walk.repository)?;
-            if ref_state(tx, walk.repository, &walk.reference)?
-                .and_then(|r| r.tip)
-                .as_ref()
-                != Some(&walk.tip)
-            {
-                return Err(Error::Conflict(
-                    "The selected reference moved while its page was loading",
-                ));
-            }
-            let state=tx.query_row("SELECT row_count,frontier FROM history_series WHERE id=? AND account_id=? AND repository_id=? AND tip=?
-                        AND generation=? AND cursor IS ? AND state IN ('new','partial')",params![walk.series,walk.profile.account,walk.repository,
-                        walk.tip.as_str(),walk.generation,walk.cursor],|r|Ok((r.get::<_,i64>(0)?,r.get::<_,String>(1)?))).optional()?
-                        .ok_or(Error::Conflict("History page checkpoint was superseded"))?;
-            if let Some(next) = next_cursor
-                && tx.execute(
-                    "INSERT INTO history_page_cursors VALUES(?,?) ON CONFLICT DO NOTHING",
-                    params![walk.series, next],
-                )? != 1
-                {
-                    return Err(Error::Conflict("Repeated historical page continuation"));
-            }
-            let mut frontier: Vec<Option<CommitOid>> = decode(&state.1)?;
-            save_entries(tx, &walk.profile, walk.repository, entries)?;
-            for e in entries {
-                tx.execute("INSERT INTO history_waiting SELECT ?1,?2 WHERE NOT EXISTS(
-                            SELECT 1 FROM history_rows WHERE series_id=?1 AND oid=?2) ON CONFLICT DO NOTHING",params![walk.series,e.commit.oid.as_str()])?;
-            }
-            let row_count = append_ready(tx, walk.series, walk.repository, &mut frontier, state.0)?;
-            stage_known(tx, walk.series, walk.repository, &frontier)?;
-            let row_count = append_ready(tx, walk.series, walk.repository, &mut frontier, row_count)?;
-            let unresolved: bool = tx.query_row(
-                "SELECT EXISTS(SELECT 1 FROM history_waiting WHERE series_id=?)",
-                [walk.series],
-                |r| r.get(0),
-            )?;
-            let coverage = if frontier.is_empty() && row_count > 0 && !unresolved {
-                "complete"
-            } else if next_cursor.is_some() {
-                "partial"
-            } else {
-                "limited"
-            };
-            tx.execute("UPDATE history_series SET row_count=?,frontier=?,cursor=?,state=?,fetched_at=?,generation=generation+1 WHERE id=?",
-                        params![row_count,encode(&frontier)?,next_cursor,coverage,at,walk.series])?;
-            observations::repair_moves(tx, walk.profile.account, walk.repository, at)?;
-            Ok(())
-        })
+        self.write(|tx| commit_history_page_in(tx, walk, entries, next_cursor, complete, at))
     }
     pub fn history_page(
         &self,
@@ -607,6 +551,71 @@ impl Store {
                 .optional()?)
         })
     }
+}
+
+pub(crate) fn commit_history_page_in(
+    tx: &Transaction<'_>,
+    walk: &HistoryWalk,
+    entries: &[HistoryEntry],
+    next_cursor: Option<&str>,
+    complete: bool,
+    at: i64,
+) -> Result<()> {
+    if entries.len() > 100
+        || next_cursor.is_some_and(|s| s.is_empty() || s.len() > 4096)
+        || complete && next_cursor.is_some()
+    {
+        return Err(Error::InvalidInput(
+            "History pages require bounded records and a consistent continuation",
+        ));
+    }
+    require_observation_profile(tx, &walk.profile, walk.repository)?;
+    if ref_state(tx, walk.repository, &walk.reference)?
+        .and_then(|r| r.tip)
+        .as_ref()
+        != Some(&walk.tip)
+    {
+        return Err(Error::Conflict(
+            "The selected reference moved while its page was loading",
+        ));
+    }
+    let state=tx.query_row("SELECT row_count,frontier FROM history_series WHERE id=? AND account_id=? AND repository_id=? AND tip=?
+                    AND generation=? AND cursor IS ? AND state IN ('new','partial')",params![walk.series,walk.profile.account,walk.repository,
+                    walk.tip.as_str(),walk.generation,walk.cursor],|r|Ok((r.get::<_,i64>(0)?,r.get::<_,String>(1)?))).optional()?
+                    .ok_or(Error::Conflict("History page checkpoint was superseded"))?;
+    if let Some(next) = next_cursor
+        && tx.execute(
+            "INSERT INTO history_page_cursors VALUES(?,?) ON CONFLICT DO NOTHING",
+            params![walk.series, next],
+        )? != 1
+    {
+        return Err(Error::Conflict("Repeated historical page continuation"));
+    }
+    let mut frontier: Vec<Option<CommitOid>> = decode(&state.1)?;
+    save_entries(tx, &walk.profile, walk.repository, entries)?;
+    for e in entries {
+        tx.execute("INSERT INTO history_waiting SELECT ?1,?2 WHERE NOT EXISTS(
+                        SELECT 1 FROM history_rows WHERE series_id=?1 AND oid=?2) ON CONFLICT DO NOTHING",params![walk.series,e.commit.oid.as_str()])?;
+    }
+    let row_count = append_ready(tx, walk.series, walk.repository, &mut frontier, state.0)?;
+    stage_known(tx, walk.series, walk.repository, &frontier)?;
+    let row_count = append_ready(tx, walk.series, walk.repository, &mut frontier, row_count)?;
+    let unresolved: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM history_waiting WHERE series_id=?)",
+        [walk.series],
+        |r| r.get(0),
+    )?;
+    let coverage = if frontier.is_empty() && row_count > 0 && !unresolved {
+        "complete"
+    } else if next_cursor.is_some() {
+        "partial"
+    } else {
+        "limited"
+    };
+    tx.execute("UPDATE history_series SET row_count=?,frontier=?,cursor=?,state=?,fetched_at=?,generation=generation+1 WHERE id=?",
+                    params![row_count,encode(&frontier)?,next_cursor,coverage,at,walk.series])?;
+    observations::repair_moves(tx, walk.profile.account, walk.repository, at)?;
+    Ok(())
 }
 
 #[cfg(test)]

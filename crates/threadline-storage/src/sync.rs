@@ -6,8 +6,10 @@ use std::time::Duration;
 pub use threadline_core::sync::policy::{ReadPriority, SyncControls, WorkSchedule};
 use threadline_core::sync::policy::{activity_since, retry_delay};
 
+mod history;
 mod observation;
 mod pr;
+pub use history::{HistoryRead, MonitoredAncestors, MonitoredBranches};
 pub use observation::*;
 
 const LEASE_MS: i64 = 90_000;
@@ -192,6 +194,7 @@ impl Store {
     pub fn schedule_selected_activity(&self, account: AccountId, now: i64) -> Result<()> {
         self.write(|tx| {
             crate::pr::enroll_selected(tx, account, now)?;
+            history::enroll(tx, account, now)?;
             for family in [ResourceFamily::RepositoryItems, ResourceFamily::Comments] {
                 tx.execute(
                     "INSERT INTO scheduled_reads(account_id,repository_id,family,revision,due_at)

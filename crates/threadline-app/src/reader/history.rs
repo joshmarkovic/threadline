@@ -296,7 +296,7 @@ impl ReaderService {
     }
 }
 
-fn history_entry(row: HistoryCommit) -> Result<HistoryEntry, ReaderError> {
+pub(crate) fn history_entry(row: HistoryCommit) -> Result<HistoryEntry, ReaderError> {
     Ok(HistoryEntry {
         commit: GraphCommit {
             oid: CommitOid::parse(&row.oid)?,
@@ -314,7 +314,7 @@ fn history_entry(row: HistoryCommit) -> Result<HistoryEntry, ReaderError> {
     })
 }
 
-fn history_page_number(cursor: Option<&str>) -> Result<u32, ReaderError> {
+pub(crate) fn history_page_number(cursor: Option<&str>) -> Result<u32, ReaderError> {
     cursor.map_or(Ok(1), |cursor| {
         cursor
             .parse::<u32>()

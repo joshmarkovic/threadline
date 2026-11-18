@@ -1,4 +1,5 @@
 use super::*;
+mod history;
 mod pr;
 use threadline_core::{
     domain::ItemNumber,
@@ -12,7 +13,8 @@ use threadline_storage::{
     reader::{DiscussionComment, ListSummary},
     resources::{ResourceFamily, Validators},
     sync::{
-        ObservationPage, ObservedComment, ObservedItem, ReadClaim, ReadCompletion, ReadFailure,
+        HistoryRead, ObservationPage, ObservedComment, ObservedItem, ReadClaim, ReadCompletion,
+        ReadFailure,
     },
 };
 
@@ -51,40 +53,60 @@ pub(super) async fn execute(
     };
     let changed = match result {
         Ok((outcome, rate)) => {
-            if let Some(id) = id {
+            if !matches!(&outcome, Outcome::History(page) if !page.contacted())
+                && let Some(id) = id
+            {
                 core.record(id, Reachability::ReceivedResponse, None);
             }
             hold(store, claim.account, Some(rate), None).await;
             let system_zone = zone(&local.settings);
             let committed = blocking(store, move |store| {
-                let changed = match &outcome {
-                    Outcome::Feed { .. } | Outcome::Metadata { .. } => true,
-                    Outcome::Pr(page) => page.changed(),
-                    _ => false,
-                };
-                let write = match outcome {
+                let changed = match outcome {
                     Outcome::Prepared => {
-                        store.fail_sync_read(&claim, ReadFailure::Cancelled, now.0, None)
+                        store.fail_sync_read(&claim, ReadFailure::Cancelled, now.0, None)?;
+                        false
                     }
-                    Outcome::Unmodified(validators) => store.finish_sync_read(
-                        &claim,
-                        ReadCompletion::NotModified(validators),
-                        now.0,
-                        &system_zone?,
-                    ),
+                    Outcome::Unmodified(validators) => {
+                        store.finish_sync_read(
+                            &claim,
+                            ReadCompletion::NotModified(validators),
+                            now.0,
+                            &system_zone?,
+                        )?;
+                        false
+                    }
                     Outcome::Metadata {
                         summary,
                         validators,
-                    } => store
-                        .commit_sync_item_metadata(
+                    } => {
+                        store.commit_sync_item_metadata(
                             &claim,
                             *summary,
                             &validators,
                             now.0,
                             &system_zone?,
-                        )
-                        .map(|_| ()),
-                    Outcome::Pr(page) => page.commit(store, &claim, now.0, &system_zone?),
+                        )?;
+                        true
+                    }
+                    Outcome::Pr(page) => {
+                        let changed = page.changed();
+                        page.commit(store, &claim, now.0, &system_zone?)?;
+                        changed
+                    }
+                    Outcome::History(page) => {
+                        return match page.commit(store, &claim, now.0, &system_zone?) {
+                            Ok(changed) => Ok(changed),
+                            Err(error) => {
+                                let failure = if matches!(&error, Error::Conflict(_)) {
+                                    ReadFailure::Cancelled
+                                } else {
+                                    ReadFailure::Transient
+                                };
+                                let _ = store.fail_sync_read(&claim, failure, now.0, None);
+                                Err(error)
+                            }
+                        };
+                    }
                     Outcome::Feed {
                         items,
                         comments,
@@ -99,13 +121,13 @@ pub(super) async fn execute(
                             validators,
                         };
                         if limited {
-                            store.commit_observed_partial(&claim, page, now.0)
+                            store.commit_observed_partial(&claim, page, now.0)?;
                         } else {
-                            store.commit_observed_page(&claim, page, now.0, &system_zone?)
+                            store.commit_observed_page(&claim, page, now.0, &system_zone?)?;
                         }
+                        true
                     }
                 };
-                write?;
                 Ok(changed)
             })
             .await;
@@ -136,6 +158,7 @@ enum Outcome {
     Prepared,
     Unmodified(Validators),
     Pr(Box<pr::ClaimedPage>),
+    History(Box<history::Claimed>),
     Metadata {
         summary: Box<ListSummary>,
         validators: Validators,
@@ -167,7 +190,11 @@ async fn read(
     let repository = claim.target.repository;
     let identity = claim.clone();
     let entry = blocking(store, move |store| {
-        store.read_sync_repository(&identity, UtcMillis::now()?.0)
+        let now = UtcMillis::now()?.0;
+        if HistoryRead::from_target(&identity.target).is_some() {
+            store.monitored_history_target(&identity, now)?;
+        }
+        store.read_sync_repository(&identity, now)
     })
     .await?;
     let (route, provider_id, profile) = entry;
@@ -201,6 +228,10 @@ async fn read_bound(
     claim: &ReadClaim,
     cancel: &Cancellation,
 ) -> Result<(Outcome, RateLimit), ReaderError> {
+    if HistoryRead::from_target(&claim.target).is_some() {
+        let (page, rate) = history::read(store, reader, claim, cancel).await?;
+        return Ok((Outcome::History(Box::new(page)), rate));
+    }
     let validator = ReadValidators {
         etag: claim.validators.etag.clone(),
         last_modified: claim.validators.last_modified.clone(),

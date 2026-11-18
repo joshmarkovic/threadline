@@ -84,7 +84,11 @@ pub struct RefMove {
     pub movement: RefMovement,
 }
 
-fn settings(db: &Connection, a: AccountId, r: RepositoryId) -> Result<HistoryMonitoring> {
+pub(crate) fn settings(
+    db: &Connection,
+    a: AccountId,
+    r: RepositoryId,
+) -> Result<HistoryMonitoring> {
     let s = db
         .query_row(
             "SELECT settings FROM history_monitoring WHERE account_id=? AND repo=?",
@@ -297,73 +301,7 @@ impl Store {
         tip: Option<&CommitOid>,
         at: i64,
     ) -> Result<RefMovement> {
-        let key = reference.key()?;
-        self.write(|tx| {
-            require_observation_profile(tx, p, r)?;
-            let old = ref_state(tx, r, reference)?;
-            let base=tx.query_row("SELECT tip,observed_at FROM history_ref_baselines WHERE account_id=? AND repo=? AND ref_key=?",
-                        params![p.account,r,key],|row|Ok((row.get::<_,Option<String>>(0)?,row.get::<_,i64>(1)?))).optional()?;
-            let latest = old
-                .as_ref()
-                .map(|v| v.observed_at_ms)
-                .into_iter()
-                .chain(base.as_ref().map(|v| v.1))
-                .max();
-            if latest.is_some_and(|t| t > at) {
-                return Ok(RefMovement::Stale);
-            }
-            if old
-                .as_ref()
-                .is_some_and(|o| o.observed_at_ms == at && o.tip.as_ref() != tip)
-                || base
-                    .as_ref()
-                    .is_some_and(|(oid, t)| *t == at && oid.as_deref() != tip.map(CommitOid::as_str))
-            {
-                return Err(Error::Conflict(
-                    "A different ref tip has already been recorded for this observation",
-                ));
-            }
-            tx.execute("INSERT INTO cached_refs(repository_id,name,oid,observed_at_ms) VALUES(?,?,?,?) ON CONFLICT(repository_id,name)
-                        DO UPDATE SET oid=excluded.oid,observed_at_ms=excluded.observed_at_ms WHERE excluded.observed_at_ms>cached_refs.observed_at_ms",
-                        params![r,key,tip.map(CommitOid::as_str),at])?;
-            if let Some(tip) = tip {
-                tx.execute("INSERT INTO history_ref_tips VALUES(?,?,?,?,?) ON CONFLICT(account_id,repo,ref_key,tip)
-                            DO UPDATE SET last_observed_at=MAX(history_ref_tips.last_observed_at,excluded.last_observed_at)",
-                            params![p.account,r,key,tip.as_str(),at])?;
-            }
-            let monitored = settings(tx, p.account, r)?.watches(reference);
-            let previous = if monitored {
-                tx.execute("INSERT INTO history_ref_baselines VALUES(?,?,?,?,?) ON CONFLICT(account_id,repo,ref_key)
-                            DO UPDATE SET tip=excluded.tip,observed_at=excluded.observed_at",
-                            params![p.account,r,key,tip.map(CommitOid::as_str),at])?;
-                base.map(|(v, _)| v)
-            } else {
-                old.map(|o| o.tip.map(String::from))
-            };
-            let Some(previous) = previous else {
-                return Ok(RefMovement::Baseline);
-            };
-            let (old, tip) = match (previous, tip) {
-                (None, None) => return Ok(RefMovement::Unchanged),
-                (Some(_), None) => return Ok(RefMovement::Deleted),
-                (None, Some(_)) => return Ok(RefMovement::Created),
-                (Some(old), Some(tip)) if old == tip.as_str() => return Ok(RefMovement::Unchanged),
-                (Some(old), Some(tip)) => (old, tip),
-            };
-            if !monitored {
-                return Ok(classify(tx, r, &CommitOid::parse(&old)?, tip)?.0);
-            }
-            tx.execute("INSERT INTO history_ref_moves(account_id,repo,ref_key,old_tip,new_tip,observed_at) VALUES(?,?,?,?,?,?)",
-                        params![p.account,r,key,old,tip.as_str(),at])?;
-            let id = tx.last_insert_rowid();
-            repair_moves(tx, p.account, r, at)?;
-            let outcome = tx.query_row(
-                "SELECT outcome FROM history_ref_moves WHERE id=?",
-                [id],
-                |row| row.get::<_, String>(0),
-            )?;
-            RefMovement::from_code(&outcome)
-        })
+        self.write(|tx| observe_ref_in(tx, p, r, reference, tip, at))
     }
     pub fn history_ref_moves(
         &self,
@@ -405,4 +343,79 @@ impl Store {
             .collect()
         })
     }
+}
+
+pub(crate) fn observe_ref_in(
+    tx: &Transaction<'_>,
+    p: &AccessProfile,
+    r: RepositoryId,
+    reference: &HistoryRef,
+    tip: Option<&CommitOid>,
+    at: i64,
+) -> Result<RefMovement> {
+    let key = reference.key()?;
+    require_observation_profile(tx, p, r)?;
+    let old = ref_state(tx, r, reference)?;
+    let base=tx.query_row("SELECT tip,observed_at FROM history_ref_baselines WHERE account_id=? AND repo=? AND ref_key=?",
+                params![p.account,r,key],|row|Ok((row.get::<_,Option<String>>(0)?,row.get::<_,i64>(1)?))).optional()?;
+    let latest = old
+        .as_ref()
+        .map(|v| v.observed_at_ms)
+        .into_iter()
+        .chain(base.as_ref().map(|v| v.1))
+        .max();
+    if latest.is_some_and(|t| t > at) {
+        return Ok(RefMovement::Stale);
+    }
+    if old
+        .as_ref()
+        .is_some_and(|o| o.observed_at_ms == at && o.tip.as_ref() != tip)
+        || base
+            .as_ref()
+            .is_some_and(|(oid, t)| *t == at && oid.as_deref() != tip.map(CommitOid::as_str))
+    {
+        return Err(Error::Conflict(
+            "A different ref tip has already been recorded for this observation",
+        ));
+    }
+    tx.execute("INSERT INTO cached_refs(repository_id,name,oid,observed_at_ms) VALUES(?,?,?,?) ON CONFLICT(repository_id,name)
+                DO UPDATE SET oid=excluded.oid,observed_at_ms=excluded.observed_at_ms WHERE excluded.observed_at_ms>cached_refs.observed_at_ms",
+                params![r,key,tip.map(CommitOid::as_str),at])?;
+    if let Some(tip) = tip {
+        tx.execute("INSERT INTO history_ref_tips VALUES(?,?,?,?,?) ON CONFLICT(account_id,repo,ref_key,tip)
+                    DO UPDATE SET last_observed_at=MAX(history_ref_tips.last_observed_at,excluded.last_observed_at)",
+                    params![p.account,r,key,tip.as_str(),at])?;
+    }
+    let monitored = settings(tx, p.account, r)?.watches(reference);
+    let previous = if monitored {
+        tx.execute("INSERT INTO history_ref_baselines VALUES(?,?,?,?,?) ON CONFLICT(account_id,repo,ref_key)
+                    DO UPDATE SET tip=excluded.tip,observed_at=excluded.observed_at",
+                    params![p.account,r,key,tip.map(CommitOid::as_str),at])?;
+        base.map(|(v, _)| v)
+    } else {
+        old.map(|o| o.tip.map(String::from))
+    };
+    let Some(previous) = previous else {
+        return Ok(RefMovement::Baseline);
+    };
+    let (old, tip) = match (previous, tip) {
+        (None, None) => return Ok(RefMovement::Unchanged),
+        (Some(_), None) => return Ok(RefMovement::Deleted),
+        (None, Some(_)) => return Ok(RefMovement::Created),
+        (Some(old), Some(tip)) if old == tip.as_str() => return Ok(RefMovement::Unchanged),
+        (Some(old), Some(tip)) => (old, tip),
+    };
+    if !monitored {
+        return Ok(classify(tx, r, &CommitOid::parse(&old)?, tip)?.0);
+    }
+    tx.execute("INSERT INTO history_ref_moves(account_id,repo,ref_key,old_tip,new_tip,observed_at) VALUES(?,?,?,?,?,?)",
+                params![p.account,r,key,old,tip.as_str(),at])?;
+    let id = tx.last_insert_rowid();
+    repair_moves(tx, p.account, r, at)?;
+    let outcome = tx.query_row(
+        "SELECT outcome FROM history_ref_moves WHERE id=?",
+        [id],
+        |row| row.get::<_, String>(0),
+    )?;
+    RefMovement::from_code(&outcome)
 }

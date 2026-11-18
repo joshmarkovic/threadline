@@ -34,6 +34,7 @@ use crate::accounts::AccountService;
 use crate::sync_worker::{blocking, hold};
 
 mod history;
+pub(crate) use history::{history_entry, history_page_number};
 pub(crate) mod pr_reads;
 pub(crate) use pr_reads::PrSourceRequest;
 mod merge_policy;
