@@ -1,4 +1,5 @@
 mod access_fixture;
+mod activity;
 mod catalog;
 mod cli;
 mod install;

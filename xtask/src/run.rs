@@ -52,6 +52,14 @@ const UNIT: &[CargoTest] = &[
         arguments: &["-p", "threadline-core", "--lib", "ut_013"],
     },
     CargoTest {
+        id: "UT-014",
+        arguments: &["-p", "threadline-storage", "--lib", "ut_014"],
+    },
+    CargoTest {
+        id: "UT-015",
+        arguments: &["-p", "threadline-storage", "--lib", "ut_015"],
+    },
+    CargoTest {
         id: "UT-016",
         arguments: &["-p", "threadline-storage", "--lib", "ut_016"],
     },
@@ -101,6 +109,30 @@ const UNIT: &[CargoTest] = &[
     },
 ];
 const INTEGRATION: &[CargoTest] = &[
+    CargoTest {
+        id: "IT-018",
+        arguments: &[
+            "-p",
+            "threadline-storage",
+            "--test",
+            "sync",
+            "--test",
+            "notifications",
+            "it_018",
+        ],
+    },
+    CargoTest {
+        id: "IT-019",
+        arguments: &[
+            "-p",
+            "threadline-storage",
+            "--test",
+            "identity",
+            "--test",
+            "durability",
+            "it_019",
+        ],
+    },
     CargoTest {
         id: "IT-006",
         arguments: &[
@@ -500,6 +532,9 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
     let full = options.suite.as_deref() == Some("full");
     match options.case.as_deref() {
         Some("E2E-001") => {}
+        Some(id @ ("E2E-012" | "E2E-018")) => {
+            return vec![crate::activity::run(id, options, root, dir)];
+        }
         Some(id) => {
             let mode = if id == "S04-READER-PERF" {
                 Some(NativeMode::WindowsReaderPerformance)
@@ -534,6 +569,9 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
             };
             platform.evidence = platform.evidence.map(|path| format!("{subdir}/{path}"));
             cases.push(platform);
+        }
+        for id in ["E2E-012", "E2E-018"] {
+            cases.push(crate::activity::run(id, options, root, dir));
         }
     }
     cases

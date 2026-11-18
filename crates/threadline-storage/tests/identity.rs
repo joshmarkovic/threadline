@@ -626,7 +626,7 @@ fn assert_checkpoint(connection: &Connection) {
 }
 
 #[test]
-fn prior_profile_upgrade_backup_restore_transfer_and_cleanup_preserve_durable_state() {
+fn it_019_prior_profile_upgrade_backup_restore_transfer_and_cleanup_preserve_durable_state() {
     let profile = tempdir().unwrap();
     let path = profile.path().join(DATABASE_FILENAME);
     let (item, original_repository, next_repository) = create_v1(&path);

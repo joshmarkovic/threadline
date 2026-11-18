@@ -3,6 +3,7 @@ use std::path::PathBuf;
 pub const USAGE: &str =
     "cargo xtask test <unit|integration|ui> [--case ID] [--seed N] [--report-dir DIR]
 cargo xtask test e2e --suite <smoke|full> [--binary PATH] [--case ID] [--seed N] [--report-dir DIR]
+cargo xtask test e2e --suite full --case <E2E-012|E2E-018> --local-fixture TRUSTED_JSON [--report-dir DIR]
 cargo xtask test install --artifact PATH [--local-fixture TRUSTED_JSON] [--case ID] [--report-dir DIR]
 cargo xtask test live --repo OWNER/REPO --case LIVE-001 [--credential-stdin [--allow-existing-cli-oauth]] [--first-issue-pr-page] [--report-dir DIR]
 cargo xtask test live --repo OWNER/REPO --case <LIVE-003|LIVE-004> [--allow-live-writes | --readback-only] --credential-stdin [--allow-existing-cli-oauth] [--report-dir DIR]
@@ -141,7 +142,7 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
             "--artifact" if matches!(lane, Lane::Install | Lane::Measure) => {
                 options.artifact = Some(value.into());
             }
-            "--local-fixture" if lane == Lane::Install => {
+            "--local-fixture" if matches!(lane, Lane::Install | Lane::E2e) => {
                 options.local_fixture = Some(value.into());
             }
             "--repo" if lane == Lane::Live => {
@@ -161,6 +162,13 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
     }
 
     match lane {
+        Lane::E2e
+            if options.local_fixture.is_some()
+                && (!matches!(options.case.as_deref(), Some("E2E-012" | "E2E-018"))
+                    || options.suite.as_deref() != Some("full")) =>
+        {
+            return Err("The installed activity fixture requires --suite full and an installed activity case.".into());
+        }
         Lane::E2e if options.suite.is_none() => return Err("Specify --suite smoke or full".into()),
         Lane::Install if options.artifact.is_none() => return Err("Specify --artifact PATH".into()),
         Lane::Live if options.repo.is_none() => return Err("Specify --repo OWNER/REPO".into()),
@@ -227,7 +235,9 @@ pub fn report_arguments(args: &[String]) -> Vec<String> {
                     "--artifact" if matches!(lane, Some(Lane::Install | Lane::Measure)) => {
                         public_path(value, "<artifact-path>")
                     }
-                    "--local-fixture" if lane == Some(Lane::Install) => "<local-fixture-path>",
+                    "--local-fixture" if matches!(lane, Some(Lane::Install | Lane::E2e)) => {
+                        "<local-fixture-path>"
+                    }
                     "--report-dir" => public_path(value, "<report-dir>"),
                     "--repo" if lane == Some(Lane::Live) && value == "OWNER/REPO" => value,
                     "--repo" => "<repository>",

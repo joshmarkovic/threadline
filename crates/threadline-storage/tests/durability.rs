@@ -114,7 +114,7 @@ fn server(step: &str) -> Receipt {
 }
 
 #[test]
-fn workspace_views_drafts_refs_and_preferences_survive_cache_cleanup_and_restart() {
+fn it_019_workspace_views_drafts_refs_and_preferences_survive_cache_cleanup_and_restart() {
     let f = Fixture::new();
     let s = &f.store;
     let a = f.account;
@@ -530,7 +530,7 @@ fn ut_009_recovery_does_not_blindly_replay_and_preserves_step_mapping() {
 }
 
 #[test]
-fn signout_scope_pause_and_backup_hold_survive_restart() {
+fn it_019_signout_scope_pause_and_backup_hold_survive_restart() {
     let f = Fixture::new();
     let s = &f.store;
     let a = f.account;
