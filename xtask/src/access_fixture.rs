@@ -383,6 +383,17 @@ fn answer(
     if route == Route::CommentCreated && reply.status == 201 {
         socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:4101:07\r\n")?;
     }
+    if reply.status == 200 {
+        match route {
+            Route::ReviewCreated => {
+                socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:4201:08\r\n")?
+            }
+            Route::ReviewSubmitted => {
+                socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:4202:08\r\n")?
+            }
+            _ => (),
+        }
+    }
     if phase == Phase::SyncThrottle && route == Route::User && reply.status == 429 {
         socket.write_all(b"Retry-After: 2\r\n")?;
     }

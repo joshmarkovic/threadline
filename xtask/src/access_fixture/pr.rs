@@ -244,6 +244,43 @@ mod tests {
     use super::*;
 
     #[test]
+    fn accepted_review_steps_return_distinct_required_request_receipts() {
+        let temp = tempfile::tempdir().unwrap();
+        let fixture = AccessFixture::start(temp.path()).unwrap();
+        fs::write(fixture.phase_file(), "review-send").unwrap();
+        let post = |path: &str, payload: Value| {
+            let mut socket = TcpStream::connect(fixture.address()).unwrap();
+            let body = payload.to_string();
+            write!(socket, "POST {path} HTTP/1.1\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\nContent-Length: {}\r\n\r\n{body}", body.len()).unwrap();
+            let mut reply = String::new();
+            socket.read_to_string(&mut reply).unwrap();
+            reply
+        };
+        let created = post(
+            "/repos/fixture-org/private/pulls/42/reviews",
+            json!({
+                "commit_id":A_HEAD,"body":REVIEW_SUMMARY,
+                "comments":[{"path":"src/first.rs","line":1,"side":"RIGHT","body":INLINE_NOTE}]
+            }),
+        );
+        let submitted = post(
+            "/repos/fixture-org/private/pulls/42/reviews/91/events",
+            json!({
+                "event":"COMMENT","body":REVIEW_SUMMARY
+            }),
+        );
+        assert!(
+            created.starts_with("HTTP/1.1 200")
+                && created.contains("X-GitHub-Request-Id: SYNTHETIC:4201:08\r\n")
+        );
+        assert!(
+            submitted.starts_with("HTTP/1.1 200")
+                && submitted.contains("X-GitHub-Request-Id: SYNTHETIC:4202:08\r\n")
+        );
+        fixture.finish(temp.path(), TraceCheck::Observe).unwrap();
+    }
+
+    #[test]
     fn isolates_both_heads_and_holds_only_the_exact_linked_issue() {
         let temp = tempfile::tempdir().unwrap();
         let fixture = AccessFixture::start(temp.path()).unwrap();
