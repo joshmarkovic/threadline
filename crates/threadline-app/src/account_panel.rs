@@ -108,7 +108,7 @@ impl AccountPanel {
             #[cfg(feature = "e2e")]
             token_observation,
         };
-        panel.launch(AccountCommand::Load, None, cx);
+        panel.launch(panel.service.initial_command(), None, cx);
         panel
     }
 

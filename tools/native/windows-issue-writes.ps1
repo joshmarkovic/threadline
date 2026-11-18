@@ -1,7 +1,7 @@
 function Open-WriteFixtureIssue([IntPtr]$Window) {
     Set-AccessPhase 'write-online'
-    Connect-FixtureAccount $Window -FromVisibleControl
-    Click-AccountControl $Window 'account-close'
+    Wait-SeededFixtureAccount
+    Click-AccountControl $Window 'reader-repository-1'
     Click-AccountControl $Window 'reader-fetch-repository'
     Click-AccountControl $Window 'reader-result-0'
     $state = Wait-Reader 'the downloaded existing fixture issue' {
@@ -23,8 +23,7 @@ function Set-WriteFixtureOffline([IntPtr]$Window, [bool]$Offline) {
 
 function Type-WriteFixtureField([IntPtr]$Window, [string]$Id, [string]$Value) {
     Click-AccountControl $Window $Id
-    [ThreadlineWinInput]::Chord(@(0x11, 0x41))
-    [ThreadlineWinInput]::TypeText($Value)
+    [ThreadlineWinInput]::ReplaceFixtureText($Window, [uint32]$script:app.Id, $Value)
 }
 
 function Wait-WriteFixtureDraft([long]$Item, [string]$Value) {
@@ -96,8 +95,7 @@ function Invoke-IssueWriteProof([IntPtr]$Window, [string]$Profile) {
     Add-Evidence 'Cancel the original issue edit while it is still offline' 'Cancelled'
 
     Set-WriteFixtureOffline $restarted $false
-    Connect-FixtureAccount $restarted -FromVisibleControl
-    Click-AccountControl $restarted 'account-close'
+    Wait-SeededFixtureAccount
     $null = Wait-Reader 'the eligible comment completes without a second Submit' {
         param($reader) !$reader.offline -and $reader.outbox -eq 0
     }
@@ -169,6 +167,7 @@ function Invoke-IssueWriteSurfaceProof([IntPtr]$Window) {
     Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
     $item = Open-WriteFixtureIssue $Window
     Assert-OwnedIssueCreationAbsent $Window $true
+    Set-WindowFocus $Window
     [ThreadlineWinInput]::Chord(@(0x11, 0x4E))
     $null = Wait-Reader 'Ctrl+N leaves the original issue and one tab open' {
         param($reader)

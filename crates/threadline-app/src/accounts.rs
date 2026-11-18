@@ -25,6 +25,9 @@ use zeroize::Zeroize;
 
 pub(crate) const FIXTURE_PAT: &str = "threadline-test-fixture";
 
+#[cfg(feature = "e2e")]
+mod fixture_auth;
+
 pub(crate) struct Pat(Credential);
 
 impl Pat {
@@ -79,6 +82,8 @@ pub(crate) struct AccountService {
 
 pub(crate) enum AccountCommand {
     Load,
+    #[cfg(feature = "e2e")]
+    LoadFixture,
     Connect {
         repository: String,
         pat: Pat,
@@ -194,6 +199,16 @@ impl AccountService {
         self.store.clone()
     }
 
+    pub(crate) fn initial_command(&self) -> AccountCommand {
+        #[cfg(feature = "e2e")]
+        if self.fixture
+            && std::env::var_os("THREADLINE_E2E_FIXTURE_AUTH").is_some_and(|value| value == "1")
+        {
+            return AccountCommand::LoadFixture;
+        }
+        AccountCommand::Load
+    }
+
     pub(crate) fn sync_worker_enabled(&self) -> bool {
         !self.fixture
             || (cfg!(feature = "e2e")
@@ -271,6 +286,8 @@ impl AccountService {
     ) -> Result<(Option<&'static str>, Reachability), Problem> {
         match command {
             AccountCommand::Load => Ok((None, Reachability::NotAttempted)),
+            #[cfg(feature = "e2e")]
+            AccountCommand::LoadFixture => self.seed_fixture_access(cancel).await,
             AccountCommand::Connect {
                 repository,
                 pat,

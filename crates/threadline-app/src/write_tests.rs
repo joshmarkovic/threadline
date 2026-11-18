@@ -403,3 +403,53 @@ async fn write_dispatch_uses_durable_offline_outbox_and_stops_after_lost_respons
     assert_eq!(fixture.sent.load(Ordering::SeqCst), 2);
     assert_eq!(state(LOST), State::OutcomeUnknown);
 }
+
+#[cfg(feature = "e2e")]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn startup_fixture_authorization_verifies_loopback_and_rehydrates_without_network_offline() {
+    let fixture = WriteFixture::start();
+    let dir = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open_profile(dir.path()).unwrap());
+    let service = || AccountService {
+        store: store.clone(),
+        credentials: Arc::new(FixtureVault::default()),
+        github: GitHubClient::loopback(fixture.address).unwrap(),
+        fixture: true,
+    };
+    let cancel = Cancellation::new();
+    let first = service()
+        .execute(AccountCommand::LoadFixture, &cancel)
+        .await;
+    assert!(first.github_error.is_none());
+    assert_eq!(first.reachability, Reachability::ReceivedResponse);
+    let account = first.view.active.unwrap();
+    assert_eq!(first.view.profiles[0].user_id.get(), 41);
+    assert_eq!(first.view.repositories[0].provider_id.get(), 71);
+    assert!(first.view.repositories[0].selected);
+    let profile = first.view.profiles[0].clone();
+    store
+        .update_sync_settings(account, |s| s.controls.work_offline = true)
+        .unwrap();
+
+    let restarted = service();
+    let next = restarted
+        .execute(AccountCommand::LoadFixture, &cancel)
+        .await;
+    assert_eq!(next.reachability, Reachability::NotAttempted);
+    assert!(next.view.offline);
+    assert_eq!(next.view.active, Some(account));
+    assert_eq!(next.view.profiles[0], profile);
+    let key = credential_ref(&profile)
+        .ok()
+        .expect("isolated fixture credential reference");
+    assert!(restarted.credentials.read(&key).unwrap().is_some());
+    let signout = restarted
+        .execute(AccountCommand::SignOut(account), &cancel)
+        .await;
+    assert_eq!(signout.view.profiles[0].access, AccessState::SignedOut);
+    let signed_out = service()
+        .execute(AccountCommand::LoadFixture, &cancel)
+        .await;
+    assert_eq!(signed_out.view.profiles[0].access, AccessState::SignedOut);
+    assert_eq!(signed_out.reachability, Reachability::NotAttempted);
+}

@@ -71,6 +71,7 @@ $copiedClipboardSequence = $null
 $toastFixture = $null
 $toastSubmissionAttempted = $false
 $script:UseOwnedUiAutomation = $false
+$script:UseSeededFixtureAuth = $ReaderProof -in @('Resume', 'PullRequest', 'Writes', 'WriteSurface')
 
 function Get-FileSha256 {
     param([string]$Path)
@@ -199,12 +200,14 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     $info.EnvironmentVariables.Remove('THREADLINE_TEST_TOAST_TOKEN')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_GITHUB_ADDR')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_SYNC')
+    $info.EnvironmentVariables.Remove('THREADLINE_E2E_FIXTURE_AUTH')
     if ($ToastProof -and $null -ne $script:toastFixture) {
         $info.EnvironmentVariables['THREADLINE_TEST_TOAST_TOKEN'] = $script:toastFixture.Token
     }
     if ($AccessProof -or $ReaderProof) {
         $info.EnvironmentVariables['THREADLINE_E2E_GITHUB_ADDR'] = $script:AccessAddress
     }
+    if ($script:UseSeededFixtureAuth) { $info.EnvironmentVariables['THREADLINE_E2E_FIXTURE_AUTH'] = '1' }
     if ($ReaderProof -in @('Sync', 'Writes', 'WriteSurface')) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
     return [Diagnostics.Process]::Start($info)
 }
@@ -872,7 +875,7 @@ try {
         }
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
-    if ($AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'PullRequest')) {
+    if ($AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'PullRequest', 'Writes', 'WriteSurface')) {
         Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
         . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
         $script:UseOwnedUiAutomation = $true
@@ -886,6 +889,15 @@ try {
     $null = New-Item -ItemType Directory -Path $firstProfile -Force
     if ($ReaderProof -eq 'Offline') { Initialize-ReaderProfile $firstProfile 'small' }
     if ($ReaderProof -eq 'Performance') { Initialize-ReaderProfile $firstProfile 'section-16' }
+    if ($script:UseSeededFixtureAuth) {
+        $fixturePhase = switch ($ReaderProof) {
+            Resume { 'reader-failure' }
+            PullRequest { 'pr-load' }
+            default { 'write-online' }
+        }
+        Set-AccessPhase $fixturePhase
+        $report.authentication_setup = 'Fixed isolated loopback identity, verified by the application'
+    }
     if ($ToastProof) {
         if (!(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'windows-notification-focus.ps1') -PathType Leaf)) {
             throw 'The registered toast action helper is missing from this test build.'

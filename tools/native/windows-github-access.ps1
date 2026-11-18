@@ -6,6 +6,20 @@ function Wait-Account([string]$Description, [scriptblock]$AccountCheck) {
     }
 }
 
+function Wait-SeededFixtureAccount {
+    if (!$script:UseSeededFixtureAuth) { throw 'This case must use normal native credential entry.' }
+    $observed = Wait-Account 'the authorized synthetic fixture and selected repository' {
+        param($account)
+        $account.active_user_id -eq 41 -and $account.active_login -ceq 'fixture-user' -and
+            $account.profile_access -ceq 'Readable' -and $account.repository_count -eq 1 -and
+            $account.selected_count -eq 1
+    }
+    Add-Evidence 'Load the isolated verified account and scope' ([ordered]@{
+        user = $observed.account_access.active_user_id
+        repository_count = $observed.account_access.selected_count
+    })
+}
+
 function Wait-AccountControl([string]$Id) {
     return Wait-State ('account control ' + $Id) {
         param($snapshot)

@@ -66,8 +66,7 @@ function Open-FixturePr([IntPtr]$Window, [int]$Pane, [int]$Number, [string]$Titl
 
 function Invoke-PrReaderProof([IntPtr]$Window) {
     Set-AccessPhase 'pr-load'
-    Connect-FixtureAccount $Window
-    Click-AccountControl $Window 'account-close'
+    Wait-SeededFixtureAccount
     Click-AccountControl $Window 'reader-repository-1'
     Click-AccountControl $Window 'reader-fetch-repository'
 

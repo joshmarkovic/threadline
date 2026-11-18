@@ -96,8 +96,7 @@ function Invoke-OfflineReaderProof([IntPtr]$Window, [string]$Profile) {
 
 function Invoke-ReaderResumeProof([IntPtr]$Window, [string]$Profile) {
     Set-AccessPhase 'reader-failure'
-    Connect-FixtureAccount $Window
-    Click-AccountControl $Window 'account-close'
+    Wait-SeededFixtureAccount
     Click-AccountControl $Window 'reader-repository-1'
     Click-AccountControl $Window 'reader-fetch-repository'
     Click-AccountControl $Window 'reader-result-0'
@@ -130,8 +129,7 @@ function Invoke-ReaderResumeProof([IntPtr]$Window, [string]$Profile) {
             $reader.download_state -cin @('Active', 'Pending')
     }
     Set-AccessPhase 'reader-resume'
-    Connect-FixtureAccount $restarted -FromVisibleControl
-    Click-AccountControl $restarted 'account-close'
+    Wait-SeededFixtureAccount
     Click-AccountControl $restarted 'reader-resume-download-0'
     $null = Wait-Reader 'the resumed offline download completed with two unique comments' {
         param($reader)
