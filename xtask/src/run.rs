@@ -575,20 +575,28 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
             platform.evidence = platform.evidence.map(|path| format!("{subdir}/{path}"));
             cases.push(platform);
         }
-        for id in ["E2E-012", "E2E-018"] {
-            cases.push(crate::activity::run(id, options, root, dir));
+        for (id, name) in [
+            ("E2E-012", "windows-activity-cold"),
+            ("E2E-018", "windows-activity-fallback"),
+        ] {
+            let subdir = dir.join(name);
+            let mut result = match fs::create_dir(&subdir) {
+                Ok(()) => crate::activity::run(id, options, root, &subdir),
+                Err(error) => CaseResult::new(id, Status::Fail, error.to_string()),
+            };
+            result.evidence = result.evidence.map(|path| format!("{name}/{path}"));
+            cases.push(result);
         }
     }
     cases
 }
 
 fn unimplemented(id: &str) -> CaseResult {
-    let detail = if id == "IT-019" {
-        "Full IT-019 remains a Sprint 12 gate. Use S02-DURABILITY for the Sprint 02 storage subset."
-    } else {
-        "This scheduled case has no implementation yet."
-    };
-    CaseResult::new(id, Status::Blocked, detail)
+    CaseResult::new(
+        id,
+        Status::Blocked,
+        "This scheduled case has no implementation yet.",
+    )
 }
 
 fn run_cargo_tests(

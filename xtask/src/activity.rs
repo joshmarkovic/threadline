@@ -101,10 +101,11 @@ pub fn run(id: &str, options: &Options, root: &Path, dir: &Path) -> CaseResult {
             .is_some_and(|x| x.eq_ignore_ascii_case("exe"))
         || !sha256(&exe).is_ok_and(|got| got.eq_ignore_ascii_case(&fixture.app_sha256))
         || !sha256(&helper).is_ok_and(|got| got.eq_ignore_ascii_case(&fixture.fixture_sha256))
-        || options
-            .binary
-            .as_ref()
-            .is_some_and(|given| given.canonicalize().ok().as_ref() != Some(&exe))
+        || options.case.is_some()
+            && options
+                .binary
+                .as_ref()
+                .is_some_and(|given| given.canonicalize().ok().as_ref() != Some(&exe))
     {
         return failed(
             "The selected installed app or fixture helper did not match its trusted file identity.",

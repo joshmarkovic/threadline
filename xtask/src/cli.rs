@@ -164,10 +164,10 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
     match lane {
         Lane::E2e
             if options.local_fixture.is_some()
-                && (!matches!(options.case.as_deref(), Some("E2E-012" | "E2E-018"))
+                && (!matches!(options.case.as_deref(), None | Some("E2E-012" | "E2E-018"))
                     || options.suite.as_deref() != Some("full")) =>
         {
-            return Err("The installed activity fixture requires --suite full and an installed activity case.".into());
+            return Err("The installed activity fixture requires the full suite or a named installed activity case.".into());
         }
         Lane::E2e if options.suite.is_none() => return Err("Specify --suite smoke or full".into()),
         Lane::Install if options.artifact.is_none() => return Err("Specify --artifact PATH".into()),
