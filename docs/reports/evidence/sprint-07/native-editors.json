@@ -1,0 +1,242 @@
+{
+  "cases": [
+    {
+      "run": "e2e-1795040227176-40580",
+      "case": "E2E-006",
+      "result": "Pass",
+      "exit_code": 0,
+      "driver_revision": "4f1e2087d726c7208f937fd6510ea346c5471198",
+      "source_dirty": false,
+      "app_revision": "eb77755",
+      "executable_sha256": "ea9d7d974decb6269ddd63f18103ce283f69a76b83ea7b7186c77ceb6707a739",
+      "bytes": 75254272,
+      "os_build": "10.0.22631",
+      "dpi": 144,
+      "fixture": "s07-write-engine-v1",
+      "seed": 12345,
+      "auth": "Fixed isolated loopback identity, verified by the application",
+      "detail": "The native editor restored two offline actions, cancelled the unsent issue edit and completed the retained ordinary comment after reconnect. A second ordinary comment lost its server response and retained an uncertain outcome after cancellation. See native-driver.log.",
+      "new_process": true,
+      "checked_actions": [
+        {
+          "action": "Open existing GitHub issue 41 from the downloaded repository",
+          "observed": 41
+        },
+        {
+          "action": "Save two explicit actions and a separate unsent draft while offline",
+          "observed": {
+            "issue_number": 41,
+            "queued_actions": 2,
+            "later_draft_submitted": false
+          }
+        },
+        {
+          "action": "Relaunch the same SQLite profile in a separate process",
+          "observed": {
+            "sqlite_retained": true
+          }
+        },
+        {
+          "action": "Cancel the original issue edit while it is still offline",
+          "observed": "Cancelled"
+        },
+        {
+          "action": "Reconcile the original queued ordinary comment after reconnect",
+          "observed": "Confirmed"
+        },
+        {
+          "action": "Request cancellation after a mutation may have been sent",
+          "observed": {
+            "state": "OutcomeUnknown",
+            "cancellation_requested": true
+          }
+        }
+      ],
+      "http": [
+        {
+          "route": "comment_created",
+          "status": 201,
+          "count": 1
+        },
+        {
+          "route": "comment_reply_lost",
+          "status": 0,
+          "count": 1
+        },
+        {
+          "route": "item",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "route": "items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "route": "repository",
+          "status": 200,
+          "count": 5
+        },
+        {
+          "route": "user",
+          "status": 200,
+          "count": 6
+        }
+      ],
+      "raw_sha256": {
+        "result": "0f539e48e10a3866671bbb56d92417b7b6452efbafe8414e07a720d062a6587a",
+        "native": "d2c913e635d3d8596a8e2d6d9975005bec33d8d7bbd1dbad992e107c869fc14f",
+        "redacted_http_trace": "3a49d53db1f92d087a24690102f2586332ba9cf5522aece5aff0bf9fa6a6cef7"
+      }
+    },
+    {
+      "run": "e2e-1795040304303-39284",
+      "case": "E2E-019",
+      "result": "Fail",
+      "exit_code": 1,
+      "driver_revision": "4f1e2087d726c7208f937fd6510ea346c5471198",
+      "source_dirty": false,
+      "app_revision": "eb77755",
+      "executable_sha256": "ea9d7d974decb6269ddd63f18103ce283f69a76b83ea7b7186c77ceb6707a739",
+      "bytes": 75254272,
+      "os_build": "10.0.22631",
+      "dpi": 144,
+      "fixture": "s07-write-engine-v1",
+      "seed": 12345,
+      "auth": "Fixed isolated loopback identity, verified by the application",
+      "detail": "Could not verify the isolated GitHub trace.",
+      "new_process": false,
+      "checked_actions": [
+        {
+          "action": "Open existing GitHub issue 41 from the downloaded repository",
+          "observed": 41
+        },
+        {
+          "action": "Inspect owned native edit, comment and Outbox controls and exercise Ctrl+N",
+          "observed": {
+            "existing_issue": 41,
+            "issue_creation_control_found": false,
+            "ordinary_comment_confirmed": true
+          }
+        }
+      ],
+      "http": [
+        {
+          "route": "comment_created",
+          "status": 201,
+          "count": 1
+        },
+        {
+          "route": "item",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "route": "items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "route": "repository",
+          "status": 200,
+          "count": 4
+        },
+        {
+          "route": "unexpected",
+          "status": 404,
+          "count": 1
+        },
+        {
+          "route": "updated_items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "route": "user",
+          "status": 200,
+          "count": 4
+        }
+      ],
+      "raw_sha256": {
+        "result": "37ef848a4a11f02114b6a69e1ee152c4c0af8d6b642647187697130424fa38d8",
+        "native": "3122e2d9617b413b1b4b513a8be049172b7cc441097eb48b18efb0502861c9d3",
+        "redacted_http_trace": "fe627a4844e82276628f458439318626b17abc244f982e2ca59b251d009b48e2"
+      }
+    },
+    {
+      "run": "e2e-1795041019153-47996",
+      "case": "E2E-019",
+      "result": "Pass",
+      "exit_code": 0,
+      "driver_revision": "1df3c637a28a3648dbd0fc336896e404f3e18066",
+      "source_dirty": false,
+      "app_revision": "eb77755",
+      "executable_sha256": "ea9d7d974decb6269ddd63f18103ce283f69a76b83ea7b7186c77ceb6707a739",
+      "bytes": 75254272,
+      "os_build": "10.0.22631",
+      "dpi": 144,
+      "fixture": "s07-write-engine-v1",
+      "seed": 12345,
+      "auth": "Fixed isolated loopback identity, verified by the application",
+      "detail": "The owned native controls, Ctrl+N, existing issue draft and actual ordinary comment did not expose an issue-creation path. See native-driver.log.",
+      "new_process": false,
+      "checked_actions": [
+        {
+          "action": "Open existing GitHub issue 41 from the downloaded repository",
+          "observed": 41
+        },
+        {
+          "action": "Inspect owned native edit, comment and Outbox controls and exercise Ctrl+N",
+          "observed": {
+            "existing_issue": 41,
+            "issue_creation_control_found": false,
+            "ordinary_comment_confirmed": true
+          }
+        }
+      ],
+      "http": [
+        {
+          "route": "comment_created",
+          "status": 201,
+          "count": 1
+        },
+        {
+          "route": "item",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "route": "items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "route": "repository",
+          "status": 200,
+          "count": 4
+        },
+        {
+          "route": "scheduled_issue",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "route": "updated_comments",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "route": "user",
+          "status": 200,
+          "count": 4
+        }
+      ],
+      "raw_sha256": {
+        "result": "cdf72aca9f6d75245f534c866c1e4d1260088e0be0b7adc23c6c753ff8aa7b11",
+        "native": "19bb4a7dff7c0cd51da87c174ff46be17803a551d5e7cdfe4f3b422b2bd395fb",
+        "redacted_http_trace": "dc4d82ed6dbe7c8320229f9024e3bdfe4ffac75e4420191db444fdf795e3551e"
+      }
+    }
+  ]
+}
