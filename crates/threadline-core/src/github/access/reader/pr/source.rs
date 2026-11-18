@@ -13,6 +13,7 @@ const MAX_CONTEXT_LINES: u16 = 200;
 pub enum PrSource {
     Text {
         oid: String,
+        blob_oid: String,
         path: String,
         first_line: u32,
         text: String,
@@ -101,7 +102,7 @@ impl FileContents {
         if self.path != expected_path {
             return Err(identity_mismatch());
         }
-        oid(self.sha)?;
+        let blob_oid = oid(self.sha)?;
         if self.size > MAX_BLOB_BYTES {
             return Ok(PrSource::Unavailable(SourceUnavailable::TooLarge));
         }
@@ -135,6 +136,7 @@ impl FileContents {
         }
         Ok(PrSource::Text {
             oid: commit.to_owned(),
+            blob_oid,
             path: self.path,
             first_line: range.start,
             text: text.join("\n"),

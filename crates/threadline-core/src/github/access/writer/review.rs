@@ -31,7 +31,75 @@ struct ReplyWire {
     pull_request_url: String,
 }
 
+#[derive(Deserialize)]
+pub struct ReviewedLine {
+    pub id: NonZeroU64,
+    #[serde(rename = "pull_request_review_id")]
+    review: NonZeroU64,
+    user: UserWire,
+    pub path: String,
+    pub side: Option<String>,
+    pub line: Option<u32>,
+    pub body: String,
+    pub commit_id: String,
+    pull_request_url: String,
+}
+
+impl ReviewedLine {
+    pub fn author(&self) -> NonZeroU64 {
+        self.user.id
+    }
+}
+
 impl GitHubWriter<'_> {
+    pub fn reader(&self) -> GitHubReader<'_> {
+        GitHubReader::from_access(self.session, &self.repository)
+    }
+
+    pub async fn has_reviews(
+        &self,
+        pull: &VerifiedPull,
+        cancel: &CancellationToken,
+    ) -> Result<(bool, RateLimit), AccessError> {
+        self.check_pull(pull)?;
+        let path = format!("pulls/{}/reviews?per_page=1&page=1", pull.number.get());
+        let (rows, headers): (Vec<serde_json::Value>, _) = self.get(&path, cancel).await?;
+        if partial_sso(&headers).is_some()
+            || (rows.is_empty() && headers.contains_key(header::LINK))
+        {
+            return Err(AccessError::received(AccessKind::MalformedResponse, 200));
+        }
+        Ok((!rows.is_empty(), RateLimit::from_headers(&headers)))
+    }
+
+    /// Read a bounded complete list for this known review. A larger review needs paginated reading.
+    pub async fn review_lines(
+        &self,
+        pull: &VerifiedPull,
+        review: &ObservedReview,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<ReviewedLine>, AccessError> {
+        self.check_pull(pull)?;
+        if review.repository != self.repository() || review.pull != pull.id {
+            return Err(AccessError::local(AccessKind::WrongScope));
+        }
+        let path = format!(
+            "pulls/{}/reviews/{}/comments?per_page=2&page=1",
+            pull.number.get(),
+            review.id
+        );
+        let (rows, headers): (Vec<ReviewedLine>, _) = self.get(&path, cancel).await?;
+        if partial_sso(&headers).is_some() || headers.contains_key(header::LINK) || rows.len() > 2 {
+            return Err(AccessError::received(AccessKind::InvalidPagination, 200));
+        }
+        if rows.iter().any(|row| {
+            row.review != review.id || !self.check_pull_url(&row.pull_request_url, pull.number)
+        }) {
+            return Err(AccessError::received(AccessKind::IdentityMismatch, 200));
+        }
+        Ok(rows)
+    }
+
     pub async fn observe_pull_for_review(
         &self,
         number: ItemNumber,

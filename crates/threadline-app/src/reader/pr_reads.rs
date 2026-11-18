@@ -141,6 +141,7 @@ impl ReaderService {
                 path,
                 first_line,
                 text,
+                ..
             } => PrRecord::Context {
                 oid,
                 path,

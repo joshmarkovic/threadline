@@ -16,6 +16,7 @@ const EXPECTED_REPOSITORY_ID: u64 = 1_462_273_296;
 const CASE: &str = "LIVE-001";
 const EVIDENCE: &str = "github-read.json";
 
+mod reviews;
 mod writes;
 
 fn authorize(
@@ -46,6 +47,9 @@ pub(crate) fn run(options: &Options, root: &Path, dir: &Path) -> CaseResult {
     let case = options.case.as_deref().unwrap_or(CASE);
     if case == "LIVE-002" {
         return writes::run(options, root, dir);
+    }
+    if case == "LIVE-003" {
+        return reviews::run(options, root, dir);
     }
     let repository = std::env::var("THREADLINE_LIVE_READ_REPO").ok();
     let user_id = std::env::var("THREADLINE_LIVE_EXPECTED_USER_ID")
