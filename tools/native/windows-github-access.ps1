@@ -82,7 +82,7 @@ function Open-AccountFixture {
     return Wait-Account 'open the native account panel' { param($account) $account.panel_open }
 }
 
-function Enter-FixtureAccountForm([IntPtr]$Window) {
+function Enter-FixtureAccountForm([IntPtr]$Window, [switch]$LoopbackTokenAction) {
     if (!$script:UseOwnedUiAutomation -or !(Set-OwnedFixtureRepository $Window)) {
         if ($script:UseOwnedUiAutomation) { Set-WindowFocus $Window }
         Click-AccountControl $Window 'account-repository'
@@ -94,28 +94,39 @@ function Enter-FixtureAccountForm([IntPtr]$Window) {
     $null = Wait-Account 'the exact synthetic repository in the native form' {
         param($account) $account.fixture_route_entered
     }
-    if ($script:UseOwnedUiAutomation) {
+    if ($LoopbackTokenAction) {
+        if (!$script:UseOwnedUiAutomation -or $ReaderProof -cne 'CredentialBoundary') {
+            throw 'The synthetic fill action is limited to the scoped credential boundary driver.'
+        }
         Assert-OwnedMaskedFixtureField $Window
-        if ([ThreadlineWinInput]::GetForegroundWindow() -ne $Window) { Set-WindowFocus $Window }
-        [ThreadlineWinInput]::TargetWindow = $Window
+        Wait-For 'the owned synthetic credential setup action' {
+            Invoke-OwnedFixtureControl $Window 'account-fill-synthetic-token' $null 'Fill synthetic test credential'
+        }
+    } else {
+        if ($script:UseOwnedUiAutomation) {
+            Assert-OwnedMaskedFixtureField $Window
+            if ([ThreadlineWinInput]::GetForegroundWindow() -ne $Window) { Set-WindowFocus $Window }
+            [ThreadlineWinInput]::TargetWindow = $Window
+        }
+        Click-AccountControl $Window 'account-token'
+        $null = Wait-Account 'focus in the masked native token field' {
+            param($account) $account.panel_open -and $account.fixture_token_focused
+        }
+        $syntheticPat = 'threadline-test-fixture'
+        if ($script:UseOwnedUiAutomation) { Assert-OwnedMaskedFixtureField $Window }
+        [ThreadlineWinInput]::ReplaceFixtureText($Window, [uint32]$script:app.Id, $syntheticPat)
     }
-    Click-AccountControl $Window 'account-token'
-    $null = Wait-Account 'focus in the masked native token field' {
-        param($account) $account.panel_open -and $account.fixture_token_focused
-    }
-    $syntheticPat = 'threadline-test-fixture'
-    if ($script:UseOwnedUiAutomation) { Assert-OwnedMaskedFixtureField $Window }
-    [ThreadlineWinInput]::ReplaceFixtureText($Window, [uint32]$script:app.Id, $syntheticPat)
     $null = Wait-Account 'the exact synthetic credential entered into the masked native form' {
         param($account) $account.fixture_route_entered -and $account.fixture_token_entered
     }
-    Add-Evidence 'Verify native input reached both authorization fields' ([ordered]@{
+    Add-Evidence 'Verify the synthetic settings reached the native authorization form' ([ordered]@{
         repository_value_confirmed = $true
         synthetic_credential_confirmed = $true
+        input = if ($LoopbackTokenAction) { 'Fixture-only owned setup action' } else { 'Guarded keyboard' }
     })
 }
 
-function Connect-FixtureAccount([IntPtr]$Window, [switch]$FromVisibleControl) {
+function Connect-FixtureAccount([IntPtr]$Window, [switch]$FromVisibleControl, [switch]$LoopbackTokenAction) {
     if ($FromVisibleControl) {
         Click-AccountControl $Window 'account-open'
         $null = Wait-Account 'open the native account panel through its visible control' {
@@ -124,7 +135,7 @@ function Connect-FixtureAccount([IntPtr]$Window, [switch]$FromVisibleControl) {
     } else {
         $null = Open-AccountFixture
     }
-    Enter-FixtureAccountForm $Window
+    Enter-FixtureAccountForm $Window -LoopbackTokenAction:$LoopbackTokenAction
     Click-AccountControl $Window 'account-connect'
     $identity = Wait-Account 'verified fixture identity and repository access' {
         param($account)

@@ -11,7 +11,7 @@ function Select-FixtureReplacement([IntPtr]$Window, [long]$LocalAccount) {
 
 function Invoke-CredentialBoundaryProof([IntPtr]$Window, [string]$Profile) {
     Set-AccessPhase 'credential-ready'
-    Connect-FixtureAccount $Window -FromVisibleControl
+    Connect-FixtureAccount $Window -FromVisibleControl -LoopbackTokenAction
     $initial = Wait-Account 'the original verified local account' {
         param($account) $account.active_local_id -gt 0 -and $account.active_user_id -eq 41
     }
@@ -50,7 +50,7 @@ function Invoke-CredentialBoundaryProof([IntPtr]$Window, [string]$Profile) {
         param($reader) !$reader.offline -and $reader.signed_out -and $reader.outbox -eq 1
     }
     Select-FixtureReplacement $ready $original
-    Enter-FixtureAccountForm $ready
+    Enter-FixtureAccountForm $ready -LoopbackTokenAction
     Click-AccountControl $ready 'account-connect'
     $null = Wait-Account 'replacement credential rejected for a different authenticated GitHub user' {
         param($account)
@@ -61,7 +61,7 @@ function Invoke-CredentialBoundaryProof([IntPtr]$Window, [string]$Profile) {
         original_user = 41; replacement_rejected = $true
     })
 
-    Enter-FixtureAccountForm $ready
+    Enter-FixtureAccountForm $ready -LoopbackTokenAction
     Click-AccountControl $ready 'account-connect'
     $alternate = Wait-Account 'the same repository is authenticated in a separate local account' {
         param($account)
@@ -93,7 +93,7 @@ function Invoke-CredentialBoundaryProof([IntPtr]$Window, [string]$Profile) {
     }
     Set-AccessPhase 'credential-return'
     Select-FixtureReplacement $ready $original
-    Enter-FixtureAccountForm $ready
+    Enter-FixtureAccountForm $ready -LoopbackTokenAction
     Click-AccountControl $ready 'account-connect'
     $null = Wait-Account 'the renewed credential was verified for the original account and repository' {
         param($account)

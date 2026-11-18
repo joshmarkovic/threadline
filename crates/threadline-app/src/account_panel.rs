@@ -326,7 +326,7 @@ impl AccountPanel {
     }
 
     fn forms(&self, palette: Palette, cx: &mut Context<Self>) -> impl IntoElement {
-        div()
+        let form = div()
             .flex()
             .flex_col()
             .gap_2()
@@ -401,7 +401,36 @@ impl AccountPanel {
                             .text_color(palette.muted)
                             .child(if self.busy { "Checking…" } else { "" }),
                     ),
-            )
+            );
+        #[cfg(feature = "e2e")]
+        let form = form.when(
+            self.service.fixture
+                && std::env::var_os("THREADLINE_E2E_ACCOUNT_FORM")
+                    .is_some_and(|value| value == "1"),
+            |form| {
+                form.child(
+                    Button::new("account-fill-synthetic-token")
+                        .label("Fill synthetic test credential")
+                        .accessibility_id("account-fill-synthetic-token")
+                        .small()
+                        .disabled(
+                            self.busy
+                                || self.route.read(cx).value().as_ref() != "fixture-org/private",
+                        )
+                        .on_click(cx.listener(|panel, _, window, cx| {
+                            if panel.service.fixture
+                                && !panel.busy
+                                && panel.route.read(cx).value().as_ref() == "fixture-org/private"
+                            {
+                                panel.token.update(cx, |token, cx| {
+                                    token.set_value(crate::accounts::FIXTURE_PAT, window, cx);
+                                });
+                            }
+                        })),
+                )
+            },
+        );
+        form
     }
 
     fn profile_controls(&self, palette: Palette, cx: &mut Context<Self>) -> impl IntoElement {

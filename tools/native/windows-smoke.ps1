@@ -219,6 +219,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_GITHUB_ADDR')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_SYNC')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_FIXTURE_AUTH')
+    $info.EnvironmentVariables.Remove('THREADLINE_E2E_ACCOUNT_FORM')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_READER_TIMING')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_READER_IDLE')
     if ($ReaderProof -in @('Performance', 'PerformancePhysical', 'LargeWorkspace')) { $info.EnvironmentVariables['THREADLINE_E2E_READER_TIMING'] = '1' }
@@ -230,6 +231,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
         $info.EnvironmentVariables['THREADLINE_E2E_GITHUB_ADDR'] = $script:AccessAddress
     }
     if ($script:UseSeededFixtureAuth -or $ReaderBacklog) { $info.EnvironmentVariables['THREADLINE_E2E_FIXTURE_AUTH'] = '1' }
+    if ($ReaderProof -eq 'CredentialBoundary') { $info.EnvironmentVariables['THREADLINE_E2E_ACCOUNT_FORM'] = '1' }
     if ($ReaderBacklog) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
     if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'DirectMerge', 'CredentialBoundary', 'Writes', 'WriteSurface')) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
     return [Diagnostics.Process]::Start($info)
