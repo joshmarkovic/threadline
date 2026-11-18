@@ -1,0 +1,74 @@
+{
+  "comparison": "SQLite schema 9 after installed predecessor smoke versus schema 10 after installed upgrade smoke",
+  "source_previous": "8d93bc11d2867e0ce3c8addb47f5b6861738dadf",
+  "source_current": "1ba4fff",
+  "method": "SHA-256 of ordered rows returned by the Python sqlite3 CLI on closed-database snapshots",
+  "queries": {
+    "items": "SELECT * FROM items ORDER BY id",
+    "drafts": "SELECT account_id,id,item_id,kind,body,base,anchor,revision FROM drafts ORDER BY account_id,id",
+    "operations": "SELECT * FROM operations ORDER BY account_id,sequence",
+    "receipts": "SELECT * FROM step_receipts ORDER BY account_id,operation_id,step",
+    "dispatch": "SELECT * FROM dispatch_profiles ORDER BY account_id",
+    "resources": "SELECT * FROM cached_resource_records ORDER BY resource_id,record_key",
+    "credentials": "SELECT * FROM github_access_profiles ORDER BY account_id,owner_scope",
+    "tabs": "SELECT p.key,t.key,json_extract(t.value,'$.id'),json_extract(t.value,'$.item') FROM workspaces w,json_each(w.layout,'$.panes') p,json_each(p.value,'$.tabs') t ORDER BY p.key,t.key",
+    "sync": "SELECT * FROM sync_settings ORDER BY account_id"
+  },
+  "tables": {
+    "items": {
+      "schema_9": "7a61313417f1af9232a8a5f1c78f8a92a264bcec35fd9e85992abf427ce6cd48",
+      "schema_10": "7a61313417f1af9232a8a5f1c78f8a92a264bcec35fd9e85992abf427ce6cd48",
+      "match": true
+    },
+    "drafts": {
+      "schema_9": "e2c7011b376e27b37b9c19962a672abaddea2d76a49cee65acb6776b84622e1d",
+      "schema_10": "e2c7011b376e27b37b9c19962a672abaddea2d76a49cee65acb6776b84622e1d",
+      "match": true
+    },
+    "operations": {
+      "schema_9": "d845211810028f8fe0b81083a95cddcf81fcac7fd8447a77cd8f1fe1d13b7710",
+      "schema_10": "d845211810028f8fe0b81083a95cddcf81fcac7fd8447a77cd8f1fe1d13b7710",
+      "match": true
+    },
+    "receipts": {
+      "schema_9": "921af72bd3d120454abbd655b61600ca92759e32e405c3839a2b51ea3c2d9d88",
+      "schema_10": "921af72bd3d120454abbd655b61600ca92759e32e405c3839a2b51ea3c2d9d88",
+      "match": true
+    },
+    "dispatch": {
+      "schema_9": "0a7e58150268e978346b814d0f51633a4ed5ebe529ed49d7822e501bbe472030",
+      "schema_10": "0a7e58150268e978346b814d0f51633a4ed5ebe529ed49d7822e501bbe472030",
+      "match": true
+    },
+    "resources": {
+      "schema_9": "fd8f9a108a0a94f983141839b1e9b5407fd70efc3c349559d430f8c5dd76d23a",
+      "schema_10": "fd8f9a108a0a94f983141839b1e9b5407fd70efc3c349559d430f8c5dd76d23a",
+      "match": true
+    },
+    "credentials": {
+      "schema_9": "644e56048e9789a1e5c7b4ff489842728c00705c5100aa0fb5178214d1c702b4",
+      "schema_10": "644e56048e9789a1e5c7b4ff489842728c00705c5100aa0fb5178214d1c702b4",
+      "match": true
+    },
+    "tabs": {
+      "schema_9": "9034dee932f4f91327727cdd67faaddb42889ea01e6fd4a9fded9f7891826e45",
+      "schema_10": "9034dee932f4f91327727cdd67faaddb42889ea01e6fd4a9fded9f7891826e45",
+      "match": true
+    },
+    "sync": {
+      "schema_9": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "schema_10": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    }
+  },
+  "counts": {
+    "items": 30,
+    "comments": 90,
+    "tabs": 20,
+    "drafts": 1,
+    "operations": 10,
+    "step_receipts": 1
+  },
+  "offline": true,
+  "synchronization_settings_rows": 0
+}

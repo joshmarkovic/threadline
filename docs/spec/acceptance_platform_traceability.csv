@@ -278,21 +278,21 @@ AC-92,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-93,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-93,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-93,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-94,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-94,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"../reports/sprint-12.md. Local per-user install, installed launch and tab activation passed. Published command check awaits publication."
 AC-94,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-94,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-95,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-95,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"../reports/sprint-12.md. Wrong fixture publisher, tampered files and local downgrade refusals were exercised."
 AC-95,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-95,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-96,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-96,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/sprint-12.md. Local repair and staged upgrade succeeded.
 AC-96,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-96,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-97,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-97,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/sprint-12.md. The installed predecessor migrated the retained seeded schema to its successor.
 AC-97,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-97,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-98,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-98,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/sprint-12.md. Local uninstall removed app integration and retained the database byte for byte.
 AC-98,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-98,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-99,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-99,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/sprint-12.md. Local packaging proof is available. Windows publication remains pending.
 AC-99,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-99,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,

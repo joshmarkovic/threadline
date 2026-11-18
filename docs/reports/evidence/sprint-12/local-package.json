@@ -1,0 +1,91 @@
+{
+  "predecessor": {
+    "source_sha256": "187f5ed72d12819130486c0147bd0ca048d856765d1196f82c778cc5ca645649",
+    "result": {
+      "package": "local-predecessor",
+      "exitCode": 0,
+      "registered": true,
+      "installed": true,
+      "shortcut": true,
+      "appProfile": false
+    }
+  },
+  "upgrade": {
+    "source_sha256": "bc7689e2249f53fd48d32caf9a78f11662c1d7aa4f280ccef15fac4abaeae5b0",
+    "result": {
+      "exitCode": 0,
+      "installedHash": "783BC377629896A4F5102EE5C50B94166CB4D214B00CFA28C933C79FB351381A",
+      "installedVersion": "0.1.0-current",
+      "installedBuild": 2,
+      "shortcutMatches": true,
+      "registeredLocationMatches": true,
+      "localDataPresent": true
+    }
+  },
+  "repair": {
+    "source_sha256": "bc7689e2249f53fd48d32caf9a78f11662c1d7aa4f280ccef15fac4abaeae5b0",
+    "result": {
+      "exitCode": 0,
+      "installedHash": "783BC377629896A4F5102EE5C50B94166CB4D214B00CFA28C933C79FB351381A",
+      "installedVersion": "0.1.0-current",
+      "installedBuild": 2,
+      "shortcutMatches": true,
+      "registeredLocationMatches": true,
+      "localDataPresent": true
+    }
+  },
+  "downgrade_refused": {
+    "source_sha256": "a4a8377333717b230e94fd90ea560fc2aeff34ffcef3d31336b047a19c8d1e5f",
+    "result": {
+      "installerExitCode": 12,
+      "installedHash": "783BC377629896A4F5102EE5C50B94166CB4D214B00CFA28C933C79FB351381A",
+      "registeredBuild": 2,
+      "profileUnchanged": true
+    }
+  },
+  "installed_smoke": {
+    "source_sha256": "eaba01420fb13ba2e122912568210a20ad32f376473455058b734366c1f77a2e",
+    "result": {
+      "installed_executable_sha256": "783bc377629896a4f5102ee5c50b94166cb4d214b00cfa28c933c79fb351381a",
+      "owned_window": true,
+      "tab_automation_id": "reader-tab-0-1",
+      "selected_before_invocation": false,
+      "tab_invoke_supported": true,
+      "tab_activated": true,
+      "orderly_exit": true
+    }
+  },
+  "uninstall": {
+    "source_sha256": "dd921e8c5d128fa49b380413f6f7efd4ef115e305011b42b7f8b1fbd1e37edc5",
+    "result": {
+      "exitCode": 0,
+      "appAndIntegrationRemoved": true,
+      "profileUnchanged": true,
+      "retainedDatabaseSha256": "055763D69F311261E805FFA62473E3108AD702325AB69099F11E87EB4B97D71C"
+    }
+  },
+  "fixture_manifest_signature": {
+    "source_sha256": "bf97b93c6cd82846fa92e3be66f1e10ef2562799f167a106a5ae7caa46cc972c",
+    "result": {
+      "verified": true,
+      "channel": "local-fixture",
+      "setup_sha256": "dd8c6fcc8f05665014c668ff2795bb644e388dd521cf5c61e1769a52675262c5",
+      "fixture_publisher_certificate_sha256": "3e89c4b5db33a826c2f3c091741a5abd568177308d59dbb0d698c2fdb8e04a30"
+    }
+  },
+  "tampered_fixture": {
+    "source_sha256": "abcb167afa2a8929f976ab050d7e85a701afe9ac3a37bd53276b02d02b5973be",
+    "result": {
+      "sameLength": true,
+      "modifiedPackageRejected": true,
+      "executed": false
+    }
+  },
+  "wrong_publisher": {
+    "source_sha256": "33d4847c891dbf1518f5a6ae9b64cccafbde3bbd70bf3d145a3e5dfdb0ff8c19",
+    "result": {
+      "wrongPublisherRejected": true,
+      "executed": false
+    }
+  }
+}

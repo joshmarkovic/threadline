@@ -1,0 +1,51 @@
+{
+    "channel":  "local-fixture",
+    "target":  "x86_64-pc-windows-msvc",
+    "windows_build":  "22631",
+    "predecessor_setup_sha256":  "42a3b6266bdfe786e364924b49269b481f943297fab40ef4dd6405d2e5647c02",
+    "current_setup_sha256":  "41bbe48a67e874bc7b44a7e1dca864bd5a283a24ceb1368a41d35d06091820de",
+    "staged_fault_setup_sha256":  "1d752e5372914e104e18fd3311f52504d7c66e26670df7ace960d90333b5e1d9",
+    "preseeded_profile_checked":  true,
+    "completed_steps":  [
+                            {
+                                "step":  "install_predecessor",
+                                "exit_code":  0
+                            },
+                            {
+                                "step":  "repair_predecessor",
+                                "exit_code":  0
+                            },
+                            {
+                                "step":  "refuse_locked_executable",
+                                "exit_code":  14
+                            },
+                            {
+                                "step":  "fail_staged_write",
+                                "exit_code":  16
+                            },
+                            {
+                                "step":  "upgrade_after_failures",
+                                "exit_code":  0
+                            },
+                            {
+                                "step":  "repair_current",
+                                "exit_code":  0
+                            },
+                            {
+                                "step":  "refuse_installed_downgrade",
+                                "exit_code":  12
+                            },
+                            {
+                                "step":  "uninstall_retains_profile",
+                                "exit_code":  0
+                            },
+                            {
+                                "step":  "refuse_downgrade_after_uninstall",
+                                "exit_code":  12
+                            },
+                            {
+                                "step":  "reinstall_current",
+                                "exit_code":  0
+                            }
+                        ]
+}

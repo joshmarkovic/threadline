@@ -476,28 +476,28 @@ UX-01,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; 
 UX-02,windows,Windows first release,04,10,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 UX-02,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 UX-02,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-INSTALL-01,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Documented projected one-to-three-command prebuilt installer paths.
+INSTALL-01,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Documented projected one-to-three-command prebuilt installer paths. ../reports/sprint-12.md. The Windows x64 local per-user installer and its installed-process smoke passed.
 INSTALL-01,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-01,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-INSTALL-02,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Documented candidate architecture, version, channel, and compatibility fields."
+INSTALL-02,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Documented candidate architecture, version, channel, and compatibility fields. ../reports/sprint-12.md. Local package version, build ordinal, target and payload digest were checked on Windows build 22631."
 INSTALL-02,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-02,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-INSTALL-03,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Documented publisher identity and artifact digest policy.
+INSTALL-03,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Documented publisher identity and artifact digest policy. ../reports/sprint-12.md. The local fixture verifier accepted its pinned test identity and rejected a modified package and wrong pin.
 INSTALL-03,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-03,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-INSTALL-04,windows,Windows first release,02,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+INSTALL-04,windows,Windows first release,02,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-12.md. The installed schema 9 predecessor and schema 10 candidate retained nine ordered table projections.
 INSTALL-04,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-04,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-INSTALL-05,windows,Windows first release,12,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+INSTALL-05,windows,Windows first release,12,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-12.md. Local same-build repairs, post-failure upgrade and downgrade refusal passed."
 INSTALL-05,macos,macOS release,12,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-05,linux,Linux release,12,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-INSTALL-06,windows,Windows first release,12,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+INSTALL-06,windows,Windows first release,12,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-12.md. A locked executable and injected staging failure preserved the working installation.
 INSTALL-06,macos,macOS release,12,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-06,linux,Linux release,12,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-INSTALL-07,windows,Windows first release,12,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+INSTALL-07,windows,Windows first release,12,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-12.md. Local uninstall removed application integration and preserved the database hash.
 INSTALL-07,macos,macOS release,12,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-07,linux,Linux release,12,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-INSTALL-08,windows,Windows first release,12,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+INSTALL-08,windows,Windows first release,12,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-12.md. Digest-checked local installed process opened a cached tab through native UI Automation.
 INSTALL-08,macos,macOS release,12,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-08,linux,Linux release,12,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-01,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Cargo runner with unit, integration, UI, E2E, installation and live commands."
