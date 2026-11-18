@@ -14,18 +14,17 @@ function Open-SyncSettings([IntPtr]$Window) {
 }
 
 function Invoke-SyncProof([IntPtr]$Window, [string]$Profile) {
-    Set-AccessPhase 'sync-live'
-    Connect-FixtureAccount $Window
-    Click-AccountControl $Window 'account-close'
+    Wait-SeededFixtureAccount
     $null = Wait-Sync 'actual GitHub availability and both scheduled resource families' {
         param($sync) $sync.connection -ceq 'Reachable' -and $sync.cache_generation -ge 2
     }
     Add-Evidence 'Observe authenticated issue and comment updates in the native reader' 'Reachable'
 
     Open-SyncSettings $Window
-    Click-AccountControl $Window 'sync-timezone'
-    [ThreadlineWinInput]::Chord(@(0x11, 0x41))
-    [ThreadlineWinInput]::TypeText('UTC')
+    $null = Wait-AccountControl 'sync-timezone'
+    Wait-For 'the owned timezone field' {
+        Set-OwnedFixtureEditValue $Window 'sync-timezone' 'IANA time zone override' 'UTC'
+    }
     Click-AccountControl $Window 'sync-save-schedule'
     $null = Wait-Sync 'the saved timezone override' { param($sync) $sync.schedule.timezone -ceq 'UTC' }
     Click-AccountControl $Window 'sync-pause-background'
@@ -55,9 +54,7 @@ function Invoke-SyncProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Sync 'online mode while both pauses remain set' {
         param($sync) !$sync.controls.work_offline -and $sync.controls.pause_background -and $sync.controls.pause_queued_actions
     }
-    Connect-FixtureAccount $restarted -FromVisibleControl
-    Click-AccountControl $restarted 'account-close'
-    Open-SyncSettings $restarted
+    Wait-SeededFixtureAccount
 
     Set-AccessPhase 'sync-service'
     Click-AccountControl $restarted 'sync-check-now'

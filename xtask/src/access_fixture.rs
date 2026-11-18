@@ -36,6 +36,7 @@ const REPOSITORY: &str = "/repos/fixture-org/private";
 const ITEMS: &str =
     "/repos/fixture-org/private/issues?state=all&sort=created&direction=desc&per_page=20&page=1";
 const ITEM: &str = "/repos/fixture-org/private/issues/41";
+const SCHEDULED_ISSUE: &str = "/repositories/71/issues/41";
 const COMMENTS_FIRST: &str = "/repos/fixture-org/private/issues/41/comments?per_page=20&page=1";
 const COMMENTS_NEXT: &str = "/repos/fixture-org/private/issues/41/comments?per_page=20&page=2";
 const TIMELINE: &str = "/repos/fixture-org/private/issues/41/timeline?per_page=20&page=1";
@@ -100,6 +101,7 @@ enum Route {
     Graphql,
     Items,
     Item,
+    ScheduledIssue,
     CommentsFirst,
     CommentsNext,
     Timeline,
@@ -367,6 +369,11 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
         (Some("GET"), Some(REPOSITORY), Some("HTTP/1.1")) => Route::Repository,
         (Some("GET"), Some(ITEMS), Some("HTTP/1.1")) => Route::Items,
         (Some("GET"), Some(ITEM), Some("HTTP/1.1")) => Route::Item,
+        (Some("GET"), Some(SCHEDULED_ISSUE), Some("HTTP/1.1"))
+            if matches!(phase, Phase::WriteOnline | Phase::WriteDrop) =>
+        {
+            Route::ScheduledIssue
+        }
         (Some("GET"), Some(COMMENTS_FIRST), Some("HTTP/1.1")) => Route::CommentsFirst,
         (Some("GET"), Some(COMMENTS_NEXT), Some("HTTP/1.1")) => Route::CommentsNext,
         (Some("GET"), Some(TIMELINE), Some("HTTP/1.1")) => Route::Timeline,

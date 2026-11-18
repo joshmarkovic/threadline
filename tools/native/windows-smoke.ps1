@@ -71,7 +71,7 @@ $copiedClipboardSequence = $null
 $toastFixture = $null
 $toastSubmissionAttempted = $false
 $script:UseOwnedUiAutomation = $false
-$script:UseSeededFixtureAuth = $ReaderProof -in @('Resume', 'PullRequest', 'Writes', 'WriteSurface')
+$script:UseSeededFixtureAuth = $ReaderProof -in @('Resume', 'Sync', 'PullRequest', 'Writes', 'WriteSurface')
 
 function Get-FileSha256 {
     param([string]$Path)
@@ -892,6 +892,7 @@ try {
     if ($script:UseSeededFixtureAuth) {
         $fixturePhase = switch ($ReaderProof) {
             Resume { 'reader-failure' }
+            Sync { 'sync-live' }
             PullRequest { 'pr-load' }
             default { 'write-online' }
         }

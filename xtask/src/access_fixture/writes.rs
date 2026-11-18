@@ -30,7 +30,7 @@ pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
     };
     let (status, reason, body) = match route {
         Route::Items => (200, "OK", json!([issue()])),
-        Route::Item => (200, "OK", issue()),
+        Route::Item | Route::ScheduledIssue => (200, "OK", issue()),
         Route::UpdatedItems | Route::UpdatedComments | Route::CommentsFirst | Route::Timeline => {
             (200, "OK", json!([]))
         }
@@ -109,6 +109,10 @@ mod tests {
         };
         fs::write(fixture.phase_file(), "write-online").unwrap();
         assert!(request("GET", ITEM, Value::Null).contains("Existing issue for offline edits"));
+        assert!(
+            request("GET", SCHEDULED_ISSUE, Value::Null)
+                .contains("Existing issue for offline edits")
+        );
         assert!(request("POST", POST, json!({"body":CONFIRMED})).starts_with("HTTP/1.1 201"));
         fs::write(fixture.phase_file(), "write-drop").unwrap();
         assert!(request("POST", POST, json!({"body":UNKNOWN})).is_empty());
