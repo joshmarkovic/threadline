@@ -15,6 +15,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 mod pr;
+mod writes;
 
 const MAX_REQUEST: u64 = 16 * 1024;
 const FIXTURE_AUTHORIZATION: &str = "Bearer threadline-test-fixture";
@@ -61,6 +62,8 @@ enum Phase {
     PrLoad,
     PrDelay,
     PrRelease,
+    WriteOnline,
+    WriteDrop,
 }
 
 impl Phase {
@@ -81,6 +84,8 @@ impl Phase {
             "pr-load" => Ok(Self::PrLoad),
             "pr-delay" => Ok(Self::PrDelay),
             "pr-release" => Ok(Self::PrRelease),
+            "write-online" => Ok(Self::WriteOnline),
+            "write-drop" => Ok(Self::WriteDrop),
             _ => Err(io::Error::other("invalid access fixture phase")),
         }
     }
@@ -104,6 +109,8 @@ enum Route {
     PullB,
     CompareA,
     CompareB,
+    CommentCreated,
+    CommentReplyLost,
     Unexpected,
 }
 
@@ -129,6 +136,8 @@ pub enum TraceCheck {
     ReaderResume,
     SyncJourney,
     PullRequestJourney,
+    WritesWithLoss,
+    WriteSurface,
 }
 
 impl AccessFixture {
@@ -173,6 +182,8 @@ impl AccessFixture {
             TraceCheck::ReaderResume => complete_reader_resume(&records),
             TraceCheck::SyncJourney => complete_sync_journey(&records),
             TraceCheck::PullRequestJourney => pr::trace(&records),
+            TraceCheck::WritesWithLoss => writes::trace(&records, true),
+            TraceCheck::WriteSurface => writes::trace(&records, false),
         };
         if !valid {
             return Err(io::Error::other(
@@ -290,11 +301,14 @@ fn answer(
     socket.set_nonblocking(false)?;
     socket.set_read_timeout(timeout)?;
     socket.set_write_timeout(timeout)?;
-    let (route, authorized) = read_request(socket)?;
+    let (route, authorized) = read_request(socket, phase)?;
     if phase == Phase::PrDelay && route == Route::Item && authorized {
         pr::wait_for_release(phase_file, stopping)?;
     }
-    if phase == Phase::SyncTransport && route == Route::User && authorized {
+    if authorized
+        && ((phase == Phase::SyncTransport && route == Route::User)
+            || route == Route::CommentReplyLost)
+    {
         return Ok(RequestEvidence {
             phase,
             route,
@@ -314,10 +328,13 @@ fn answer(
     if let Some(sso) = reply.sso {
         write!(socket, "X-GitHub-SSO: {sso}\r\n")?;
     }
+    if route == Route::CommentCreated && reply.status == 201 {
+        socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:4101:07\r\n")?;
+    }
     if phase == Phase::SyncThrottle && route == Route::User && reply.status == 429 {
         socket.write_all(b"Retry-After: 2\r\n")?;
     }
-    if route == Route::CommentsFirst && reply.status == 200 {
+    if phase == Phase::ReaderFailure && route == Route::CommentsFirst && reply.status == 200 {
         let local = socket.local_addr()?;
         write!(
             socket,
@@ -334,12 +351,17 @@ fn answer(
     })
 }
 
-fn read_request(socket: &TcpStream) -> io::Result<(Route, bool)> {
+fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
     let mut reader = BufReader::new(socket.take(MAX_REQUEST));
     let mut line = String::new();
     reader.read_line(&mut line)?;
     let mut parts = line.split_ascii_whitespace();
-    let mut route = match (parts.next(), parts.next(), parts.next()) {
+    let request = (parts.next(), parts.next(), parts.next());
+    let post_path = match request {
+        (Some("POST"), Some(path), Some("HTTP/1.1")) => Some(path.to_owned()),
+        _ => None,
+    };
+    let mut route = match request {
         (Some("GET"), Some(USER), Some("HTTP/1.1")) => Route::User,
         (Some("GET"), Some(DISCOVERY), Some("HTTP/1.1")) => Route::Discovery,
         (Some("GET"), Some(REPOSITORY), Some("HTTP/1.1")) => Route::Repository,
@@ -384,18 +406,22 @@ fn read_request(socket: &TcpStream) -> io::Result<(Route, bool)> {
             }
         }
     }
-    if route == Route::Graphql {
+    if let Some(post_path) = post_path {
         let mut body = vec![0; content_length];
         reader.read_exact(&mut body)?;
-        let authorized_query = serde_json::from_slice::<Value>(&body).is_ok_and(|body| {
+        let payload = serde_json::from_slice::<Value>(&body).ok();
+        if route != Route::Graphql {
+            route = payload.as_ref().map_or(Route::Unexpected, |body| {
+                writes::post(phase, &post_path, body)
+            });
+        } else if !payload.is_some_and(|body| {
             body.pointer("/variables/owner").and_then(Value::as_str) == Some("fixture-org")
                 && body.pointer("/variables/name").and_then(Value::as_str) == Some("private")
                 && body
                     .get("query")
                     .and_then(Value::as_str)
                     .is_some_and(|query| query.contains("RepositoryAccess"))
-        });
-        if !authorized_query {
+        }) {
             route = Route::Unexpected;
         }
     }
@@ -441,6 +467,9 @@ fn response(phase: Phase, route: Route, authorized: bool) -> Response {
     }
     if let Some(pr) = pr::response(phase, route) {
         return pr;
+    }
+    if let Some(write) = writes::response(phase, route) {
+        return write;
     }
     let repository = json!({
         "id":71, "node_id":"R_71", "name":"private", "owner":{"login":"fixture-org"},

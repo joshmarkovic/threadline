@@ -399,6 +399,12 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
         ),
         ("S05-WINDOWS-SYNC", NativeMode::WindowsSync, "windows-sync"),
         ("E2E-005", NativeMode::WindowsPullRequest, "windows-pr"),
+        ("E2E-006", NativeMode::WindowsIssueWrites, "windows-writes"),
+        (
+            "E2E-019",
+            NativeMode::WindowsWriteSurface,
+            "windows-write-surface",
+        ),
     ];
     let full = options.suite.as_deref() == Some("full");
     match options.case.as_deref() {
@@ -562,6 +568,8 @@ enum NativeMode {
     WindowsReaderPerformance,
     WindowsSync,
     WindowsPullRequest,
+    WindowsIssueWrites,
+    WindowsWriteSurface,
 }
 
 fn run_native(
@@ -622,6 +630,8 @@ fn native_driver(
         NativeMode::WindowsReaderPerformance => Some("Performance"),
         NativeMode::WindowsSync => Some("Sync"),
         NativeMode::WindowsPullRequest => Some("PullRequest"),
+        NativeMode::WindowsIssueWrites => Some("Writes"),
+        NativeMode::WindowsWriteSurface => Some("WriteSurface"),
         _ => None,
     };
     let access_fixture = if mode == NativeMode::WindowsGitHubAccess || reader_proof.is_some() {
@@ -712,6 +722,7 @@ fn native_driver(
         NativeMode::WindowsReaderPerformance => "reader-performance.json",
         NativeMode::WindowsSync => "sync-native.json",
         NativeMode::WindowsPullRequest => "pr-native.json",
+        NativeMode::WindowsIssueWrites | NativeMode::WindowsWriteSurface => "writes-native.json",
     };
     let details = fs::read(dir.join(driver_report))
         .ok()
@@ -750,6 +761,8 @@ fn native_driver(
             (Status::Pass, NativeMode::WindowsReaderResume) => TraceCheck::ReaderResume,
             (Status::Pass, NativeMode::WindowsSync) => TraceCheck::SyncJourney,
             (Status::Pass, NativeMode::WindowsPullRequest) => TraceCheck::PullRequestJourney,
+            (Status::Pass, NativeMode::WindowsIssueWrites) => TraceCheck::WritesWithLoss,
+            (Status::Pass, NativeMode::WindowsWriteSurface) => TraceCheck::WriteSurface,
             _ => TraceCheck::Observe,
         };
         if fixture.finish(dir, check).is_err() {
@@ -772,6 +785,7 @@ fn access_output_disclosed_credential(dir: &Path, output: &Output) -> Result<boo
         "reader-restart-observation.json",
         "sync-native.json",
         "pr-native.json",
+        "writes-native.json",
     ] {
         let path = dir.join(name);
         if let Ok(bytes) = fs::read(&path)

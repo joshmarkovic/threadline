@@ -166,6 +166,7 @@ jobs:
             'tools/native/windows-sync.ps1'
             'tools/native/windows-pr-reader.ps1'
             'tools/native/windows-owned-uia.ps1'
+            'tools/native/windows-issue-writes.ps1'
             'tools/native/windows-notification-focus.ps1'
             'tools/native/ThreadlineToastShortcut.cs'
             'docs/architecture/windows-budgets.json'

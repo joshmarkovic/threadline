@@ -8,7 +8,7 @@ param(
     [switch]$PlatformProof,
     [switch]$ToastProof,
     [switch]$AccessProof,
-    [ValidateSet('Offline', 'Resume', 'Performance', 'Sync', 'PullRequest')][string]$ReaderProof,
+    [ValidateSet('Offline', 'Resume', 'Performance', 'Sync', 'PullRequest', 'Writes', 'WriteSurface')][string]$ReaderProof,
     [string]$AccessAddress,
     [string]$AccessPhaseFile,
     [switch]$ManualTrayClick,
@@ -34,6 +34,8 @@ $reportName = if ($Measure) {
     'sync-native.json'
 } elseif ($ReaderProof -eq 'PullRequest') {
     'pr-native.json'
+} elseif ($ReaderProof -in @('Writes', 'WriteSurface')) {
+    'writes-native.json'
 } elseif ($ReaderProof) {
     'reader-native.json'
 } else {
@@ -203,7 +205,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     if ($AccessProof -or $ReaderProof) {
         $info.EnvironmentVariables['THREADLINE_E2E_GITHUB_ADDR'] = $script:AccessAddress
     }
-    if ($ReaderProof -eq 'Sync') { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
+    if ($ReaderProof -in @('Sync', 'Writes', 'WriteSurface')) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
     return [Diagnostics.Process]::Start($info)
 }
 
@@ -879,6 +881,7 @@ try {
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
     if ($ReaderProof -eq 'Sync') { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
     if ($ReaderProof -eq 'PullRequest') { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
+    if ($ReaderProof -in @('Writes', 'WriteSurface')) { . (Join-Path $PSScriptRoot 'windows-issue-writes.ps1') }
     $firstProfile = Join-Path $ProfileDir ('initial-' + [guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $firstProfile -Force
     if ($ReaderProof -eq 'Offline') { Initialize-ReaderProfile $firstProfile 'small' }
@@ -923,6 +926,8 @@ try {
             Performance { Invoke-ReaderPerformance $window }
             Sync { Invoke-SyncProof $window $firstProfile }
             PullRequest { Invoke-PrReaderProof $window }
+            Writes { Invoke-IssueWriteProof $window $firstProfile }
+            WriteSurface { Invoke-IssueWriteSurfaceProof $window }
         }
     } else {
         try {

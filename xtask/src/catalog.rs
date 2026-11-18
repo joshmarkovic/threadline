@@ -18,7 +18,7 @@ pub fn scenario_ids() -> impl Iterator<Item = &'static str> {
 pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if matches!(
         case,
-        "IT-008" | "IT-009" | "IT-010" | "IT-012" | "S07-WRITE-WORKER"
+        "IT-008" | "IT-009" | "IT-010" | "IT-012" | "S07-WRITE-WORKER" | "E2E-006" | "E2E-019"
     ) {
         return Some("s07-write-engine-v1");
     }
