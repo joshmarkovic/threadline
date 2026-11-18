@@ -761,3 +761,37 @@ fn stale_visible_response_cannot_publish_another_item_or_change_cache_after_dese
         Change::Value("Issue 10".into())
     );
 }
+
+#[test]
+fn foreground_admission_distinguishes_local_spacing_from_the_persisted_server_floor() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = Store::open_profile(dir.path()).unwrap();
+    let (account, _) = install(&s);
+    assert_eq!(
+        s.reserve_read_budget(account, START).unwrap(),
+        ReadBudget::Granted
+    );
+    assert_eq!(
+        s.reserve_read_budget(account, START + 1).unwrap(),
+        ReadBudget::Deferred {
+            until_ms: START + 1000,
+            server: false
+        }
+    );
+    s.hold_sync_budget(account, START + 50_000).unwrap();
+    s.hold_sync_budget(account, START + 10_000).unwrap();
+    drop(s);
+    let s = Store::open_profile(dir.path()).unwrap();
+    assert_eq!(s.server_read_budget(account).unwrap(), Some(START + 50_000));
+    assert_eq!(
+        s.reserve_read_budget(account, START + 10_000).unwrap(),
+        ReadBudget::Deferred {
+            until_ms: START + 50_000,
+            server: true
+        }
+    );
+    assert_eq!(
+        s.reserve_read_budget(account, START + 50_000).unwrap(),
+        ReadBudget::Granted
+    );
+}

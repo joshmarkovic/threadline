@@ -83,6 +83,11 @@ pub struct SyncStatus {
     pub budget_not_before_ms: Option<i64>,
     pub last_failure: Option<String>,
 }
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ReadBudget {
+    Granted,
+    Deferred { until_ms: i64, server: bool },
+}
 
 fn decode_family(name: &str) -> Result<ResourceFamily> {
     use ResourceFamily::*;
@@ -135,6 +140,33 @@ fn settings(db: &Connection, account: AccountId) -> Result<SyncSettings> {
         schedule,
         controls: row.1,
     })
+}
+
+fn write_settings(tx: &Transaction<'_>, account: AccountId, value: &SyncSettings) -> Result<()> {
+    value.schedule.validate().map_err(Error::InvalidInput)?;
+    let json = serde_json::to_string(&value.schedule)
+        .map_err(|_| Error::InvalidInput("Invalid schedule"))?;
+    let controls = value.controls;
+    tx.execute(
+        "INSERT INTO sync_settings(account_id,schedule,background_paused,notification_quiet)
+         VALUES(?1,?2,?3,?4) ON CONFLICT(account_id) DO UPDATE SET schedule=excluded.schedule,
+         background_paused=excluded.background_paused,notification_quiet=excluded.notification_quiet",
+        params![account,json,controls.pause_background,controls.notification_quiet],
+    )?;
+    tx.execute(
+        "INSERT INTO dispatch_profiles(account_id,offline,outbox_paused) VALUES(?1,?2,?3)
+         ON CONFLICT(account_id) DO UPDATE SET offline=excluded.offline,outbox_paused=excluded.outbox_paused",
+        params![account,controls.work_offline,controls.pause_queued_actions],
+    )?;
+    if controls.work_offline || controls.pause_background {
+        tx.execute(
+            "UPDATE scheduled_reads SET lease_until=NULL, leased_generation=NULL WHERE account_id=?1
+             AND lease_until IS NOT NULL AND (?2 OR NOT EXISTS(SELECT 1 FROM sync_subscriptions s
+                 WHERE s.read_id=scheduled_reads.id AND s.priority=0))",
+            params![account,controls.work_offline],
+        )?;
+    }
+    Ok(())
 }
 pub(super) fn require_claim(tx: &Transaction<'_>, claim: &ReadClaim, now: i64) -> Result<()> {
     let valid: bool = tx.query_row(
@@ -194,24 +226,23 @@ impl Store {
         self.read(|db| settings(db, account))
     }
     pub fn save_sync_settings(&self, account: AccountId, value: &SyncSettings) -> Result<()> {
-        value.schedule.validate().map_err(Error::InvalidInput)?;
-        let json = serde_json::to_string(&value.schedule)
-            .map_err(|_| Error::InvalidInput("Invalid schedule"))?;
+        self.write(|tx| write_settings(tx, account, value))
+    }
+
+    /// Change settings from the current committed state. The callback must not reenter the store.
+    pub fn update_sync_settings(
+        &self,
+        account: AccountId,
+        change: impl FnOnce(&mut SyncSettings),
+    ) -> Result<(SyncSettings, SyncSettings)> {
         self.write(|tx| {
-            let controls=value.controls;
-            tx.execute("INSERT INTO sync_settings(account_id,schedule,background_paused,notification_quiet)
-                VALUES(?1,?2,?3,?4) ON CONFLICT(account_id) DO UPDATE SET schedule=excluded.schedule,
-                background_paused=excluded.background_paused,notification_quiet=excluded.notification_quiet",
-                params![account,json,controls.pause_background,controls.notification_quiet])?;
-            tx.execute("INSERT INTO dispatch_profiles(account_id,offline,outbox_paused) VALUES(?1,?2,?3)
-                ON CONFLICT(account_id) DO UPDATE SET offline=excluded.offline,outbox_paused=excluded.outbox_paused",
-                params![account,controls.work_offline,controls.pause_queued_actions])?;
-            if controls.work_offline || controls.pause_background {
-                tx.execute("UPDATE scheduled_reads SET lease_until=NULL, leased_generation=NULL WHERE account_id=?1
-                    AND lease_until IS NOT NULL AND (?2 OR NOT EXISTS(SELECT 1 FROM sync_subscriptions s
-                         WHERE s.read_id=scheduled_reads.id AND s.priority=0))",params![account,controls.work_offline])?;
+            let previous = settings(tx, account)?;
+            let mut updated = previous.clone();
+            change(&mut updated);
+            if previous != updated {
+                write_settings(tx, account, &updated)?;
             }
-            Ok(())
+            Ok((previous, updated))
         })
     }
 
@@ -258,7 +289,32 @@ impl Store {
     }
 
     pub fn hold_sync_budget(&self, account: AccountId, not_before_ms: i64) -> Result<()> {
-        self.write(|tx| budget_in(tx, account, not_before_ms))
+        self.write(|tx| server_floor_in(tx, account, not_before_ms))
+    }
+
+    pub fn server_read_budget(&self, account: AccountId) -> Result<Option<i64>> {
+        self.read(|db| server_floor(db, account))
+    }
+
+    /// Reserve shared transport capacity for an already authorized foreground read or probe.
+    pub fn reserve_read_budget(&self, account: AccountId, now_ms: i64) -> Result<ReadBudget> {
+        self.write(|tx| {
+            let floor: Option<i64> = tx
+                .query_row(
+                    "SELECT not_before FROM sync_budgets WHERE account_id=?",
+                    [account],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            if let Some(until_ms) = floor.filter(|floor| *floor > now_ms) {
+                return Ok(ReadBudget::Deferred {
+                    until_ms,
+                    server: server_floor(tx, account)?.is_some_and(|t| t > now_ms),
+                });
+            }
+            budget_in(tx, account, now_ms.saturating_add(SPACING_MS))?;
+            Ok(ReadBudget::Granted)
+        })
     }
     pub fn claim_sync_read(&self, account: AccountId, now_ms: i64) -> Result<Option<ReadClaim>> {
         self.write(|tx| claim_in(tx, account, now_ms))
@@ -400,7 +456,7 @@ impl Store {
     ) -> Result<()> {
         self.write(|tx|{
             require_claim(tx,claim,now_ms)?;
-            if let Some(floor)=server_not_before_ms { budget_in(tx,claim.account,floor)?; }
+            if let Some(floor)=server_not_before_ms { server_floor_in(tx,claim.account,floor)?; }
             let prior:u32=tx.query_row("SELECT failures FROM scheduled_reads WHERE id=?",[claim.id],|r|r.get(0))?;
             let failures=prior.saturating_add(1);
             let floor=server_not_before_ms.unwrap_or(now_ms);
@@ -567,6 +623,19 @@ fn target_id(db: &Connection, account: AccountId, t: &ReadTarget) -> Result<Opti
             |r| r.get(0),
         )
         .optional()?)
+}
+fn server_floor(db: &Connection, account: AccountId) -> Result<Option<i64>> {
+    let text:Option<String>=db.query_row("SELECT value FROM local_preferences WHERE account_id=? AND name='sync.server_not_before_ms'",
+        [account],|row|row.get(0)).optional()?;
+    text.map(|s| s.parse().map_err(|_| Error::Corrupt))
+        .transpose()
+}
+fn server_floor_in(tx: &Transaction<'_>, account: AccountId, floor: i64) -> Result<()> {
+    if server_floor(tx, account)?.is_none_or(|old| floor > old) {
+        tx.execute("INSERT INTO local_preferences(account_id,name,value) VALUES(?1,'sync.server_not_before_ms',?2)
+            ON CONFLICT(account_id,name) DO UPDATE SET value=excluded.value",params![account,floor.to_string()])?;
+    }
+    budget_in(tx, account, floor)
 }
 fn budget_in(tx: &Transaction<'_>, account: AccountId, floor: i64) -> Result<()> {
     tx.execute(
