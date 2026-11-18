@@ -1,4 +1,4 @@
-use super::{check_item, json, parse};
+use super::{json, parse};
 use crate::{AccountId, Error, ItemId, Result, Store};
 use rusqlite::{OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
@@ -115,14 +115,14 @@ fn validate_workspace(
             if tab.id.is_empty() || !seen.insert(&tab.id) {
                 return Err(Error::InvalidInput("duplicate or empty tab identity"));
             }
-            check_item(db, account, tab.item)?;
-            if tab.view.pr_reader.is_some() && item_kind(db, account, tab.item)? != "pull_request" {
+            let kind = item_kind(db, account, tab.item)?;
+            if tab.view.pr_reader.is_some() && kind != "pull_request" {
                 return Err(Error::InvalidInput(
                     "PR view requires a confirmed pull request",
                 ));
             }
             if let Some(context) = &tab.view.context {
-                check_context(db, account, tab.item, context)?;
+                check_context(db, account, tab.item, &kind, context)?;
             }
             if let Some(id) = &tab.view.draft {
                 let item: Option<ItemId> = db
@@ -146,6 +146,7 @@ pub(crate) fn write_workspace(
     workspace: &Workspace,
 ) -> Result<()> {
     validate_workspace(tx, account, workspace)?;
+    let serialized = json(workspace)?;
     let previous: Option<String> = tx
         .query_row(
             "SELECT layout FROM workspaces WHERE account_id=?",
@@ -175,16 +176,17 @@ pub(crate) fn write_workspace(
                     params![account,tab.item,tab.id,i64::try_from(pi).map_err(|_|Error::Corrupt)?,i64::try_from(ti).map_err(|_|Error::Corrupt)?,json(&tab.view)?])?;
             }
         }
-        let mut forget =
-            tx.prepare_cached("DELETE FROM reader_closed_tabs WHERE account_id=? AND tab_id=?")?;
-        for id in open {
-            forget.execute(params![account, id])?;
-        }
+        tx.prepare_cached(
+            "DELETE FROM reader_closed_tabs WHERE account_id=?1 AND tab_id IN (
+                SELECT json_extract(tab.value,'$.id') FROM json_each(?2,'$.panes') pane
+                JOIN json_each(pane.value,'$.tabs') tab)",
+        )?
+        .execute(params![account, serialized])?;
     }
     tx.execute(
         "INSERT INTO workspaces(account_id,layout) VALUES(?1,?2)
         ON CONFLICT(account_id) DO UPDATE SET layout=excluded.layout",
-        params![account, json(workspace)?],
+        params![account, serialized],
     )?;
     tx.execute(
         "DELETE FROM local_preferences
@@ -540,7 +542,8 @@ fn put_context(
     pr: ItemId,
     context: &PrContext,
 ) -> Result<()> {
-    check_context(tx, account, pr, context)?;
+    let kind = item_kind(tx, account, pr)?;
+    check_context(tx, account, pr, &kind, context)?;
     tx.execute(
         "INSERT INTO pr_contexts VALUES(?,?,?,?,?,?,?) ON CONFLICT(account_id,pr_id) DO UPDATE SET
          mode=excluded.mode,issue_id=excluded.issue_id,body_revision=excluded.body_revision,
@@ -606,18 +609,19 @@ pub(crate) fn refresh_contexts_in(
 }
 
 fn item_kind(db: &rusqlite::Connection, account: AccountId, item: ItemId) -> Result<String> {
-    check_item(db, account, item)?;
-    Ok(db.query_row("SELECT kind FROM items WHERE id=?", [item], |r| r.get(0))?)
+    db.prepare_cached("SELECT kind FROM items WHERE id=? AND account_id=?")?
+        .query_row(params![item, account], |r| r.get(0))
+        .optional()?
+        .ok_or(Error::NotFound)
 }
 fn check_context(
     db: &rusqlite::Connection,
     account: AccountId,
     pr: ItemId,
+    kind: &str,
     context: &PrContext,
 ) -> Result<()> {
-    if item_kind(db, account, pr)? != "pull_request"
-        || !(0.0 < context.ratio && context.ratio < 1.0)
-    {
+    if kind != "pull_request" || !(0.0 < context.ratio && context.ratio < 1.0) {
         return Err(Error::InvalidInput("invalid PR context"));
     }
     if context.selected_issue.is_some() && !verified_context(db, account, pr, context)? {
