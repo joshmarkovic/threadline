@@ -644,3 +644,287 @@ fn ui_008_observed_reader_controls_follow_the_visible_panes(cx: &mut TestAppCont
     );
     setup.runtime.block_on(writer.finish()).unwrap();
 }
+
+#[gpui_kit::test]
+fn ui_001_pr_context_changes_keep_the_immutable_native_diff_and_each_tabs_state(
+    cx: &mut TestAppContext,
+) {
+    use gpui_kit::component::diff::{DiffLineRange, DiffMode, DiffSide};
+    use std::num::NonZeroU64;
+    use threadline_storage::{
+        ItemLocator,
+        pr::{
+            PatchEvidence, PrContextMode, PrFamily, PrHeader, PrInputPage, PrRecord, PrSection,
+            ReferenceObservation,
+        },
+        resources::{CommitOid, WalkMode},
+    };
+    let setup = ReaderHarness::seeded();
+    let store = &setup.store;
+    let account = setup.fixture.account;
+    let repository = setup.fixture.repository;
+    let pr = setup.fixture.reviewed_pr;
+    let pr_item = store.item(account, pr).unwrap().unwrap();
+    let stamp = 1_900_000_000_000;
+    store
+        .ingest(
+            account,
+            pr_item.locator,
+            ItemUpdate {
+                representation: ItemRepresentation::Issue(IssueRecord {
+                    id: pr_item.issue_id.unwrap(),
+                    node_id: pr_item.issue_node_id,
+                    classification: IssueClassification::PullRequest,
+                }),
+                remote_updated_at: UtcMillis(stamp),
+                title: Change::Value("Offline review fixture".into()),
+                body: Change::Value("Review introduction\n\nFixes #101. Resolves #102.".into()),
+                closed: Change::Value(false),
+            },
+        )
+        .unwrap();
+    let issue_ids = (101..=102)
+        .map(|number| {
+            let issue_id =
+                threadline_storage::IssueApiId::new(NonZeroU64::new(6000 + number).unwrap());
+            let item = store
+                .ingest(
+                    account,
+                    ItemLocator { repository, number },
+                    ItemUpdate {
+                        representation: ItemRepresentation::Issue(IssueRecord {
+                            id: issue_id,
+                            node_id: None,
+                            classification: IssueClassification::Issue,
+                        }),
+                        remote_updated_at: UtcMillis(stamp),
+                        title: Change::Value(format!("Linked fixture {number}")),
+                        body: Change::Value(format!("**Cached issue {number} body**")),
+                        closed: Change::Value(false),
+                    },
+                )
+                .unwrap();
+            (item, issue_id)
+        })
+        .collect::<Vec<_>>();
+    use threadline_storage::access::{
+        AccessState, DiscoveryState, RepositoryObservation, RepositoryObservationSource,
+    };
+    let original = store.github_access_profiles().unwrap().remove(0);
+    let profile = store
+        .reserve_access_profile_credential(
+            account,
+            original.user_id,
+            &original.login,
+            &original.owner_scope,
+            original.kind,
+            Some(&original),
+        )
+        .unwrap();
+    store
+        .install_current_credential(&profile, || Ok::<_, ()>(()))
+        .unwrap()
+        .unwrap();
+    store
+        .record_access_result(
+            &profile,
+            original.kind,
+            AccessState::Readable,
+            DiscoveryState::Complete,
+            stamp,
+        )
+        .unwrap();
+    let repo = store
+        .github_repository_views(account)
+        .unwrap()
+        .into_iter()
+        .find(|repo| repo.id == repository)
+        .unwrap();
+    assert_eq!(
+        store
+            .observe_github_repository(
+                &profile,
+                &RepositoryObservation {
+                    provider_id: repo.provider_id,
+                    owner: &repo.owner,
+                    name: &repo.name,
+                    private: true,
+                    source: RepositoryObservationSource::Direct,
+                },
+                stamp
+            )
+            .unwrap(),
+        repository
+    );
+    let body_revision = "fixture-pr-body-1";
+    let prior = store
+        .pr_reference_set(account, pr)
+        .unwrap()
+        .map(|(revision, _)| revision);
+    let candidates = store
+        .index_pr_body(account, pr, prior.as_deref(), body_revision, stamp)
+        .unwrap();
+    for (candidate, (item, issue_id)) in candidates.into_iter().zip(&issue_ids) {
+        store
+            .record_pr_reference(
+                account,
+                pr,
+                body_revision,
+                candidate.position,
+                ReferenceObservation::Item {
+                    repository,
+                    item: *item,
+                    issue_id: *issue_id,
+                },
+                stamp + 1,
+            )
+            .unwrap();
+    }
+    store.sign_out_github_account(account, stamp + 2).unwrap();
+    let commit = |byte: char| CommitOid::parse(&byte.to_string().repeat(40)).unwrap();
+    let revision = store
+        .record_pr_revision(
+            account,
+            pr,
+            &commit('a'),
+            &commit('b'),
+            Some(&commit('c')),
+            &PrHeader::default(),
+            stamp,
+        )
+        .unwrap();
+    let write = store
+        .start_pr_fetch(&revision, PrFamily::Files, WalkMode::Full)
+        .unwrap();
+    let filenames = ["src/main.rs", "src/renamed module.rs"];
+    store
+        .commit_pr_page(
+            &revision,
+            PrFamily::Files,
+            &write,
+            PrInputPage {
+                records: filenames
+                    .iter()
+                    .map(|path| PrRecord::File {
+                        path: (*path).to_owned(),
+                        previous_path: Some("src/old.rs".into()),
+                        status: "renamed".into(),
+                        additions: Some(1),
+                        deletions: Some(1),
+                        patch: PatchEvidence::Text(
+                            "@@ -10,2 +20,2 @@\n unchanged\n-old line\n+new line".into(),
+                        ),
+                    })
+                    .collect(),
+                next_cursor: None,
+                validators: None,
+                partial: None,
+                fetched_at_ms: stamp + 1,
+            },
+        )
+        .unwrap();
+    let tab = Tab {
+        id: "review-pane-one".into(),
+        item: pr,
+        view: TabView::default(),
+    };
+    setup.one_pane(&tab);
+    let (window, reader) = setup.open(cx);
+    click(cx, window, "pr-0-file-1");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            reader.read(cx).tab_views[&tab.id]
+                .pr
+                .as_ref()
+                .and_then(|pr| pr.data.files.as_ref())
+                .and_then(|files| files.selected.as_ref())
+                .is_some_and(|file| file.summary.path == filenames[1])
+        })
+    });
+    click(cx, window, "pr-0-diff-split");
+    let diff = cx
+        .update_window(window, |_, _, cx| {
+            let diff = reader.read(cx).tab_views[&tab.id]
+                .pr
+                .as_ref()
+                .unwrap()
+                .diff
+                .as_ref()
+                .unwrap()
+                .clone();
+            diff.update(cx, |state, cx| {
+                state.set_selected_lines(
+                    Some(DiffLineRange::new(filenames[1], DiffSide::Modified, 21, 21)),
+                    cx,
+                )
+            });
+            assert_eq!(diff.read(cx).mode(), DiffMode::Split);
+            assert!(diff.read(cx).selected_text(cx).contains("new line"));
+            diff
+        })
+        .unwrap();
+    until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+    click(cx, window, "pr-0-context-issue");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let reader = reader.read(cx);
+            !reader.layout_busy
+                && reader.tab_views[&tab.id]
+                    .pr
+                    .as_ref()
+                    .and_then(|pr| pr.data.linked.as_ref())
+                    .is_some_and(|link| link.item.id == issue_ids[0].0)
+        })
+    });
+    click(cx, window, "pr-0-linked-1");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let reader = reader.read(cx);
+            !reader.layout_busy
+                && reader.tab_views[&tab.id]
+                    .pr
+                    .as_ref()
+                    .and_then(|pr| pr.data.linked.as_ref())
+                    .is_some_and(|link| link.item.id == issue_ids[1].0)
+        })
+    });
+    click(cx, window, "pr-0-context-body");
+    until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+    click(cx, window, "pr-0-context-collapse");
+    until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.try_find("pr-0-context-issue").is_none());
+        let pr = reader.read(cx).tab_views[&tab.id].pr.as_ref().unwrap();
+        assert_eq!(pr.data.revision, revision);
+        assert_eq!(pr.diff.as_ref(), Some(&diff));
+        assert!(diff.read(cx).selected_text(cx).contains("new line"));
+    })
+    .unwrap();
+    click(cx, window, "reader-duplicate-tab");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let reader = reader.read(cx);
+            reader.layout.panes.len() == 2 && !reader.layout_busy && reader.tab_views.len() == 2
+        })
+    });
+    click(cx, window, "pr-1-conversation");
+    until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+    let reopened = Store::open(&setup._directory.path().join("s04-ui.sqlite")).unwrap();
+    let saved = reopened.reader_layout(account).unwrap().unwrap().0;
+    let original = &saved.panes[0].tabs[0].view;
+    let duplicate = &saved.panes[1].tabs[0].view;
+    let settings = original.pr_reader.as_ref().unwrap();
+    assert_eq!(settings.section, PrSection::Files);
+    assert_eq!(settings.context_mode, PrContextMode::Body);
+    assert!(settings.context_collapsed);
+    assert_eq!(settings.selected_path.as_deref(), Some(filenames[1]));
+    assert_eq!(
+        original.context.as_ref().unwrap().selected_issue,
+        Some(issue_ids[1].0)
+    );
+    assert_eq!(
+        duplicate.pr_reader.as_ref().unwrap().section,
+        PrSection::Conversation
+    );
+}

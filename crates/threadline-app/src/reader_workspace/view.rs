@@ -42,7 +42,7 @@ impl ReaderWorkspace {
         cx.notify();
     }
 
-    fn observed_control(
+    pub(super) fn observed_control(
         &self,
         name: impl Into<String>,
         control: impl IntoElement,
@@ -852,6 +852,7 @@ impl ReaderWorkspace {
         &self,
         index: usize,
         pane: &Pane,
+        pane_width: f32,
         palette: Palette,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
@@ -921,7 +922,18 @@ impl ReaderWorkspace {
                     .collect::<Vec<_>>(),
             );
         let current = active
-            .map(|tab| self.item_view(index, tab, palette, cx))
+            .map(|tab| {
+                match self
+                    .tab_views
+                    .get(&tab.id)
+                    .and_then(|view| view.data.item.as_ref())
+                {
+                    Some(item) if item.kind == ItemKind::PullRequest => {
+                        self.pull_request_view(index, tab, item, pane_width, palette, cx)
+                    }
+                    _ => self.item_view(index, tab, palette, cx),
+                }
+            })
             .unwrap_or_else(|| {
                 div()
                     .p_4()
@@ -953,7 +965,7 @@ impl ReaderWorkspace {
             .child(current)
     }
 
-    fn item_view(
+    pub(super) fn item_view(
         &self,
         pane: usize,
         tab: &Tab,
@@ -1499,6 +1511,7 @@ impl ReaderWorkspace {
     fn workspace_content(
         &self,
         focused_only: bool,
+        width: f32,
         palette: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
@@ -1517,13 +1530,18 @@ impl ReaderWorkspace {
                 .enumerate()
                 .filter(|(index, _)| !focused_only || *index == self.layout.focused_pane)
                 .map(|(index, pane)| {
+                    let share = if focused_only {
+                        1.
+                    } else {
+                        self.layout.proportions[index] as f32
+                    };
                     div()
                         .min_w_0()
                         .min_h_0()
                         .h_full()
                         .flex_basis(px(0.))
-                        .flex_grow(self.layout.proportions[index] as f32)
-                        .child(self.pane(index, pane, palette, cx))
+                        .flex_grow(share)
+                        .child(self.pane(index, pane, (width - 196.) * share, palette, cx))
                 })
                 .collect::<Vec<_>>();
 
@@ -1610,7 +1628,12 @@ impl Render for ReaderWorkspace {
                     .text_sm()
                     .child(status)
             }))
-            .child(self.workspace_content(compact || self.maximized, palette, cx))
+            .child(self.workspace_content(
+                compact || self.maximized,
+                window.viewport_size().width.as_f32(),
+                palette,
+                cx,
+            ))
     }
 }
 
@@ -1698,7 +1721,7 @@ fn kind_label(kind: ItemKind) -> &'static str {
     }
 }
 
-fn item_metadata(metadata: &ReaderItemMetadata, palette: Palette) -> impl IntoElement {
+pub(super) fn item_metadata(metadata: &ReaderItemMetadata, palette: Palette) -> impl IntoElement {
     let labels = observed_people(metadata.labels.as_deref());
     let assignees = observed_people(metadata.assignees.as_deref());
     let milestone = match &metadata.milestone {
@@ -1767,7 +1790,7 @@ fn observed_people(values: Option<&[String]>) -> String {
     }
 }
 
-fn time_label(value: Option<i64>) -> String {
+pub(super) fn time_label(value: Option<i64>) -> String {
     value
         .and_then(chrono::DateTime::from_timestamp_millis)
         .map_or_else(
@@ -1776,7 +1799,7 @@ fn time_label(value: Option<i64>) -> String {
         )
 }
 
-fn coverage_label(label: &str, coverage: Coverage, time: Option<i64>) -> String {
+pub(super) fn coverage_label(label: &str, coverage: Coverage, time: Option<i64>) -> String {
     let text = match coverage {
         Coverage::Missing => "not checked",
         Coverage::Partial => "partially downloaded",
@@ -1785,7 +1808,11 @@ fn coverage_label(label: &str, coverage: Coverage, time: Option<i64>) -> String 
     format!("{label} · {text} · Last saved {}", time_label(time))
 }
 
-fn resource_problem(label: &str, state: &ResourceState, palette: Palette) -> impl IntoElement {
+pub(super) fn resource_problem(
+    label: &str,
+    state: &ResourceState,
+    palette: Palette,
+) -> impl IntoElement {
     let problem = match state.error {
         Some(ResourceError::Transport) => "Download interrupted by a connection error",
         Some(ResourceError::RateLimited) => "GitHub delayed further requests",

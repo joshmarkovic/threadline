@@ -1,7 +1,7 @@
 use super::*;
 use crate::sync_worker::{SyncUpdate, SyncWorker};
 use threadline_core::{
-    connectivity::{ConnectionSnapshot, ProbeTrigger},
+    connectivity::{ConnectionSnapshot, ConnectionStatus, ProbeTrigger},
     github::AccessKind,
 };
 
@@ -54,11 +54,19 @@ impl ReaderWorkspace {
             .sync_update
             .as_ref()
             .map_or(0, |previous| previous.cache_generation);
+        let reached = update.connection.status == ConnectionStatus::Reachable
+            && self.sync_update.as_ref().is_some_and(|previous| {
+                previous.connection.status == ConnectionStatus::Unreachable
+            });
         let changed = update.cache_generation > published;
         if let Some(panel) = self.sync_panel.as_ref() {
             panel.update(cx, |panel, cx| panel.set_status(update.status.clone(), cx));
         }
         self.sync_update = Some(update);
+        if reached {
+            self.pr_resume_attempts.clear();
+            self.resume_visible_pr_downloads(window, cx);
+        }
         if changed {
             let visible = self
                 .layout

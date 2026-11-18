@@ -19,6 +19,8 @@ use threadline_storage::{
 
 mod drafts;
 mod media;
+mod pr;
+mod pr_view;
 mod remote;
 mod scheduled;
 mod sync_bridge;
@@ -67,6 +69,8 @@ pub(crate) struct ReaderObservation {
     pub offline: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shared_sync: Option<SyncObservation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pull_request: Option<pr_view::PrObservation>,
     pub outbox: Option<u64>,
 }
 
@@ -101,6 +105,8 @@ pub(crate) struct ReaderWorkspace {
     remote_error: Option<String>,
     images: HashMap<media::ImageKey, media::ImageState>,
     downloads: HashMap<ItemId, Cancellation>,
+    pr_reads: std::collections::HashSet<pr_view::PrReadKey>,
+    pr_resume_attempts: std::collections::HashSet<(i64, i64)>,
     account: Option<AccountId>,
     login: String,
     access: AccessState,
@@ -169,6 +175,7 @@ enum Surface {
 struct ItemData {
     item: Option<Item>,
     metadata: Option<ReaderItemMetadata>,
+    pr: Option<pr::PullRequestData>,
     anchor_missing: bool,
     discussion: DiscussionPage,
     timeline: TimelinePage,
@@ -179,6 +186,7 @@ struct ItemData {
 
 struct ItemView {
     data: ItemData,
+    pr: Option<Box<pr::PullRequestView>>,
     body: Option<media::CachedMarkdown>,
     notes: Vec<(String, media::CachedMarkdown)>,
     scroll: ScrollHandle,
@@ -291,6 +299,7 @@ impl ReaderWorkspace {
                     pending_reads: update.status.as_ref().map(|status| status.pending),
                 }
             }),
+            pull_request: active.and_then(|tab| self.pr_observation(tab, cx)),
             outbox: self.counts.map(|counts| counts.outbox),
         }
     }
@@ -341,6 +350,8 @@ impl ReaderWorkspace {
             remote_error: None,
             images: HashMap::new(),
             downloads: HashMap::new(),
+            pr_reads: std::collections::HashSet::new(),
+            pr_resume_attempts: std::collections::HashSet::new(),
             account: None,
             login: String::new(),
             access: AccessState::Unchecked,
@@ -473,6 +484,7 @@ impl ReaderWorkspace {
         let changed = self.account != account;
         let offline_changed = self.offline != offline;
         let previous_access = self.access;
+        let can_fetch_before = self.can_fetch();
         if offline && !self.offline {
             self.network.cancel();
             self.network = Cancellation::new();
@@ -486,6 +498,12 @@ impl ReaderWorkspace {
         self.offline = offline;
         self.access = profile.map_or(AccessState::Unchecked, |item| item.access);
         self.login = profile.map_or_else(String::new, |item| item.login.clone());
+        if changed || can_fetch_before != self.can_fetch() {
+            self.pr_resume_attempts.clear();
+        }
+        if !changed && !can_fetch_before && self.can_fetch() {
+            self.resume_visible_pr_downloads(window, cx);
+        }
         let checked = profile.and_then(|item| item.checked_at_ms);
         if changed || (reachability != Reachability::NotAttempted && checked >= self.checked) {
             self.reachability = reachability;
@@ -503,6 +521,7 @@ impl ReaderWorkspace {
             self.remote_error = None;
             self.images.clear();
             self.downloads.clear();
+            self.pr_reads.clear();
             self.release_drafts();
             self.account = account;
             self.generation += 1;
@@ -844,11 +863,17 @@ impl ReaderWorkspace {
                 |this, _, change: &crate::sync_panel::SettingsChanged, window, cx| {
                     let offline = change.current.work_offline;
                     let offline_changed = change.previous.work_offline != offline;
+                    if offline_changed {
+                        this.pr_resume_attempts.clear();
+                    }
                     if offline && !this.offline {
                         this.network.cancel();
                         this.network = Cancellation::new();
                     }
                     this.offline = offline;
+                    if offline_changed && !offline {
+                        this.resume_visible_pr_downloads(window, cx);
+                    }
                     if let Some(worker) = this.sync_worker.as_ref() {
                         if offline_changed {
                             worker.interrupt((!offline).then_some(
@@ -918,8 +943,18 @@ impl ReaderWorkspace {
                         linked_items.insert(entry.remote_key.clone(), target);
                     }
                 }
+                let cached = store.item(account, item)?;
+                let pr = if cached
+                    .as_ref()
+                    .is_some_and(|item| item.kind == threadline_storage::ItemKind::PullRequest)
+                {
+                    pr::PullRequestData::read(store, account, &tab)?
+                } else {
+                    None
+                };
                 Ok(ItemData {
-                    item: store.item(account, item)?,
+                    item: cached,
+                    pr,
                     metadata: store.reader_item_metadata(account, item)?,
                     anchor_missing,
                     discussion,
@@ -946,7 +981,7 @@ impl ReaderWorkspace {
                 };
                 match result {
                     Ok(mut data) => {
-                        let old = this.tab_views.remove(&id);
+                        let mut old = this.tab_views.remove(&id);
                         let scroll = old
                             .as_ref()
                             .map_or_else(ScrollHandle::new, |view| view.scroll.clone());
@@ -963,17 +998,36 @@ impl ReaderWorkspace {
                                     .set_offset(point(px(0.), px(-(tab.view.scroll_offset as f32))))
                             });
                         }
+                        if let Some(set) = data.pr.as_ref().and_then(|pr| pr.references.as_ref()) {
+                            for current in this
+                                .layout
+                                .panes
+                                .iter_mut()
+                                .flat_map(|pane| &mut pane.tabs)
+                                .filter(|tab| tab.item == item)
+                            {
+                                if let Some(context) = current.view.context.as_mut() {
+                                    pr::refresh_context(set, context);
+                                }
+                            }
+                        }
+                        let prior = old.as_mut().and_then(|view| view.pr.take().map(|pr| *pr));
+                        let pr = data.pr.take().map(|data| {
+                            Box::new(pr::PullRequestView::new(data, &tab, prior, window, cx))
+                        });
                         let (body, notes) = ItemView::use_cached_text(&mut data, old, cx);
                         this.tab_views.insert(
                             id,
                             ItemView {
                                 data,
+                                pr,
                                 body,
                                 notes,
                                 scroll,
                             },
                         );
                         this.trim_inactive_views();
+                        this.resume_visible_pr_downloads(window, cx);
                     }
                     Err(_) => this.status = Some("The cached item could not be loaded."),
                 }
@@ -986,6 +1040,17 @@ impl ReaderWorkspace {
         for tab in self.layout.panes.iter_mut().flat_map(|pane| &mut pane.tabs) {
             if let Some(view) = self.tab_views.get(&tab.id) {
                 tab.view.scroll_offset = (-view.scroll.offset().y.as_f32()).max(0.) as u64;
+                if let Some(pr_view) = view.pr.as_ref() {
+                    let settings = tab.view.pr_reader.get_or_insert_with(Default::default);
+                    if pr_view.context_scroll.bounds().size.height > px(0.) {
+                        settings.context_scroll =
+                            (-pr_view.context_scroll.offset().y.as_f32()).max(0.) as u32;
+                    }
+                    if pr_view.issue_scroll.bounds().size.height > px(0.) {
+                        settings.issue_scroll =
+                            (-pr_view.issue_scroll.offset().y.as_f32()).max(0.) as u32;
+                    }
+                }
             }
         }
     }
@@ -1007,6 +1072,27 @@ impl ReaderWorkspace {
                 let editor_to_focus = this.editor_to_focus.take();
                 match result {
                     Ok(()) => {
+                        let reloading = layout
+                            .panes
+                            .iter()
+                            .filter_map(|pane| pane.active.and_then(|index| pane.tabs.get(index)))
+                            .filter(|tab| {
+                                let previous = this
+                                    .layout
+                                    .panes
+                                    .iter()
+                                    .flat_map(|pane| &pane.tabs)
+                                    .find(|old| old.id == tab.id);
+                                previous.is_some_and(|old| {
+                                    let old_pr = pr::tab_settings(old);
+                                    let new_pr = pr::tab_settings(tab);
+                                    old_pr.section != new_pr.section
+                                        || old_pr.selected_path != new_pr.selected_path
+                                        || old.view.context != tab.view.context
+                                })
+                            })
+                            .cloned()
+                            .collect::<Vec<_>>();
                         this.layout = layout;
                         this.tab_views.retain(|id, _| {
                             this.layout
@@ -1020,6 +1106,9 @@ impl ReaderWorkspace {
                                 .iter()
                                 .any(|pane| pane.tabs.iter().any(|tab| tab.id == editor.tab_id))
                         });
+                        for tab in reloading {
+                            this.load_tab(tab, window, cx);
+                        }
                         this.load_visible(window, cx);
                         this.restore_active_draft(window, cx);
                         if let Some(editor) = editor_to_focus.and_then(|id| this.drafts.get(&id)) {

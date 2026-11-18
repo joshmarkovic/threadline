@@ -133,12 +133,13 @@ impl ReaderWorkspace {
                 if focused_only && pane_index != self.layout.focused_pane {
                     continue;
                 }
-                let item = pane
-                    .active
-                    .and_then(|index| pane.tabs.get(index))
-                    .and_then(|tab| self.tab_views.get(&tab.id))
-                    .and_then(|view| view.data.item.as_ref());
-                if let Some(item) = item {
+                let Some(tab) = pane.active.and_then(|index| pane.tabs.get(index)) else {
+                    continue;
+                };
+                let Some(view) = self.tab_views.get(&tab.id) else {
+                    continue;
+                };
+                if let Some(item) = view.data.item.as_ref() {
                     targets.push(VisibleRead {
                         subscriber: format!("pane-{pane_index}"),
                         target: ReadTarget {
@@ -149,6 +150,16 @@ impl ReaderWorkspace {
                         },
                         due_ms,
                     });
+                }
+                if let Some(pr) = view.pr.as_ref() {
+                    let section = super::pr::tab_settings(tab).section;
+                    for family in super::pr::section_resources(section) {
+                        targets.push(VisibleRead {
+                            subscriber: format!("pane-{pane_index}-{}", family.name()),
+                            target: pr.data.revision.read_target(*family),
+                            due_ms,
+                        });
+                    }
                 }
             }
         }

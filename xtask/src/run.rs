@@ -232,6 +232,17 @@ const UI: &[CargoTest] = &[
         arguments: &["-p", "threadline-app", "--test", "feasibility_ui"],
     },
     CargoTest {
+        id: "UI-001",
+        arguments: &[
+            "-p",
+            "threadline-app",
+            "--features",
+            "e2e",
+            "--lib",
+            "ui_001_",
+        ],
+    },
+    CargoTest {
         id: "UI-002",
         arguments: &[
             "-p",
