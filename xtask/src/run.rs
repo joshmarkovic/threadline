@@ -129,6 +129,47 @@ const INTEGRATION: &[CargoTest] = &[
         ],
     },
     CargoTest {
+        id: "IT-008",
+        arguments: &[
+            "-p",
+            "threadline-storage",
+            "-p",
+            "threadline-core",
+            "--test",
+            "writes",
+            "--test",
+            "github_writes",
+            "it_008",
+        ],
+    },
+    CargoTest {
+        id: "IT-009",
+        arguments: &[
+            "-p",
+            "threadline-storage",
+            "-p",
+            "threadline-core",
+            "--lib",
+            "--test",
+            "writes",
+            "--test",
+            "github_writes",
+            "it_009",
+        ],
+    },
+    CargoTest {
+        id: "IT-010",
+        arguments: &["-p", "threadline-storage", "--test", "writes", "it_010"],
+    },
+    CargoTest {
+        id: "IT-012",
+        arguments: &["-p", "threadline-storage", "--test", "writes", "it_012"],
+    },
+    CargoTest {
+        id: "S07-WRITE-WORKER",
+        arguments: &["-p", "threadline-app", "--lib", "write_dispatch_"],
+    },
+    CargoTest {
         id: "IT-016",
         arguments: &["-p", "threadline-storage", "--test", "pr", "it_016"],
     },

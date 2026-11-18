@@ -324,7 +324,10 @@ fn known_case(lane: Lane, case: &str) -> bool {
                 "S04-READ-TRANSPORT" | "S04-CACHED-STORE" | "S04-READ-SERVICE"
             )
             | (Lane::Ui, "S01-GPUI")
-            | (Lane::Integration, "S05-FEED-HTTP" | "S05-SYNC-WORKER")
+            | (
+                Lane::Integration,
+                "S05-FEED-HTTP" | "S05-SYNC-WORKER" | "S07-WRITE-WORKER"
+            )
             | (Lane::E2e, "S01-WINDOWS-SHELL")
             | (Lane::E2e, "S04-READER-PERF")
             | (Lane::E2e, "S05-WINDOWS-SYNC")

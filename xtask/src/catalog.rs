@@ -16,6 +16,12 @@ pub fn scenario_ids() -> impl Iterator<Item = &'static str> {
 }
 
 pub fn fixture_revision(case: &str) -> Option<&'static str> {
+    if matches!(
+        case,
+        "IT-008" | "IT-009" | "IT-010" | "IT-012" | "S07-WRITE-WORKER"
+    ) {
+        return Some("s07-write-engine-v1");
+    }
     if case == "LIVE-001" {
         return Some("s03-live-read-allowlist-v1");
     }
@@ -119,6 +125,10 @@ pub fn associations(case: &str) -> Associations {
         "S04-CACHED-STORE" | "S04-READ-SERVICE" => (
             "CACHE-03;CACHE-05;OFFLINE-03;SEARCH-01;TEST-03",
             "AC-06;AC-07;AC-08;AC-09",
+        ),
+        "S07-WRITE-WORKER" => (
+            "WRITE-04;OUTBOX-07;OUTBOX-08;TEST-03",
+            "AC-13;AC-15;AC-62;AC-67",
         ),
         "S05-FEED-HTTP" => ("SYNC-05;SYNC-06;SYNC-07;SYNC-10;TEST-03", "AC-12;AC-54"),
         "S05-SYNC-WORKER" => (
