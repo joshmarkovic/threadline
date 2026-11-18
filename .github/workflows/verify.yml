@@ -49,6 +49,26 @@ jobs:
         run: cargo fmt --all --check
       - name: Build the native application
         run: cargo build --locked -p threadline-app
+      - name: Verify the Windows desktop executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.Reflection.Metadata
+          $binary = (Resolve-Path 'target/debug/threadline.exe').Path
+          $stream = [IO.File]::OpenRead($binary)
+          try {
+            $reader = [System.Reflection.PortableExecutable.PEReader]::new($stream)
+            try {
+              if ($reader.PEHeaders.PEHeader.Subsystem -ne [System.Reflection.PortableExecutable.Subsystem]::WindowsGui) {
+                throw 'Threadline must use the Windows GUI subsystem.'
+              }
+            } finally { $reader.Dispose() }
+          } finally { $stream.Dispose() }
+          $stderr = Join-Path $env:RUNNER_TEMP 'threadline-invalid-argument.stderr'
+          $child = Start-Process -FilePath $binary -ArgumentList '--invalid-argument' -RedirectStandardError $stderr -PassThru -Wait
+          if ($child.ExitCode -ne 1 -or (Get-Content -LiteralPath $stderr -Raw).Trim() -ne 'Unknown argument: --invalid-argument') {
+            throw 'Threadline must report an invalid argument through its exit code and redirected stderr.'
+          }
       - name: Run portable unit tests
         run: cargo xtask test unit
       - name: Run isolated integration tests

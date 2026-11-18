@@ -268,6 +268,14 @@ fn native_driver(
         .map_err(|error| NativeError::Blocked(error.to_string()))?;
     let mut driver = if os == "windows" {
         let mut cmd = Command::new("powershell.exe");
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+
+            // A console window can take focus from the desktop controls under test.
+            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
         // Windows PowerShell must resolve its own inbox modules when launched through Cargo from PowerShell 7.
         cmd.env_remove("PSModulePath")
             .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Sta", "-File"])

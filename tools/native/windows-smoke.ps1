@@ -133,6 +133,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     $info = New-Object System.Diagnostics.ProcessStartInfo
     $info.FileName = $script:Binary
     $info.UseShellExecute = $false
+    $info.CreateNoWindow = $true
     $info.WorkingDirectory = $Profile
     $info.Arguments = '--e2e-report "' + $Observation + '"'
     if ($Measure) { $info.Arguments += ' --measure' }
