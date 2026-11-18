@@ -84,6 +84,7 @@ pub struct PullPresentation {
     pub author: Option<String>,
     pub author_id: Option<NonZeroU64>,
     pub locked: Option<bool>,
+    pub merged_by: Option<NonZeroU64>,
     pub base_ref: Option<String>,
     pub head_ref: Option<String>,
     pub draft: Option<bool>,

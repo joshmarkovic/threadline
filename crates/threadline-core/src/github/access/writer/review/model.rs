@@ -11,14 +11,39 @@ pub struct VerifiedPull {
     pub(super) id: NonZeroU64,
     pub(super) node_id: String,
     pub(super) base: String,
+    pub(super) base_ref: Option<String>,
     pub(super) head: String,
     pub(super) open: bool,
+    pub(super) merged: bool,
+    pub(super) merge_oid: Option<String>,
+    pub(super) merged_by: Option<NonZeroU64>,
     pub(super) author: Option<NonZeroU64>,
     pub(super) locked: Option<bool>,
     pub(super) draft: Option<bool>,
 }
 
 impl VerifiedPull {
+    pub fn number(&self) -> ItemNumber {
+        self.number
+    }
+    pub fn id(&self) -> NonZeroU64 {
+        self.id
+    }
+    pub fn node_id(&self) -> &str {
+        &self.node_id
+    }
+    pub fn base_ref(&self) -> Option<&str> {
+        self.base_ref.as_deref()
+    }
+    pub fn is_merged(&self) -> bool {
+        self.merged
+    }
+    pub fn merge_oid(&self) -> Option<&str> {
+        self.merge_oid.as_deref()
+    }
+    pub fn merged_by(&self) -> Option<NonZeroU64> {
+        self.merged_by
+    }
     pub fn base(&self) -> &str {
         &self.base
     }

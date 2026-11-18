@@ -57,8 +57,19 @@ impl GitHubWriter<'_> {
                 id,
                 node_id: details.node_id.clone(),
                 base: details.base_oid.clone(),
+                base_ref: details.presentation.base_ref.clone(),
                 head: details.head_oid.clone(),
                 open: !details.closed && !details.merged,
+                merged: details.merged,
+                merge_oid: if details.merged {
+                    match &details.merge_oid {
+                        super::super::reader::Reported::Value(oid) => Some(oid.clone()),
+                        _ => None,
+                    }
+                } else {
+                    None
+                },
+                merged_by: details.presentation.merged_by,
                 author: details.presentation.author_id,
                 locked: details.presentation.locked,
                 draft: details.presentation.draft,
@@ -226,7 +237,7 @@ impl GitHubWriter<'_> {
         })
     }
 
-    fn check_pull(&self, pull: &VerifiedPull) -> Result<(), AccessError> {
+    pub(super) fn check_pull(&self, pull: &VerifiedPull) -> Result<(), AccessError> {
         if pull.repository != self.repository() || pull.actor != self.actor() {
             return Err(AccessError::local(AccessKind::WrongScope));
         }

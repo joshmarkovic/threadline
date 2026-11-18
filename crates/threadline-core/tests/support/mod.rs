@@ -160,7 +160,7 @@ async fn serve_reply(State(shared): State<Arc<Shared>>, request: Request) -> Res
     let (parts, body) = request.into_parts();
     let path = parts.uri.path_and_query().map_or("/", |u| u.as_str());
     let key = (parts.method.clone(), path.to_owned());
-    let json_body = if matches!(parts.method, Method::POST | Method::PATCH) {
+    let json_body = if matches!(parts.method, Method::POST | Method::PATCH | Method::PUT) {
         let bytes = axum::body::to_bytes(body, 16 * 1024)
             .await
             .unwrap_or_default();

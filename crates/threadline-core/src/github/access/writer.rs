@@ -11,6 +11,7 @@ use super::{
     *,
 };
 
+pub mod merge;
 mod model;
 pub mod review;
 mod wire;

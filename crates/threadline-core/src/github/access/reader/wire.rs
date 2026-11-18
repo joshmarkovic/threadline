@@ -167,6 +167,7 @@ pub(super) struct PullRequest {
     user: Option<Author>,
     draft: Option<bool>,
     locked: Option<bool>,
+    merged_by: Option<Author>,
     requested_reviewers: Option<Vec<Author>>,
     created_at: Option<String>,
     merged_at: Option<String>,
@@ -195,6 +196,7 @@ impl PullRequest {
             presentation: PullPresentation {
                 author_id: self.user.as_ref().and_then(|author| author.id),
                 locked: self.locked,
+                merged_by: self.merged_by.and_then(|actor| actor.id),
                 author: self.user.map(|user| user.login),
                 base_ref: self.base.name,
                 head_ref: self.head.name,
