@@ -415,8 +415,8 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
             Route::UpdatedComments
         }
         (Some("POST"), Some("/graphql"), Some("HTTP/1.1")) => Route::Graphql,
-        (Some("GET"), Some(target), Some("HTTP/1.1")) => pr::route(target)
-            .or_else(|| history::route(phase, target))
+        (Some("GET"), Some(target), Some("HTTP/1.1")) => history::route(phase, target)
+            .or_else(|| pr::route(target))
             .unwrap_or(Route::Unexpected),
         _ => Route::Unexpected,
     };
@@ -620,6 +620,30 @@ fn response(phase: Phase, route: Route, authorized: bool) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn immutable_compare_routes_to_the_active_native_fixture() {
+        let temp = tempfile::tempdir().unwrap();
+        let fixture = AccessFixture::start(temp.path()).unwrap();
+        let base = "a".repeat(40);
+        let head = "b".repeat(40);
+        let fetch = |phase| {
+            fs::write(fixture.phase_file(), phase).unwrap();
+            let mut socket = TcpStream::connect(fixture.address()).unwrap();
+            write!(
+                socket,
+                "GET /repositories/71/compare/{base}...{head}?per_page=20&page=1 HTTP/1.1\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\n\r\n"
+            )
+            .unwrap();
+            let mut reply = String::new();
+            socket.read_to_string(&mut reply).unwrap();
+            assert!(reply.starts_with("HTTP/1.1 200"));
+            reply
+        };
+        assert!(fetch("history").contains("pair.txt"));
+        assert!(fetch("pr-load").contains("src/first.rs"));
+        fixture.finish(temp.path(), TraceCheck::Observe).unwrap();
+    }
 
     #[test]
     fn fixture_binds_loopback_and_exports_only_redacted_access_metadata() {
