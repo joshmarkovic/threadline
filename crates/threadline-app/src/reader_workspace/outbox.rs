@@ -318,6 +318,9 @@ impl ReaderWorkspace {
                     .child(filters)
                     .child(self.observed_control("reader-outbox-pause", pause_button, false)),
             );
+        if let Some(inspection) = &self.outbox.selected {
+            view = view.child(self.outbox_inspection(inspection, palette, cx));
+        }
         let matching = self
             .queue
             .iter()
@@ -354,9 +357,6 @@ impl ReaderWorkspace {
                     cx.listener(|this, _, window, cx| this.show_outbox(true, window, cx)),
                 ),
             );
-        }
-        if let Some(inspection) = &self.outbox.selected {
-            view = view.child(self.outbox_inspection(inspection, palette, cx));
         }
         view.into_any_element()
     }

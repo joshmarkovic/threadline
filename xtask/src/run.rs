@@ -563,6 +563,16 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
             NativeMode::WindowsReviewContext,
             "windows-review-context",
         ),
+        (
+            "E2E-014",
+            NativeMode::WindowsLargeWorkspace,
+            "windows-large-workspace",
+        ),
+        (
+            "E2E-015",
+            NativeMode::WindowsAccessibility,
+            "windows-accessibility",
+        ),
         ("E2E-006", NativeMode::WindowsIssueWrites, "windows-writes"),
         (
             "E2E-019",
@@ -744,6 +754,8 @@ enum NativeMode {
     WindowsReaderOffline,
     WindowsReaderResume,
     WindowsReaderPerformance,
+    WindowsLargeWorkspace,
+    WindowsAccessibility,
     WindowsSync,
     WindowsPullRequest,
     WindowsHistory,
@@ -809,6 +821,7 @@ fn native_driver(
         NativeMode::WindowsReaderOffline => Some("Offline"),
         NativeMode::WindowsReaderResume => Some("Resume"),
         NativeMode::WindowsReaderPerformance => Some("Performance"),
+        NativeMode::WindowsLargeWorkspace => Some("LargeWorkspace"),
         NativeMode::WindowsSync => Some("Sync"),
         NativeMode::WindowsPullRequest => Some("PullRequest"),
         NativeMode::WindowsHistory => Some("History"),
@@ -864,6 +877,9 @@ fn native_driver(
         if mode == NativeMode::WindowsToast {
             cmd.arg("-ToastProof");
         }
+        if mode == NativeMode::WindowsAccessibility {
+            cmd.arg("-AccessibilityProof");
+        }
         if let Some(fixture) = &access_fixture {
             if let Some(proof) = reader_proof {
                 cmd.arg("-ReaderProof").arg(proof);
@@ -904,6 +920,8 @@ fn native_driver(
         NativeMode::WindowsGitHubAccess => "github-access-native.json",
         NativeMode::WindowsReaderOffline | NativeMode::WindowsReaderResume => "reader-native.json",
         NativeMode::WindowsReaderPerformance => "reader-performance.json",
+        NativeMode::WindowsLargeWorkspace => "large-workspace-native.json",
+        NativeMode::WindowsAccessibility => "accessibility-native.json",
         NativeMode::WindowsSync => "sync-native.json",
         NativeMode::WindowsPullRequest => "pr-native.json",
         NativeMode::WindowsHistory => "history-native.json",
@@ -945,6 +963,13 @@ fn native_driver(
                 Status::Pass,
                 NativeMode::WindowsReaderOffline | NativeMode::WindowsReaderPerformance,
             ) => TraceCheck::OfflineReader,
+            (Status::Blocked, NativeMode::WindowsLargeWorkspace)
+                if details
+                    .as_ref()
+                    .is_some_and(|json| json["offline_checks_passed"] == true) =>
+            {
+                TraceCheck::OfflineReader
+            }
             (Status::Pass, NativeMode::WindowsReaderResume) => TraceCheck::ReaderResume,
             (Status::Pass, NativeMode::WindowsSync) => TraceCheck::SyncJourney,
             (Status::Pass, NativeMode::WindowsPullRequest) => TraceCheck::PullRequestJourney,

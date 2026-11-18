@@ -180,7 +180,7 @@ function Set-ReaderPerformanceQuery([IntPtr]$Window, [int]$Sample) {
     return $targetItem
 }
 
-function Invoke-ReaderPerformance([IntPtr]$Window) {
+function Invoke-ReaderPerformance([IntPtr]$Window, [switch]$KeepOpen) {
     $initial = Wait-Reader 'twenty restored tabs across two offline panes' {
         param($reader)
         $reader.offline -and $reader.signed_out -and $reader.cached_content_ready -and
@@ -239,9 +239,33 @@ function Invoke-ReaderPerformance([IntPtr]$Window) {
         local_search = Get-ReaderBudget ($search.ToArray()) 200
         cached_tab_switch = Get-ReaderBudget ($switch.ToArray()) 100
     }
-    Stop-ThroughUi
+    if (!$KeepOpen) { Stop-ThroughUi }
     if ($script:report.budgets.Values.status -contains 'Fail') {
         throw 'One or more Section 16 cached-reader p95 budgets failed.'
     }
     $script:report.detail = 'Cached opening, local search and tab switching passed their Section 16 p95 budgets.'
+}
+
+function Invoke-LargeWorkspaceProof([IntPtr]$Window) {
+    Invoke-ReaderPerformance $Window -KeepOpen
+    Click-AccountControl $Window 'reader-outbox'
+    $null = Wait-Reader 'the signed-out native queue shows 900 unresolved fixture operations' {
+        param($reader) $reader.offline -and $reader.outbox_visible -and $reader.outbox -eq 900
+    }
+    Click-AccountControl $Window 'reader-outbox-action-0'
+    $null = Wait-Reader 'the first seeded action is queued' {
+        param($reader) $reader.outbox_action_state -ceq 'Queued'
+    }
+    $cancel = [Diagnostics.Stopwatch]::new()
+    Click-AccountControl $Window 'reader-outbox-cancel' $cancel
+    $null = Wait-Reader 'native cancellation committed and only one action left the unresolved count' {
+        param($reader)
+        $reader.outbox_action_state -ceq 'Cancelled' -and $reader.outbox -eq 899 -and $reader.offline
+    } 5
+    Add-Evidence 'Inspect and cancel the first queued action in the full offline Outbox' ([ordered]@{
+        unresolved_before = 900; unresolved_after = 899; cancellation_ms = $cancel.Elapsed.TotalMilliseconds
+    })
+    Stop-ThroughUi
+    $script:report.offline_checks_passed = $true
+    Stop-Blocked 'Offline reader budgets, large Outbox inspection and durable cancellation passed. Concurrent eligible online backlog drain still requires a verified workload.'
 }

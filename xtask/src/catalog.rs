@@ -37,7 +37,7 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == "S10-HISTORY-MONITOR" {
         return Some("s10-history-monitor-v1");
     }
-    if matches!(case, "UT-016" | "S10-HISTORY-HTTP") {
+    if matches!(case, "UT-016" | "S10-HISTORY-HTTP" | "E2E-011") {
         return Some("s10-history-dag-v1");
     }
     if matches!(case, "IT-011" | "IT-013" | "UI-004" | "E2E-007" | "E2E-008") {
@@ -89,13 +89,14 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
             | "E2E-003"
             | "E2E-004"
             | "S04-READER-PERF"
+            | "E2E-014"
             | "S04-READ-TRANSPORT"
             | "S04-CACHED-STORE"
             | "S04-READ-SERVICE"
     ) {
         return Some("s04-reader-v1");
     }
-    if case.starts_with("S01-") || matches!(case, "UT-021" | "E2E-001") {
+    if case.starts_with("S01-") || matches!(case, "UT-021" | "E2E-001" | "E2E-015") {
         return Some(include_str!("../../fixtures/revision.txt").trim_ascii());
     }
     if matches!(

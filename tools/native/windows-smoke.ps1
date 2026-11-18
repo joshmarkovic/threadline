@@ -8,7 +8,8 @@ param(
     [switch]$PlatformProof,
     [switch]$ToastProof,
     [switch]$AccessProof,
-    [ValidateSet('Offline', 'Resume', 'Performance', 'Sync', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'History', 'Writes', 'WriteSurface')][string]$ReaderProof,
+    [ValidateSet('Offline', 'Resume', 'Performance', 'LargeWorkspace', 'Sync', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'History', 'Writes', 'WriteSurface')][string]$ReaderProof,
+    [switch]$AccessibilityProof,
     [string]$AccessAddress,
     [string]$AccessPhaseFile,
     [switch]$ManualTrayClick,
@@ -30,6 +31,8 @@ $reportName = if ($Measure) {
     'github-access-native.json'
 } elseif ($ReaderProof -eq 'Performance') {
     'reader-performance.json'
+} elseif ($ReaderProof -eq 'LargeWorkspace') {
+    'large-workspace-native.json'
 } elseif ($ReaderProof -eq 'Sync') {
     'sync-native.json'
 } elseif ($ReaderProof -eq 'PullRequest') {
@@ -44,6 +47,8 @@ $reportName = if ($Measure) {
     'writes-native.json'
 } elseif ($ReaderProof) {
     'reader-native.json'
+} elseif ($AccessibilityProof) {
+    'accessibility-native.json'
 } else {
     'native.json'
 }
@@ -360,7 +365,7 @@ function Invoke-TrayIconClick {
     }
 }
 
-function Wait-CopiedText([uint32]$Before, [string]$Expected) {
+function Wait-CopiedText([uint32]$Before, [string]$Expected, [switch]$Exact) {
     $wait = [Diagnostics.Stopwatch]::StartNew()
     while ($wait.ElapsedMilliseconds -lt 1600) {
         $sequence = [ThreadlineWinInput]::GetClipboardSequenceNumber()
@@ -368,7 +373,8 @@ function Wait-CopiedText([uint32]$Before, [string]$Expected) {
             try {
                 $text = [Windows.Forms.Clipboard]::GetText()
                 if ([ThreadlineWinInput]::GetClipboardSequenceNumber() -eq $sequence -and
-                    $text.IndexOf($Expected, [StringComparison]::Ordinal) -ge 0) {
+                    (($Exact -and [string]::Equals($text, $Expected, [StringComparison]::Ordinal)) -or
+                     (!$Exact -and $text.IndexOf($Expected, [StringComparison]::Ordinal) -ge 0))) {
                     return $sequence
                 }
             } catch {
@@ -380,13 +386,13 @@ function Wait-CopiedText([uint32]$Before, [string]$Expected) {
     return $null
 }
 
-function Assert-ClipboardContains([string]$Expected, [switch]$SelectAll) {
+function Assert-ClipboardContains([string]$Expected, [switch]$SelectAll, [switch]$Exact) {
     $before = [ThreadlineWinInput]::GetClipboardSequenceNumber()
     for ($attempt = 1; $attempt -le 3; $attempt++) {
         if ($SelectAll) { [ThreadlineWinInput]::Chord(@(0x11, 0x41)) }
         Start-Sleep -Milliseconds 80
         [ThreadlineWinInput]::Chord(@(0x11, 0x43))
-        $sequence = Wait-CopiedText $before $Expected
+        $sequence = Wait-CopiedText $before $Expected -Exact:$Exact
         if ($null -ne $sequence) {
             $script:copiedClipboardSequence = $sequence
             return $attempt
@@ -409,6 +415,10 @@ function Stop-ThroughUi {
 }
 
 function Invoke-Smoke([IntPtr]$Window) {
+    $draftText = 'native draft 72'
+    if ($AccessibilityProof) {
+        $draftText += ' ' + [char]0x00e9 + [char]0x03bb + [char]0x65e5
+    }
     $initial = Read-Observation
     if ($initial.left_tab -ne 41 -or $initial.right_tab -ne 72 -or
         [Math]::Abs($initial.context_ratio - 0.33) -gt 0.03) {
@@ -431,20 +441,26 @@ function Invoke-Smoke([IntPtr]$Window) {
 
     [ThreadlineWinInput]::Chord(@(0x11, 0x32))
     $null = Wait-State 'right pane focus' { param($state) $state.focused_pane -eq 'right' }
-    [ThreadlineWinInput]::Chord(@(0x11, 0x52))
+    if ($AccessibilityProof) {
+        Wait-For 'the owned native Load preview accessibility action' {
+            Invoke-OwnedFixtureControl $Window 'load-preview' $null 'Load preview'
+        }
+    } else {
+        [ThreadlineWinInput]::Chord(@(0x11, 0x52))
+    }
     $null = Wait-State 'background preview starts' { param($state) $state.preview_state -eq 'loading' }
     [ThreadlineWinInput]::Chord(@(0x11, 0x46))
-    [ThreadlineWinInput]::TypeText('native draft 72')
-    $draft = Wait-State 'text typed into PR review input' { param($state) $state.right_input -eq 'native draft 72' -and $state.left_input -eq '' }
+    [ThreadlineWinInput]::TypeText($draftText)
+    $draft = Wait-State 'text typed into PR review input' { param($state) $state.right_input -ceq $draftText -and $state.left_input -eq '' }
     if ($draft.preview_state -ne 'loading') { throw 'Review input was not observed before planned background completion.' }
     $null = Wait-State 'background preview completes' { param($state) $state.preview_state -eq 'ready' }
-    $draftAttempts = Assert-ClipboardContains 'native draft 72' -SelectAll
+    $draftAttempts = Assert-ClipboardContains $draftText -SelectAll -Exact:$AccessibilityProof
     Add-Evidence 'Type into the right review input while background preview is pending and copy its value' ([ordered]@{ tab = $draft.right_tab; text = $draft.right_input; copy_attempts = $draftAttempts })
 
     [ThreadlineWinInput]::Chord(@(0x11, 0x09))
     $switched = Wait-State 'next PR tab without changing the other pane' { param($state) $state.right_tab -eq 68 -and $state.left_tab -eq 41 }
     [ThreadlineWinInput]::Chord(@(0x11, 0x09))
-    $restored = Wait-State 'return to PR 72 with draft intact' { param($state) $state.right_tab -eq 72 -and $state.right_input -eq 'native draft 72' }
+    $restored = Wait-State 'return to PR 72 with draft intact' { param($state) $state.right_tab -eq 72 -and $state.right_input -ceq $draftText }
     Add-Evidence 'Change the active tab and return to the same draft target' ([ordered]@{ switched = $switched.right_tab; restored = $restored.right_tab; draft = $restored.right_input })
 
     [ThreadlineWinInput]::Chord(@(0x11, 0x10, 0x4C))
@@ -473,7 +489,7 @@ function Invoke-Smoke([IntPtr]$Window) {
         Wait-For 'secondary process to forward and exit' { $forwarded.HasExited }
         if ($forwarded.ExitCode -ne 0) { throw "Secondary launch returned $($forwarded.ExitCode)." }
         $routed = Wait-State 'existing app routes external activation to PR 72' {
-            param($state) $state.activations -gt $prior.activations -and $state.right_tab -eq 72 -and $state.right_input -eq 'native draft 72'
+            param($state) $state.activations -gt $prior.activations -and $state.right_tab -eq 72 -and $state.right_input -ceq $draftText
         }
         if ($routed.pid -ne $script:app.Id) { throw 'PR activation did not stay in the existing process.' }
         Add-Evidence 'Forward a second launch through the Windows instance channel' ([ordered]@{ existing_pid = $routed.pid; secondary_pid = $forwarded.Id; right_tab = $routed.right_tab })
@@ -837,7 +853,9 @@ function Invoke-Measurement([IntPtr]$Window, [double]$ColdMs) {
 }
 
 try {
-    if (@($Measure, $PlatformProof, $ToastProof | Where-Object { $_ }).Count -gt 1) { throw 'Select one native evidence mode per run.' }
+    if (@($Measure, $PlatformProof, $ToastProof, $AccessProof, [bool]$ReaderProof, $AccessibilityProof | Where-Object { $_ }).Count -gt 1) {
+        throw 'Select one native evidence mode per run.'
+    }
     if (($ManualTrayClick -or $ManualNotificationClick) -and !$PlatformProof) { throw 'Manual shell checkpoints require -PlatformProof.' }
     if ($report.session_id -eq 0 -or ![Environment]::UserInteractive) {
         Stop-Blocked 'The driver needs an unlocked interactive Windows desktop outside Session 0.'
@@ -881,10 +899,10 @@ try {
         }
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
-    if ($AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'History', 'Writes', 'WriteSurface', 'Performance')) {
+    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'History', 'Writes', 'WriteSurface', 'Performance', 'LargeWorkspace')) {
         Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
         . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
-        $script:UseOwnedUiAutomation = $true
+        $script:UseOwnedUiAutomation = !$AccessibilityProof
         $report.driver = 'Windows PowerShell / owned UI Automation and guarded Win32 SendInput'
     }
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
@@ -896,7 +914,7 @@ try {
     $firstProfile = Join-Path $ProfileDir ('initial-' + [guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $firstProfile -Force
     if ($ReaderProof -eq 'Offline') { Initialize-ReaderProfile $firstProfile 'small' }
-    if ($ReaderProof -eq 'Performance') { Initialize-ReaderProfile $firstProfile 'section-16' }
+    if ($ReaderProof -in @('Performance', 'LargeWorkspace')) { Initialize-ReaderProfile $firstProfile 'section-16' }
     if ($script:UseSeededFixtureAuth) {
         $fixturePhase = switch ($ReaderProof) {
             Resume { 'reader-failure' }
@@ -924,6 +942,9 @@ try {
     $coldMs = $clock.Elapsed.TotalMilliseconds
     $report.native_window = $window.ToInt64()
     $report.dpi = [ThreadlineWinInput]::GetDpiForWindow($window)
+    if ($AccessibilityProof -and $report.dpi -lt 144) {
+        Stop-Blocked 'Run native high-DPI acceptance on a Windows fixture display already configured for 150% scale or higher.'
+    }
     if (!$script:UseOwnedUiAutomation) { Set-WindowFocus $window }
     $report.loaded_modules = @($app.Modules | ForEach-Object { $_.ModuleName } | Sort-Object -Unique)
     if ($report.loaded_modules | Where-Object { $_ -match '^(lib)?(webkit|wry|electron|cef|chromium|msedgewebview2)' }) {
@@ -948,6 +969,7 @@ try {
             Offline { Invoke-OfflineReaderProof $window $firstProfile }
             Resume { Invoke-ReaderResumeProof $window $firstProfile }
             Performance { Invoke-ReaderPerformance $window }
+            LargeWorkspace { Invoke-LargeWorkspaceProof $window }
             Sync { Invoke-SyncProof $window $firstProfile }
             PullRequest { Invoke-PrReaderProof $window }
             ReviewDraft { Invoke-ReviewDraftProof $window $firstProfile }
@@ -983,6 +1005,11 @@ try {
             restart_sqlite_sha256 = $restartDatabase.sha256
             retained = $true
         })
+        if ($AccessibilityProof) {
+            $report.automated_checks_passed = $true
+            $report.manual_screen_reader_and_visual = 'Pending'
+            Stop-Blocked 'Native keyboard, focus, exact Unicode clipboard, high DPI and owned UI Automation passed. Signed human visual and screen-reader observations are pending.'
+        }
         $report.detail = 'Exercised the native window, Markdown selection, independent focus and tabs, review input, and both splitters.'
     }
     $report.status = 'Pass'
