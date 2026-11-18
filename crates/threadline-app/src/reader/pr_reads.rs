@@ -5,6 +5,7 @@ mod references;
 
 pub(crate) use flights::Flights;
 
+use threadline_core::github::RateLimit;
 use threadline_core::github::reader::{
     GitHubReader,
     pr::{PrSide, PrSnapshot, PrSource, PrSourceRange},
@@ -33,13 +34,13 @@ struct Prepared {
     header: PrHeader,
 }
 
-struct FetchPage {
-    records: Vec<PrRecord>,
-    next: Option<String>,
-    partial: Option<ResourceError>,
-    validators: Validators,
-    merge_base: Option<String>,
-    review_decision: Option<String>,
+pub(crate) struct FetchPage {
+    pub(crate) records: Vec<PrRecord>,
+    pub(crate) next: Option<String>,
+    pub(crate) partial: Option<ResourceError>,
+    pub(crate) validators: Validators,
+    pub(crate) merge_base: Option<String>,
+    pub(crate) review_decision: Option<String>,
 }
 
 impl ReaderService {
@@ -50,19 +51,23 @@ impl ReaderService {
         family: PrFamily,
         cancel: &Cancellation,
     ) -> Result<PageStatus, ReaderError> {
-        let key = (account, pr, family.name());
+        let current = self.store.current_pr_revision(account, pr)?;
+        let intended = current.as_ref().map(|(revision, _)| revision.id);
+        let key = (account, pr, intended, family.name());
         let service = self.clone();
         self.pr_reads
             .read(key, cancel, move |flight| async move {
-                let current = service.store.current_pr_revision(account, pr)?;
                 if let Some((rev, _)) = current
-                    && family != PrFamily::Threads
+                    && !mutable_family(family)
                     && service.store.pr_page(&rev, family, None, 1)?.state.coverage
                         == Coverage::Complete
                 {
                     return Ok(PageStatus::complete());
                 }
                 let mut prepared = service.prepare_pr(account, pr, &flight).await?;
+                if intended.is_some_and(|id| id != prepared.revision.id) {
+                    return Err(ReaderError::ScopeChanged);
+                }
                 service
                     .read_pr_page(&mut prepared, family, None, &flight)
                     .await
@@ -310,15 +315,14 @@ impl ReaderService {
         if let Some(replied) = self.resume_pr_replies(prepared, family, cancel).await? {
             return Ok(replied);
         }
+        let cached = self
+            .store
+            .pr_page(&prepared.revision, family, None, 1)?
+            .state;
+        let refresh = download.is_none() && mutable_family(family);
         let mut progress = self.store.resume_pr_fetch(&prepared.revision, family)?;
         if progress.is_none() {
-            if self
-                .store
-                .pr_page(&prepared.revision, family, None, 1)?
-                .state
-                .coverage
-                == Coverage::Complete
-            {
+            if !refresh && cached.coverage == Coverage::Complete {
                 return Ok(PageStatus::complete());
             }
             progress = Some(self.store.start_pr_fetch(
@@ -328,47 +332,81 @@ impl ReaderService {
             )?);
         }
         let progress = progress.expect("existing or started PR fetch");
+        let read_validators = if refresh && progress.cursor.is_none() {
+            ReadValidators {
+                etag: cached.validators.etag.clone(),
+                last_modified: cached.validators.last_modified.clone(),
+            }
+        } else {
+            ReadValidators::default()
+        };
         let result: Result<PageStatus, ReaderError> = async {
             self.admit(account, cancel).await?;
-            let fetched = self
-                .request_pr_page(
-                    account,
-                    &prepared.reader.reader(),
-                    &prepared.snapshot,
-                    family,
-                    progress.cursor.as_deref(),
-                    cancel,
-                )
-                .await?;
-            self.check_item(&prepared.scope, prepared.item, prepared.locator, cancel)?;
+            let fetched = match request_pr_page(
+                &prepared.reader.reader(),
+                &prepared.snapshot,
+                family,
+                progress.cursor.as_deref(),
+                &read_validators,
+                cancel,
+            )
+            .await
+            {
+                Ok((Some(fetched), rate)) => {
+                    self.pr_rate(account, rate).await;
+                    fetched
+                }
+                Ok((None, rate)) => {
+                    self.pr_rate(account, rate).await;
+                    self.check_pr_current(prepared, cancel)?;
+                    self.store.revalidate_current_pr(
+                        &prepared.revision,
+                        family,
+                        &progress,
+                        &cached.validators,
+                        UtcMillis::now()?.0,
+                    )?;
+                    return Ok(PageStatus {
+                        has_more: false,
+                        complete: true,
+                        contacted: true,
+                    });
+                }
+                Err(ReaderError::Remote(error)) => return self.response(account, Err(error)).await,
+                Err(error) => return Err(error),
+            };
+            self.check_pr_current(prepared, cancel)?;
+            let ancestor = fetched
+                .merge_base
+                .as_deref()
+                .map(CommitOid::parse)
+                .transpose()?;
+            let updated_identity = ancestor.is_some() || fetched.review_decision.is_some();
             if let Some(decision) = fetched.review_decision {
                 prepared.header.review_decision = Some(decision);
             }
-            if fetched.merge_base.is_some() || prepared.header.review_decision.is_some() {
-                prepared.revision =
-                    self.save_pr_revision(prepared, fetched.merge_base.as_deref())?;
-            }
+            let identity = updated_identity.then_some(threadline_storage::pr::PrPageIdentity {
+                merge_base: ancestor.as_ref(),
+                header: &prepared.header,
+                provider_updated_at_ms: prepared.snapshot.details().updated_at_ms,
+            });
             let more = fetched.next.is_some();
             let partial = fetched.partial;
             let update = PrInputPage {
                 records: fetched.records,
                 next_cursor: fetched.next.as_deref(),
-                validators: Some(&fetched.validators),
+                validators: (progress.cursor.is_none() && !more).then_some(&fetched.validators),
                 partial,
                 fetched_at_ms: UtcMillis::now()?.0,
             };
-            if let Some(generation) = download {
-                self.store.commit_pr_download_page(
-                    &prepared.revision,
-                    generation,
-                    family,
-                    &progress,
-                    update,
-                )?;
-            } else {
-                self.store
-                    .commit_pr_page(&prepared.revision, family, &progress, update)?;
-            }
+            prepared.revision = self.store.commit_current_pr_page(
+                &prepared.revision,
+                family,
+                &progress,
+                update,
+                identity,
+                download,
+            )?;
             Ok(PageStatus {
                 has_more: more,
                 complete: !more && partial.is_none(),
@@ -389,71 +427,20 @@ impl ReaderService {
         result
     }
 
-    async fn request_pr_page(
+    fn check_pr_current(
         &self,
-        account: AccountId,
-        repo: &GitHubReader<'_>,
-        snapshot: &PrSnapshot,
-        family: PrFamily,
-        cursor: Option<&str>,
+        prepared: &Prepared,
         cancel: &Cancellation,
-    ) -> Result<FetchPage, ReaderError> {
-        let validators = ReadValidators::default();
-        let fetched = match family {
-            PrFamily::Commits | PrFamily::Files => {
-                let (data, validators) = self
-                    .pr_value(
-                        account,
-                        repo.pr_comparison(snapshot, numeric_page(cursor)?, &validators, cancel)
-                            .await,
-                    )
-                    .await?;
-                let merge_base = Some(data.merge_base().to_owned());
-                let mut page = if family == PrFamily::Commits {
-                    convert::page(data.commits, validators, convert::commit)
-                } else {
-                    convert::files(data.files.ok_or(ReaderError::BadCursor)?, validators)
-                };
-                page.merge_base = merge_base;
-                page
-            }
-            PrFamily::Reviews => {
-                let data = self
-                    .response(account, repo.pr_reviews(snapshot, cursor, cancel).await)
-                    .await?;
-                self.pr_rate(account, data.rate).await;
-                convert::graph(data, convert::review)
-            }
-            PrFamily::Threads => {
-                let data = self
-                    .response(account, repo.pr_threads(snapshot, cursor, cancel).await)
-                    .await?;
-                self.pr_rate(account, data.rate).await;
-                convert::graph(data, convert::thread)
-            }
-            PrFamily::Checks => {
-                let (data, validators) = self
-                    .pr_value(
-                        account,
-                        repo.pr_checks(snapshot, numeric_page(cursor)?, &validators, cancel)
-                            .await,
-                    )
-                    .await?;
-                convert::page(data, validators, convert::check)
-            }
-            PrFamily::Statuses => {
-                let (data, validators) = self
-                    .pr_value(
-                        account,
-                        repo.pr_statuses(snapshot, numeric_page(cursor)?, &validators, cancel)
-                            .await,
-                    )
-                    .await?;
-                convert::page(data, validators, convert::status)
-            }
-            PrFamily::Context | PrFamily::Media => return Err(ReaderError::InvalidIdentity),
-        };
-        Ok(fetched)
+    ) -> Result<(), ReaderError> {
+        self.check_item(&prepared.scope, prepared.item, prepared.locator, cancel)?;
+        if self
+            .store
+            .current_pr_revision(prepared.scope.account, prepared.item)?
+            .is_none_or(|(revision, _)| revision.id != prepared.revision.id)
+        {
+            return Err(ReaderError::ScopeChanged);
+        }
+        Ok(())
     }
 
     async fn resume_pr_replies(
@@ -534,6 +521,77 @@ impl ReaderService {
                 return Ok(None);
             }
         }
+    }
+}
+
+fn mutable_family(family: PrFamily) -> bool {
+    matches!(
+        family,
+        PrFamily::Reviews | PrFamily::Threads | PrFamily::Checks | PrFamily::Statuses
+    )
+}
+
+pub(crate) async fn request_pr_page(
+    repo: &GitHubReader<'_>,
+    snapshot: &PrSnapshot,
+    family: PrFamily,
+    cursor: Option<&str>,
+    validators: &ReadValidators,
+    cancel: &Cancellation,
+) -> Result<(Option<FetchPage>, RateLimit), ReaderError> {
+    fn map_response<T>(
+        response: Refresh<T>,
+        map: impl FnOnce(T, Validators) -> Result<FetchPage, ReaderError>,
+    ) -> Result<(Option<FetchPage>, RateLimit), ReaderError> {
+        let result = response
+            .value
+            .map(|value| map(value, convert::validators(response.validators)))
+            .transpose()?;
+        Ok((result, response.rate))
+    }
+    match family {
+        PrFamily::Commits | PrFamily::Files => {
+            let response = repo
+                .pr_comparison(snapshot, numeric_page(cursor)?, validators, cancel)
+                .await?;
+            map_response(response, |data, validators| {
+                let merge_base = Some(data.merge_base().to_owned());
+                let mut page = if family == PrFamily::Commits {
+                    convert::page(data.commits, validators, convert::commit)
+                } else {
+                    convert::files(data.files.ok_or(ReaderError::BadCursor)?, validators)
+                };
+                page.merge_base = merge_base;
+                Ok(page)
+            })
+        }
+        PrFamily::Reviews => {
+            let result = repo.pr_reviews(snapshot, cursor, cancel).await?;
+            let rate = result.rate;
+            Ok((Some(convert::graph(result, convert::review)), rate))
+        }
+        PrFamily::Threads => {
+            let result = repo.pr_threads(snapshot, cursor, cancel).await?;
+            let rate = result.rate;
+            Ok((Some(convert::graph(result, convert::thread)), rate))
+        }
+        PrFamily::Checks => {
+            let result = repo
+                .pr_checks(snapshot, numeric_page(cursor)?, validators, cancel)
+                .await?;
+            map_response(result, |data, validators| {
+                Ok(convert::page(data, validators, convert::check))
+            })
+        }
+        PrFamily::Statuses => {
+            let result = repo
+                .pr_statuses(snapshot, numeric_page(cursor)?, validators, cancel)
+                .await?;
+            map_response(result, |data, validators| {
+                Ok(convert::page(data, validators, convert::status))
+            })
+        }
+        PrFamily::Context | PrFamily::Media => Err(ReaderError::InvalidIdentity),
     }
 }
 

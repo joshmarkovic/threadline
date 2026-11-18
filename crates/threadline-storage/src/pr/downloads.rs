@@ -96,6 +96,14 @@ fn status(db: &Connection, rev: &PrRevision) -> Result<Option<PrDownload>> {
 }
 
 impl PrDownload {
+    pub fn unselected_optional_resources(&self) -> impl Iterator<Item = PrFamily> + '_ {
+        self.families.iter().filter_map(|(family, state)| {
+            (matches!(family, PrFamily::Context | PrFamily::Media)
+                && state.coverage != Coverage::Complete)
+                .then_some(*family)
+        })
+    }
+
     pub fn fully_cached(&self) -> bool {
         self.body_downloaded
             && self.conversation.coverage == Coverage::Complete
@@ -107,6 +115,23 @@ impl PrDownload {
                 .all(|(_, state)| state.coverage == Coverage::Complete)
     }
 }
+
+pub(super) fn require_download_page(
+    tx: &Transaction<'_>,
+    rev: &PrRevision,
+    generation: i64,
+    family: PrFamily,
+) -> Result<()> {
+    let active:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM pr_downloads d JOIN eligible_sync_repositories e
+        ON e.account_id=?3 AND e.repository_id=?4 WHERE d.revision_id=?1 AND d.generation=?2 AND d.state='active'
+        AND (?5<>'context' OR d.include_context) AND (?5<>'media' OR d.include_media))",
+        params![rev.id,generation,rev.account,rev.repository,family.name()],|row|row.get(0))?;
+    if !active {
+        return Err(Error::Conflict("PR download is held or has been cancelled"));
+    }
+    Ok(())
+}
+
 impl Store {
     pub fn pr_download(&self, rev: &PrRevision) -> Result<Option<PrDownload>> {
         self.read(|db| {
@@ -156,13 +181,9 @@ impl Store {
         expected: &ResourceProgress,
         page: PrInputPage<'_>,
     ) -> Result<Option<ResourceProgress>> {
-        self.write(|tx|{
-            let active:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM pr_downloads d JOIN eligible_sync_repositories e
-                ON e.account_id=?3 AND e.repository_id=?4 WHERE d.revision_id=?1 AND d.generation=?2 AND d.state='active'
-                AND (?5<>'context' OR d.include_context) AND (?5<>'media' OR d.include_media))",
-                params![rev.id,generation,rev.account,rev.repository,family.name()],|row|row.get(0))?;
-            if !active {return Err(Error::Conflict("PR download is held or has been cancelled"));}
-            publish_page(tx,rev,family,expected,page)
+        self.write(|tx| {
+            require_download_page(tx, rev, generation, family)?;
+            publish_page(tx, rev, family, expected, page)
         })
     }
     pub fn finish_pr_download(&self, rev: &PrRevision, generation: i64) -> Result<PrDownloadState> {

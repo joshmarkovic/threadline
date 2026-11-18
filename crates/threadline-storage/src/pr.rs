@@ -32,6 +32,12 @@ pub struct PrInputPage<'a> {
     pub fetched_at_ms: i64,
 }
 
+pub struct PrPageIdentity<'a> {
+    pub merge_base: Option<&'a CommitOid>,
+    pub header: &'a PrHeader,
+    pub provider_updated_at_ms: i64,
+}
+
 #[derive(Serialize, Deserialize)]
 struct StoredRecord {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -46,6 +52,98 @@ fn encoded<T: Serialize>(v: &T) -> Result<String> {
 }
 fn decoded<'a, T: Deserialize<'a>>(s: &'a str) -> Result<T> {
     serde_json::from_str(s).map_err(|_| Error::Corrupt)
+}
+
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Revision and its provider observation are published within the caller's transaction"
+)]
+pub(crate) fn record_revision_in(
+    tx: &Transaction<'_>,
+    account: AccountId,
+    pr: ItemId,
+    base: &CommitOid,
+    head: &CommitOid,
+    merge_base: Option<&CommitOid>,
+    header: &PrHeader,
+    updated_at_ms: i64,
+) -> Result<PrRevision> {
+    let (repository, body, body_at) = tx
+        .query_row(
+            "SELECT repository_id,body,body_at FROM items
+         WHERE account_id=? AND id=? AND kind='pull_request'",
+            params![account, pr],
+            |row| {
+                Ok((
+                    row.get::<_, RepositoryId>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, Option<i64>>(2)?,
+                ))
+            },
+        )
+        .optional()?
+        .ok_or(Error::NotFound)?;
+    let previous = current_in(tx, account, pr)?;
+    let existing = tx
+        .query_row(
+            "SELECT merge_base_oid,header,updated_at FROM pr_revisions
+         WHERE account_id=? AND repository_id=? AND item_id=? AND base_oid=? AND head_oid=?",
+            params![account, repository, pr, base.as_str(), head.as_str()],
+            |row| {
+                Ok((
+                    row.get::<_, Option<String>>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
+            },
+        )
+        .optional()?;
+    let mut next_header = header.clone();
+    if let Some((ancestor, raw, observed)) = existing {
+        if let (Some(saved), Some(new)) = (ancestor, merge_base)
+            && saved != new.as_str()
+        {
+            return Err(Error::Conflict(
+                "Immutable PR comparison has a different merge base",
+            ));
+        }
+        let old: PrHeader = decoded(&raw)?;
+        next_header = if observed >= updated_at_ms {
+            old.fill_unknown(header)
+        } else {
+            next_header.fill_unknown(&old)
+        };
+    }
+    let body_at = body_at.filter(|stamp| *stamp <= updated_at_ms);
+    let body = body_at.and(body);
+    let id = tx.query_row(
+        "INSERT INTO pr_revisions(account_id,repository_id,item_id,base_oid,head_oid,merge_base_oid,header,updated_at,body,body_at)
+         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)
+         ON CONFLICT(account_id,repository_id,item_id,base_oid,head_oid) DO UPDATE SET
+             merge_base_oid=COALESCE(pr_revisions.merge_base_oid,excluded.merge_base_oid),
+             header=excluded.header,updated_at=MAX(pr_revisions.updated_at,excluded.updated_at),
+             body=CASE WHEN excluded.body_at IS NOT NULL AND
+                 (pr_revisions.body_at IS NULL OR excluded.body_at>pr_revisions.body_at)
+                 THEN excluded.body ELSE pr_revisions.body END,
+             body_at=COALESCE(MAX(excluded.body_at,pr_revisions.body_at),pr_revisions.body_at,excluded.body_at)
+         RETURNING id",
+        params![account, repository, pr, base.as_str(), head.as_str(),merge_base.map(CommitOid::as_str),
+            encoded(&next_header)?, updated_at_ms, body, body_at],
+        |row| row.get(0),
+    )?;
+    let (revision, _) = revision_in(tx, account, pr, id)?.ok_or(Error::Corrupt)?;
+    if let Some((_, previous_header, observed)) = previous
+        && updated_at_ms > observed
+    {
+        observation::reviewer_changes(
+            tx,
+            &revision,
+            &previous_header,
+            &next_header,
+            updated_at_ms,
+        )?;
+    }
+    Ok(revision)
 }
 
 impl Store {
@@ -65,55 +163,16 @@ impl Store {
         updated_at_ms: i64,
     ) -> Result<PrRevision> {
         self.write(|tx| {
-            let (repository, body, body_at) = tx.query_row(
-                "SELECT repository_id,body,body_at FROM items
-                 WHERE account_id=? AND id=? AND kind='pull_request'",
-                params![account, pr],
-                |row| Ok((row.get::<_, RepositoryId>(0)?,row.get::<_, Option<String>>(1)?,row.get::<_, Option<i64>>(2)?)),
-            ).optional()?.ok_or(Error::NotFound)?;
-            let previous = current_in(tx, account, pr)?;
-            let existing = tx.query_row(
-                "SELECT merge_base_oid,header,updated_at FROM pr_revisions
-                 WHERE account_id=? AND repository_id=? AND item_id=? AND base_oid=? AND head_oid=?",
-                params![account, repository, pr, base.as_str(), head.as_str()],
-                |row| Ok((row.get::<_, Option<String>>(0)?,row.get::<_, String>(1)?,row.get::<_, i64>(2)?)),
-            ).optional()?;
-            let mut next_header = header.clone();
-            if let Some((ancestor, raw, observed)) = existing {
-                if let (Some(saved),Some(new)) = (ancestor, merge_base)
-                    && saved != new.as_str() {
-                    return Err(Error::Conflict("Immutable PR comparison has a different merge base"));
-                }
-                let old: PrHeader = decoded(&raw)?;
-                next_header = if observed >= updated_at_ms {
-                    old.fill_unknown(header)
-                } else {
-                    next_header.fill_unknown(&old)
-                };
-            }
-            let body_at = body_at.filter(|stamp| *stamp <= updated_at_ms);
-            let body = body_at.and(body);
-            let id = tx.query_row(
-                "INSERT INTO pr_revisions(account_id,repository_id,item_id,base_oid,head_oid,merge_base_oid,header,updated_at,body,body_at)
-                 VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)
-                 ON CONFLICT(account_id,repository_id,item_id,base_oid,head_oid) DO UPDATE SET
-                     merge_base_oid=COALESCE(pr_revisions.merge_base_oid,excluded.merge_base_oid),
-                     header=excluded.header,updated_at=MAX(pr_revisions.updated_at,excluded.updated_at),
-                     body=CASE WHEN excluded.body_at IS NOT NULL AND
-                         (pr_revisions.body_at IS NULL OR excluded.body_at>pr_revisions.body_at)
-                         THEN excluded.body ELSE pr_revisions.body END,
-                     body_at=COALESCE(MAX(excluded.body_at,pr_revisions.body_at),pr_revisions.body_at,excluded.body_at)
-                 RETURNING id",
-                params![account, repository, pr, base.as_str(), head.as_str(),merge_base.map(CommitOid::as_str),
-                    encoded(&next_header)?, updated_at_ms, body, body_at],
-                |row| row.get(0),
-            )?;
-            let (revision, _) = revision_in(tx, account, pr, id)?.ok_or(Error::Corrupt)?;
-            if let Some((_,previous_header,observed)) = previous
-                && updated_at_ms > observed {
-                observation::reviewer_changes(tx, &revision, &previous_header, &next_header, updated_at_ms)?;
-            }
-            Ok(revision)
+            record_revision_in(
+                tx,
+                account,
+                pr,
+                base,
+                head,
+                merge_base,
+                header,
+                updated_at_ms,
+            )
         })
     }
 
@@ -174,7 +233,27 @@ impl Store {
         self.write(|tx| publish_page(tx, rev, family, expected, page))
     }
 
-    pub fn pr_not_modified(
+    pub fn commit_current_pr_page(
+        &self,
+        rev: &PrRevision,
+        family: PrFamily,
+        expected: &ResourceProgress,
+        page: PrInputPage<'_>,
+        identity: Option<PrPageIdentity<'_>>,
+        download: Option<i64>,
+    ) -> Result<PrRevision> {
+        self.write(|tx| {
+            require_current_revision(tx, rev)?;
+            if let Some(generation) = download {
+                downloads::require_download_page(tx, rev, generation, family)?;
+            }
+            let rev = attach_page_identity(tx, rev, identity)?;
+            publish_page(tx, &rev, family, expected, page)?;
+            Ok(rev)
+        })
+    }
+
+    pub fn revalidate_current_pr(
         &self,
         rev: &PrRevision,
         family: PrFamily,
@@ -183,10 +262,20 @@ impl Store {
         at_ms: i64,
     ) -> Result<()> {
         self.write(|tx| {
-            let id = family_id(tx, rev, family)?.ok_or(Error::NotFound)?;
-            let (_, has_page) = require_walk_id(tx, id, expected)?;
-            accept_not_modified(tx, id, has_page, matched, at_ms)
+            require_current_revision(tx, rev)?;
+            revalidate_page(tx, rev, family, expected, matched, at_ms)
         })
+    }
+
+    pub fn pr_not_modified(
+        &self,
+        rev: &PrRevision,
+        family: PrFamily,
+        expected: &ResourceProgress,
+        matched: &Validators,
+        at_ms: i64,
+    ) -> Result<()> {
+        self.write(|tx| revalidate_page(tx, rev, family, expected, matched, at_ms))
     }
 
     pub fn record_pr_fetch_error(
@@ -260,6 +349,46 @@ impl Store {
             Ok(PrPage{rows,next,state:state_by_id(&tx,id)?})
         })
     }
+}
+
+pub(crate) fn require_current_revision(tx: &Transaction<'_>, rev: &PrRevision) -> Result<()> {
+    if current_in(tx, rev.account, rev.pr)?.is_none_or(|(current, _, _)| current.id != rev.id) {
+        return Err(Error::Conflict("PR revision has been superseded"));
+    }
+    Ok(())
+}
+
+pub(crate) fn attach_page_identity(
+    tx: &Transaction<'_>,
+    rev: &PrRevision,
+    identity: Option<PrPageIdentity<'_>>,
+) -> Result<PrRevision> {
+    let Some(identity) = identity else {
+        return Ok(rev.clone());
+    };
+    record_revision_in(
+        tx,
+        rev.account,
+        rev.pr,
+        &rev.base,
+        &rev.head,
+        identity.merge_base,
+        identity.header,
+        identity.provider_updated_at_ms,
+    )
+}
+
+fn revalidate_page(
+    tx: &Transaction<'_>,
+    rev: &PrRevision,
+    family: PrFamily,
+    expected: &ResourceProgress,
+    matched: &Validators,
+    at_ms: i64,
+) -> Result<()> {
+    let id = family_id(tx, rev, family)?.ok_or(Error::NotFound)?;
+    let (_, has_page) = require_walk_id(tx, id, expected)?;
+    accept_not_modified(tx, id, has_page, matched, at_ms)
 }
 
 impl PrHeader {

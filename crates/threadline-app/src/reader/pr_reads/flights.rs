@@ -10,7 +10,7 @@ use tokio::sync::watch;
 
 use super::{AccountId, Cancellation, ItemId, PageStatus, ReaderError};
 
-pub(super) type Key = (AccountId, ItemId, &'static str);
+pub(super) type Key = (AccountId, ItemId, Option<i64>, &'static str);
 type Result = std::result::Result<PageStatus, ReaderError>;
 
 #[derive(Default)]
@@ -109,11 +109,14 @@ mod tests {
     #[test]
     fn pr_service_one_departing_subscriber_cannot_cancel_the_other() {
         let flights = Flights::default();
-        let key = (AccountId(1), ItemId(2), "files");
+        let key = (AccountId(1), ItemId(2), Some(1), "files");
         let (first, spawned) = flights.subscribe(key);
         assert!(spawned);
         let (second, spawned) = flights.subscribe(key);
         assert!(!spawned);
+        let (_, different_revision_spawned) =
+            flights.subscribe((AccountId(1), ItemId(2), Some(2), "files"));
+        assert!(different_revision_spawned);
         let transport = first.0.cancellation.clone();
         drop(first);
         assert!(!transport.is_cancelled());

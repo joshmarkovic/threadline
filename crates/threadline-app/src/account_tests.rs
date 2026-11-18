@@ -19,6 +19,8 @@ struct Simulator {
     user_requests: Arc<AtomicUsize>,
     repository_id: Arc<AtomicU64>,
     page_two_ready: Arc<AtomicBool>,
+    check_arrived: Arc<AtomicBool>,
+    hold_check_response: Arc<AtomicBool>,
     worker: Option<thread::JoinHandle<()>>,
 }
 
@@ -38,6 +40,10 @@ impl Simulator {
         let server_user_requests = user_requests.clone();
         let repository_id = Arc::new(AtomicU64::new(42));
         let page_two_ready = Arc::new(AtomicBool::new(false));
+        let check_arrived = Arc::new(AtomicBool::new(false));
+        let hold_check_response = Arc::new(AtomicBool::new(false));
+        let (server_check_arrived, server_check_hold) =
+            (check_arrived.clone(), hold_check_response.clone());
         let (server_sso, server_stop, server_requests, server_repository) = (
             sso.clone(),
             stop.clone(),
@@ -55,6 +61,8 @@ impl Simulator {
                             server_sso.load(Ordering::Relaxed),
                             server_repository.load(Ordering::Relaxed),
                             reader.then(|| (address, server_page_two.load(Ordering::Relaxed))),
+                            &server_check_arrived,
+                            &server_check_hold,
                         ) {
                             server_user_requests.fetch_add(1, Ordering::Relaxed);
                         }
@@ -74,6 +82,8 @@ impl Simulator {
             user_requests,
             repository_id,
             page_two_ready,
+            check_arrived,
+            hold_check_response,
             worker: Some(worker),
         }
     }
@@ -97,6 +107,8 @@ fn respond(
     sso: bool,
     repository_id: u64,
     reader: Option<(SocketAddr, bool)>,
+    check_arrived: &AtomicBool,
+    hold_check_response: &AtomicBool,
 ) -> bool {
     // Windows can inherit the nonblocking listener mode on an accepted socket.
     stream.set_nonblocking(false).unwrap();
@@ -126,7 +138,36 @@ fn respond(
     let repo = format!(
         r#"{{"id":{repository_id},"node_id":"synthetic-private-repo","name":"private","owner":{{"login":"fixture-org"}},"private":true,"permissions":{{"pull":true,"push":false,"admin":false}}}}"#
     );
-    let (status, extra, body) = if let Some(reply) =
+    let checked_head = ["b".repeat(40), "d".repeat(40)].into_iter().find(|head| {
+        target
+            == format!("/repositories/73/commits/{head}/check-runs?filter=all&per_page=20&page=1")
+    });
+    let (status, extra, body) = if let Some(head) = checked_head.filter(|_| reader.is_some()) {
+        check_arrived.store(true, Ordering::Release);
+        for _ in 0..500 {
+            if !hold_check_response.load(Ordering::Acquire) {
+                break;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        let etag = "ETag: \"checks-v1\"\r\n".into();
+        if headers
+            .lines()
+            .any(|line| line.eq_ignore_ascii_case("if-none-match: \"checks-v1\""))
+        {
+            ("304 Not Modified", etag, String::new())
+        } else {
+            (
+                "200 OK",
+                etag,
+                serde_json::json!({"total_count":1, "check_runs":[{
+                "id":6,"head_sha":head,"name":"Fixture test","status":"completed",
+                    "conclusion":"success","completed_at":"2013-09-06T00:00:00Z"
+                }]})
+                .to_string(),
+            )
+        }
+    } else if let Some(reply) =
         reader.and_then(|(address, page_two)| reader_reply(&target, &repo, address, page_two))
     {
         reply
@@ -345,7 +386,7 @@ async fn pr_service_commits_verified_files_context_and_cross_repository_referenc
             },
         )
         .unwrap();
-    let reader = ReaderService::new(service);
+    let reader = ReaderService::new(service.clone());
     let left = reader.fetch_pr_family(account, pr, PrFamily::Files, &cancel);
     let right = reader.fetch_pr_family(account, pr, PrFamily::Files, &cancel);
     let before = fixture.requests.load(Ordering::Relaxed);
@@ -405,11 +446,71 @@ async fn pr_service_commits_verified_files_context_and_cross_repository_referenc
         .unwrap();
     assert!(matches!(&context.rows[0].1,PrRecord::Context {text,..} if text == "before"));
 
+    store
+        .update_sync_settings(account, |settings| {
+            settings.controls.pause_background = true
+        })
+        .unwrap();
+    let check_target = revision.read_target(PrFamily::Checks);
+    let request_check = || {
+        store
+            .subscribe_read(
+                account,
+                &check_target,
+                "explicit-fixture-check",
+                threadline_storage::sync::ReadPriority::Explicit,
+                UtcMillis::now().unwrap().0,
+            )
+            .unwrap();
+    };
+    request_check();
+    let worker =
+        crate::sync_worker::SyncWorker::start_fixture(service, &tokio::runtime::Handle::current());
+    worker.wake(Some(threadline_core::connectivity::ProbeTrigger::Startup));
+    let checks = tokio::time::timeout(Duration::from_secs(12), async {
+        loop {
+            let checks = store
+                .pr_page(&revision, PrFamily::Checks, None, 10)
+                .unwrap();
+            if checks.state.coverage == Coverage::Complete {
+                break checks;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert!(
+        matches!(&checks.rows[0].1, PrRecord::Check {head_oid,..} if *head_oid == "b".repeat(40))
+    );
+    assert_eq!(
+        checks.state.validators.etag.as_deref(),
+        Some("\"checks-v1\"")
+    );
+    let downloaded_at = checks.state.last_fetch_at_ms;
+    request_check();
+    worker.wake(None);
+    let validated = tokio::time::timeout(Duration::from_secs(8), async {
+        loop {
+            let checks = store
+                .pr_page(&revision, PrFamily::Checks, None, 10)
+                .unwrap();
+            if checks.state.last_validation_at_ms > downloaded_at {
+                break checks;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(validated.state.last_fetch_at_ms, downloaded_at);
+    assert_eq!(validated.rows, checks.rows);
+    drop(worker);
+
     for family in [
         PrFamily::Commits,
         PrFamily::Reviews,
         PrFamily::Threads,
-        PrFamily::Checks,
         PrFamily::Statuses,
     ] {
         let progress = store
@@ -460,8 +561,76 @@ async fn pr_service_commits_verified_files_context_and_cross_repository_referenc
             .coverage,
         Coverage::Complete
     );
+    let optional = store
+        .request_pr_download(&revision, true, true, UtcMillis::now().unwrap().0)
+        .unwrap();
+    assert_eq!(
+        reader
+            .run_pr_download(&revision, optional.generation, &cancel)
+            .await
+            .unwrap(),
+        PrDownloadState::Partial
+    );
+    let media = store.pr_page(&revision, PrFamily::Media, None, 1).unwrap();
+    let job = store.pr_download(&revision).unwrap().unwrap();
+    assert_eq!(
+        job.unselected_optional_resources().collect::<Vec<_>>(),
+        [PrFamily::Media]
+    );
+    assert!(!media.state.shows_empty(media.rows.len()));
 
-    fixture.page_two_ready.store(true, Ordering::Relaxed);
+    fixture.check_arrived.store(false, Ordering::Release);
+    fixture.hold_check_response.store(true, Ordering::Release);
+    let old_reader = reader.clone();
+    let old = tokio::spawn(async move {
+        old_reader
+            .fetch_pr_family(account, pr, PrFamily::Checks, &Cancellation::new())
+            .await
+    });
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !fixture.check_arrived.load(Ordering::Acquire) {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap();
+    fixture.page_two_ready.store(true, Ordering::Release);
+    let new_revision = store
+        .record_pr_revision(
+            account,
+            pr,
+            &revision.base,
+            &threadline_storage::resources::CommitOid::parse(&"d".repeat(40)).unwrap(),
+            None,
+            &header,
+            chrono::DateTime::parse_from_rfc3339("2013-09-06T02:01:04Z")
+                .unwrap()
+                .timestamp_millis(),
+        )
+        .unwrap();
+    let new = reader.fetch_pr_family(account, pr, PrFamily::Checks, &cancel);
+    tokio::pin!(new);
+    tokio::select! { biased;
+        _ = &mut new => panic!("new revision completed while previous HTTP request was pending"),
+        _ = tokio::time::sleep(Duration::from_millis(25)) => {}
+    }
+    fixture.hold_check_response.store(false, Ordering::Release);
+    assert!(matches!(old.await.unwrap(), Err(ReaderError::ScopeChanged)));
+    assert!(new.await.unwrap().complete);
+    let fresh = store
+        .pr_page(&new_revision, PrFamily::Checks, None, 10)
+        .unwrap();
+    assert!(
+        matches!(&fresh.rows[0].1, PrRecord::Check {head_oid,..} if *head_oid == "d".repeat(40))
+    );
+    let previous = store
+        .pr_page(&revision, PrFamily::Checks, None, 10)
+        .unwrap();
+    assert_eq!(
+        previous.state.last_validation_at_ms,
+        validated.state.last_validation_at_ms
+    );
+
     let before = fixture.requests.load(Ordering::Relaxed);
     assert!(matches!(
         reader

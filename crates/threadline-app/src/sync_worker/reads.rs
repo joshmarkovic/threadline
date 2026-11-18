@@ -1,4 +1,5 @@
 use super::*;
+mod pr;
 use threadline_core::{
     domain::ItemNumber,
     github::reader::{
@@ -56,7 +57,11 @@ pub(super) async fn execute(
             hold(store, claim.account, Some(rate), None).await;
             let system_zone = zone(&local.settings);
             let committed = blocking(store, move |store| {
-                let changed = matches!(outcome, Outcome::Feed { .. } | Outcome::Metadata { .. });
+                let changed = match &outcome {
+                    Outcome::Feed { .. } | Outcome::Metadata { .. } => true,
+                    Outcome::Pr(page) => page.changed(),
+                    _ => false,
+                };
                 let write = match outcome {
                     Outcome::Prepared => {
                         store.fail_sync_read(&claim, ReadFailure::Cancelled, now.0, None)
@@ -79,6 +84,7 @@ pub(super) async fn execute(
                             &system_zone?,
                         )
                         .map(|_| ()),
+                    Outcome::Pr(page) => page.commit(store, &claim, now.0, &system_zone?),
                     Outcome::Feed {
                         items,
                         comments,
@@ -129,6 +135,7 @@ pub(super) async fn execute(
 enum Outcome {
     Prepared,
     Unmodified(Validators),
+    Pr(Box<pr::ClaimedPage>),
     Metadata {
         summary: Box<ListSummary>,
         validators: Validators,
@@ -149,9 +156,12 @@ async fn read(
     claim: &ReadClaim,
     cancel: &Cancellation,
 ) -> Result<(Outcome, RateLimit), ReaderError> {
-    if let Some(binding) = bound.repositories.get(&claim.target.repository)
+    if let Some(binding) = bound.repositories.get_mut(&claim.target.repository)
         && binding.generation == claim.credential_generation
     {
+        if claim.target.revision.starts_with("pr:") {
+            return pr::read(store, binding, claim, cancel).await;
+        }
         return read_bound(store, binding.reader.reader(), claim, cancel).await;
     }
     let repository = claim.target.repository;
@@ -169,6 +179,7 @@ async fn read(
                 generation: claim.credential_generation,
                 credential: profile.credential_ref.clone(),
                 reader,
+                pr_snapshots: HashMap::new(),
             },
         );
         rate

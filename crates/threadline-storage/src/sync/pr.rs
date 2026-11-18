@@ -1,5 +1,8 @@
 use super::*;
-use crate::pr::{PrFamily, PrInputPage, PrRevision};
+use crate::pr::{
+    PrFamily, PrInputPage, PrPageIdentity, PrRevision, attach_page_identity,
+    require_current_revision,
+};
 use crate::resources::{
     ResourceError, ResourceProgress, WalkMode, accept_not_modified, require_walk_id,
     resume_walk_in, start_walk_in,
@@ -40,7 +43,8 @@ fn authorize(
             "Scheduled PR read has a different target or revision",
         ));
     }
-    require_claim(tx, claim, now)
+    require_claim(tx, claim, now)?;
+    require_current_revision(tx, rev)
 }
 
 impl Store {
@@ -84,10 +88,28 @@ impl Store {
         page: PrInputPage<'_>,
         zone: &str,
     ) -> Result<()> {
+        self.commit_sync_pr_observation(claim, rev, family, expected, page, zone, None)
+    }
+
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "The page and any new immutable identity evidence are accepted in the same transaction"
+    )]
+    pub fn commit_sync_pr_observation(
+        &self,
+        claim: &ReadClaim,
+        rev: &PrRevision,
+        family: PrFamily,
+        expected: &ResourceProgress,
+        page: PrInputPage<'_>,
+        zone: &str,
+        identity: Option<PrPageIdentity<'_>>,
+    ) -> Result<()> {
         let now = page.fetched_at_ms;
         self.write(|tx| {
             authorize(tx,claim,rev,family,now)?;
             if expected.cursor!=claim.cursor {return Err(Error::Conflict("PR page is not the claimed continuation"))}
+            let rev = attach_page_identity(tx, rev, identity)?;
             if claim.cursor.is_none() {
                 let validators=page.validators.cloned().unwrap_or_default();
                 tx.execute("UPDATE scheduled_reads SET walk_etag=?2,walk_modified=?3,walk_revision=?4 WHERE id=?1",
@@ -98,7 +120,7 @@ impl Store {
             let next=page.next_cursor;
             let reason=page.partial;
             let stored=PrInputPage{validators:if next.is_none() && reason.is_none(){Some(&validators)}else{None},..page};
-            crate::pr::publish_page(tx,rev,family,expected,stored)?;
+            crate::pr::publish_page(tx,&rev,family,expected,stored)?;
             if let Some(reason)=reason {
                 let suspended=matches!(reason,ResourceError::Forbidden|ResourceError::Unauthorized|ResourceError::NotFound);
                 // The cache kept usable rows but this limited response cannot advance the walk.

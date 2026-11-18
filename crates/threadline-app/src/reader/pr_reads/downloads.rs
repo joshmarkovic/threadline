@@ -55,6 +55,7 @@ impl ReaderService {
                 if matches!(family, PrFamily::Context | PrFamily::Media)
                     || terminal_families.contains(family.name())
                 {
+                    // These families need an explicit file range or media target.
                     continue;
                 }
                 if state.coverage != Coverage::Complete || family == PrFamily::Threads {

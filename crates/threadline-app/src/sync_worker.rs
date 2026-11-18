@@ -206,6 +206,7 @@ struct Bound {
     generation: i64,
     credential: String,
     reader: BoundRepositoryReader,
+    pr_snapshots: HashMap<i64, threadline_core::github::reader::pr::PrSnapshot>,
 }
 
 impl BoundReaders {

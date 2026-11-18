@@ -33,7 +33,7 @@ use threadline_storage::{
 use crate::accounts::AccountService;
 use crate::sync_worker::{blocking, hold};
 
-mod pr_reads;
+pub(crate) mod pr_reads;
 pub(crate) use pr_reads::PrSourceRequest;
 
 #[derive(Clone, Debug)]
