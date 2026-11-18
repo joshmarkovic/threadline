@@ -1,13 +1,17 @@
 mod fixtures;
+#[cfg(windows)]
+mod notification_commands;
 #[cfg(feature = "e2e")]
 mod observation;
 mod palette;
 mod pane_content;
 mod workspace;
 
+#[cfg(windows)]
+pub use notification_commands::handle_notification_command;
 pub use workspace::{Workspace, bind_shortcuts};
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use gpui_kit::{
@@ -24,16 +28,27 @@ pub struct Options {
     pub measure: bool,
 }
 
+fn start_platform(
+    activation: Activation,
+    profile: Option<&Path>,
+) -> Result<Launch, threadline_platform::PlatformError> {
+    let Some(profile) = profile else {
+        return threadline_platform::start(activation);
+    };
+    #[cfg(all(windows, feature = "e2e"))]
+    if let Ok(token) = std::env::var("THREADLINE_TEST_TOAST_TOKEN") {
+        return threadline_platform::start_isolated_with_test_toast(activation, profile, &token);
+    }
+    threadline_platform::start_isolated(activation, profile)
+}
+
 pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error::Error>> {
     let activation = if options.open_review {
         Activation::OpenReview
     } else {
         Activation::Focus
     };
-    let launch = match options.profile.as_deref() {
-        Some(profile) => threadline_platform::start_isolated(activation, profile)?,
-        None => threadline_platform::start(activation)?,
-    };
+    let launch = start_platform(activation, options.profile.as_deref())?;
     let (controls, events) = match launch {
         Launch::Forwarded => return Ok(()),
         Launch::Primary { controls, events } => (controls, events),

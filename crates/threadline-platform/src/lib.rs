@@ -8,6 +8,10 @@ use tokio::sync::mpsc::{self, UnboundedReceiver};
 
 #[cfg(windows)]
 mod platform_windows;
+#[cfg(windows)]
+mod toast_registration;
+#[cfg(windows)]
+mod toast_windows;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Activation {
@@ -20,6 +24,8 @@ pub enum PlatformEvent {
     Activate(Activation),
     TrayChanged(bool),
     NotificationShown,
+    NotificationSubmitted,
+    NotificationComActivated,
     Quit,
     Wake,
     NetworkChanged,
@@ -98,7 +104,7 @@ impl PlatformControls {
         }
     }
 
-    /// Queue a native feasibility notification; `NotificationShown` is reported by the shell.
+    /// Queue a native feasibility notification. WinRT reports submission before any activation.
     pub fn notify_open_review(&self) -> Result<(), PlatformError> {
         #[cfg(windows)]
         return self.desktop.show_notification();
@@ -120,6 +126,27 @@ pub fn start(activation: Activation) -> Result<Launch, PlatformError> {
 }
 
 pub fn start_isolated(activation: Activation, profile: &Path) -> Result<Launch, PlatformError> {
+    let profile = canonical_profile(profile)?;
+    start_platform(activation, Some(&profile))
+}
+
+#[cfg(windows)]
+pub fn start_isolated_with_test_toast(
+    activation: Activation,
+    profile: &Path,
+    token: &str,
+) -> Result<Launch, PlatformError> {
+    let profile = canonical_profile(profile)?;
+    let identity = toast_windows::Identity::registered_fixture(token)?;
+    start_windows(activation, Some(&profile), Some(identity))
+}
+
+#[cfg(windows)]
+pub fn clear_test_toast_history(token: &str) -> Result<u32, PlatformError> {
+    toast_windows::clear_fixture_history(token)
+}
+
+fn canonical_profile(profile: &Path) -> Result<PathBuf, PlatformError> {
     if profile.as_os_str().is_empty() {
         return Err(PlatformError::InvalidProfileDirectory);
     }
@@ -129,13 +156,26 @@ pub fn start_isolated(activation: Activation, profile: &Path) -> Result<Launch, 
     if !profile.is_dir() {
         return Err(PlatformError::InvalidProfileDirectory);
     }
-    start_platform(activation, Some(&profile))
+    Ok(profile)
 }
 
 #[cfg(windows)]
 fn start_platform(activation: Activation, profile: Option<&Path>) -> Result<Launch, PlatformError> {
+    let identity = profile
+        .is_none()
+        .then(toast_windows::Identity::installed)
+        .flatten();
+    start_windows(activation, profile, identity)
+}
+
+#[cfg(windows)]
+fn start_windows(
+    activation: Activation,
+    profile: Option<&Path>,
+    identity: Option<toast_windows::Identity>,
+) -> Result<Launch, PlatformError> {
     let (sender, events) = mpsc::unbounded_channel();
-    match platform_windows::start(activation, profile, sender)? {
+    match platform_windows::start(activation, profile, sender, identity)? {
         Some(desktop) => Ok(Launch::Primary {
             controls: PlatformControls { desktop },
             events,

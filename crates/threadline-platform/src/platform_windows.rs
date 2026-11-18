@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::Path;
 use std::ptr::{null, null_mut};
@@ -23,6 +23,7 @@ use windows_sys::Win32::UI::Shell::{
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 use windows_sys::w;
 
+use super::toast_windows::{Identity, Toasts};
 use super::{Activation, PlatformError, PlatformEvent};
 
 const COMMAND_READY: u32 = WM_APP + 1;
@@ -126,6 +127,7 @@ pub fn start(
     activation: Activation,
     profile: Option<&Path>,
     events: UnboundedSender<PlatformEvent>,
+    toast_identity: Option<Identity>,
 ) -> Result<Option<Desktop>, PlatformError> {
     let names = InstanceNames::new(profile);
     // Use the session-local named object for lifetime detection without acquiring mutex ownership.
@@ -151,13 +153,25 @@ pub fn start(
         return Ok(None);
     }
 
+    let toast_identity = toast_identity.map(|identity| {
+        identity.set_process()?;
+        Ok(identity)
+    });
+
     let (sender, commands) = mpsc::channel();
     let (started, ready) = mpsc::sync_channel(1);
     thread::Builder::new()
         .name("threadline-windows-desktop".into())
         .spawn(move || {
             let _instance = instance;
-            run_desktop(names, activation_message, events, commands, started);
+            run_desktop(
+                names,
+                activation_message,
+                events,
+                commands,
+                started,
+                toast_identity,
+            );
         })
         .map_err(|_| PlatformError::Unavailable)?;
     let window = ready.recv().map_err(|_| PlatformError::Unavailable)??;
@@ -218,10 +232,13 @@ fn run_desktop(
     events: UnboundedSender<PlatformEvent>,
     commands: Receiver<Command>,
     started: SyncSender<Result<usize, PlatformError>>,
+    toast_identity: Option<Result<Identity, PlatformError>>,
 ) {
     // This worker owns every HWND operation except posting bounded messages to its queue.
     let module = unsafe { GetModuleHandleW(null()) };
     let taskbar_created = unsafe { RegisterWindowMessageW(w!("TaskbarCreated")) };
+    let toasts = toast_identity
+        .map(|identity| identity.and_then(|identity| Toasts::register(identity, events.clone())));
     let state = WindowState {
         activation_message,
         taskbar_created,
@@ -231,6 +248,7 @@ fn run_desktop(
         icon_present: Cell::new(false),
         balloon_pending: Cell::new(false),
         balloon_shown: Cell::new(false),
+        toasts: RefCell::new(toasts),
     };
     let class = WNDCLASSW {
         lpfnWndProc: Some(window_proc),
@@ -290,6 +308,7 @@ struct WindowState {
     icon_present: Cell<bool>,
     balloon_pending: Cell<bool>,
     balloon_shown: Cell<bool>,
+    toasts: RefCell<Option<Result<Toasts, PlatformError>>>,
 }
 
 impl WindowState {
@@ -301,7 +320,11 @@ impl WindowState {
         for command in self.commands.try_iter() {
             let result = match command {
                 Command::EnableTray(enabled) => self.set_tray(hwnd, enabled),
-                Command::NotifyReview => self.show_balloon(hwnd),
+                Command::NotifyReview => match self.toasts.borrow_mut().as_mut() {
+                    Some(Ok(toasts)) => toasts.show_review(),
+                    Some(Err(error)) => Err(*error),
+                    None => self.show_balloon(hwnd),
+                },
                 Command::Shutdown => {
                     // The worker owns this window and WM_DESTROY performs icon cleanup.
                     unsafe { DestroyWindow(hwnd) };
@@ -502,6 +525,8 @@ unsafe extern "system" fn window_proc(
         }
         WM_DESTROY => {
             state.remove_icon(hwnd);
+            // Release the notification and class registration before the sender's shutdown request returns.
+            state.toasts.borrow_mut().take();
             // The receiver has terminated; wake the owning thread to release its resources.
             unsafe { PostQuitMessage(0) };
         }
