@@ -491,7 +491,7 @@ function Invoke-LargeWorkspaceProof([IntPtr]$Window, [string]$Profile, [double]$
     })
     $gpuMaximum = if ($gpuTotals.Count) { ($gpuTotals | Measure-Object -Maximum).Maximum } else { $null }
     $budgets.gpu_memory_bytes = Get-GpuBudget $gpuMaximum $gpuTotals.Count $limits.gpu_memory_bytes
-    if ($null -eq $runtime.gpu_memory.after_drain -and $budgets.gpu_memory_bytes.status -eq 'Pass') {
+    if ($gpuTotals.Count -ne $runtime.gpu_memory.Count -and $budgets.gpu_memory_bytes.status -eq 'Pass') {
         $budgets.gpu_memory_bytes.status = 'Blocked'
     }
     if ($budgets.Values.status -contains 'Fail') { throw 'At least one Section 16 large-workspace budget failed.' }

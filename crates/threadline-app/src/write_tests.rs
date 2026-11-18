@@ -597,3 +597,97 @@ async fn startup_fixture_authorization_verifies_loopback_and_rehydrates_without_
     assert_eq!(signed_out.view.profiles[0].access, AccessState::SignedOut);
     assert_eq!(signed_out.reachability, Reachability::NotAttempted);
 }
+
+#[cfg(feature = "e2e")]
+#[tokio::test]
+async fn sealed_backlog_reauthorizes_the_original_account_but_keeps_its_offline_hold() {
+    use threadline_storage::fixtures::{BACKLOG_ARCHIVE, BACKLOG_OWNER, backlog_comment};
+
+    let fixture = WriteFixture::start();
+    let dir = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open_profile(dir.path()).unwrap());
+    let service = || AccountService {
+        store: store.clone(),
+        credentials: Arc::new(FixtureVault::default()),
+        github: GitHubClient::loopback(fixture.address).unwrap(),
+        fixture: true,
+    };
+    let cancel = Cancellation::new();
+    let first = service()
+        .execute(AccountCommand::LoadFixture, &cancel)
+        .await;
+    let account = first.view.active.unwrap();
+    let repository = first.view.repositories[0].id;
+    let profile = &first.view.profiles[0];
+    store
+        .observe_github_repository(
+            profile,
+            &RepositoryObservation {
+                provider_id: BACKLOG_ARCHIVE.try_into().unwrap(),
+                owner: BACKLOG_OWNER,
+                name: "archive",
+                private: true,
+                source: RepositoryObservationSource::Direct,
+            },
+            10,
+        )
+        .unwrap();
+    let item = store
+        .ingest(
+            account,
+            ItemLocator {
+                repository,
+                number: 1,
+            },
+            ItemUpdate {
+                representation: ItemRepresentation::Issue(IssueRecord {
+                    id: 1.try_into().unwrap(),
+                    node_id: None,
+                    classification: IssueClassification::Issue,
+                }),
+                remote_updated_at: UtcMillis(1),
+                title: Change::Value("Local fixture".into()),
+                body: Change::Null,
+                closed: Change::Value(false),
+            },
+        )
+        .unwrap();
+    let marker = "00000000-0000-4000-8001-000000000000";
+    store
+        .submit_write(
+            account,
+            WriteSubmission {
+                id: marker,
+                item,
+                intent: &WriteIntent::CreateComment {
+                    body: backlog_comment(0),
+                },
+                draft: None,
+                dependencies: &[],
+                submitted_at_ms: 20,
+            },
+        )
+        .unwrap();
+    store.cancel_operation(account, marker).unwrap();
+    store
+        .update_sync_settings(account, |settings| settings.controls.work_offline = true)
+        .unwrap();
+    let before = service()
+        .execute(AccountCommand::SignOut(account), &cancel)
+        .await;
+    assert_eq!(before.view.profiles[0].access, AccessState::SignedOut);
+
+    let restarted = service()
+        .execute(AccountCommand::LoadFixture, &cancel)
+        .await;
+    assert!(restarted.github_error.is_none());
+    assert_eq!(restarted.reachability, Reachability::ReceivedResponse);
+    assert_eq!(restarted.view.active, Some(account));
+    assert!(restarted.view.offline);
+    assert_eq!(restarted.view.profiles[0].access, AccessState::Readable);
+    assert_eq!(
+        store.operation(account, marker).unwrap().unwrap().state,
+        State::Cancelled
+    );
+    assert_eq!(fixture.sent.load(Ordering::SeqCst), 0);
+}
