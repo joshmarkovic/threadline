@@ -56,13 +56,13 @@ AUTH-03,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required
 AUTH-04,windows,Windows first release,03,03,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Test server returned actionable SSO, approval and partial-discovery evidence. LIVE-001 has no observed organization SSO challenge. docs/reports/sprint-03.md"
 AUTH-04,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-04,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-AUTH-05,windows,Windows first release,03,03,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Provider tests distinguish revocation, permission, SSO, rate and service responses. Windows account GUI verification is still open. docs/reports/sprint-03.md"
+AUTH-05,windows,Windows first release,03,03,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"E2E-002 verified real Windows input, distinct access restrictions and retained selection across ordinary Quit and relaunch. docs/reports/sprint-03.md"
 AUTH-05,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-05,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-06,windows,Windows first release,03,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-06,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-06,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-AUTH-07,windows,Windows first release,03,03,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,Native protected-store and account tests passed. External Windows GUI exit/relaunch and sign-out is still being verified. docs/reports/sprint-03.md
+AUTH-07,windows,Windows first release,03,03,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"E2E-002 verified real Windows input, distinct access restrictions and retained selection across ordinary Quit and relaunch. docs/reports/sprint-03.md"
 AUTH-07,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-07,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 AUTH-08,windows,Windows first release,03,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,

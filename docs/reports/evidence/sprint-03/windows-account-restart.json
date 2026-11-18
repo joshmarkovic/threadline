@@ -1,0 +1,189 @@
+{
+  "source_revision": "6117dee6c4ea7a3907dfa8522618fb6ebb413a90",
+  "source_dirty": false,
+  "fixture_revision": "s03-github-access-v1",
+  "host": {
+    "os": "windows",
+    "architecture": "x86_64",
+    "version": "Microsoft Windows [Version 10.0.22631.7652]",
+    "display_session": "Windows desktop availability is checked by native driver"
+  },
+  "command": {
+    "program": "xtask",
+    "argv": [
+      "test",
+      "e2e",
+      "--suite",
+      "full",
+      "--case",
+      "E2E-002",
+      "--binary",
+      "<binary-path>",
+      "--seed",
+      "12345",
+      "--report-dir",
+      "<report-dir>"
+    ],
+    "redacted": true
+  },
+  "seed": 12345,
+  "status": "Pass",
+  "exit_code": 0,
+  "source_sha256": {
+    "result.json": "b91f85240582e7c7bd4c1965790d9925c9421731b4a8cb7fa89c164374988406",
+    "github-access-native.json": "e4ead4eee71dfa46c221408404453a124ee54059d73e8e2f886c7fb0c8c4a69b",
+    "github-access-trace.json": "101ab5869085540598708790a910457dd5b391f6404a0361b774e28549e79847",
+    "github-access-restart-observation.json": "5bc48b87a7be76c74fada60edcf9413562c4d559fde725934dc2f5371dec344a",
+    "binary.json": "7345093a53b350c48871f1fbb29d3f005e6b889bf41e8130045cba7423c1c74d"
+  },
+  "case": "E2E-002",
+  "app_sha256": "aaffe223e3bb057decc7ab757097856657bff734e10af462008ba2ebc148c4c1",
+  "dpi": 144,
+  "actions": [
+    "Attempt focus through a verified native pointer target",
+    "Verify native input reached both authorization fields",
+    "Connect through native repository and password controls",
+    "Select the verified repository",
+    "Show incomplete discovery while retaining direct read access",
+    "Offer a validated SSO authorization action",
+    "Show insufficient permission separately from SSO",
+    "Keep the selected repository on token revocation",
+    "Restart with the same isolated profile and retained selection"
+  ],
+  "separate_process": true,
+  "http_fixture": [
+    {
+      "phase": "ready",
+      "route": "user",
+      "status": 200
+    },
+    {
+      "phase": "ready",
+      "route": "repository",
+      "status": 200
+    },
+    {
+      "phase": "ready",
+      "route": "discovery",
+      "status": 200
+    },
+    {
+      "phase": "ready",
+      "route": "user",
+      "status": 200
+    },
+    {
+      "phase": "ready",
+      "route": "repository",
+      "status": 200
+    },
+    {
+      "phase": "ready",
+      "route": "discovery",
+      "status": 200
+    },
+    {
+      "phase": "partial",
+      "route": "user",
+      "status": 200
+    },
+    {
+      "phase": "partial",
+      "route": "repository",
+      "status": 200
+    },
+    {
+      "phase": "partial",
+      "route": "discovery",
+      "status": 200
+    },
+    {
+      "phase": "sso",
+      "route": "user",
+      "status": 200
+    },
+    {
+      "phase": "sso",
+      "route": "repository",
+      "status": 403
+    },
+    {
+      "phase": "sso",
+      "route": "discovery",
+      "status": 200
+    },
+    {
+      "phase": "denied",
+      "route": "user",
+      "status": 200
+    },
+    {
+      "phase": "denied",
+      "route": "repository",
+      "status": 403
+    },
+    {
+      "phase": "denied",
+      "route": "discovery",
+      "status": 200
+    },
+    {
+      "phase": "revoked",
+      "route": "user",
+      "status": 401
+    }
+  ],
+  "prior_attempt": {
+    "source_revision": "8e445d202f38e3633c4ef3a5d9114e9e4655f7d9",
+    "status": "Fail",
+    "exit_code": 1,
+    "termination": "Driver timed out on Quit after simulating SSO, denied access and revocation."
+  },
+  "accessibility": {
+    "app_source": "24c21ed",
+    "probe_sha256": "0f869c40957c6007ecc5919dd813e0603e82114891f8c427c034093ae87a0b97",
+    "raw_sha256": "5db23dd2d2b55d2a70736123d42f6fcdee621a05c4df6e00decc9ee1bb65f5c0",
+    "owned_root": true,
+    "invoked_welcome": true,
+    "welcome": [
+      {
+        "id": "reader-connect-account",
+        "found": true,
+        "invoke": true,
+        "value": false
+      },
+      {
+        "id": "account-open",
+        "found": true,
+        "invoke": true,
+        "value": false
+      }
+    ],
+    "accounts": [
+      {
+        "id": "account-close",
+        "found": true,
+        "invoke": true,
+        "value": false
+      },
+      {
+        "id": "account-connect",
+        "found": true,
+        "invoke": true,
+        "value": false
+      },
+      {
+        "id": "account-repository",
+        "found": true,
+        "invoke": false,
+        "value": true
+      },
+      {
+        "id": "account-token",
+        "found": true,
+        "invoke": false,
+        "value": false
+      }
+    ]
+  }
+}

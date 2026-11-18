@@ -374,6 +374,7 @@
       }
     ],
     "trace_sha256": "6b5ef9bf05cca973b87e8f855c766963aabd58a850e1910ce06b967eac7defb1",
-    "termination": "Driver timeout opening the native Accounts panel after restart."
+    "termination": "Driver timeout opening the native Accounts panel after restart.",
+    "app_source": "24c21ed"
   }
 }
