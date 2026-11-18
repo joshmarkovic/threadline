@@ -8,7 +8,7 @@ param(
     [switch]$PlatformProof,
     [switch]$ToastProof,
     [switch]$AccessProof,
-    [ValidateSet('Offline', 'Resume', 'Performance')][string]$ReaderProof,
+    [ValidateSet('Offline', 'Resume', 'Performance', 'Sync')][string]$ReaderProof,
     [string]$AccessAddress,
     [string]$AccessPhaseFile,
     [switch]$ManualTrayClick,
@@ -30,6 +30,8 @@ $reportName = if ($Measure) {
     'github-access-native.json'
 } elseif ($ReaderProof -eq 'Performance') {
     'reader-performance.json'
+} elseif ($ReaderProof -eq 'Sync') {
+    'sync-native.json'
 } elseif ($ReaderProof) {
     'reader-native.json'
 } else {
@@ -191,12 +193,14 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     $info.EnvironmentVariables['THREADLINE_TEST_SEED'] = $Seed.ToString([Globalization.CultureInfo]::InvariantCulture)
     $info.EnvironmentVariables.Remove('THREADLINE_TEST_TOAST_TOKEN')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_GITHUB_ADDR')
+    $info.EnvironmentVariables.Remove('THREADLINE_E2E_SYNC')
     if ($ToastProof -and $null -ne $script:toastFixture) {
         $info.EnvironmentVariables['THREADLINE_TEST_TOAST_TOKEN'] = $script:toastFixture.Token
     }
     if ($AccessProof -or $ReaderProof) {
         $info.EnvironmentVariables['THREADLINE_E2E_GITHUB_ADDR'] = $script:AccessAddress
     }
+    if ($ReaderProof -eq 'Sync') { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
     return [Diagnostics.Process]::Start($info)
 }
 
@@ -857,6 +861,7 @@ try {
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
+    if ($ReaderProof -eq 'Sync') { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
     $firstProfile = Join-Path $ProfileDir ('initial-' + [guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $firstProfile -Force
     if ($ReaderProof -eq 'Offline') { Initialize-ReaderProfile $firstProfile 'small' }
@@ -899,6 +904,7 @@ try {
             Offline { Invoke-OfflineReaderProof $window $firstProfile }
             Resume { Invoke-ReaderResumeProof $window $firstProfile }
             Performance { Invoke-ReaderPerformance $window }
+            Sync { Invoke-SyncProof $window $firstProfile }
         }
     } else {
         try {

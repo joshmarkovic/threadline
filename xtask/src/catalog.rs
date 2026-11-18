@@ -24,7 +24,14 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     }
     if matches!(
         case,
-        "UT-002" | "UT-005" | "UT-006" | "UT-007" | "IT-007" | "S05-FEED-HTTP" | "S05-SYNC-WORKER"
+        "UT-002"
+            | "UT-005"
+            | "UT-006"
+            | "UT-007"
+            | "IT-007"
+            | "S05-FEED-HTTP"
+            | "S05-SYNC-WORKER"
+            | "S05-WINDOWS-SYNC"
     ) {
         return Some("s05-sync-v1");
     }
@@ -114,6 +121,10 @@ pub fn associations(case: &str) -> Associations {
         "S05-SYNC-WORKER" => (
             "SYNC-02;SYNC-03;SYNC-09;NOTIFY-13;TEST-03",
             "AC-11;AC-54;AC-57",
+        ),
+        "S05-WINDOWS-SYNC" => (
+            "SYNC-01;SYNC-04;SYNC-08;CONNECT-01;CONNECT-02;TEST-04",
+            "AC-11;AC-12;AC-57",
         ),
         _ => catalog_associations(case).unwrap_or_default(),
     };

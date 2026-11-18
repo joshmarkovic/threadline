@@ -36,6 +36,8 @@ const ITEM: &str = "/repos/fixture-org/private/issues/41";
 const COMMENTS_FIRST: &str = "/repos/fixture-org/private/issues/41/comments?per_page=20&page=1";
 const COMMENTS_NEXT: &str = "/repos/fixture-org/private/issues/41/comments?per_page=20&page=2";
 const TIMELINE: &str = "/repos/fixture-org/private/issues/41/timeline?per_page=20&page=1";
+const SYNC_ITEMS: &str = "/repositories/71/issues?state=all&sort=updated&direction=asc&since=";
+const SYNC_COMMENTS: &str = "/repositories/71/issues/comments?sort=updated&direction=asc&since=";
 const AUTHORIZATION_URL: &str =
     "https://github.com/orgs/fixture-org/sso?authorization_request=fixture123";
 
@@ -49,6 +51,11 @@ enum Phase {
     Revoked,
     ReaderFailure,
     ReaderResume,
+    SyncLive,
+    SyncOffline,
+    SyncService,
+    SyncThrottle,
+    SyncTransport,
 }
 
 impl Phase {
@@ -61,6 +68,11 @@ impl Phase {
             "revoked" => Ok(Self::Revoked),
             "reader-failure" => Ok(Self::ReaderFailure),
             "reader-resume" => Ok(Self::ReaderResume),
+            "sync-live" => Ok(Self::SyncLive),
+            "sync-offline" => Ok(Self::SyncOffline),
+            "sync-service" => Ok(Self::SyncService),
+            "sync-throttle" => Ok(Self::SyncThrottle),
+            "sync-transport" => Ok(Self::SyncTransport),
             _ => Err(io::Error::other("invalid access fixture phase")),
         }
     }
@@ -78,6 +90,8 @@ enum Route {
     CommentsFirst,
     CommentsNext,
     Timeline,
+    UpdatedItems,
+    UpdatedComments,
     Unexpected,
 }
 
@@ -101,6 +115,7 @@ pub enum TraceCheck {
     AccountJourney,
     OfflineReader,
     ReaderResume,
+    SyncJourney,
 }
 
 impl AccessFixture {
@@ -143,6 +158,7 @@ impl AccessFixture {
             TraceCheck::AccountJourney => complete_journey(&records),
             TraceCheck::OfflineReader => records.is_empty(),
             TraceCheck::ReaderResume => complete_reader_resume(&records),
+            TraceCheck::SyncJourney => complete_sync_journey(&records),
         };
         if !valid {
             return Err(io::Error::other(
@@ -181,6 +197,23 @@ fn complete_reader_resume(records: &[RequestEvidence]) -> bool {
                 (Phase::ReaderFailure, Route::CommentsNext, 502),
                 (Phase::ReaderResume, Route::CommentsNext, 200),
             ]
+}
+
+fn complete_sync_journey(records: &[RequestEvidence]) -> bool {
+    let promised = |phase, route, status| {
+        records
+            .iter()
+            .any(|entry| entry.phase == phase && entry.route == route && entry.status == status)
+    };
+    records.iter().all(|entry| {
+        entry.route != Route::Unexpected
+            && entry.phase != Phase::SyncOffline
+            && entry.fixture_authorization
+    }) && promised(Phase::SyncLive, Route::UpdatedItems, 200)
+        && promised(Phase::SyncLive, Route::UpdatedComments, 200)
+        && promised(Phase::SyncService, Route::User, 503)
+        && promised(Phase::SyncThrottle, Route::User, 429)
+        && promised(Phase::SyncTransport, Route::User, 0)
 }
 
 impl Drop for AccessFixture {
@@ -239,6 +272,14 @@ fn answer(socket: &mut TcpStream, phase: Phase) -> io::Result<RequestEvidence> {
     socket.set_read_timeout(timeout)?;
     socket.set_write_timeout(timeout)?;
     let (route, authorized) = read_request(socket)?;
+    if phase == Phase::SyncTransport && route == Route::User && authorized {
+        return Ok(RequestEvidence {
+            phase,
+            route,
+            fixture_authorization: true,
+            status: 0,
+        });
+    }
     let reply = response(phase, route, authorized);
     let body = serde_json::to_vec(&reply.body)?;
     write!(
@@ -250,6 +291,9 @@ fn answer(socket: &mut TcpStream, phase: Phase) -> io::Result<RequestEvidence> {
     )?;
     if let Some(sso) = reply.sso {
         write!(socket, "X-GitHub-SSO: {sso}\r\n")?;
+    }
+    if phase == Phase::SyncThrottle && route == Route::User && reply.status == 429 {
+        socket.write_all(b"Retry-After: 2\r\n")?;
     }
     if route == Route::CommentsFirst && reply.status == 200 {
         let local = socket.local_addr()?;
@@ -282,6 +326,12 @@ fn read_request(socket: &TcpStream) -> io::Result<(Route, bool)> {
         (Some("GET"), Some(COMMENTS_FIRST), Some("HTTP/1.1")) => Route::CommentsFirst,
         (Some("GET"), Some(COMMENTS_NEXT), Some("HTTP/1.1")) => Route::CommentsNext,
         (Some("GET"), Some(TIMELINE), Some("HTTP/1.1")) => Route::Timeline,
+        (Some("GET"), Some(target), Some("HTTP/1.1")) if sync_since(target, SYNC_ITEMS) => {
+            Route::UpdatedItems
+        }
+        (Some("GET"), Some(target), Some("HTTP/1.1")) if sync_since(target, SYNC_COMMENTS) => {
+            Route::UpdatedComments
+        }
         (Some("POST"), Some("/graphql"), Some("HTTP/1.1")) => Route::Graphql,
         _ => Route::Unexpected,
     };
@@ -327,6 +377,26 @@ fn read_request(socket: &TcpStream) -> io::Result<(Route, bool)> {
     Ok((route, authorized))
 }
 
+fn sync_since(target: &str, prefix: &str) -> bool {
+    let Some(value) = target
+        .strip_prefix(prefix)
+        .and_then(|s| s.strip_suffix("&per_page=20&page=1"))
+    else {
+        return false;
+    };
+    let bytes = value.as_bytes();
+    // Match the fixed encoded UTC form without accepting additional query clauses.
+    let structure = b"0000-00-00T00%3A00%3A00Z";
+    bytes.len() == structure.len()
+        && bytes.iter().zip(structure).all(|(value, pattern)| {
+            if *pattern == b'0' {
+                value.is_ascii_digit()
+            } else {
+                value == pattern
+            }
+        })
+}
+
 struct Response {
     status: u16,
     reason: &'static str,
@@ -366,6 +436,16 @@ fn response(phase: Phase, route: Route, authorized: bool) -> Response {
         (_, Route::Unexpected) => {
             result(404, "Not Found", json!({"message":"Unknown fixture route"}))
         }
+        (Phase::SyncService, Route::User) => result(
+            503,
+            "Service Unavailable",
+            json!({"message":"Fixture service unavailable"}),
+        ),
+        (Phase::SyncThrottle, Route::User) => result(
+            429,
+            "Too Many Requests",
+            json!({"message":"Fixture throttled"}),
+        ),
         (_, Route::User) => result(200, "OK", json!({"id":41,"login":"fixture-user"})),
         (Phase::Partial, Route::Discovery) => Response {
             sso: Some("partial-results; organizations=123".into()),
@@ -417,6 +497,17 @@ fn response(phase: Phase, route: Route, authorized: bool) -> Response {
         ),
         (Phase::ReaderFailure | Phase::ReaderResume, Route::Timeline) => {
             result(200, "OK", json!([]))
+        }
+        (Phase::SyncLive, Route::UpdatedItems) => {
+            let mut current = item();
+            current["repository_url"] = json!("https://api.github.com/repos/fixture-org/private");
+            result(200, "OK", json!([current]))
+        }
+        (Phase::SyncLive, Route::UpdatedComments) => {
+            let mut current = comment(5151, 4, "Observed ordinary conversation.");
+            current["issue_url"] =
+                json!("https://api.github.com/repos/fixture-org/private/issues/41");
+            result(200, "OK", json!([current]))
         }
         _ => result(
             404,
@@ -504,5 +595,49 @@ mod tests {
             fixture_authorization: true,
         });
         assert!(!complete_reader_resume(&records));
+    }
+
+    #[test]
+    fn sync_journey_replays_concrete_http_failures_and_rejects_offline_traffic() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut fixture = AccessFixture::start(dir.path()).unwrap();
+        let since = "2026-11-18T20%3A11%3A12Z&per_page=20&page=1";
+        let items = format!("{SYNC_ITEMS}{since}");
+        let comments = format!("{SYNC_COMMENTS}{since}");
+        assert!(!sync_since(&format!("{items}&unexpected=1"), SYNC_ITEMS));
+        for (phase, route, expected) in [
+            ("sync-live", items.as_str(), "200 OK"),
+            ("sync-live", comments.as_str(), "200 OK"),
+            ("sync-service", USER, "503 Service Unavailable"),
+            ("sync-throttle", USER, "429 Too Many Requests"),
+            ("sync-transport", USER, ""),
+        ] {
+            fs::write(fixture.phase_file(), phase).unwrap();
+            let mut socket = TcpStream::connect(fixture.address()).unwrap();
+            write!(
+                socket,
+                "GET {route} HTTP/1.1\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\n\r\n"
+            )
+            .unwrap();
+            let mut reply = String::new();
+            socket.read_to_string(&mut reply).unwrap();
+            if expected.is_empty() {
+                assert!(reply.is_empty());
+            } else {
+                assert!(reply.starts_with(&format!("HTTP/1.1 {expected}")));
+            }
+            if phase == "sync-throttle" {
+                assert!(reply.contains("Retry-After: 2\r\n"));
+            }
+        }
+        let mut records = fixture.stop().unwrap();
+        assert!(complete_sync_journey(&records));
+        records.push(RequestEvidence {
+            phase: Phase::SyncOffline,
+            route: Route::User,
+            status: 200,
+            fixture_authorization: true,
+        });
+        assert!(!complete_sync_journey(&records));
     }
 }

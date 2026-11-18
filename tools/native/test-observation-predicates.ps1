@@ -18,6 +18,7 @@ if (@($helpers.Name | Sort-Object -Unique).Count -ne 5 -or $helpers.Count -ne 5)
 . ([scriptblock]::Create(($helpers | ForEach-Object { $_.Extent.Text }) -join [Environment]::NewLine))
 . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
 . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1')
+. (Join-Path $PSScriptRoot 'windows-sync.ps1')
 
 function Read-Observation {
     if ($script:observations.Count -gt 1) { return $script:observations.Dequeue() }
@@ -55,6 +56,22 @@ $state = Wait-Reader 'cached content for the expected item' {
 if (!$state.cached_reader.cached_content_ready -or $state.cached_reader.active_item -ne 44 -or
     ($visited -join ',') -cne '43,44,44') {
     throw 'Wait-Reader did not reject missing, mismatched, and loading reader states.'
+}
+
+$script:observations.Clear()
+$script:observations.Enqueue([pscustomobject]@{ cached_reader = [pscustomobject]@{} })
+$script:observations.Enqueue([pscustomobject]@{ cached_reader = [pscustomobject]@{ shared_sync = @{ connection = 'Offline' } } })
+$script:observations.Enqueue([pscustomobject]@{ cached_reader = [pscustomobject]@{ shared_sync = @{ connection = 'Reachable' } } })
+$script:observations.Enqueue([pscustomobject]@{ cached_reader = [pscustomobject]@{ shared_sync = @{ connection = 'Unreachable' } } })
+$states = [System.Collections.Generic.List[string]]::new()
+$state = Wait-Sync 'the exact transport outcome' {
+    param($sync)
+    $states.Add($sync.connection)
+    $sync.connection -ceq 'Unreachable'
+}
+if ($state.cached_reader.shared_sync.connection -cne 'Unreachable' -or
+    ($states -join ',') -cne 'Offline,Reachable,Unreachable') {
+    throw 'Wait-Sync did not verify its exact nested state predicate.'
 }
 $sample = Get-ReaderBudget ([double[]](1..20)) 20
 if ($sample.sample_count -ne 20 -or $sample.p95_ms -ne 19 -or $sample.status -ne 'Pass' -or

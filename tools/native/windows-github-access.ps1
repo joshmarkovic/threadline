@@ -20,7 +20,8 @@ function Click-AccountControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwat
 }
 
 function Set-AccessPhase([string]$Phase) {
-    if ($Phase -cnotin @('ready', 'partial', 'sso', 'denied', 'revoked', 'reader-failure', 'reader-resume')) {
+    if ($Phase -cnotin @('ready', 'partial', 'sso', 'denied', 'revoked', 'reader-failure', 'reader-resume',
+        'sync-live', 'sync-offline', 'sync-service', 'sync-throttle', 'sync-transport')) {
         throw 'Unknown access fixture phase.'
     }
     try {
