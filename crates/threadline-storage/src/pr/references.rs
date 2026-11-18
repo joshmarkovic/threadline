@@ -67,6 +67,8 @@ pub enum ReferenceObservation {
     Inaccessible,
     Failed,
 }
+pub type PrRevisionContext = (crate::Change<String>, Option<(String, Vec<BodyReference>)>);
+
 impl Store {
     /// Derive and replace candidates from the actual downloaded body. Reading context never changes repository selection.
     pub fn index_pr_body(
@@ -115,7 +117,7 @@ impl Store {
     pub fn pr_revision_context(
         &self,
         rev: &PrRevision,
-    ) -> Result<(crate::Change<String>, Option<(String, Vec<BodyReference>)>)> {
+    ) -> Result<PrRevisionContext> {
         self.read(|db|{
             let tx=db.unchecked_transaction()?;
             validate_revision(&tx,rev)?;
