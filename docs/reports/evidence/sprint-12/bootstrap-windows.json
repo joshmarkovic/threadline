@@ -39,5 +39,16 @@
     }
   ],
   "setup_launched": false,
-  "production_publication": "Pending"
+  "production_publication": "Pending",
+  "metadata_finalizer": {
+    "verified_manifest_sha256": "f814f52b83d7f8429dcb91273e3ecd1763b8235e08e71190400ec6a77081aacc",
+    "positive": "Windows verified the independently pinned SDK tool and wrote the release fixture manifest.",
+    "unsigned": "Windows refused the unsigned setup at Authenticode verification.",
+    "existing_output": "Finalizer refused to replace the existing manifest.",
+    "raw_log_sha256": {
+      "signed": "10c27dcf495ccc41a6cd555cdadb6e98bb7b3efc48fed5f95c309c3a170cd48b",
+      "unsigned": "a1aef2dcbeec0a03abcfdc2f4870c0ccad42d92feb2c383289a78c4262f18d1b",
+      "existing": "b34640b3f3fe981d3a1622eb49806234124e3663f0c6d25efb7358a7f904bcd2"
+    }
+  }
 }

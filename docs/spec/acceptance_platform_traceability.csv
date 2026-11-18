@@ -107,7 +107,7 @@ AC-35,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-36,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-36,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-36,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-37,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-37,windows,12,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,E2E-020 passed on the installed local package. Exact published artifact verification is pending. ../reports/evidence/sprint-12/installed-runtime.json
 AC-37,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-37,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-38,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,

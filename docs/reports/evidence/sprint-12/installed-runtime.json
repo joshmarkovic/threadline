@@ -1,0 +1,121 @@
+{
+  "source_revision": "1bf7e77e8aa6cff3eb675790010602fcd2778c8e",
+  "source_dirty": false,
+  "fixture_revision": "threadline-s12-installed-runtime-v1",
+  "seed": 12345,
+  "status": "Pass",
+  "exit_code": 0,
+  "host": {
+    "os": "windows",
+    "architecture": "x86_64",
+    "version": "Microsoft Windows [Version 10.0.22631.7652]",
+    "display_session": "Windows desktop availability is checked by native driver"
+  },
+  "command": {
+    "program": "xtask",
+    "argv": [
+      "test",
+      "e2e",
+      "--suite",
+      "full",
+      "--case",
+      "E2E-020",
+      "--local-fixture",
+      "<local-fixture-path>",
+      "--seed",
+      "12345",
+      "--report-dir",
+      "<report-dir>"
+    ],
+    "redacted": true
+  },
+  "case": "E2E-020",
+  "run": "e2e-1795044995274-29208",
+  "distribution": "Local Windows package build 9",
+  "native_actions": {
+    "markdown_initial": "Open cached image",
+    "markdown_after": "Image unavailable. Retry",
+    "selected_file": "second.txt",
+    "diff_mode": "Split",
+    "offline": true,
+    "orderly_quit": true,
+    "synthetic_profile_archived": true,
+    "fixture_sha256": "95e0b36eb1de7919466d9e9eecd9f617faac6541e199a24e781d50feefa0bbe0"
+  },
+  "samples": [
+    {
+      "phase": "Native Markdown with parsed image attachment",
+      "module_count": 72,
+      "descendants": 0,
+      "browser_matches": []
+    },
+    {
+      "phase": "Native selected comparison file and diff toolbar",
+      "module_count": 72,
+      "descendants": 0,
+      "browser_matches": []
+    },
+    {
+      "phase": "Native split diff after the persisted action",
+      "module_count": 72,
+      "descendants": 0,
+      "browser_matches": []
+    }
+  ],
+  "common_owned_window_pid_verified": true,
+  "build": {
+    "source_commit": "1ddd9c8375c0c45df658e8dddc06964b03b882e4",
+    "app_sha256": "f23723610de33d329087f6f28fe4dc41f024affc474469763f18933426bfc8e7",
+    "dependency_tree_sha256": "1bd719d1880d2b815a0f2b3185d56668bb26f314434b24afb601e32d39229e83",
+    "normal_dependency_names": 393,
+    "imported_libraries": [
+      "advapi32.dll",
+      "api-ms-win-core-synch-l1-2-0.dll",
+      "api-ms-win-core-winrt-error-l1-1-0.dll",
+      "api-ms-win-core-winrt-l1-1-0.dll",
+      "api-ms-win-crt-heap-l1-1-0.dll",
+      "api-ms-win-crt-locale-l1-1-0.dll",
+      "api-ms-win-crt-math-l1-1-0.dll",
+      "api-ms-win-crt-runtime-l1-1-0.dll",
+      "api-ms-win-crt-stdio-l1-1-0.dll",
+      "api-ms-win-crt-string-l1-1-0.dll",
+      "api-ms-win-crt-time-l1-1-0.dll",
+      "api-ms-win-crt-utility-l1-1-0.dll",
+      "api-ms-win-shcore-scaling-l1-1-1.dll",
+      "bcrypt.dll",
+      "bcryptprimitives.dll",
+      "combase.dll",
+      "comctl32.dll",
+      "d3d11.dll",
+      "dcomp.dll",
+      "dwmapi.dll",
+      "dwrite.dll",
+      "dxgi.dll",
+      "gdi32.dll",
+      "gdiplus.dll",
+      "icuuc.dll",
+      "imm32.dll",
+      "iphlpapi.dll",
+      "kernel32.dll",
+      "ntdll.dll",
+      "ole32.dll",
+      "oleaut32.dll",
+      "propsys.dll",
+      "shell32.dll",
+      "uiautomationcore.dll",
+      "user32.dll",
+      "userenv.dll",
+      "vcruntime140.dll",
+      "winmm.dll",
+      "ws2_32.dll"
+    ],
+    "native_ui": "gpui-kit",
+    "markdown_dependency": "markdown",
+    "browser_matches": []
+  },
+  "raw_sha256": {
+    "result.json": "f3566cdee5ba9a693aea8981370b50bf54790bacbb9942e92df11702ee430c0f",
+    "runtime-build.json": "16c966eb631851640411d2c30f356426062d633be9d6904c5d80c3ecbcd551a0",
+    "installed-runtime.json": "c66912cc79017802bb0988fc7c92270e16083076dd6abbe282731672c0f6e233"
+  }
+}
