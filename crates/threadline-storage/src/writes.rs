@@ -13,6 +13,8 @@ mod model;
 #[cfg(test)]
 mod tests;
 pub use model::*;
+mod choices;
+pub use choices::*;
 mod control;
 pub use control::*;
 mod outcomes;

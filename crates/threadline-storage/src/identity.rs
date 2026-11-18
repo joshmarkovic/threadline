@@ -402,6 +402,13 @@ impl Store {
     pub fn clear_cache(&self, account: AccountId) -> Result<()> {
         self.write(|tx| {
             clear_resource_cache(tx, account)?;
+            tx.execute("DELETE FROM write_repository_choices WHERE account_id=?", [account])?;
+            tx.execute("DELETE FROM write_issue_milestones AS w WHERE account_id=? AND NOT EXISTS(
+                 SELECT 1 FROM issue_downloads d WHERE d.item_id=w.item_id AND d.account_id=w.account_id AND d.state IN ('pending','active','complete'))",[account])?;
+            tx.execute("DELETE FROM write_comment_authors AS w WHERE w.account_id=? AND NOT EXISTS(
+                 SELECT 1 FROM cached_resources c JOIN reader_comment_metadata m ON m.resource_id=c.id
+                 WHERE c.account_id=w.account_id AND c.item_id=w.item_id AND c.family='comments'
+                 AND ltrim(m.record_key,'0')=w.comment_id)",[account])?;
             tx.execute(
                 "UPDATE pr_revisions SET header='{}',body=NULL,body_at=NULL WHERE account_id=? AND NOT EXISTS(
                  SELECT 1 FROM pr_downloads d WHERE d.revision_id=pr_revisions.id AND d.state IN ('pending','active','partial','complete'))",

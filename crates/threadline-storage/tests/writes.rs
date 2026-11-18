@@ -542,3 +542,140 @@ fn it_009_throttle_survives_restart_and_unknown_work_cannot_skip_the_floor_or_re
     assert_eq!(db.resume_writes(a, 12_003).unwrap(), 0);
     assert!(db.claim_write(a, 14_000, 20_000).unwrap().is_none());
 }
+
+#[test]
+fn it_012_cached_repository_options_and_numeric_edit_base_survive_offline_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Store::open_profile(dir.path()).unwrap();
+    let (a, r, item) = setup(&db);
+    let p = db.github_access_profile(a, "work").unwrap().unwrap();
+    assert_eq!(
+        db.issue_write_base(a, item).unwrap().unwrap().milestone,
+        None
+    );
+    let labels = |names: &[&str], complete, checked_at_ms| ChoiceList {
+        values: names.iter().map(|n| n.to_string()).collect(),
+        complete,
+        checked_at_ms,
+    };
+    let mut choices = CachedRepositoryChoices {
+        labels: Some(labels(&["bug"], false, 100)),
+        assignees: Some(labels(&[], true, 100)),
+        milestones: Some(ChoiceList {
+            values: vec![MilestoneChoice {
+                number: id(23),
+                title: "Winter".into(),
+            }],
+            complete: true,
+            checked_at_ms: 100,
+        }),
+    };
+    db.record_write_choices(&p, r, &choices).unwrap();
+    choices.labels = Some(labels(&["bug", "triage"], true, 100));
+    db.record_write_choices(&p, r, &choices).unwrap();
+    db.record_write_choices(
+        &p,
+        r,
+        &CachedRepositoryChoices {
+            labels: Some(labels(&[], true, 99)),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let fields = IssueValues {
+        milestone: Some(Some(id(23))),
+        body: Some(None),
+        ..Default::default()
+    };
+    let record = |issue_id, number, values: &IssueValues, title, stamp| {
+        db.record_issue_write_base(&p, r, item, id(issue_id), id(number), values, title, stamp)
+    };
+    assert!(record(1041, 72, &fields, Some("Winter"), 110).is_err());
+    assert!(record(100, 41, &fields, Some("Winter"), 110).is_err());
+    record(1041, 41, &fields, Some("Winter"), 110).unwrap();
+    let empty = IssueValues {
+        milestone: Some(None),
+        ..Default::default()
+    };
+    record(1041, 41, &empty, None, 109).unwrap();
+    let snapshot = db.issue_write_base(a, item).unwrap().unwrap();
+    assert_eq!(snapshot.milestone, Some(Some(id(23))));
+    assert_eq!(snapshot.body, Some(None));
+    assert_eq!(snapshot.title.as_deref(), Some("old"));
+    record(1041, 41, &empty, None, 111).unwrap();
+    db.select_github_repository(a, r, false).unwrap();
+    assert!(db.record_write_choices(&p, r, &choices).is_err());
+    assert!(record(1041, 41, &fields, Some("Winter"), 120).is_err());
+    drop(db);
+    let reopened = Store::open_profile(dir.path()).unwrap();
+    assert_eq!(reopened.write_choices(a, r).unwrap(), choices);
+    assert_eq!(
+        reopened
+            .issue_write_base(a, item)
+            .unwrap()
+            .unwrap()
+            .milestone,
+        Some(None)
+    );
+}
+
+#[test]
+fn it_011_cached_author_proof_is_bound_to_original_comment_and_cannot_change_actors() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Store::open_profile(dir.path()).unwrap();
+    let (a, r, item) = setup(&db);
+    let other = issue(&db, a, r, 42);
+    let p = db.github_access_profile(a, "work").unwrap().unwrap();
+    let proof = CommentAuthorObservation {
+        comment_id: id(377),
+        author_id: id(81),
+        observed_at_ms: 120,
+    };
+    assert!(db.record_comment_authors(&p, r, item, &[proof]).is_err());
+    assert_eq!(db.comment_author_id(a, item, id(377)).unwrap(), None);
+    submit(
+        &db,
+        a,
+        item,
+        &WriteIntent::CreateComment { body: "one".into() },
+        100,
+    );
+    let claim = db.claim_write(a, 101, 600).unwrap().unwrap();
+    ticket(&db, &claim, &obs(&claim, 101), 101);
+    db.confirm_write(
+        a,
+        claim.operation_id(),
+        claim.attempt(),
+        ConfirmationProof::MutationResponse {
+            request_id: "actual-create",
+        },
+        &reply(&claim, ConfirmedObject::Comment(remote("one", 103))),
+        104,
+    )
+    .unwrap();
+    assert_eq!(
+        db.comment_author_id(a, item, id(377)).unwrap(),
+        Some(id(81))
+    );
+    db.record_comment_authors(&p, r, item, &[proof]).unwrap();
+    assert!(db.record_comment_authors(&p, r, other, &[proof]).is_err());
+    assert!(
+        db.record_comment_authors(
+            &p,
+            r,
+            item,
+            &[CommentAuthorObservation {
+                author_id: id(99),
+                ..proof
+            }]
+        )
+        .is_err()
+    );
+    drop(db);
+    let reopened = Store::open_profile(dir.path()).unwrap();
+    assert_eq!(
+        reopened.comment_author_id(a, item, id(377)).unwrap(),
+        Some(id(81))
+    );
+    assert_eq!(reopened.comment_author_id(a, other, id(377)).unwrap(), None);
+}

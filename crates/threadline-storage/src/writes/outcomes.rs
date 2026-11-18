@@ -315,7 +315,7 @@ impl Store {
             let still_at_route:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM items WHERE id=? AND account_id=? AND repository_id=? AND number=?
                         AND issue_api_id=?)",params![route.item,account,route.repository,route.number.get().to_string(),route.issue_id.to_string()],|r|r.get(0))?;
             if still_at_route {
-                publish(tx, route, &response.object, now)?;
+                publish(tx, CacheTarget::from(route), &response.object, now)?;
             }
             tx.execute("INSERT INTO own_write_actions(account_id,operation_id,repository_id,item_id,action,remote_id,remote_revision,confirmed_at)
                         VALUES(?,?,?,?,?,?,?,?)",params![account,id,route.repository,route.item,action,remote_id.to_string(),revision,now])?;
@@ -338,9 +338,27 @@ impl Store {
         })
     }
 }
-fn publish(
+pub(super) struct CacheTarget {
+    pub account: AccountId,
+    pub repository: RepositoryId,
+    pub item: ItemId,
+    pub issue_id: NonZeroU64,
+    pub number: NonZeroU64,
+}
+impl From<&WriteRoute> for CacheTarget {
+    fn from(r: &WriteRoute) -> Self {
+        Self {
+            account: r.account,
+            repository: r.repository,
+            item: r.item,
+            issue_id: r.issue_id,
+            number: r.number,
+        }
+    }
+}
+pub(super) fn publish(
     tx: &Transaction<'_>,
-    route: &WriteRoute,
+    route: CacheTarget,
     object: &ConfirmedObject,
     at: i64,
 ) -> Result<()> {
@@ -361,6 +379,18 @@ fn publish(
                 "UPDATE cached_resources SET coverage=1 WHERE id=? AND coverage=0",
                 [id],
             )?;
+            if let Some(author_id) = c.author_id {
+                super::choices::comment_author_in(
+                    tx,
+                    route.account,
+                    route.item,
+                    CommentAuthorObservation {
+                        comment_id: c.id,
+                        author_id,
+                        observed_at_ms: c.updated_at_ms,
+                    },
+                )?;
+            }
             crate::sync::apply_downloaded_comment(
                 tx,
                 route.item,
@@ -416,6 +446,15 @@ fn publish(
                     ..Default::default()
                 },
             };
+            if let Some(number) = fields.milestone {
+                super::choices::milestone_in(
+                    tx,
+                    route.account,
+                    route.item,
+                    number,
+                    *updated_at_ms,
+                )?;
+            }
             let item = commit_item_metadata_in(
                 tx,
                 route.account,
