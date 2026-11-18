@@ -110,9 +110,14 @@ fn cached_reader_filters_search_anchors_counts_and_tab_reopen_survive_an_offline
     assert_eq!(rest.state.coverage, Coverage::Complete);
     let mut ws = store.workspace(f.account).unwrap().unwrap();
     let removed = ws.panes[0].tabs.remove(2);
-    store.save_workspace(f.account, &ws).unwrap();
+    store.save_reader_layout(f.account, &ws, Some(1)).unwrap();
+    assert!(store.save_reader_layout(f.account, &ws, Some(2)).is_err());
     drop(store);
     let store = Store::open(&path).unwrap();
+    assert_eq!(
+        store.reader_layout(f.account).unwrap(),
+        Some((ws.clone(), Some(1)))
+    );
     assert_eq!(
         store.reader_views(f.account).unwrap(),
         [("My assignments".into(), assigned)]

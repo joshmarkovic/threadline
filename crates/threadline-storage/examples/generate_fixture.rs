@@ -6,19 +6,21 @@ use std::{
 
 use threadline_storage::{
     Store,
-    fixtures::{Scale, populate},
+    fixtures::{Scale, populate, populate_reader},
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let usage = "Usage: generate_fixture <new-database-path> <small|section16> <seed>";
+    let usage = "Usage: generate_fixture <new-database-path> <small|section16|reader-small|reader-section16> <seed>";
     let [database, scale, seed]: [_; 3] = env::args_os()
         .skip(1)
         .collect::<Vec<_>>()
         .try_into()
         .map_err(|_| usage)?;
-    let scale = match scale.to_str() {
-        Some("small") => Scale::Small,
-        Some("section16") => Scale::Section16,
+    let (scale, reader) = match scale.to_str() {
+        Some("small") => (Scale::Small, false),
+        Some("section16") => (Scale::Section16, false),
+        Some("reader-small") => (Scale::Small, true),
+        Some("reader-section16") => (Scale::Section16, true),
         _ => return Err(usage.into()),
     };
     let seed = seed.to_str().ok_or(usage)?.parse()?;
@@ -35,7 +37,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         .tempfile_in(parent)?
         .into_temp_path();
     let store = Store::open(&staged)?;
-    let fixture = populate(&store, seed, scale)?;
+    let fixture = if reader {
+        populate_reader(&store, seed, scale)?
+    } else {
+        populate(&store, seed, scale)?
+    };
     drop(store);
     staged.persist_noclobber(&database)?;
 

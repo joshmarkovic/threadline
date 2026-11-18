@@ -179,6 +179,14 @@ pub(crate) fn write_workspace(
         ON CONFLICT(account_id) DO UPDATE SET layout=excluded.layout",
         params![account, json(workspace)?],
     )?;
+    tx.execute(
+        "DELETE FROM local_preferences
+         WHERE account_id = ?1 AND name = 'reader.maximized_pane' AND CAST(value AS INTEGER) >= ?2",
+        params![
+            account,
+            i64::try_from(workspace.panes.len()).map_err(|_| Error::Corrupt)?
+        ],
+    )?;
     Ok(())
 }
 
@@ -187,19 +195,55 @@ impl Store {
         self.write(|tx| write_workspace(tx, account, workspace))
     }
     pub fn workspace(&self, account: AccountId) -> Result<Option<Workspace>> {
-        self.read(|db| {
-            let raw: Option<String> = db
-                .query_row(
-                    "SELECT layout FROM workspaces WHERE account_id=?",
+        Ok(self.reader_layout(account)?.map(|(workspace, _)| workspace))
+    }
+
+    pub fn save_reader_layout(
+        &self,
+        account: AccountId,
+        workspace: &Workspace,
+        maximized_pane: Option<usize>,
+    ) -> Result<()> {
+        if maximized_pane.is_some_and(|pane| pane >= workspace.panes.len()) {
+            return Err(Error::InvalidInput(
+                "maximized pane is outside the workspace",
+            ));
+        }
+        self.write(|tx| {
+            write_workspace(tx, account, workspace)?;
+            match maximized_pane {
+                Some(pane) => tx.execute(
+                    "INSERT INTO local_preferences(account_id, name, value)
+                     VALUES (?1, 'reader.maximized_pane', ?2)
+                     ON CONFLICT(account_id, name) DO UPDATE SET value = excluded.value",
+                    params![account, pane.to_string()],
+                )?,
+                None => tx.execute(
+                    "DELETE FROM local_preferences WHERE account_id = ? AND name = 'reader.maximized_pane'",
                     [account],
-                    |r| r.get(0),
+                )?,
+            };
+            Ok(())
+        })
+    }
+
+    pub fn reader_layout(&self, account: AccountId) -> Result<Option<(Workspace, Option<usize>)>> {
+        self.read(|db| {
+            let raw: Option<(String, Option<String>)> = db
+                .query_row(
+                    "SELECT w.layout, p.value FROM workspaces w
+                     LEFT JOIN local_preferences p ON p.account_id = w.account_id AND p.name = 'reader.maximized_pane'
+                     WHERE w.account_id = ?",
+                    [account],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
                 )
                 .optional()?;
-            raw.as_deref()
-                .map(|data| {
-                    let ws = parse(data)?;
+            raw.map(|(data, maximized)| {
+                    let ws = parse(&data)?;
                     validate_workspace(db, account, &ws)?;
-                    Ok(ws)
+                    let pane = maximized.map(|v| v.parse::<usize>()).transpose().map_err(|_| Error::Corrupt)?;
+                    if pane.is_some_and(|index| index >= ws.panes.len()) { return Err(Error::Corrupt); }
+                    Ok((ws, pane))
                 })
                 .transpose()
         })
