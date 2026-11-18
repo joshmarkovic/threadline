@@ -15,6 +15,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 mod history;
+mod merge;
 mod pr;
 mod writes;
 
@@ -66,6 +67,9 @@ enum Phase {
     PrRelease,
     ReviewSend,
     ReviewChanged,
+    MergePrepare,
+    MergeSend,
+    MergeWrongHead,
     History,
     WriteOnline,
     WriteDrop,
@@ -91,6 +95,9 @@ impl Phase {
             "pr-release" => Ok(Self::PrRelease),
             "review-send" => Ok(Self::ReviewSend),
             "review-changed" => Ok(Self::ReviewChanged),
+            "merge-prepare" => Ok(Self::MergePrepare),
+            "merge-send" => Ok(Self::MergeSend),
+            "merge-wrong-head" => Ok(Self::MergeWrongHead),
             "history" => Ok(Self::History),
             "write-online" => Ok(Self::WriteOnline),
             "write-drop" => Ok(Self::WriteDrop),
@@ -123,6 +130,10 @@ enum Route {
     ReviewRead,
     ReviewCreated,
     ReviewSubmitted,
+    MergePolicyA,
+    MergePolicyB,
+    MergePut,
+    MergeReadback,
     HistoryBranches,
     HistoryTags,
     HistoryBranch,
@@ -160,6 +171,7 @@ pub enum TraceCheck {
     PullRequestJourney,
     ReviewContextJourney,
     ReviewDraftJourney,
+    MergeJourney,
     HistoryJourney,
     WritesWithLoss,
     WriteSurface,
@@ -210,6 +222,7 @@ impl AccessFixture {
             TraceCheck::PullRequestJourney => pr::trace(&records),
             TraceCheck::ReviewContextJourney => pr::trace_review_context(&records),
             TraceCheck::ReviewDraftJourney => pr::trace_review_draft(&records),
+            TraceCheck::MergeJourney => merge::trace(&records),
             TraceCheck::HistoryJourney => history::trace(&records),
             TraceCheck::WritesWithLoss => writes::trace(&records, true),
             TraceCheck::WriteSurface => writes::trace(&records, false),
@@ -326,7 +339,16 @@ fn serve(
                     return Err(io::Error::other("too many requests to the access fixture"));
                 }
                 let phase = Phase::read(phase_file)?;
-                evidence.push(answer(&mut socket, phase, phase_file, stopping)?);
+                let merge_sent = evidence.iter().any(|record: &RequestEvidence| {
+                    record.route == Route::MergePut && record.status == 200
+                });
+                evidence.push(answer(
+                    &mut socket,
+                    phase,
+                    phase_file,
+                    stopping,
+                    merge_sent,
+                )?);
             }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
                 thread::sleep(Duration::from_millis(12));
@@ -342,6 +364,7 @@ fn answer(
     phase: Phase,
     phase_file: &Path,
     stopping: &AtomicBool,
+    merge_sent: bool,
 ) -> io::Result<RequestEvidence> {
     let timeout = Some(Duration::from_secs(2));
     socket.set_nonblocking(false)?;
@@ -362,7 +385,7 @@ fn answer(
             status: 0,
         });
     }
-    let reply = response(phase, route, authorized);
+    let reply = response(phase, route, authorized, merge_sent);
     let body = serde_json::to_vec(&reply.body)?;
     write!(
         socket,
@@ -391,6 +414,7 @@ fn answer(
             Route::ReviewSubmitted => {
                 socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:4202:08\r\n")?
             }
+            Route::MergePut => socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:4201:09\r\n")?,
             _ => (),
         }
     }
@@ -422,6 +446,10 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
     let request = (parts.next(), parts.next(), parts.next());
     let post_path = match request {
         (Some("POST"), Some(path), Some("HTTP/1.1")) => Some(path.to_owned()),
+        _ => None,
+    };
+    let put_path = match request {
+        (Some("PUT"), Some(path), Some("HTTP/1.1")) => Some(path.to_owned()),
         _ => None,
     };
     let mut route = match request {
@@ -474,7 +502,15 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
             }
         }
     }
-    if let Some(post_path) = post_path {
+    if let Some(put_path) = put_path {
+        let mut body = vec![0; content_length];
+        reader.read_exact(&mut body)?;
+        route = serde_json::from_slice::<Value>(&body)
+            .ok()
+            .map_or(Route::Unexpected, |body| {
+                merge::put(phase, &put_path, &body)
+            });
+    } else if let Some(post_path) = post_path {
         let mut body = vec![0; content_length];
         reader.read_exact(&mut body)?;
         let payload = serde_json::from_slice::<Value>(&body).ok();
@@ -483,6 +519,11 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
                 pr::post(phase, &post_path, body)
                     .unwrap_or_else(|| writes::post(phase, &post_path, body))
             });
+        } else if let Some(merge) = payload
+            .as_ref()
+            .and_then(|body| merge::graphql(phase, body))
+        {
+            route = merge;
         } else if !payload.is_some_and(|body| {
             body.pointer("/variables/owner").and_then(Value::as_str) == Some("fixture-org")
                 && body.pointer("/variables/name").and_then(Value::as_str) == Some("private")
@@ -524,7 +565,7 @@ struct Response {
     sso: Option<String>,
 }
 
-fn response(phase: Phase, route: Route, authorized: bool) -> Response {
+fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> Response {
     let result = |status, reason, body| Response {
         status,
         reason,
@@ -537,6 +578,9 @@ fn response(phase: Phase, route: Route, authorized: bool) -> Response {
     if let Some(history) = history::response(phase, route) {
         return history;
     }
+    if let Some(merge) = merge::response(phase, route, merge_sent) {
+        return merge;
+    }
     if let Some(pr) = pr::response(phase, route) {
         return pr;
     }
@@ -546,7 +590,7 @@ fn response(phase: Phase, route: Route, authorized: bool) -> Response {
     let repository = json!({
         "id":71, "node_id":"R_71", "name":"private", "owner":{"login":"fixture-org"},
         "default_branch":"main","private":true,
-        "permissions":{"pull":true,"push":matches!(phase, Phase::ReviewSend | Phase::ReviewChanged),"admin":false}
+        "permissions":{"pull":true,"push":matches!(phase, Phase::ReviewSend | Phase::ReviewChanged) || merge::applies(phase),"admin":false}
     });
     let item = || {
         json!({
@@ -606,6 +650,9 @@ fn response(phase: Phase, route: Route, authorized: bool) -> Response {
                 "id":"R_71","name":"private","owner":{"login":"fixture-org"},"isPrivate":true,"viewerPermission":"READ"
             }}}),
         ),
+        (phase, Route::UpdatedItems | Route::UpdatedComments) if merge::applies(phase) => {
+            result(200, "OK", json!([]))
+        }
         (Phase::ReaderFailure | Phase::ReaderResume, Route::Items) => {
             result(200, "OK", json!([item()]))
         }

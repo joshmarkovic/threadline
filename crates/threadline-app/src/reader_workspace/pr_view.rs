@@ -70,6 +70,7 @@ pub(crate) struct PrObservation {
     selected_file: Option<String>,
     revision_id: Option<i64>,
     head: Option<String>,
+    merged: Option<bool>,
     linked_issue: Option<i64>,
     verified_targets: usize,
     download_state: Option<String>,
@@ -129,6 +130,12 @@ impl ReaderWorkspace {
                 }),
                 revision_id: pr.map(|pr| pr.data.revision.id),
                 head: pr.map(|pr| pr.data.revision.head.as_str().to_owned()),
+                merged: cached.data.item.as_ref().and_then(|item| {
+                    match &item.pull_request.as_ref()?.fields.merged {
+                        Change::Value(value) => Some(*value),
+                        _ => None,
+                    }
+                }),
                 linked_issue: pr
                     .and_then(|pr| pr.data.linked.as_ref())
                     .map(|issue| issue.item.id.0),

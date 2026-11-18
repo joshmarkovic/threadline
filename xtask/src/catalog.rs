@@ -37,7 +37,7 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == crate::install::LOCAL_CASE {
         return Some("s12-windows-local-installer-v1");
     }
-    if matches!(case, "UT-017" | "IT-014" | "IT-015") {
+    if matches!(case, "UT-017" | "IT-014" | "IT-015" | "E2E-009") {
         return Some("s09-direct-merge-v1");
     }
     if case == "S10-HISTORY-MONITOR" {

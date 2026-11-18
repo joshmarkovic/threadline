@@ -38,7 +38,7 @@ pub(super) fn applies(phase: Phase) -> bool {
             | Phase::PrRelease
             | Phase::ReviewSend
             | Phase::ReviewChanged
-    )
+    ) || merge::applies(phase)
 }
 
 fn data(phase: Phase, route: Route) -> Option<Value> {
@@ -92,7 +92,7 @@ fn data(phase: Phase, route: Route) -> Option<Value> {
             second(),
             43,
             B_BASE,
-            if phase == Phase::ReviewChanged {
+            if matches!(phase, Phase::ReviewChanged | Phase::MergeWrongHead) {
                 B_NEW_HEAD
             } else {
                 B_HEAD
