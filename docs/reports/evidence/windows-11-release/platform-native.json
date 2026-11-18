@@ -1,0 +1,44 @@
+{
+  "source_revision": "acd7ce73e51f3d0ba1e4ada4243779d211d21904",
+  "binary_sha256": "2d6c06948bf3273973ec448c3f78176f87ce9a1dd7c02c20b9d326ee415a7aa4",
+  "seed": 12345,
+  "window_dpi": 144,
+  "run_id": "e2e-1795010622127-10392",
+  "runner_case": "S01-WINDOWS-SHELL",
+  "runner_status": "Blocked",
+  "source_files_sha256": {
+    "platform-native.json": "f76138a9c2b4b3dc28222be420d76b1ff61b25e7b4ba424cf31c07ebb8f2b24b",
+    "ui-observation.json": "1a3c4987b1416dadb521d166605fae0da55b22f0a49a9bfdd822cd92e2b37d95",
+    "result.json": "3cf1b0663c87b3fa6a0963515db29f56dfdc315fc5d79070756ce97b99bc5f81",
+    "binary.json": "0db44f8a19afc282de03a50cc86a205da985523f24de55215a578c3550bc44fb"
+  },
+  "detail": "Windows reported the banner shown, but UI Automation could not identify its clickable title. Use the manual notification click mode on this target.",
+  "app_pid": 27004,
+  "actions": [
+    {
+      "action": "Use Keep in tray to opt into native background residence",
+      "observed": true
+    },
+    {
+      "action": "Close the main window while tray is enabled",
+      "observed": {
+        "pid": 27004,
+        "minimized": true
+      }
+    },
+    {
+      "action": "Open the identified Windows notification area overflow",
+      "observed": true
+    },
+    {
+      "action": "Click the actual Windows tray icon",
+      "observed": 27004
+    },
+    {
+      "action": "Windows shell confirmed the test banner displayed",
+      "observed": 1
+    }
+  ],
+  "final_pr": 68,
+  "notifications_shown": 1
+}

@@ -1,0 +1,162 @@
+{
+  "build_manifest": "../windows-hosted/build.json",
+  "source_revision": "acd7ce73e51f3d0ba1e4ada4243779d211d21904",
+  "binary_sha256": "2d6c06948bf3273973ec448c3f78176f87ce9a1dd7c02c20b9d326ee415a7aa4",
+  "executable_bytes": 26802688,
+  "driver_sha256": {
+    "windows-smoke.ps1": "bf685da7b8ca2d68cc0b9d4cfbe826165c4b2b7e23b3fb7cb279f302d2443d59",
+    "ThreadlineWinInput.cs": "3d2e9c40d4262b3f2fac153a50998945f15449a187db606374ba1f91ff053bbc"
+  },
+  "seed": 12345,
+  "fixture_revision": "s01-feasibility-v1",
+  "windows_product": "Microsoft Windows 11 Enterprise",
+  "version": "Microsoft Windows [Version 10.0.22631.7652]",
+  "architecture": "AMD64",
+  "machine": {
+    "manufacturer": "Microsoft Corporation",
+    "model": "Virtual Machine",
+    "ram_bytes": 34358562816,
+    "processors": [
+      {
+        "Name": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+        "NumberOfCores": 4,
+        "NumberOfLogicalProcessors": 8
+      }
+    ],
+    "graphics": [
+      {
+        "Name": "Microsoft Hyper-V Video",
+        "DriverVersion": "10.0.22621.1"
+      },
+      {
+        "Name": "Microsoft Remote Display Adapter",
+        "DriverVersion": "10.0.22621.7649"
+      }
+    ],
+    "storage": [
+      {
+        "Model": "Microsoft Virtual Disk",
+        "InterfaceType": "SCSI",
+        "MediaType": "Fixed hard disk media"
+      }
+    ],
+    "display": {
+      "width": 3840,
+      "height": 2160
+    }
+  },
+  "window_dpi": 144,
+  "gpui_scale_factor": 1.5,
+  "run_id": "e2e-1795010824955-39540",
+  "runner_case": "E2E-001",
+  "runner_status": "Pass",
+  "source_files_sha256": {
+    "native.json": "19e28318b51de2b1218933966d70886c8961d6ff1b94171bade0036cf48ca8dc",
+    "ui-observation.json": "9033e26058deb6e5b81569723fb5ef3ef874883e103ee1c29f7f6715456df6f7",
+    "result.json": "e3ed0adae34143f59e9b3275f28db122ea9ce084da173fb00f9ff8fd8d249795",
+    "binary.json": "0db44f8a19afc282de03a50cc86a205da985523f24de55215a578c3550bc44fb"
+  },
+  "test_runner_console": "hidden",
+  "app_pid": 38200,
+  "restarted_pid": 45964,
+  "actions": [
+    {
+      "action": "Launch native window",
+      "observed": {
+        "left_tab": 41,
+        "right_tab": 72,
+        "context_ratio": 0.33
+      }
+    },
+    {
+      "action": "Pointer select formatted Markdown and copy",
+      "observed": {
+        "verified": true,
+        "copy_attempts": 1
+      }
+    },
+    {
+      "action": "Type into the right review input while background preview is pending and copy its value",
+      "observed": {
+        "tab": 72,
+        "text": "native draft 72",
+        "copy_attempts": 1
+      }
+    },
+    {
+      "action": "Change the active tab and return to the same draft target",
+      "observed": {
+        "switched": 68,
+        "restored": 72,
+        "draft": "native draft 72"
+      }
+    },
+    {
+      "action": "Switch context to linked issue",
+      "observed": "issue"
+    },
+    {
+      "action": "Resize workspace panes with the pointer",
+      "observed": 0.33875778
+    },
+    {
+      "action": "Resize PR context and code with the pointer",
+      "observed": 0.37752402
+    },
+    {
+      "action": "Forward a second launch through the Windows instance channel",
+      "observed": {
+        "existing_pid": 38200,
+        "secondary_pid": 9356,
+        "right_tab": 72
+      }
+    },
+    {
+      "action": "Quit with the native keyboard shortcut",
+      "observed": 0
+    },
+    {
+      "action": "Relaunch a fresh isolated feasibility profile and quit again",
+      "observed": 45964
+    }
+  ],
+  "original_clipboard_restored": true,
+  "earlier_attempts": [
+    {
+      "run_id": "e2e-1795010593910-34988",
+      "runner_case": "E2E-001",
+      "runner_status": "Fail",
+      "source_files_sha256": {
+        "native.json": "37195de1c967771d14410edd4f0e6edf1fd0d7e70ac8a06450b2b5ee676dcad2",
+        "ui-observation.json": "bddbdf18663cd1ea879f47309eec321a9ad15595fa045f2f00309e59d2981407",
+        "result.json": "7ff3ea935ea216e36efe4fc939fe308c810d0611e65169198b1a094022419c65",
+        "binary.json": "0db44f8a19afc282de03a50cc86a205da985523f24de55215a578c3550bc44fb"
+      },
+      "detail": "Exception calling \"Drag\" with \"2\" argument(s): \"The Threadline test window lost foreground focus.\"",
+      "failed_action": "Drag PR context divider",
+      "last_completed_action": {
+        "action": "Resize workspace panes with the pointer",
+        "observed": 0.34341615
+      },
+      "original_clipboard_restored": true
+    },
+    {
+      "run_id": "e2e-1795010685293-44708",
+      "runner_case": "E2E-001",
+      "runner_status": "Fail",
+      "source_files_sha256": {
+        "native.json": "b1dec186eb253b4e659c0c52553ad5a7187b78ebe6b01467fed79db654c577c3",
+        "ui-observation.json": "04c112f885cc093c6dbe2308e52a60ccb9b87636daf46a38e57d47b2cadf4f2d",
+        "result.json": "7ff3ea935ea216e36efe4fc939fe308c810d0611e65169198b1a094022419c65",
+        "binary.json": "0db44f8a19afc282de03a50cc86a205da985523f24de55215a578c3550bc44fb"
+      },
+      "detail": "Exception calling \"Drag\" with \"2\" argument(s): \"The Threadline test window lost foreground focus.\"",
+      "failed_action": "Drag PR context divider",
+      "last_completed_action": {
+        "action": "Resize workspace panes with the pointer",
+        "observed": 0.33875778
+      },
+      "original_clipboard_restored": true
+    }
+  ]
+}

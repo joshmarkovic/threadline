@@ -1,0 +1,266 @@
+{
+  "build_manifest": "../windows-hosted/build.json",
+  "source_revision": "acd7ce73e51f3d0ba1e4ada4243779d211d21904",
+  "binary_sha256": "2d6c06948bf3273973ec448c3f78176f87ce9a1dd7c02c20b9d326ee415a7aa4",
+  "executable_bytes": 26802688,
+  "driver_sha256": {
+    "windows-smoke.ps1": "bf685da7b8ca2d68cc0b9d4cfbe826165c4b2b7e23b3fb7cb279f302d2443d59",
+    "ThreadlineWinInput.cs": "3d2e9c40d4262b3f2fac153a50998945f15449a187db606374ba1f91ff053bbc"
+  },
+  "seed": 12345,
+  "fixture_revision": "s01-feasibility-v1",
+  "windows_product": "Microsoft Windows 11 Enterprise",
+  "version": "Microsoft Windows [Version 10.0.22631.7652]",
+  "architecture": "AMD64",
+  "machine": {
+    "manufacturer": "Microsoft Corporation",
+    "model": "Virtual Machine",
+    "ram_bytes": 34358562816,
+    "processors": [
+      {
+        "Name": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+        "NumberOfCores": 4,
+        "NumberOfLogicalProcessors": 8
+      }
+    ],
+    "graphics": [
+      {
+        "Name": "Microsoft Hyper-V Video",
+        "DriverVersion": "10.0.22621.1"
+      },
+      {
+        "Name": "Microsoft Remote Display Adapter",
+        "DriverVersion": "10.0.22621.7649"
+      }
+    ],
+    "storage": [
+      {
+        "Model": "Microsoft Virtual Disk",
+        "InterfaceType": "SCSI",
+        "MediaType": "Fixed hard disk media"
+      }
+    ],
+    "display": {
+      "width": 3840,
+      "height": 2160
+    }
+  },
+  "window_dpi": 144,
+  "gpui_scale_factor": 1.5,
+  "renderer_adapter": {
+    "is_software_emulated": true,
+    "device_name": "Microsoft Basic Render Driver",
+    "driver_name": "Unknown Vendor (ID: 0x1414)",
+    "driver_info": "10.0.22621.7649"
+  },
+  "minimum_frames_per_surface": 10,
+  "runs": [
+    {
+      "run_id": "measure-windows-1795010869197-34520",
+      "runner_case": "S01-WINDOWS-BASELINE",
+      "runner_status": "Fail",
+      "source_files_sha256": {
+        "measurements.json": "3bb1f0f2274bcba7d2e8027ba9c0182467720bfa10fcc3b1b6654d7a38ca11b8",
+        "ui-observation.json": "6c0bdb50cdfdebb51559036f264396249a859593c586ff5e16576f522d4c7dd0",
+        "result.json": "602a29bd28e3ab32fde27e7537f8396ff55d988da0816a431cdc26e5aa732384",
+        "binary.json": "0db44f8a19afc282de03a50cc86a205da985523f24de55215a578c3550bc44fb"
+      },
+      "test_runner_console": "hidden",
+      "GPUI_DISABLE_DIRECT_COMPOSITION": null,
+      "budgets": {
+        "idle_working_set_bytes": {
+          "value": 103784448,
+          "limit": 209715200,
+          "status": "Pass"
+        },
+        "peak_working_set_bytes": {
+          "value": 105050112,
+          "limit": 471859200,
+          "status": "Pass"
+        },
+        "gpu_memory_bytes": {
+          "value": 0,
+          "limit": 268435456,
+          "status": "Pass"
+        },
+        "package_bytes": {
+          "value": null,
+          "limit": 52428800,
+          "status": "Blocked"
+        },
+        "cold_start_ms": {
+          "value": 1693.06,
+          "limit": 3000,
+          "status": "Pass"
+        },
+        "scroll_frame_p95_ms": {
+          "value": null,
+          "limit": 20,
+          "status": "Fail",
+          "surfaces": {
+            "large_diff": {
+              "value": null,
+              "sample_count": 4,
+              "limit": 20,
+              "status": "Blocked"
+            },
+            "markdown_discussion": {
+              "value": 134.4278,
+              "sample_count": 36,
+              "limit": 20,
+              "status": "Fail"
+            }
+          }
+        }
+      },
+      "gpu_process_memory": {
+        "idle": {
+          "dedicated_bytes": 0,
+          "shared_bytes": 0
+        },
+        "after_scroll": {
+          "dedicated_bytes": 0,
+          "shared_bytes": 0
+        }
+      }
+    },
+    {
+      "run_id": "measure-windows-1795010526691-30564",
+      "runner_case": "S01-WINDOWS-BASELINE",
+      "runner_status": "Fail",
+      "source_files_sha256": {
+        "measurements.json": "15ecf87b49fc368aa5c07ee80d84a3eda7eb188f9fadb9491c5b13af14a2a945",
+        "ui-observation.json": "dfa3cf4df25f58be5be816c45c312ed02aa83f7efc0e4faa71a64b43eb66a5b4",
+        "result.json": "602a29bd28e3ab32fde27e7537f8396ff55d988da0816a431cdc26e5aa732384",
+        "binary.json": "0db44f8a19afc282de03a50cc86a205da985523f24de55215a578c3550bc44fb"
+      },
+      "test_runner_console": "ordinary",
+      "GPUI_DISABLE_DIRECT_COMPOSITION": null,
+      "budgets": {
+        "idle_working_set_bytes": {
+          "value": 104038400,
+          "limit": 209715200,
+          "status": "Pass"
+        },
+        "peak_working_set_bytes": {
+          "value": 105500672,
+          "limit": 471859200,
+          "status": "Pass"
+        },
+        "gpu_memory_bytes": {
+          "value": 0,
+          "limit": 268435456,
+          "status": "Pass"
+        },
+        "package_bytes": {
+          "value": null,
+          "limit": 52428800,
+          "status": "Blocked"
+        },
+        "cold_start_ms": {
+          "value": 1609.31,
+          "limit": 3000,
+          "status": "Pass"
+        },
+        "scroll_frame_p95_ms": {
+          "value": null,
+          "limit": 20,
+          "status": "Fail",
+          "surfaces": {
+            "large_diff": {
+              "value": null,
+              "sample_count": 3,
+              "limit": 20,
+              "status": "Blocked"
+            },
+            "markdown_discussion": {
+              "value": 137.7274,
+              "sample_count": 36,
+              "limit": 20,
+              "status": "Fail"
+            }
+          }
+        }
+      },
+      "gpu_process_memory": {
+        "idle": {
+          "dedicated_bytes": 0,
+          "shared_bytes": 0
+        },
+        "after_scroll": {
+          "dedicated_bytes": 0,
+          "shared_bytes": 0
+        }
+      }
+    },
+    {
+      "run_id": "measure-windows-1795010712410-33936",
+      "runner_case": "S01-WINDOWS-BASELINE",
+      "runner_status": "Fail",
+      "source_files_sha256": {
+        "measurements.json": "33d67691b1fe37ff5e4d1171ef26ed575f0f6628cb7b3ae570cd368ceafe7ec2",
+        "ui-observation.json": "5d3616b3cbd1d5cff282cf42015d5142621090538f2b46e9fa723c08db5a016e",
+        "result.json": "602a29bd28e3ab32fde27e7537f8396ff55d988da0816a431cdc26e5aa732384",
+        "binary.json": "0db44f8a19afc282de03a50cc86a205da985523f24de55215a578c3550bc44fb"
+      },
+      "test_runner_console": "ordinary",
+      "GPUI_DISABLE_DIRECT_COMPOSITION": "1",
+      "budgets": {
+        "idle_working_set_bytes": {
+          "value": 114200576,
+          "limit": 209715200,
+          "status": "Pass"
+        },
+        "peak_working_set_bytes": {
+          "value": 115445760,
+          "limit": 471859200,
+          "status": "Pass"
+        },
+        "gpu_memory_bytes": {
+          "value": 0,
+          "limit": 268435456,
+          "status": "Pass"
+        },
+        "package_bytes": {
+          "value": null,
+          "limit": 52428800,
+          "status": "Blocked"
+        },
+        "cold_start_ms": {
+          "value": 1628.2,
+          "limit": 3000,
+          "status": "Pass"
+        },
+        "scroll_frame_p95_ms": {
+          "value": null,
+          "limit": 20,
+          "status": "Fail",
+          "surfaces": {
+            "large_diff": {
+              "value": null,
+              "sample_count": 3,
+              "limit": 20,
+              "status": "Blocked"
+            },
+            "markdown_discussion": {
+              "value": 196.5959,
+              "sample_count": 28,
+              "limit": 20,
+              "status": "Fail"
+            }
+          }
+        }
+      },
+      "gpu_process_memory": {
+        "idle": {
+          "dedicated_bytes": 0,
+          "shared_bytes": 0
+        },
+        "after_scroll": {
+          "dedicated_bytes": 0,
+          "shared_bytes": 0
+        }
+      }
+    }
+  ]
+}
