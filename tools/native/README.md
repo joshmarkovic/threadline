@@ -18,6 +18,8 @@ Use `--case E2E-001` or `--case UT-021` to select a case and `--seed 12345` to r
 
 The live command checks exact matches for `THREADLINE_LIVE_READ_REPO` and the requested repository, plus a named `THREADLINE_LIVE_PROFILE`. The write option also requires `THREADLINE_LIVE_WRITE_REPO` to match. These values cannot grant authorization to an unattended run. Release-phase live testing requires a separately authorized disposable scope and a verified credential profile. The Sprint 01 runner retrieves neither credentials nor remote content.
 
+`cargo xtask test live --case LIVE-002 --repo joshmarkovic/threadline --allow-live-writes --credential-stdin` requires the authorized issue fixture, `THREADLINE_LIVE_WRITE_REPO=joshmarkovic/threadline`, `THREADLINE_LIVE_EXPECTED_USER_ID=52184130`, and `THREADLINE_LIVE_PROFILE=threadline-disposable-issue-1`. Supply the authorized credential over a private pipe. `--allow-existing-cli-oauth` records that separate credential class. The run makes one bounded edit of issue #1, creates and edits one synthetic comment, and restores the original title only while its own change is still current. The comment remains as evidence. The journal under `artifacts/verification/live-write-journal` prevents rerunning a prior or interrupted attempt. Review that evidence before any further writes to the fixture.
+
 ## Windows native input
 
 Run on an unlocked Windows 11 x64 desktop. Windows PowerShell 5.1 drives Win32 keyboard, pointer, window, and clipboard APIs. Reserve the desktop for the test while it runs. The driver snapshots the clipboard in memory and restores it if the clipboard still contains the last synthetic copy. It never writes clipboard contents to a report.

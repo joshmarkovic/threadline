@@ -25,6 +25,9 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == "LIVE-001" {
         return Some("s03-live-read-allowlist-v1");
     }
+    if case == "LIVE-002" {
+        return Some("s07-live-issue-1-v1");
+    }
     if matches!(
         case,
         "UT-011" | "UT-012" | "IT-006" | "IT-016" | "IT-017" | "E2E-005"

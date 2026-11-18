@@ -16,6 +16,8 @@ const EXPECTED_REPOSITORY_ID: u64 = 1_462_273_296;
 const CASE: &str = "LIVE-001";
 const EVIDENCE: &str = "github-read.json";
 
+mod writes;
+
 fn authorize(
     options: &Options,
     authorized_repo: Option<&str>,
@@ -42,6 +44,9 @@ fn authorize(
 
 pub(crate) fn run(options: &Options, root: &Path, dir: &Path) -> CaseResult {
     let case = options.case.as_deref().unwrap_or(CASE);
+    if case == "LIVE-002" {
+        return writes::run(options, root, dir);
+    }
     let repository = std::env::var("THREADLINE_LIVE_READ_REPO").ok();
     let user_id = std::env::var("THREADLINE_LIVE_EXPECTED_USER_ID")
         .ok()
@@ -52,7 +57,7 @@ pub(crate) fn run(options: &Options, root: &Path, dir: &Path) -> CaseResult {
         Ok(user_id) => user_id,
         Err(detail) => return CaseResult::new(case, Status::Blocked, detail),
     };
-    let binary = match build_harness(root) {
+    let binary = match build_harness(root, "github_live_read") {
         Ok(binary) => binary,
         Err(status) => {
             return CaseResult::new(case, status, "The live-read harness could not be built.");
@@ -159,7 +164,7 @@ pub(crate) fn run(options: &Options, root: &Path, dir: &Path) -> CaseResult {
     result
 }
 
-fn build_harness(root: &Path) -> Result<PathBuf, Status> {
+fn build_harness(root: &Path, example: &str) -> Result<PathBuf, Status> {
     let output = Command::new(env!("CARGO"))
         .current_dir(root)
         .args([
@@ -168,7 +173,7 @@ fn build_harness(root: &Path) -> Result<PathBuf, Status> {
             "-p",
             "threadline-core",
             "--example",
-            "github_live_read",
+            example,
             "--message-format=json",
         ])
         .env_remove("THREADLINE_LIVE_PAT")
@@ -182,7 +187,7 @@ fn build_harness(root: &Path) -> Result<PathBuf, Status> {
         .filter_map(|line| serde_json::from_str::<Value>(line).ok())
         .find_map(|artifact| {
             (artifact["reason"] == "compiler-artifact"
-                && artifact["target"]["name"] == "github_live_read"
+                && artifact["target"]["name"] == example
                 && artifact["target"]["kind"] == serde_json::json!(["example"]))
             .then(|| artifact["executable"].as_str().map(PathBuf::from))
             .flatten()

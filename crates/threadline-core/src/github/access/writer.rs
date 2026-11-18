@@ -78,6 +78,30 @@ impl GitHubWriter<'_> {
         self.repository.id
     }
 
+    pub fn is_private(&self) -> bool {
+        self.repository.private
+    }
+
+    /// A scoped, first-page check used before a one-time disposable issue verification.
+    pub async fn has_ordinary_comments(
+        &self,
+        issue: &VerifiedIssue,
+        cancel: &CancellationToken,
+    ) -> Result<bool, AccessError> {
+        self.check_issue(issue)?;
+        let path = format!(
+            "issues/{}/comments?per_page=1&page=1",
+            issue.target.number.get()
+        );
+        let (rows, headers): (Vec<serde_json::Value>, _) = self.get(&path, cancel).await?;
+        if partial_sso(&headers).is_some()
+            || (rows.is_empty() && headers.contains_key(header::LINK))
+        {
+            return Err(AccessError::received(AccessKind::MalformedResponse, 200));
+        }
+        Ok(!rows.is_empty())
+    }
+
     pub async fn observe_issue(
         &self,
         target: IssueWriteTarget,

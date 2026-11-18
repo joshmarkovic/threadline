@@ -22,6 +22,12 @@ pub struct VerifiedIssue {
     pub updated_at_ms: i64,
 }
 
+impl VerifiedIssue {
+    pub fn author_id(&self) -> Option<NonZeroU64> {
+        self.author
+    }
+}
+
 #[derive(Default)]
 pub struct IssueWriteValues {
     pub title: Option<String>,
