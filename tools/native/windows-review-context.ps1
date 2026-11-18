@@ -96,8 +96,13 @@ function Invoke-ReviewContextProof([IntPtr]$Window, [string]$Profile) {
     }
     Click-AccountControl $Window 'reader-tab-0-0'
     $null = Wait-ExactFixtureReview $draftId $head
-    Click-AccountControl $Window 'reader-duplicate-tab'
-    $null = Wait-Reader 'the independent duplicate pane' { param($reader) $reader.focused_pane -eq 1 }
+    Wait-For 'the owned Duplicate view beside accessibility action' {
+        Invoke-OwnedFixtureControl $Window 'reader-duplicate-tab' $null 'Duplicate view beside'
+    }
+    $null = Wait-Reader 'the independent duplicate pane for the same pull request' {
+        param($reader)
+        $reader.focused_pane -eq 1 -and $reader.pane_count -eq 2 -and $reader.active_item -eq $firstItem
+    }
     Click-AccountControl $Window 'reader-focus-pane'
     $null = Wait-Reader 'focus the original pane without replacing either view' {
         param($reader) $reader.focused_pane -eq 0 -and $reader.active_item -eq $firstItem
