@@ -324,7 +324,13 @@ impl Store {
         }
         if match original.semantics {
             DiffSemantics::Root => page.effective_base.is_some(),
-            DiffSemantics::Direct => page.effective_base != original.base.as_ref(),
+            DiffSemantics::Direct => {
+                let unavailable = page.effective_base.is_none()
+                    && !page.complete
+                    && page.next_cursor.is_none()
+                    && page.files.is_empty();
+                !unavailable && page.effective_base != original.base.as_ref()
+            }
             DiffSemantics::MergeBase => false,
         } {
             return Err(Error::Conflict(

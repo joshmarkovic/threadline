@@ -152,6 +152,10 @@ const INTEGRATION: &[CargoTest] = &[
         arguments: &["-p", "threadline-storage", "--test", "sync", "it_007"],
     },
     CargoTest {
+        id: "S10-HISTORY-HTTP",
+        arguments: &["-p", "threadline-core", "--test", "github_history"],
+    },
+    CargoTest {
         id: "S05-FEED-HTTP",
         arguments: &[
             "-p",

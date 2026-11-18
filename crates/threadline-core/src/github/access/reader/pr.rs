@@ -2,7 +2,7 @@
 
 mod graph;
 mod source;
-mod wire;
+pub(super) mod wire;
 
 pub use graph::{PrGraphPage, PrInlineComment, PrReview, PrReviewAnchor, PrSide, PrThread};
 pub use source::{PrSource, PrSourceRange, SourceUnavailable};
@@ -236,7 +236,7 @@ impl GitHubReader<'_> {
         Ok(&snapshot.details)
     }
 
-    async fn pr_page<T: DeserializeOwned>(
+    pub(super) async fn pr_page<T: DeserializeOwned>(
         &self,
         suffix: &str,
         page: u32,

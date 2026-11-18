@@ -359,6 +359,7 @@ fn known_case(lane: Lane, case: &str) -> bool {
             | (Lane::Integration, "S02-FIXTURES")
             | (Lane::Integration, "S03-ACCOUNT-PROFILES")
             | (Lane::Integration, "S03-ACCESS-STORAGE")
+            | (Lane::Integration, "S10-HISTORY-HTTP")
             | (
                 Lane::Integration,
                 "S04-READ-TRANSPORT" | "S04-CACHED-STORE" | "S04-READ-SERVICE"

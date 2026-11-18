@@ -1,4 +1,4 @@
-mod convert;
+pub(super) mod convert;
 mod downloads;
 mod flights;
 mod references;

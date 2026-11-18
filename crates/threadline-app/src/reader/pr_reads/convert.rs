@@ -73,7 +73,7 @@ pub(super) fn commit(value: remote::PrCommit) -> PrRecord {
     }
 }
 
-fn file(value: remote::PrFile) -> PrRecord {
+pub(in crate::reader) fn file(value: remote::PrFile) -> PrRecord {
     let patch = match value.patch {
         remote::PatchEvidence::Text(value) => PatchEvidence::Text(value),
         remote::PatchEvidence::Truncated(value) => PatchEvidence::Truncated(value),

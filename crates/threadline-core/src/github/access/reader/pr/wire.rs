@@ -151,7 +151,7 @@ impl Commit {
 }
 
 #[derive(Deserialize)]
-struct File {
+pub(in crate::github::access::reader) struct File {
     filename: String,
     previous_filename: Option<String>,
     status: String,
@@ -161,7 +161,7 @@ struct File {
 }
 
 impl File {
-    fn read(self) -> Result<PrFile, AccessError> {
+    pub(in crate::github::access::reader) fn read(self) -> Result<PrFile, AccessError> {
         let path = checked_path(self.filename)?;
         let previous_path = self.previous_filename.map(checked_path).transpose()?;
         let patch = match self.patch {

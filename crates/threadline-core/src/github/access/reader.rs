@@ -1,5 +1,6 @@
 //! Read-only access to one verified repository. Page cursors never select an origin or target.
 
+pub mod history;
 pub mod pr;
 pub mod refresh;
 mod wire;
