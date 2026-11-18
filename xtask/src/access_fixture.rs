@@ -156,6 +156,7 @@ pub enum TraceCheck {
     OfflineReader,
     ReaderResume,
     SyncJourney,
+    NotificationSchedule,
     PullRequestJourney,
     ReviewContextJourney,
     ReviewDraftJourney,
@@ -205,6 +206,7 @@ impl AccessFixture {
             TraceCheck::OfflineReader => records.is_empty(),
             TraceCheck::ReaderResume => complete_reader_resume(&records),
             TraceCheck::SyncJourney => complete_sync_journey(&records),
+            TraceCheck::NotificationSchedule => complete_notification_schedule(&records),
             TraceCheck::PullRequestJourney => pr::trace(&records),
             TraceCheck::ReviewContextJourney => pr::trace_review_context(&records),
             TraceCheck::ReviewDraftJourney => pr::trace_review_draft(&records),
@@ -249,6 +251,23 @@ fn complete_reader_resume(records: &[RequestEvidence]) -> bool {
                 (Phase::ReaderFailure, Route::CommentsNext, 502),
                 (Phase::ReaderResume, Route::CommentsNext, 200),
             ]
+}
+
+fn complete_notification_schedule(records: &[RequestEvidence]) -> bool {
+    records.iter().all(|entry| {
+        entry.fixture_authorization
+            && entry.route != Route::Unexpected
+            && entry.phase != Phase::SyncOffline
+    }) && [Route::UpdatedItems, Route::UpdatedComments]
+        .into_iter()
+        .all(|route| {
+            records.iter().any(|entry| {
+                entry.phase == Phase::SyncLive && entry.route == route && entry.status == 200
+            })
+        })
+        && records.iter().any(|entry| {
+            entry.phase == Phase::SyncService && entry.route == Route::User && entry.status == 503
+        })
 }
 
 fn complete_sync_journey(records: &[RequestEvidence]) -> bool {

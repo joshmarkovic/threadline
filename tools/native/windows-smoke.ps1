@@ -8,7 +8,7 @@ param(
     [switch]$PlatformProof,
     [switch]$ToastProof,
     [switch]$AccessProof,
-    [ValidateSet('Offline', 'Resume', 'Performance', 'LargeWorkspace', 'Sync', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'History', 'Writes', 'WriteSurface')][string]$ReaderProof,
+    [ValidateSet('Offline', 'Resume', 'Performance', 'LargeWorkspace', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'History', 'Writes', 'WriteSurface')][string]$ReaderProof,
     [switch]$AccessibilityProof,
     [string]$AccessAddress,
     [string]$AccessPhaseFile,
@@ -35,6 +35,8 @@ $reportName = if ($Measure) {
     'large-workspace-native.json'
 } elseif ($ReaderProof -eq 'Sync') {
     'sync-native.json'
+} elseif ($ReaderProof -eq 'NotificationSchedule') {
+    'notification-schedule-native.json'
 } elseif ($ReaderProof -eq 'PullRequest') {
     'pr-native.json'
 } elseif ($ReaderProof -eq 'ReviewDraft') {
@@ -82,7 +84,7 @@ $copiedClipboardSequence = $null
 $toastFixture = $null
 $toastSubmissionAttempted = $false
 $script:UseOwnedUiAutomation = $false
-$script:UseSeededFixtureAuth = $ReaderProof -in @('Resume', 'Sync', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'History', 'Writes', 'WriteSurface')
+$script:UseSeededFixtureAuth = $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'History', 'Writes', 'WriteSurface')
 
 function Get-FileSha256 {
     param([string]$Path)
@@ -221,7 +223,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
         $info.EnvironmentVariables['THREADLINE_E2E_GITHUB_ADDR'] = $script:AccessAddress
     }
     if ($script:UseSeededFixtureAuth) { $info.EnvironmentVariables['THREADLINE_E2E_FIXTURE_AUTH'] = '1' }
-    if ($ReaderProof -in @('Sync', 'ReviewDraft', 'Writes', 'WriteSurface')) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
+    if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'Writes', 'WriteSurface')) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
     return [Diagnostics.Process]::Start($info)
 }
 
@@ -901,14 +903,14 @@ try {
         }
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
-    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'History', 'Writes', 'WriteSurface', 'Performance', 'LargeWorkspace')) {
+    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'History', 'Writes', 'WriteSurface', 'Performance', 'LargeWorkspace')) {
         Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
         . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
         $script:UseOwnedUiAutomation = !$AccessibilityProof
         $report.driver = 'Windows PowerShell / owned UI Automation and guarded Win32 SendInput'
     }
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
-    if ($ReaderProof -in @('Sync', 'ReviewDraft')) { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
+    if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft')) { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
     if ($ReaderProof -in @('PullRequest', 'ReviewDraft', 'ReviewContext')) { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
     if ($ReaderProof -in @('ReviewDraft', 'ReviewContext', 'History', 'Writes', 'WriteSurface')) { . (Join-Path $PSScriptRoot 'windows-issue-writes.ps1') }
     if ($ReaderProof -in @('ReviewDraft', 'ReviewContext')) { . (Join-Path $PSScriptRoot 'windows-review-context.ps1') }
@@ -921,6 +923,7 @@ try {
         $fixturePhase = switch ($ReaderProof) {
             Resume { 'reader-failure' }
             Sync { 'sync-live' }
+            NotificationSchedule { 'sync-live' }
             PullRequest { 'pr-load' }
             ReviewDraft { 'pr-load' }
             ReviewContext { 'pr-load' }
@@ -973,6 +976,7 @@ try {
             Performance { Invoke-ReaderPerformance $window }
             LargeWorkspace { Invoke-LargeWorkspaceProof $window }
             Sync { Invoke-SyncProof $window $firstProfile }
+            NotificationSchedule { Invoke-NotificationScheduleProof $window $firstProfile }
             PullRequest { Invoke-PrReaderProof $window }
             ReviewDraft { Invoke-ReviewDraftProof $window $firstProfile }
             ReviewContext { Invoke-ReviewContextProof $window $firstProfile }

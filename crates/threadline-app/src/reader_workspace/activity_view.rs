@@ -33,6 +33,25 @@ pub(super) struct ActivityState {
     rule_form: Option<RuleForm>,
 }
 
+#[cfg(feature = "e2e")]
+#[derive(serde::Serialize)]
+pub(crate) struct NotificationObservation {
+    preferences: bool,
+    saved: bool,
+    quiet_hours: Option<QuietHours>,
+}
+
+fn notification_tab_anchor(anchor: &str) -> std::borrow::Cow<'_, str> {
+    let provider_comment = anchor
+        .strip_prefix("issue-comment:")
+        .or_else(|| anchor.strip_prefix("comment:"))
+        .and_then(|id| id.parse::<NonZeroU64>().ok());
+    provider_comment.map_or_else(
+        || std::borrow::Cow::Borrowed(anchor),
+        |id| std::borrow::Cow::Owned(format!("{id:020}")),
+    )
+}
+
 #[cfg(all(test, feature = "e2e"))]
 impl ActivityState {
     pub(super) fn scope_is_ready(&self, scope: Option<RepositoryId>) -> bool {
@@ -194,6 +213,19 @@ fn update_override(rules: &mut RepositoryRules, change: Setting) {
 }
 
 impl ReaderWorkspace {
+    #[cfg(feature = "e2e")]
+    pub(super) fn notification_observation(&self) -> NotificationObservation {
+        NotificationObservation {
+            preferences: self.surface == Surface::NotificationSettings,
+            saved: !self.activity.busy && self.activity.settings.is_some(),
+            quiet_hours: self
+                .activity
+                .settings
+                .as_ref()
+                .and_then(|saved| saved.quiet_hours.clone()),
+        }
+    }
+
     pub(super) fn drain_notification_inbox(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(account) = self.account else { return };
         if self.layout_busy
@@ -226,7 +258,9 @@ impl ReaderWorkspace {
         let complete = self.activity.pending_open.as_ref().is_some_and(|(_, destination)| {
             matches!(&destination.target, NotificationTarget::Item { item, thread }
                 if self.active_tab().is_some_and(|tab| tab.item == *item
-                    && thread.as_ref().is_none_or(|anchor| tab.view.scroll_anchor.as_ref() == Some(anchor))))
+                    && thread.as_ref().is_none_or(|anchor| {
+                        tab.view.scroll_anchor.as_deref() == Some(notification_tab_anchor(anchor).as_ref())
+                    })))
         });
         if complete {
             self.complete_notification_open(window, cx);
@@ -1062,6 +1096,7 @@ impl ReaderWorkspace {
                 self.complete_notification_open(window, cx);
             }
             NotificationTarget::Item { item, thread } => {
+                let thread = thread.map(|anchor| notification_tab_anchor(&anchor).into_owned());
                 self.launch(
                     window, cx,
                     move |store| store.item(account, item),

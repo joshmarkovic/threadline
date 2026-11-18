@@ -551,6 +551,11 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
             "windows-reader-resume",
         ),
         ("S05-WINDOWS-SYNC", NativeMode::WindowsSync, "windows-sync"),
+        (
+            "E2E-013",
+            NativeMode::WindowsNotificationSchedule,
+            "windows-notification-schedule",
+        ),
         ("E2E-005", NativeMode::WindowsPullRequest, "windows-pr"),
         (
             "E2E-007",
@@ -758,6 +763,7 @@ enum NativeMode {
     WindowsLargeWorkspace,
     WindowsAccessibility,
     WindowsSync,
+    WindowsNotificationSchedule,
     WindowsPullRequest,
     WindowsHistory,
     WindowsReviewDraft,
@@ -824,6 +830,7 @@ fn native_driver(
         NativeMode::WindowsReaderPerformance => Some("Performance"),
         NativeMode::WindowsLargeWorkspace => Some("LargeWorkspace"),
         NativeMode::WindowsSync => Some("Sync"),
+        NativeMode::WindowsNotificationSchedule => Some("NotificationSchedule"),
         NativeMode::WindowsPullRequest => Some("PullRequest"),
         NativeMode::WindowsHistory => Some("History"),
         NativeMode::WindowsReviewDraft => Some("ReviewDraft"),
@@ -924,6 +931,7 @@ fn native_driver(
         NativeMode::WindowsLargeWorkspace => "large-workspace-native.json",
         NativeMode::WindowsAccessibility => "accessibility-native.json",
         NativeMode::WindowsSync => "sync-native.json",
+        NativeMode::WindowsNotificationSchedule => "notification-schedule-native.json",
         NativeMode::WindowsPullRequest => "pr-native.json",
         NativeMode::WindowsHistory => "history-native.json",
         NativeMode::WindowsReviewDraft => "review-draft-native.json",
@@ -973,6 +981,13 @@ fn native_driver(
             }
             (Status::Pass, NativeMode::WindowsReaderResume) => TraceCheck::ReaderResume,
             (Status::Pass, NativeMode::WindowsSync) => TraceCheck::SyncJourney,
+            (Status::Blocked, NativeMode::WindowsNotificationSchedule)
+                if details
+                    .as_ref()
+                    .is_some_and(|json| json["settings_and_transport_passed"] == true) =>
+            {
+                TraceCheck::NotificationSchedule
+            }
             (Status::Pass, NativeMode::WindowsPullRequest) => TraceCheck::PullRequestJourney,
             (Status::Pass, NativeMode::WindowsHistory) => TraceCheck::HistoryJourney,
             (Status::Pass, NativeMode::WindowsReviewDraft) => TraceCheck::ReviewDraftJourney,

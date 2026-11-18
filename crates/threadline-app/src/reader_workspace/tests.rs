@@ -2085,3 +2085,89 @@ fn ui_007_notification_categories_actor_rules_and_repository_settings_are_indepe
         cached
     );
 }
+
+#[gpui_kit::test]
+fn ui_007_notification_opens_the_exact_downloaded_provider_comment(cx: &mut TestAppContext) {
+    use threadline_storage::{
+        notifications::{Destination, NotificationTarget},
+        reader::{DiscussionComment, DiscussionInputPage},
+        resources::{ResourceFamily, ResourceKey, ResourceTarget, WalkMode},
+    };
+
+    let setup = ReaderHarness::seeded();
+    let account = setup.fixture.account;
+    let repository = setup.fixture.repository;
+    let item = setup.fixture.long_discussion;
+    let comments = ResourceKey {
+        account,
+        target: ResourceTarget::Item(item),
+        family: ResourceFamily::Comments,
+    };
+    let fetch = setup
+        .store
+        .start_resource_fetch(comments, WalkMode::Full)
+        .unwrap();
+    setup
+        .store
+        .commit_discussion_page(
+            account,
+            item,
+            &fetch,
+            DiscussionInputPage {
+                comments: (1..=30)
+                    .map(|id| DiscussionComment {
+                        provider_id: id,
+                        node_id: None,
+                        author: None,
+                        created_at_ms: id as i64,
+                        updated_at_ms: id as i64,
+                        body: format!("Fixture conversation {id}"),
+                    })
+                    .collect(),
+                next_cursor: None,
+                completed_validators: None,
+                fetched_at_ms: 1_900_000_000_001,
+            },
+        )
+        .unwrap();
+    let (window, reader) = setup.open(cx);
+    let key = format!("{:020}", 29);
+    for route in ["issue-comment:29", "comment:29"] {
+        cx.update_window(window, |_, window, cx| {
+            reader.update(cx, |reader, cx| {
+                reader.open_notification_destination(
+                    account,
+                    Destination {
+                        repository: Some(repository),
+                        target: NotificationTarget::Item {
+                            item,
+                            thread: Some(route.into()),
+                        },
+                    },
+                    window,
+                    cx,
+                )
+            });
+        })
+        .unwrap();
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let reader = reader.read(cx);
+                !reader.layout_busy
+                    && reader.active_tab().is_some_and(|tab| {
+                        tab.item == item
+                            && tab.view.scroll_anchor.as_deref() == Some(&key)
+                            && reader.tab_views.get(&tab.id).is_some_and(|view| {
+                                !view.data.anchor_missing
+                                    && view
+                                        .data
+                                        .discussion
+                                        .records
+                                        .first()
+                                        .is_some_and(|record| record.key == key)
+                            })
+                    })
+            })
+        });
+    }
+}

@@ -25,6 +25,9 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if matches!(case, "E2E-012" | "E2E-018") {
         return Some("threadline-s11-installed-fixture-v1");
     }
+    if case == "E2E-013" {
+        return Some("s11-native-notification-schedule-v1");
+    }
     if matches!(case, "UT-014" | "UT-015" | "IT-018") {
         return Some("s11-activity-rules-v1");
     }
