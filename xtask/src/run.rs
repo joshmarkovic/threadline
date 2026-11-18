@@ -8,7 +8,7 @@ use std::{
 use serde_json::{Value, json};
 
 use crate::{
-    cli::{Lane, Options, catalog_cases},
+    cli::{Lane, Options, catalog_cases, public_path},
     report::{CaseResult, Status, sha256},
 };
 
@@ -160,8 +160,9 @@ fn run_cargo_test(test: &CargoTest, seed: u64, root: &Path, dir: &Path) -> CaseR
     let mut case = cargo_test_result(test.id, &output.status, &output.stdout);
     match save_output(dir, test.id, &output) {
         Ok(path) => case.evidence = Some(path),
-        Err(error) => return CaseResult::new(test.id, Status::Fail, error.to_string()),
+        Err(error) => case = CaseResult::new(test.id, Status::Fail, error.to_string()),
     }
+    case.child_exit_code = output.status.code();
 
     case
 }
@@ -228,17 +229,15 @@ fn run_native(
     root: &Path,
     dir: &Path,
 ) -> CaseResult {
-    match native_driver(mode, options, root, dir) {
-        Ok(mut result) => {
-            result.case = id.into();
-            result
-        }
+    match native_driver(id, mode, options, root, dir) {
+        Ok(result) => result,
         Err(NativeError::Blocked(detail)) => CaseResult::new(id, Status::Blocked, detail),
         Err(NativeError::Failed(detail)) => CaseResult::new(id, Status::Fail, detail),
     }
 }
 
 fn native_driver(
+    id: &str,
     mode: NativeMode,
     options: &Options,
     root: &Path,
@@ -356,7 +355,8 @@ fn native_driver(
         "{} See {log}.",
         native_message.unwrap_or("The driver did not return a valid completion report.")
     );
-    let mut result = CaseResult::new("native", status, detail);
+    let mut result = CaseResult::new(id, status, detail);
+    result.child_exit_code = output.status.code();
     result.evidence = Some(if details.is_some() {
         driver_report.into()
     } else {
@@ -400,12 +400,20 @@ fn executable(options: &Options, root: &Path, dir: &Path) -> Result<PathBuf, Nat
     };
 
     check_executable(&binary)
-        .map_err(|detail| NativeError::Blocked(format!("{}: {detail}", binary.display())))?;
+        .map_err(|detail| NativeError::Blocked(format!("Native executable: {detail}")))?;
     let digest = sha256(&binary).map_err(|error| NativeError::Failed(error.to_string()))?;
+    let receipt_path = options
+        .binary
+        .as_deref()
+        .or_else(|| binary.strip_prefix(root).ok());
+    let receipt_path = public_path(
+        receipt_path.and_then(Path::to_str).unwrap_or_default(),
+        "<binary-path>",
+    );
     let identity = json!({
         "sha256": digest,
         "size_bytes": binary.metadata().ok().map(|m| m.len()),
-        "binary": binary,
+        "binary": receipt_path,
         "build": if options.binary.is_some() { "external override" } else { "release with e2e feature" },
         "evidence_class": "test-build native process",
     });
@@ -464,16 +472,13 @@ fn check_executable(path: &Path) -> Result<(), String> {
 }
 
 fn run_install(options: &Options, dir: &Path) -> Vec<CaseResult> {
+    let case = options.case.as_deref().unwrap_or("artifact");
     let Some(artifact) = &options.artifact else {
-        return vec![CaseResult::new(
-            "artifact",
-            Status::Fail,
-            "Specify --artifact.",
-        )];
+        return vec![CaseResult::new(case, Status::Fail, "Specify --artifact.")];
     };
     if !artifact.is_file() {
         return vec![CaseResult::new(
-            "artifact",
+            case,
             Status::Blocked,
             "Candidate package is missing.",
         )];
@@ -490,7 +495,7 @@ fn run_install(options: &Options, dir: &Path) -> Vec<CaseResult> {
         )
     });
     if let Err(error) = identity {
-        return vec![CaseResult::new("artifact", Status::Fail, error.to_string())];
+        return vec![CaseResult::new(case, Status::Fail, error.to_string())];
     }
     match options.case.as_deref() {
         Some(id) => vec![blocked_install_case(id)],
@@ -593,6 +598,20 @@ mod tests {
         assert_eq!(outcomes[0].case, "UT-001");
         assert_eq!(outcomes[0].status, Status::Blocked);
         assert!(outcomes[0].evidence.is_none());
+    }
+
+    #[test]
+    fn missing_install_artifact_preserves_the_requested_scenario() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut args = ["test", "install", "--case", "PKG-001", "--artifact"]
+            .map(str::to_owned)
+            .to_vec();
+        args.push(dir.path().join("missing").to_string_lossy().into_owned());
+        let options = crate::cli::parse(&args).unwrap();
+        let outcomes = execute(&options, dir.path(), dir.path());
+        assert_eq!(outcomes.len(), 1);
+        assert_eq!(outcomes[0].case, "PKG-001");
+        assert_eq!(outcomes[0].status, Status::Blocked);
     }
 
     #[test]

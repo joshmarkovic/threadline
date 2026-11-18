@@ -1,31 +1,37 @@
+mod catalog;
 mod cli;
 mod report;
 mod run;
 
 use std::{
     env,
+    io::{self, Write as _},
     path::{Path, PathBuf},
     process::ExitCode,
 };
 
-use crate::report::{CaseResult, Report, Status, allocate_report_dir};
+use crate::report::{
+    CaseResult, Invocation, Report, Status, allocate_report_dir, unix_timestamp_ms,
+};
 
 fn main() -> ExitCode {
     match run() {
-        Ok(Status::Pass) => ExitCode::SUCCESS,
-        Ok(Status::Fail) => ExitCode::FAILURE,
-        Ok(Status::Blocked) => ExitCode::from(78),
+        Ok(status) => ExitCode::from(status.exit_code()),
         Err(error) => {
-            eprintln!("Could not write the test report. {error}");
+            let _ = writeln!(io::stderr(), "Could not write the test report. {error}");
             ExitCode::FAILURE
         }
     }
 }
 
 fn run() -> std::io::Result<Status> {
-    let args: Vec<String> = env::args().skip(1).collect();
+    let started_at = unix_timestamp_ms();
+    let args: Vec<String> = env::args_os()
+        .skip(1)
+        .map(|arg| arg.into_string().unwrap_or_else(|_| "\0".into()))
+        .collect();
     if args == ["--help"] {
-        println!("{}", cli::USAGE);
+        let _ = writeln!(io::stdout(), "{}", cli::USAGE);
         return Ok(Status::Pass);
     }
 
@@ -41,13 +47,14 @@ fn run() -> std::io::Result<Status> {
         source_root
     };
     let default_dir = || root.join("artifacts").join("xtask");
+    let invocation = Invocation::new(&args, started_at);
     let options = match cli::parse(&args) {
         Ok(options) => options,
         Err(error) => {
-            eprintln!("{error}\n\n{}", cli::USAGE);
+            let _ = writeln!(io::stderr(), "{error}\n\n{}", cli::USAGE);
             let base: PathBuf = cli::report_dir_for_error(&args).unwrap_or_else(default_dir);
             let dir = allocate_report_dir(&base, "invalid-request")?;
-            let mut report = Report::new("invalid-request", None, None, root);
+            let mut report = Report::new("invalid-request", None, None, root, invocation);
             report
                 .cases
                 .push(CaseResult::new("request", Status::Fail, error));
@@ -58,7 +65,13 @@ fn run() -> std::io::Result<Status> {
     let lane = options.lane.as_str();
     let base = options.report_dir.clone().unwrap_or_else(default_dir);
     let dir = allocate_report_dir(&base, lane)?;
-    let mut report = Report::new(lane, options.suite.clone(), Some(options.seed), root);
+    let mut report = Report::new(
+        lane,
+        options.suite.clone(),
+        Some(options.seed),
+        root,
+        invocation,
+    );
     report.cases = run::execute(&options, root, &dir);
     report.finish(&dir)
 }

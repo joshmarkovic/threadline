@@ -1,7 +1,5 @@
 use std::path::PathBuf;
 
-const SCENARIOS: &str = include_str!("../../docs/spec/test_scenarios.csv");
-
 pub const USAGE: &str =
     "cargo xtask test <unit|integration|ui> [--case ID] [--seed N] [--report-dir DIR]
 cargo xtask test e2e --suite <smoke|full> [--binary PATH] [--case ID] [--seed N] [--report-dir DIR]
@@ -50,7 +48,7 @@ pub struct Options {
 pub fn report_dir_for_error(args: &[String]) -> Option<PathBuf> {
     let mut matches = args
         .windows(2)
-        .filter(|pair| pair[0] == "--report-dir" && !pair[1].starts_with("--"))
+        .filter(|pair| pair[0] == "--report-dir" && is_option_value(&pair[1]))
         .map(|pair| PathBuf::from(&pair[1]));
     let value = matches.next();
     if matches.next().is_some() {
@@ -61,19 +59,10 @@ pub fn report_dir_for_error(args: &[String]) -> Option<PathBuf> {
 }
 
 pub fn parse(args: &[String]) -> Result<Options, String> {
-    let lane = match args {
-        [verb, target, ..] if verb == "measure" && target == "windows" => Lane::Measure,
-        [verb, lane, ..] if verb == "test" => match lane.as_str() {
-            "unit" => Lane::Unit,
-            "integration" => Lane::Integration,
-            "ui" => Lane::Ui,
-            "e2e" => Lane::E2e,
-            "install" => Lane::Install,
-            "live" => Lane::Live,
-            _ => return Err(format!("Unknown test lane {lane}")),
-        },
-        _ => return Err("Expected a test lane or the Windows measurement command".into()),
-    };
+    if args.iter().any(|arg| arg.contains('\0')) {
+        return Err("Arguments must be valid Unicode.".into());
+    }
+    let lane = command_lane(args)?;
 
     let mut options = Options {
         lane,
@@ -89,22 +78,22 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
     let mut seen = std::collections::HashSet::new();
     let mut remaining = args[2..].iter();
     while let Some(flag) = remaining.next() {
+        if !is_value_option(flag) && flag != "--allow-live-writes" {
+            return Err("Unknown runner option.".into());
+        }
         if !seen.insert(flag.as_str()) {
             return Err(format!("Duplicate option {flag}"));
         }
-        if flag == "--allow-live-writes" && lane == Lane::Live {
+        if flag == "--allow-live-writes" {
+            if lane != Lane::Live {
+                return Err("--allow-live-writes is available only for live tests.".into());
+            }
             options.allow_live_writes = true;
             continue;
         }
-        if !matches!(
-            flag.as_str(),
-            "--case" | "--seed" | "--report-dir" | "--binary" | "--artifact" | "--repo" | "--suite"
-        ) {
-            return Err(format!("Unknown option {flag}"));
-        }
         let value = remaining
             .next()
-            .filter(|value| !value.is_empty() && !value.starts_with("--"))
+            .filter(|value| is_option_value(value))
             .ok_or_else(|| format!("Expected a value for {flag}"))?;
         match flag.as_str() {
             "--case" if lane != Lane::Measure => options.case = Some(value.clone()),
@@ -141,9 +130,116 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
     if let Some(case) = options.case.as_deref()
         && !known_case(lane, case)
     {
-        return Err(format!("Unknown {} case {case}", lane.as_str()));
+        return Err(format!("Unknown {} case.", lane.as_str()));
     }
     Ok(options)
+}
+
+pub fn report_arguments(args: &[String]) -> Vec<String> {
+    const OMITTED: &str = "<redacted-argument>";
+    let lane = command_lane(args).ok();
+    let mut public = Vec::with_capacity(args.len());
+    if let Some(verb) = args.first() {
+        public.push(if matches!(verb.as_str(), "test" | "measure") {
+            verb.as_str()
+        } else {
+            OMITTED
+        });
+    }
+    if let Some(target) = args.get(1) {
+        public.push(if lane.is_some() {
+            target.as_str()
+        } else {
+            OMITTED
+        });
+    }
+    let mut remaining = args.iter().skip(2).peekable();
+    while let Some(option) = remaining.next() {
+        if option == "--allow-live-writes" {
+            public.push(option);
+        } else if is_value_option(option) {
+            public.push(option);
+            if remaining
+                .peek()
+                .is_some_and(|value| !value.starts_with("--"))
+            {
+                let value = remaining.next().expect("value was peeked");
+                public.push(match option.as_str() {
+                    "--case" if lane.is_some_and(|lane| known_case(lane, value)) => value,
+                    "--seed" if value.parse::<u64>().is_ok() => value,
+                    "--suite"
+                        if lane == Some(Lane::E2e)
+                            && matches!(value.as_str(), "smoke" | "full") =>
+                    {
+                        value
+                    }
+                    "--binary" if matches!(lane, Some(Lane::E2e | Lane::Measure)) => {
+                        public_path(value, "<binary-path>")
+                    }
+                    "--artifact" if matches!(lane, Some(Lane::Install | Lane::Measure)) => {
+                        public_path(value, "<artifact-path>")
+                    }
+                    "--report-dir" => public_path(value, "<report-dir>"),
+                    "--repo" if lane == Some(Lane::Live) && value == "OWNER/REPO" => value,
+                    "--repo" => "<repository>",
+                    _ => OMITTED,
+                });
+            }
+        } else {
+            public.push(OMITTED);
+        }
+    }
+    public.into_iter().map(str::to_owned).collect()
+}
+
+fn command_lane(args: &[String]) -> Result<Lane, &'static str> {
+    match args {
+        [verb, target, ..] if verb == "measure" && target == "windows" => Ok(Lane::Measure),
+        [verb, lane, ..] if verb == "test" => match lane.as_str() {
+            "unit" => Ok(Lane::Unit),
+            "integration" => Ok(Lane::Integration),
+            "ui" => Ok(Lane::Ui),
+            "e2e" => Ok(Lane::E2e),
+            "install" => Ok(Lane::Install),
+            "live" => Ok(Lane::Live),
+            _ => Err("Unknown test lane."),
+        },
+        _ => Err("Expected a test lane or the Windows measurement command"),
+    }
+}
+
+pub fn public_path<'a>(value: &'a str, placeholder: &'static str) -> &'a str {
+    let slash_path = value.replace('\\', "/");
+    let relative = slash_path.strip_prefix("./").unwrap_or(&slash_path);
+    // A standard directory can still contain caller-chosen private labels.
+    if matches!(
+        relative.trim_end_matches('/'),
+        "artifacts/verification"
+            | "artifacts/xtask"
+            | "docs/architecture/windows-budgets.json"
+            | "windows-budgets.json"
+            | "threadline"
+            | "threadline.exe"
+            | "target/debug/threadline"
+            | "target/debug/threadline.exe"
+            | "target/release/threadline"
+            | "target/release/threadline.exe"
+    ) {
+        value
+    } else {
+        placeholder
+    }
+}
+
+fn is_value_option(option: &str) -> bool {
+    matches!(
+        option,
+        "--case" | "--seed" | "--report-dir" | "--binary" | "--artifact" | "--repo" | "--suite"
+    )
+}
+
+fn is_option_value(value: &str) -> bool {
+    !value.is_empty() && !value.starts_with("--") && !value.contains('\0')
 }
 
 fn valid_repo(value: &str) -> bool {
@@ -170,11 +266,7 @@ pub fn catalog_cases(lane: Lane) -> impl Iterator<Item = &'static str> {
         Lane::Live => "LIVE-",
         Lane::Measure => "",
     };
-    SCENARIOS
-        .lines()
-        .skip(1)
-        .filter_map(|row| row.split_once(',').map(|(id, _)| id))
-        .filter(move |id| id.starts_with(prefix))
+    crate::catalog::scenario_ids().filter(move |id| id.starts_with(prefix))
 }
 
 fn known_case(lane: Lane, case: &str) -> bool {
@@ -214,6 +306,96 @@ mod tests {
         assert_eq!(options.case.as_deref(), Some("UT-021"));
         assert_eq!(options.seed, 27);
         assert_eq!(options.report_dir, Some("output".into()));
+    }
+
+    #[test]
+    fn keeps_safe_paths_values_and_option_order_in_the_receipt() {
+        let args = arguments(&[
+            "test",
+            "install",
+            "--report-dir",
+            "artifacts/verification",
+            "--case",
+            "PKG-001",
+            "--artifact",
+            "docs/architecture/windows-budgets.json",
+            "--seed",
+            "00027",
+        ]);
+        assert!(parse(&args).is_ok());
+        assert_eq!(report_arguments(&args), args);
+        let args = arguments(&[
+            "test",
+            "e2e",
+            "--binary",
+            "target\\release\\threadline.exe",
+            "--suite",
+            "full",
+        ]);
+        assert!(parse(&args).is_ok());
+        assert_eq!(report_arguments(&args), args);
+    }
+
+    #[test]
+    fn protects_private_inputs_and_rejected_arguments() {
+        let args = arguments(&[
+            "test",
+            "live",
+            "--repo",
+            "example/internal-repo",
+            "--report-dir",
+            "/home/user/internal",
+        ]);
+        assert!(parse(&args).is_ok());
+        assert_eq!(
+            report_arguments(&args),
+            [
+                "test",
+                "live",
+                "--repo",
+                "<repository>",
+                "--report-dir",
+                "<report-dir>"
+            ]
+        );
+
+        let args = arguments(&[
+            "test",
+            "unit",
+            "--case",
+            "secret-unknown-id",
+            "--seed",
+            "17",
+            "--ghp_example",
+            "another-secret",
+        ]);
+        let error = parse(&args).unwrap_err();
+        assert_eq!(error, "Unknown runner option.");
+        assert_eq!(
+            report_arguments(&args),
+            [
+                "test",
+                "unit",
+                "--case",
+                "<redacted-argument>",
+                "--seed",
+                "17",
+                "<redacted-argument>",
+                "<redacted-argument>",
+            ]
+        );
+        assert_eq!(
+            public_path("artifacts/probe/github_pat_fixture.json", "<artifact-path>"),
+            "<artifact-path>"
+        );
+        assert_eq!(
+            public_path("docs/alice-client", "<artifact-path>"),
+            "<artifact-path>"
+        );
+        assert_eq!(
+            public_path("reports/acme-confidential", "<report-dir>"),
+            "<report-dir>"
+        );
     }
 
     #[test]

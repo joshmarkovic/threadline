@@ -2,6 +2,8 @@
 
 Run the commands from the repository root. The runner writes a unique result directory under `artifacts/xtask` unless you pass `--report-dir`. Each result includes `result.json`, `junit.xml`, the selected cases, and any available build and driver logs. A blocked case returns exit code 78. A failed test or invalid command returns 1.
 
+`result.json` records the runner arguments in `command.argv`, in their original order. It keeps named workspace-relative fixture, binary, and report paths. Other paths, repository names, and unrecognized arguments use placeholders. `command.redacted` identifies a receipt with substitutions. The run timestamps are milliseconds since the Unix epoch. `exit_code` is the runner's exit code, and `child_exit_code` records a test process exit code where available. `package_version_source` identifies the app manifest from either the reported checkout or the runner build used to fill `package_version`. The digest in `binary.json` identifies a supplied executable. Case requirement and acceptance IDs identify related criteria, including criteria with later release gates.
+
 | Command | Sprint 01 evidence |
 | --- | --- |
 | `cargo xtask test unit` | Runner checks, portable domain and clock checks, and diff fixture checks |

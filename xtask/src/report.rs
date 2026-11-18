@@ -1,7 +1,7 @@
 use std::{
     fmt::Write as _,
     fs::{self, File},
-    io::{self, Read},
+    io::{self, Read, Write as _},
     path::{Path, PathBuf},
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
@@ -10,11 +10,23 @@ use std::{
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+use crate::catalog::{Associations, associations};
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum Status {
     Pass,
     Fail,
     Blocked,
+}
+
+impl Status {
+    pub const fn exit_code(self) -> u8 {
+        match self {
+            Self::Pass => 0,
+            Self::Fail => 1,
+            Self::Blocked => 78,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -24,6 +36,9 @@ pub struct CaseResult {
     pub detail: String,
     pub tests_passed: Option<usize>,
     pub evidence: Option<String>,
+    #[serde(flatten)]
+    associations: Associations,
+    pub child_exit_code: Option<i32>,
 }
 
 impl CaseResult {
@@ -34,6 +49,29 @@ impl CaseResult {
             detail: detail.into(),
             tests_passed: None,
             evidence: None,
+            associations: associations(case),
+            child_exit_code: None,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct Invocation {
+    pub program: &'static str,
+    pub argv: Vec<String>,
+    pub redacted: bool,
+    #[serde(skip)]
+    started_at_unix_ms: u128,
+}
+
+impl Invocation {
+    pub fn new(args: &[String], started_at_unix_ms: u128) -> Self {
+        let argv = crate::cli::report_arguments(args);
+        Self {
+            program: "xtask",
+            redacted: argv != args,
+            argv,
+            started_at_unix_ms,
         }
     }
 }
@@ -89,16 +127,28 @@ pub struct Report {
     pub source_revision: Option<String>,
     pub source_dirty: Option<bool>,
     pub cargo_lock_sha256: Option<String>,
-    pub package_version: &'static str,
+    pub package_version: String,
+    pub package_version_source: &'static str,
     pub fixture_revision: &'static str,
     pub status: Status,
     pub cases: Vec<CaseResult>,
+    pub command: Invocation,
+    pub started_at_unix_ms: u128,
+    pub finished_at_unix_ms: Option<u128>,
+    pub exit_code: u8,
 }
 
 impl Report {
-    pub fn new(lane: &str, suite: Option<String>, seed: Option<u64>, root: &Path) -> Self {
+    pub fn new(
+        lane: &str,
+        suite: Option<String>,
+        seed: Option<u64>,
+        root: &Path,
+        command: Invocation,
+    ) -> Self {
         let source_revision = git_text(root, &["rev-parse", "HEAD"]);
         let source_dirty = git_text(root, &["status", "--porcelain"]).map(|s| !s.is_empty());
+        let (package_version, package_version_source) = app_version(root);
         Self {
             schema: 1,
             lane: lane.into(),
@@ -108,23 +158,32 @@ impl Report {
             source_revision,
             source_dirty,
             cargo_lock_sha256: sha256(&root.join("Cargo.lock")).ok(),
-            package_version: env!("CARGO_PKG_VERSION"),
+            package_version,
+            package_version_source,
             fixture_revision: "Sprint 01 synthetic feasibility fixture",
             status: Status::Fail,
             cases: Vec::new(),
+            started_at_unix_ms: command.started_at_unix_ms,
+            finished_at_unix_ms: None,
+            exit_code: Status::Fail.exit_code(),
+            command,
         }
     }
 
     pub fn finish(mut self, dir: &Path) -> io::Result<Status> {
         self.status = combined_status(&self.cases);
+        self.exit_code = self.status.exit_code();
+        self.finished_at_unix_ms = Some(unix_timestamp_ms());
         let report_path = dir.join("result.json");
         let document = serde_json::to_vec_pretty(&self)?;
-        fs::write(&report_path, document)?;
         fs::write(dir.join("junit.xml"), self.junit())?;
+        fs::write(&report_path, document)?;
+        let mut output = io::stdout().lock();
         for case in &self.cases {
-            println!("{}: {:?} — {}", case.case, case.status, case.detail);
+            let _ = writeln!(output, "{}: {:?} — {}", case.case, case.status, case.detail);
         }
-        println!(
+        let _ = writeln!(
+            output,
             "{}: {:?} ({} cases). Results: {}",
             self.lane,
             self.status,
@@ -169,6 +228,44 @@ impl Report {
     }
 }
 
+fn app_version(root: &Path) -> (String, &'static str) {
+    const APP_MANIFEST: &str = include_str!("../../crates/threadline-app/Cargo.toml");
+    const WORKSPACE_MANIFEST: &str = include_str!("../../Cargo.toml");
+    let workspace = fs::read_to_string(root.join("Cargo.toml")).ok();
+    let checkout_version = fs::read_to_string(root.join("crates/threadline-app/Cargo.toml"))
+        .ok()
+        .and_then(|app| declared_app_version(&app, workspace.as_deref()));
+    if let Some(version) = checkout_version {
+        (version, "checkout-app-manifest")
+    } else {
+        let version = declared_app_version(APP_MANIFEST, Some(WORKSPACE_MANIFEST))
+            .expect("runner build has a versioned application manifest");
+        (version, "runner-build-app-manifest")
+    }
+}
+
+fn declared_app_version(app: &str, workspace: Option<&str>) -> Option<String> {
+    let app: toml::Table = toml::from_str(app).ok()?;
+    let package = app.get("package")?;
+    if package.get("name")?.as_str()? != "threadline-app" {
+        return None;
+    }
+    let version = package.get("version")?;
+    if let Some(version) = version.as_str() {
+        return Some(version.into());
+    }
+    if version.get("workspace")?.as_bool()? {
+        let workspace: toml::Table = toml::from_str(workspace?).ok()?;
+        return workspace
+            .get("workspace")?
+            .get("package")?
+            .get("version")?
+            .as_str()
+            .map(str::to_owned);
+    }
+    None
+}
+
 fn xml_escape(text: &str) -> String {
     let mut escaped = String::with_capacity(text.len());
     for character in text.chars() {
@@ -193,13 +290,17 @@ fn xml_escape(text: &str) -> String {
 pub fn allocate_report_dir(parent: &Path, lane: &str) -> io::Result<PathBuf> {
     fs::create_dir_all(parent)?;
     let parent = std::path::absolute(parent)?;
-    let millis = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
+    let millis = unix_timestamp_ms();
     let dir = parent.join(format!("{lane}-{millis}-{}", std::process::id()));
     fs::create_dir(&dir)?;
     Ok(dir)
+}
+
+pub fn unix_timestamp_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
 }
 
 pub fn sha256(path: &Path) -> io::Result<String> {
@@ -268,7 +369,8 @@ mod tests {
     #[test]
     fn report_records_seed_host_and_result_in_machine_readable_form() {
         let dir = tempfile::tempdir().unwrap();
-        let mut report = Report::new("unit", None, Some(941), dir.path());
+        let invocation = Invocation::new(&["test".into(), "unit".into()], unix_timestamp_ms());
+        let mut report = Report::new("unit", None, Some(941), dir.path(), invocation);
         report.cases.push(CaseResult::new(
             "UT-021",
             Status::Blocked,
@@ -281,12 +383,101 @@ mod tests {
         assert_eq!(json["host"]["os"], std::env::consts::OS);
         assert_eq!(json["host"]["architecture"], std::env::consts::ARCH);
         assert_eq!(json["status"], "Blocked");
+        assert_eq!(json["exit_code"], 78);
         assert_eq!(json["cases"][0]["status"], "Blocked");
+        assert_eq!(
+            json["cases"][0]["requirement_ids"],
+            serde_json::json!(["TEST-01", "TEST-02", "TEST-08"])
+        );
+        assert_eq!(
+            json["cases"][0]["acceptance_ids"],
+            serde_json::json!(["AC-89"])
+        );
 
         let junit = fs::read_to_string(dir.path().join("junit.xml")).unwrap();
         assert!(junit.contains("tests=\"1\" failures=\"0\" skipped=\"1\""));
         assert!(junit.contains(
             "<skipped message=\"Blocked: deliberate &lt;test&gt; condition &amp; quote &quot;\" />"
         ));
+    }
+
+    #[test]
+    fn writes_timestamps_and_matching_exit_codes_for_all_outcomes() {
+        for (status, exit, junit) in [
+            (Status::Pass, 0, "failures=\"0\" skipped=\"0\""),
+            (Status::Fail, 1, "failures=\"1\" skipped=\"0\""),
+            (Status::Blocked, 78, "failures=\"0\" skipped=\"1\""),
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let invocation = Invocation::new(
+                &[
+                    "test".into(),
+                    "unit".into(),
+                    "--case".into(),
+                    "UT-021".into(),
+                ],
+                123,
+            );
+            let mut report = Report::new("unit", None, Some(12345), dir.path(), invocation);
+            report
+                .cases
+                .push(CaseResult::new("UT-021", status, "test result"));
+            assert_eq!(report.finish(dir.path()).unwrap().exit_code(), exit);
+            let body = fs::read(dir.path().join("result.json")).unwrap();
+            let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(json["exit_code"], exit);
+            assert_eq!(json["started_at_unix_ms"], 123);
+            assert!(json["finished_at_unix_ms"].as_u64().unwrap() >= 123);
+            assert_eq!(json["command"]["program"], "xtask");
+            assert_eq!(
+                json["command"]["argv"],
+                serde_json::json!(["test", "unit", "--case", "UT-021"])
+            );
+            assert_eq!(json["command"]["redacted"], false);
+            assert!(
+                fs::read_to_string(dir.path().join("junit.xml"))
+                    .unwrap()
+                    .contains(junit)
+            );
+        }
+    }
+
+    #[test]
+    fn reads_the_app_package_version_even_when_it_differs_from_the_workspace() {
+        let dir = tempfile::tempdir().unwrap();
+        let app_dir = dir.path().join("crates/threadline-app");
+        fs::create_dir_all(&app_dir).unwrap();
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            "[workspace.package]\nversion = '1.2.3'\n",
+        )
+        .unwrap();
+        let app = app_dir.join("Cargo.toml");
+        fs::write(
+            &app,
+            "[package]\nname = 'threadline-app'\nversion = '7.8.9' # app version\n",
+        )
+        .unwrap();
+        assert_eq!(
+            app_version(dir.path()),
+            ("7.8.9".into(), "checkout-app-manifest")
+        );
+        fs::write(
+            &app,
+            "[package]\nname = 'threadline-app'\nversion.workspace = true\n",
+        )
+        .unwrap();
+        assert_eq!(
+            app_version(dir.path()),
+            ("1.2.3".into(), "checkout-app-manifest")
+        );
+    }
+
+    #[test]
+    fn stages_without_an_app_manifest_use_a_labeled_build_fallback() {
+        let staged = tempfile::tempdir().unwrap();
+        let (version, source) = app_version(staged.path());
+        assert!(!version.is_empty());
+        assert_eq!(source, "runner-build-app-manifest");
     }
 }
