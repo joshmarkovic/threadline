@@ -1,0 +1,7 @@
+{
+  "binary": "threadline-fefdeb5470918084",
+  "build": "external override",
+  "evidence_class": "test-build native process",
+  "sha256": "4a9c32d726cd6c1cae13ed1bec3c7f5fad5bcbd890aa7a6ed6a64ae358bd8dac",
+  "size_bytes": 174658160
+}

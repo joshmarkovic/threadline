@@ -1,0 +1,298 @@
+{
+  "schema": 1,
+  "status": "Fail",
+  "detail": "One or more Windows performance budgets were exceeded.",
+  "driver": "Windows PowerShell / Win32 SendInput",
+  "shell_version": "5.1.22621.7649",
+  "seed": 12345,
+  "os_version": "10.0.22631",
+  "session_id": 2,
+  "architecture": "AMD64",
+  "app_pid": 40004,
+  "restarted_pid": null,
+  "native_window": 4852178,
+  "dpi": 96,
+  "binary_sha256": "657ffefe2b6a6215ecfb7bbfc999d8082b027da58da0b9c96b89de09041adb2b",
+  "executable_bytes": 26833408,
+  "actions": [
+    {
+      "action": "Attempt focus through a verified native pointer target",
+      "observed": {
+        "injected": true
+      }
+    }
+  ],
+  "windows_product": "Microsoft Windows 11 Enterprise",
+  "machine": {
+    "manufacturer": "Microsoft Corporation",
+    "model": "Virtual Machine",
+    "ram_bytes": 34358562816,
+    "processors": [
+      {
+        "Name": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+        "NumberOfCores": 4,
+        "NumberOfLogicalProcessors": 8
+      }
+    ],
+    "graphics": [
+      {
+        "Name": "Microsoft Hyper-V Video",
+        "DriverVersion": "10.0.22621.1"
+      },
+      {
+        "Name": "Microsoft Remote Display Adapter",
+        "DriverVersion": "10.0.22621.7649"
+      }
+    ],
+    "storage": [
+      {
+        "Model": "Microsoft Virtual Disk",
+        "InterfaceType": "SCSI",
+        "MediaType": "Fixed hard disk media"
+      }
+    ],
+    "display": {
+      "width": 2544,
+      "height": 1324
+    }
+  },
+  "loaded_modules": [
+    "advapi32.dll",
+    "ApplicationTargetedFeatureDatabase.dll",
+    "bcrypt.dll",
+    "bcryptprimitives.dll",
+    "clbcatq.dll",
+    "combase.dll",
+    "comctl32.dll",
+    "CRYPTBASE.dll",
+    "CRYPTSP.dll",
+    "d3d10warp.dll",
+    "d3d11.dll",
+    "d3dcompiler_47.dll",
+    "dataexchange.dll",
+    "dcomp.dll",
+    "directmanipulation.dll",
+    "directxdatabasehelper.dll",
+    "dwmapi.dll",
+    "dwrite.dll",
+    "dxcore.dll",
+    "dxgi.dll",
+    "GDI32.dll",
+    "gdi32full.dll",
+    "gdiplus.dll",
+    "icu.DLL",
+    "icuuc.dll",
+    "imm32.dll",
+    "kernel.appcore.dll",
+    "KERNEL32.DLL",
+    "KERNELBASE.dll",
+    "MSCTF.dll",
+    "msvcp_win.dll",
+    "msvcrt.dll",
+    "ntdll.dll",
+    "ole32.dll",
+    "Oleacc.dll",
+    "oleaut32.dll",
+    "powrprof.dll",
+    "profapi.dll",
+    "RPCRT4.dll",
+    "RpcRtRemote.dll",
+    "rsaenh.dll",
+    "sechost.dll",
+    "shcore.dll",
+    "shell32.dll",
+    "SHLWAPI.dll",
+    "sxs.dll",
+    "textinputframework.dll",
+    "TextShaping.dll",
+    "threadline-virtualized.exe",
+    "twinapi.appcore.dll",
+    "ucrtbase.dll",
+    "uiautomationcore.dll",
+    "UMPDC.dll",
+    "user32.dll",
+    "userenv.dll",
+    "uxtheme.dll",
+    "VCRUNTIME140.dll",
+    "win32u.dll",
+    "windows.storage.dll",
+    "Windows.UI.dll",
+    "Windows.UI.Immersive.dll",
+    "WindowsCodecs.dll",
+    "winmm.dll",
+    "wintypes.dll"
+  ],
+  "measurements": {
+    "idle_working_set_bytes": 83996672,
+    "cold_start_ms": 2569.04,
+    "peak_working_set_bytes": 86548480,
+    "gpu_breakdown": {
+      "idle": {
+        "dedicated_bytes": 0,
+        "shared_bytes": 0
+      },
+      "after_scroll": {
+        "dedicated_bytes": 0,
+        "shared_bytes": 0
+      }
+    },
+    "gpu_memory_bytes": 0,
+    "scroll_breakdown": {
+      "large_diff": {
+        "sample_count": 48,
+        "frame_times_ms": [
+          30.886799999999997,
+          49.2699,
+          51.3949,
+          57.0446,
+          7.451700000000001,
+          64.0345,
+          56.2787,
+          6.9994000000000005,
+          24.6075,
+          56.2186,
+          53.2307,
+          7.1295,
+          29.752000000000002,
+          110.00580000000001,
+          8.265099999999999,
+          59.3521,
+          8.1568,
+          42.4806,
+          16.8461,
+          34.0431,
+          53.3005,
+          7.1293,
+          28.209600000000002,
+          24.718400000000003,
+          28.3828,
+          27.153299999999998,
+          31.5579,
+          27.811,
+          23.1129,
+          58.223200000000006,
+          7.7193000000000005,
+          35.8942,
+          47.601200000000006,
+          53.9234,
+          36.672200000000004,
+          52.748200000000004,
+          53.237899999999996,
+          52.0333,
+          55.3251,
+          53.603699999999996,
+          31.701800000000002,
+          47.1593,
+          38.8967,
+          11.4603,
+          29.2775,
+          57.3741,
+          6.8130999999999995,
+          26.052599999999998
+        ],
+        "p95_ms": 59.3521
+      },
+      "markdown_discussion": {
+        "sample_count": 46,
+        "frame_times_ms": [
+          22.9222,
+          19.5474,
+          16.7238,
+          12.5024,
+          13.6336,
+          37.3853,
+          12.7524,
+          8.817200000000001,
+          34.297599999999996,
+          37.9745,
+          5.8580000000000005,
+          69.0472,
+          56.8836,
+          3.7635,
+          92.2685,
+          58.066100000000006,
+          57.235800000000005,
+          54.8715,
+          3.7939,
+          8.301499999999999,
+          30.0973,
+          112.0295,
+          66.8565,
+          4.2994,
+          32.955600000000004,
+          65.4327,
+          58.0898,
+          3.5163,
+          7.2598,
+          30.3059,
+          16.8659,
+          30.1611,
+          24.4512,
+          42.9476,
+          27.9849,
+          38.646100000000004,
+          21.1641,
+          24.6388,
+          58.4223,
+          62.2147,
+          55.288,
+          64.9245,
+          63.571799999999996,
+          61.594,
+          67.3678,
+          54.5869
+        ],
+        "p95_ms": 69.0472
+      }
+    },
+    "scroll_frame_p95_ms": 69.0472,
+    "package_bytes": null,
+    "package_sha256": null
+  },
+  "budgets": {
+    "idle_working_set_bytes": {
+      "value": 83996672,
+      "limit": 209715200,
+      "status": "Pass"
+    },
+    "peak_working_set_bytes": {
+      "value": 86548480,
+      "limit": 471859200,
+      "status": "Pass"
+    },
+    "gpu_memory_bytes": {
+      "value": 0,
+      "limit": 268435456,
+      "status": "Pass"
+    },
+    "package_bytes": {
+      "value": null,
+      "limit": 52428800,
+      "status": "Blocked"
+    },
+    "cold_start_ms": {
+      "value": 2569.04,
+      "limit": 3000,
+      "status": "Pass"
+    },
+    "scroll_frame_p95_ms": {
+      "value": 69.0472,
+      "limit": 20,
+      "status": "Fail",
+      "surfaces": {
+        "large_diff": {
+          "value": 59.3521,
+          "sample_count": 48,
+          "limit": 20,
+          "status": "Fail"
+        },
+        "markdown_discussion": {
+          "value": 69.0472,
+          "sample_count": 46,
+          "limit": 20,
+          "status": "Fail"
+        }
+      }
+    }
+  }
+}

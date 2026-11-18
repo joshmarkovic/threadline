@@ -1,0 +1,7 @@
+{
+  "sha256": "657ffefe2b6a6215ecfb7bbfc999d8082b027da58da0b9c96b89de09041adb2b",
+  "size_bytes": 26833408,
+  "binary": "threadline-virtualized.exe",
+  "build": "external override",
+  "evidence_class": "test-build native process"
+}

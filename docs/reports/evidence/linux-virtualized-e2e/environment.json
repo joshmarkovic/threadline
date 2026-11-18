@@ -1,0 +1,12 @@
+{
+  "command": "xtask test e2e --suite smoke --case E2E-001 --binary <instrumented Linux ELF> --seed 12345",
+  "display": ":197",
+  "x11_server": "isolated Xvfb + XTEST",
+  "xvfb_version": "2:21.1.16-1.3+deb13u4",
+  "x11_screen": "1500x1000x24",
+  "software_vulkan_icd": "/usr/share/vulkan/icd.d/lvp_icd.json",
+  "kernel": "Linux 6.18.40.1-microsoft-standard-WSL2",
+  "source_head": "adcffbdde03f774e9863917b7bbee25500d4c80f",
+  "binary_sha256": "4a9c32d726cd6c1cae13ed1bec3c7f5fad5bcbd890aa7a6ed6a64ae358bd8dac",
+  "shared_display_used": false
+}

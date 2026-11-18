@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "status": "Blocked",
+  "detail": "No unique, fresh notification card with complete fixture text and a verified click point was exposed.",
+  "driver": "Windows PowerShell / Win32 SendInput",
+  "shell_version": "5.1.22621.7649",
+  "seed": 12345,
+  "os_version": "10.0.22631",
+  "session_id": 2,
+  "architecture": "AMD64",
+  "app_pid": 45280,
+  "restarted_pid": null,
+  "native_window": 3869294,
+  "dpi": 96,
+  "binary_sha256": "7ac75ecb43636e50b9a63c99a50ad18e80e4fae8e77ca9498b73e25d739da7f2",
+  "executable_bytes": 26760192,
+  "actions": [
+    {
+      "action": "Attempt focus through a verified native pointer target",
+      "observed": {
+        "injected": true
+      }
+    },
+    {
+      "action": "Windows shell confirmed the fixture banner displayed",
+      "observed": 1
+    },
+    {
+      "action": "Inspect only fresh, authorized-shell notification windows for complete fixture text",
+      "observed": {
+        "baseline_windows": 5,
+        "newly_visible_classes": [],
+        "poll_count": 28,
+        "observed_notification_nodes": 0,
+        "fresh_notification_nodes": 0,
+        "exact_title": false,
+        "exact_body": false,
+        "full_composite": false,
+        "verified_click_points": 0,
+        "elapsed_ms": 2710
+      }
+    }
+  ],
+  "windows_product": "Microsoft Windows 11 Enterprise",
+  "staged_driver_sha256": {
+    "windows-smoke.ps1": "5622ae5233d0cc84cd4bd65427382727c32b8a5f11b3f299c3aca891faf2d7d3",
+    "ThreadlineWinInput.cs": "55595ff33e18b0cd58a4404d43814d8cb6663720c43489d44c9be91bce29f9a9"
+  }
+}

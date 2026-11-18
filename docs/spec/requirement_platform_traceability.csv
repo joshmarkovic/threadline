@@ -2,8 +2,8 @@ requirement_id,platform,release_phase,initial_implementation_sprint,platform_ver
 FND-01,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Target dependency inventories and loaded renderer modules.
 FND-01,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-01,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-FND-02,windows,Windows first release,01,01,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Windows workspace process smoke: Pass. Windows shell proof: Blocked.
-FND-02,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+FND-02,windows,Windows first release,01,01,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/evidence/windows-virtualized-e2e/native.json. Native workspace passed. Windows notification click is blocked.
+FND-02,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,../reports/evidence/macos-native-window/macos-window-probe.json. Early native window and AppKit Quit passed. Full toolkit interaction validation remains due.
 FND-02,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-03,windows,Windows first release,02,02,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-03,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -26,9 +26,9 @@ PORT-01,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required
 PORT-02,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Portable core and separate native platform adapter. Later services remain assigned.
 PORT-02,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-02,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PORT-03,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Windows workspace process smoke: Pass. Early WSLg X11 smoke passed. A macOS host was unavailable.
-PORT-03,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PORT-03,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+PORT-03,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md#test-evidence. Native Windows workspace and early Linux X11 smoke passed. Early macOS window and AppKit Quit passed.
+PORT-03,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,"../reports/evidence/macos-native-window/macos-window-probe.json. Early native window and AppKit Quit passed. Native text, focus and splitter tests remain due."
+PORT-03,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,../reports/evidence/linux-virtualized-e2e/native.json. Early native input against an isolated Debian Xvfb window passed. The release target requires Ubuntu GNOME Wayland and X11.
 PORT-04,windows,Windows first release,03,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-04,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-04,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -36,7 +36,7 @@ PORT-05,windows,Windows first release,11,12,12,yes,Partial,Actual target evidenc
 PORT-05,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-05,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-06,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Native keyboard, clipboard, focus and lifecycle slice. 2× geometry in-process and native 96 DPI."
-PORT-06,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+PORT-06,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,../reports/evidence/macos-native-window/macos-window-probe.json. AppKit Quit targeted and exited the verified child. Full native lifecycle and accessibility tests remain due.
 PORT-06,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-07,windows,Windows first release,13,,12,no,Not applicable,Requirement is specific to another platform release.,
 PORT-07,macos,macOS release,13,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -326,7 +326,7 @@ GRAPH-06,linux,Linux release,10,14,14,yes,Planned,Actual target evidence require
 GRAPH-07,windows,Windows first release,10,10,12,yes,Planned,Future option: record object-cache deferral. No clone or bare-object cache is mandatory.,
 GRAPH-07,macos,macOS release,10,13,13,yes,Planned,Future option: record object-cache deferral. No clone or bare-object cache is mandatory.,
 GRAPH-07,linux,Linux release,10,14,14,yes,Planned,Future option: record object-cache deferral. No clone or bare-object cache is mandatory.,
-NOTIFY-01,windows,Windows first release,11,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Windows notification-area prototype proof: Blocked. Durable activity and packaged tests remain Sprint 11.
+NOTIFY-01,windows,Windows first release,11,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/evidence/windows-notification-diagnostic/platform-native.json. The shell confirmed the banner display. A fresh, verified click target was unavailable. Durable activity and packaged tests remain Sprint 11."
 NOTIFY-01,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-01,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-02,windows,Windows first release,05,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -509,14 +509,14 @@ TEST-02,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required
 TEST-03,windows,Windows first release,02,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-03,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-03,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-TEST-04,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Separate native process controls on Windows (Pass) and early Linux WSLg (Pass).
-TEST-04,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-TEST-04,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+TEST-04,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/evidence/windows-virtualized-e2e/native.json. The driver operated the separate Windows process through native events.
+TEST-04,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,../reports/evidence/macos-native-window/macos-window-probe.json. Early launch and AppKit Quit passed against a separate native process. Full native E2E remains due.
+TEST-04,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,../reports/evidence/linux-virtualized-e2e/native.json. Early XTEST input drove the separate Linux app. Full native E2E on the Ubuntu GNOME target remains due.
 TEST-05,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Exact-artifact command returns Blocked pending packaging and approved release infrastructure.
 TEST-05,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-05,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-TEST-06,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Three-host Actions jobs configured. Native desktop process runs recorded separately from hosted CI.
-TEST-06,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+TEST-06,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md#hosted-build-and-core-tests. Three hosted build and core-test jobs passed. Native desktop results are recorded separately.
+TEST-06,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,../reports/evidence/macos-native-window/macos-window-probe.json. Early hosted macOS launch and AppKit Quit passed. Complete target verification remains due in Sprint 13.
 TEST-06,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-07,windows,Windows first release,03,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-07,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,

@@ -1,0 +1,7 @@
+Pass. Exercised the X11 window, Markdown selection, independent focus and tabs, review input, and both splitters
+
+--- stderr ---
+Your windowmanager claims not to support _NET_ACTIVE_WINDOW, so the attempt to activate the window was aborted.
+xdo_activate_window on window:2097153 reported an error
+Your windowmanager claims not to support _NET_ACTIVE_WINDOW, so the attempt to activate the window was aborted.
+xdo_activate_window on window:2097153 reported an error
