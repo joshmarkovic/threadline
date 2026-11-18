@@ -5,6 +5,7 @@ pub const USAGE: &str =
 cargo xtask test e2e --suite <smoke|full> [--binary PATH] [--case ID] [--seed N] [--report-dir DIR]
 cargo xtask test install --artifact PATH [--local-fixture TRUSTED_JSON] [--case ID] [--report-dir DIR]
 cargo xtask test live --repo OWNER/REPO --case LIVE-001 [--credential-stdin [--allow-existing-cli-oauth]] [--first-issue-pr-page] [--report-dir DIR]
+cargo xtask test live --repo OWNER/REPO --case LIVE-003 [--allow-live-writes | --readback-only] --credential-stdin [--allow-existing-cli-oauth] [--report-dir DIR]
 cargo xtask measure windows [--binary PATH] [--artifact PATH] [--seed N] [--report-dir DIR]";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -43,6 +44,7 @@ pub struct Options {
     pub local_fixture: Option<PathBuf>,
     pub repo: Option<String>,
     pub allow_live_writes: bool,
+    pub readback_only: bool,
     pub credential_stdin: bool,
     pub allow_existing_cli_oauth: bool,
     pub first_issue_pr_page: bool,
@@ -78,6 +80,7 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
         local_fixture: None,
         repo: None,
         allow_live_writes: false,
+        readback_only: false,
         credential_stdin: false,
         allow_existing_cli_oauth: false,
         first_issue_pr_page: false,
@@ -97,6 +100,10 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
                 return Err("--allow-live-writes is available only for live tests.".into());
             }
             options.allow_live_writes = true;
+            continue;
+        }
+        if flag == "--readback-only" {
+            options.readback_only = true;
             continue;
         }
         if flag == "--credential-stdin" {
@@ -163,6 +170,13 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
         && !known_case(lane, case)
     {
         return Err(format!("Unknown {} case.", lane.as_str()));
+    }
+    if options.readback_only
+        && (lane != Lane::Live
+            || options.case.as_deref() != Some("LIVE-003")
+            || options.allow_live_writes)
+    {
+        return Err("--readback-only requires LIVE-003 without write authorization.".into());
     }
     Ok(options)
 }
@@ -282,6 +296,7 @@ fn is_switch(option: &str) -> bool {
     matches!(
         option,
         "--allow-live-writes"
+            | "--readback-only"
             | "--credential-stdin"
             | "--allow-existing-cli-oauth"
             | "--first-issue-pr-page"

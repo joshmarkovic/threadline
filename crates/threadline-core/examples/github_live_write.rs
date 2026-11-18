@@ -43,6 +43,7 @@ const SCOPE: Scope = Scope {
     repository: REPO,
     actor: USER,
     profile: PROFILE,
+    allow_readback: false,
 };
 
 #[derive(Serialize)]
@@ -388,6 +389,7 @@ async fn main() -> ExitCode {
             return ExitCode::from(78);
         }
     };
+    debug_assert!(!options.readback_only);
     let source = if options.stdin {
         "stdin_pipe"
     } else {

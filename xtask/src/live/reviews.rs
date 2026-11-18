@@ -44,7 +44,11 @@ pub(super) fn run(options: &Options, root: &Path, dir: &Path) -> CaseResult {
             &EXPECTED_USER_ID.to_string(),
             "--profile",
             PROFILE,
-            "--allow-live-writes",
+            if options.readback_only {
+                "--readback-only"
+            } else {
+                "--allow-live-writes"
+            },
             "--journal-dir",
         ])
         .arg(root.join("artifacts/verification/live-write-journal"));
@@ -78,8 +82,12 @@ pub(super) fn run(options: &Options, root: &Path, dir: &Path) -> CaseResult {
             );
         }
     };
-    let mut result = if matches_receipt(&output.stdout, status, options.allow_existing_cli_oauth)
-        && fs::write(dir.join("github-review.json"), &output.stdout).is_ok()
+    let mut result = if matches_receipt(
+        &output.stdout,
+        status,
+        options.allow_existing_cli_oauth,
+        options.readback_only,
+    ) && fs::write(dir.join("github-review.json"), &output.stdout).is_ok()
     {
         let mut result = CaseResult::new(
             CASE,
@@ -106,7 +114,7 @@ fn authorized(
     actor: Option<u64>,
 ) -> bool {
     options.case.as_deref() == Some(CASE)
-        && options.allow_live_writes
+        && (options.allow_live_writes != options.readback_only)
         && options.credential_stdin
         && !options.first_issue_pr_page
         && options.repo.as_deref() == Some(REPOSITORY)
@@ -115,7 +123,7 @@ fn authorized(
         && actor == Some(EXPECTED_USER_ID)
 }
 
-fn matches_receipt(bytes: &[u8], status: Status, allow_oauth: bool) -> bool {
+fn matches_receipt(bytes: &[u8], status: Status, allow_oauth: bool, readback_only: bool) -> bool {
     if bytes.len() > 8192 {
         return false;
     }
@@ -218,20 +226,22 @@ fn matches_receipt(bytes: &[u8], status: Status, allow_oauth: bool) -> bool {
     if status != Status::Pass {
         return safe_failure(&evidence["failure"]);
     }
-    evidence["scope_verified"] == true
+    evidence["readback_only"] == readback_only
+        && evidence["scope_verified"] == true
         && evidence["source_verified"] == true
         && evidence["review_read_back"] == true
         && !evidence["review_id"].is_null()
         && !evidence["inline_id"].is_null()
         && evidence["pending_http_status"] == 200
         && request_id(&evidence["pending_request_id"])
-        && (if evidence["reconciled_unknown_submit"] == true {
+        && (if evidence["readback_only"] == true {
             evidence["submit_request_id"].is_null()
-                && (evidence["readback_only"] == false || evidence["submit_http_status"].is_null())
+                && evidence["submit_http_status"].is_null()
+                && evidence["reconciled_unknown_submit"] == false
+        } else if evidence["reconciled_unknown_submit"] == true {
+            evidence["submit_request_id"].is_null()
         } else {
-            evidence["readback_only"] == false
-                && evidence["submit_http_status"] == 200
-                && request_id(&evidence["submit_request_id"])
+            evidence["submit_http_status"] == 200 && request_id(&evidence["submit_request_id"])
         })
         && evidence["failure"].is_null()
 }
@@ -391,7 +401,12 @@ mod tests {
             },
         });
         let verifies = |value: &Value, oauth| {
-            matches_receipt(&serde_json::to_vec(value).unwrap(), Status::Pass, oauth)
+            matches_receipt(
+                &serde_json::to_vec(value).unwrap(),
+                Status::Pass,
+                oauth,
+                false,
+            )
         };
         assert!(verifies(&receipt, true));
         assert!(!verifies(&receipt, false));

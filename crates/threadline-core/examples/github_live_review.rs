@@ -49,6 +49,7 @@ const SCOPE: Scope = Scope {
     repository: REPOSITORY,
     actor: ACTOR,
     profile: PROFILE,
+    allow_readback: true,
 };
 const ARMED: &str = "live-003-pr-2-attempt.json";
 const PENDING: &str = "live-003-pr-2-pending.json";
@@ -157,10 +158,14 @@ async fn do_review(
     client: &GitHubClient,
     token: SecretToken,
     journal: &Path,
+    readback_only: bool,
     evidence: &mut Evidence,
 ) -> Result<(), Failure> {
-    let reading = journal.join(ARMED).exists();
-    let recovery = if reading {
+    evidence.readback_only = readback_only;
+    if readback_only != journal.join(ARMED).exists() {
+        return Err(no_receipt("recover"));
+    }
+    let recovery = if readback_only {
         let record = read_pending(&journal.join(PENDING)).ok_or_else(|| no_receipt("recover"))?;
         if journal.join(COMPLETE).exists()
             || read_pending(&journal.join(SUBMIT)).as_ref() != Some(&record)
@@ -171,7 +176,6 @@ async fn do_review(
     } else {
         None
     };
-    evidence.readback_only = reading;
     let guard = CancellationToken::new();
     let owner = OwnerScope::new("joshmarkovic").expect("pinned owner");
     let session = client
@@ -269,7 +273,6 @@ async fn do_review(
     let record = if let Some(record) = recovery {
         evidence.pending_http_status = Some(200);
         evidence.pending_request_id = Some(record.request_id.clone());
-        evidence.reconciled_unknown_submit = true;
         record
     } else {
         let (has_reviews, rate) = writer
@@ -424,23 +427,37 @@ async fn readback(
         return Err(Failure::guard("review_readback", "response_mismatch"));
     }
     evidence.review_read_back = true;
-    let comments = writer
+    let (comments, rate) = writer
         .review_lines(pull, &review, cancel)
         .await
         .map_err(|error| Failure::provider("inline_readback", "read_failed", &error))?;
     let [comment] = comments.as_slice() else {
         return Err(Failure::guard("inline_readback", "response_mismatch"));
     };
-    if comment.author().get() != ACTOR
+    if hold(rate)
+        || comment.author().get() != ACTOR
         || comment.commit_id != HEAD
         || comment.path != FILE
-        || comment.side.as_deref() != Some("RIGHT")
-        || comment.line != Some(LINE)
         || comment.body != BODY
     {
         return Err(Failure::guard("inline_readback", "response_mismatch"));
     }
-    evidence.inline_id = Some(comment.id.get());
+    // The scoped review list can omit the location on otherwise valid rows.
+    let (detail, rate) = writer
+        .review_line(pull, &review, comment.id, cancel)
+        .await
+        .map_err(|error| Failure::provider("inline_readback", "read_failed", &error))?;
+    if hold(rate)
+        || detail.author() != comment.author()
+        || detail.commit_id != comment.commit_id
+        || detail.path != comment.path
+        || detail.body != comment.body
+        || detail.side.as_deref() != Some("RIGHT")
+        || detail.line != Some(LINE)
+    {
+        return Err(Failure::guard("inline_readback", "response_mismatch"));
+    }
+    evidence.inline_id = Some(detail.id.get());
     Ok(())
 }
 
@@ -482,7 +499,16 @@ async fn main() -> ExitCode {
         }
     };
     let result = match GitHubClient::production() {
-        Ok(client) => do_review(&client, token, &options.journal, &mut evidence).await,
+        Ok(client) => {
+            do_review(
+                &client,
+                token,
+                &options.journal,
+                options.readback_only,
+                &mut evidence,
+            )
+            .await
+        }
         Err(error) => Err(Failure::provider("transport", "read_failed", &error)),
     };
     evidence.failure = result.err();
@@ -518,22 +544,14 @@ mod tests {
         )
     }
 
-    #[tokio::test]
-    async fn one_anchored_review_reconciles_a_lost_response_without_reposting() {
-        const BASE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-        const MERGE_BASE: &str = "cccccccccccccccccccccccccccccccccccccccc";
-        const NUMERIC_PR: &str = "/repositories/1462273296/pulls/2";
-        const REVIEWS: &str = "/repos/joshmarkovic/threadline/pulls/2/reviews";
-        const KNOWN: &str = "/repos/joshmarkovic/threadline/pulls/2/reviews/91";
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        let journal = env::temp_dir().join(format!(
-            "threadline-live-003-{}-{}",
-            std::process::id(),
-            now.as_nanos()
-        ));
-        fs::create_dir(&journal).unwrap();
-        let sim = Simulator::start().await;
-        let client = GitHubClient::loopback(sim.address).unwrap();
+    const BASE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const MERGE_BASE: &str = "cccccccccccccccccccccccccccccccccccccccc";
+    const NUMERIC_PR: &str = "/repositories/1462273296/pulls/2";
+    const REVIEWS: &str = "/repos/joshmarkovic/threadline/pulls/2/reviews";
+    const KNOWN: &str = "/repos/joshmarkovic/threadline/pulls/2/reviews/91";
+    const INLINE: &str = "/repos/joshmarkovic/threadline/pulls/comments/92";
+
+    fn queue_verified_scope(sim: &Simulator, pull_requests: usize) {
         sim.enqueue(
             Method::GET,
             "/user",
@@ -555,7 +573,7 @@ mod tests {
             "base":{"sha":BASE,"ref":BRANCH,"repo":{"id":REPO_ID,"node_id":"fixture-repository"}},
             "head":{"sha":HEAD,"ref":"fixture-head"},
         });
-        for _ in 0..3 {
+        for _ in 0..pull_requests {
             sim.enqueue(Method::GET, NUMERIC_PR, reply(StatusCode::OK, pull.clone()));
         }
         sim.enqueue(Method::GET, &format!("/repositories/{REPO_ID}/compare/{BASE}...{HEAD}?per_page=20&page=1"),
@@ -576,6 +594,31 @@ mod tests {
                 }),
             ),
         );
+    }
+
+    #[tokio::test]
+    async fn one_anchored_review_reconciles_a_lost_response_without_reposting() {
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        let journal = env::temp_dir().join(format!(
+            "threadline-live-003-{}-{}",
+            std::process::id(),
+            now.as_nanos()
+        ));
+        fs::create_dir(&journal).unwrap();
+        let sim = Simulator::start().await;
+        let client = GitHubClient::loopback(sim.address).unwrap();
+        let no_journal = do_review(
+            &client,
+            SecretToken::fixture(),
+            &journal,
+            true,
+            &mut Evidence::default(),
+        )
+        .await;
+        assert!(no_journal.is_err());
+        assert!(sim.take_observations().is_empty());
+        queue_verified_scope(&sim, 3);
+
         for limit in [1, 100] {
             sim.enqueue(
                 Method::GET,
@@ -600,25 +643,37 @@ mod tests {
             reply(StatusCode::BAD_GATEWAY, Value::Null)
                 .expects_json(json!({"event":"COMMENT","body":""})),
         );
-        sim.enqueue(
-            Method::GET,
-            KNOWN,
-            reply(StatusCode::OK, review("COMMENTED")),
-        );
-        sim.enqueue(
-            Method::GET,
-            &format!("{KNOWN}/comments?per_page=2&page=1"),
-            reply(
-                StatusCode::OK,
-                json!([{
-                    "id":92,"pull_request_review_id":91,"user":{"id":ACTOR,"login":"joshmarkovic"},
-                    "path":FILE,"side":"RIGHT","line":LINE,"body":BODY,"commit_id":HEAD,
-                    "pull_request_url":pr_url,
-                }]),
-            ),
-        );
+        let enqueue_comment = |review_id: u64| {
+            sim.enqueue(
+                Method::GET,
+                KNOWN,
+                reply(StatusCode::OK, review("COMMENTED")),
+            );
+            let mut detail = json!({
+                "id":92,"pull_request_review_id":91,"user":{"id":ACTOR,"login":"joshmarkovic"},
+                "path":FILE,"side":null,"line":null,"body":BODY,"commit_id":HEAD,
+                "pull_request_url":pr_url,
+            });
+            sim.enqueue(
+                Method::GET,
+                &format!("{KNOWN}/comments?per_page=2&page=1"),
+                reply(StatusCode::OK, json!([detail.clone()])),
+            );
+            detail["side"] = "RIGHT".into();
+            detail["line"] = LINE.into();
+            detail["pull_request_review_id"] = review_id.into();
+            sim.enqueue(Method::GET, INLINE, reply(StatusCode::OK, detail));
+        };
+        enqueue_comment(91);
         let mut evidence = Evidence::default();
-        let outcome = do_review(&client, SecretToken::fixture(), &journal, &mut evidence).await;
+        let outcome = do_review(
+            &client,
+            SecretToken::fixture(),
+            &journal,
+            false,
+            &mut evidence,
+        )
+        .await;
         assert!(
             outcome.is_ok(),
             "{}",
@@ -630,16 +685,56 @@ mod tests {
         assert!(evidence.reconciled_unknown_submit);
         assert_eq!(evidence.submit_http_status, Some(502));
         assert!(journal.join(COMPLETE).is_file());
+        let observations = sim.take_observations();
+        assert_eq!(observations.len(), 15);
+        assert!(observations.iter().all(|row| row.matched && row.versioned));
+
+        for readback_only in [false, true] {
+            assert!(
+                do_review(
+                    &client,
+                    SecretToken::fixture(),
+                    &journal,
+                    readback_only,
+                    &mut Evidence::default()
+                )
+                .await
+                .is_err()
+            );
+        }
+        fs::remove_file(journal.join(COMPLETE)).unwrap();
+        // A detail response for the wrong review cannot satisfy the observed anchor.
+        queue_verified_scope(&sim, 2);
+        enqueue_comment(191);
+        let wrong = do_review(
+            &client,
+            SecretToken::fixture(),
+            &journal,
+            true,
+            &mut Evidence::default(),
+        )
+        .await
+        .err()
+        .unwrap();
+        assert_eq!(wrong.kind.as_deref(), Some("IdentityMismatch"));
+        assert!(!journal.join(COMPLETE).exists());
+
+        queue_verified_scope(&sim, 2);
+        enqueue_comment(91);
+        let mut reread = Evidence::default();
         assert!(
-            do_review(
-                &client,
-                SecretToken::fixture(),
-                &journal,
-                &mut Evidence::default()
-            )
-            .await
-            .is_err()
+            do_review(&client, SecretToken::fixture(), &journal, true, &mut reread)
+                .await
+                .is_ok()
         );
+        assert!(reread.readback_only && reread.review_read_back);
+        assert!(!reread.reconciled_unknown_submit);
+        assert!(reread.submit_http_status.is_none());
+        assert_eq!(reread.inline_id, Some(92));
+        let observations = sim.take_observations();
+        assert_eq!(observations.len(), 18);
+        assert!(observations.iter().all(|row| row.matched && row.versioned));
+
         fs::remove_file(journal.join(COMPLETE)).unwrap();
         fs::write(journal.join(SUBMIT), b"incomplete").unwrap();
         assert!(
@@ -647,14 +742,13 @@ mod tests {
                 &client,
                 SecretToken::fixture(),
                 &journal,
+                true,
                 &mut Evidence::default()
             )
             .await
             .is_err()
         );
-        let observations = sim.take_observations();
-        assert_eq!(observations.len(), 14);
-        assert!(observations.iter().all(|row| row.matched && row.versioned));
+        assert!(sim.take_observations().is_empty());
         fs::remove_dir_all(journal).unwrap();
     }
 }

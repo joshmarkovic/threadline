@@ -78,7 +78,7 @@ impl GitHubWriter<'_> {
         pull: &VerifiedPull,
         review: &ObservedReview,
         cancel: &CancellationToken,
-    ) -> Result<Vec<ReviewedLine>, AccessError> {
+    ) -> Result<(Vec<ReviewedLine>, RateLimit), AccessError> {
         self.check_pull(pull)?;
         if review.repository != self.repository() || review.pull != pull.id {
             return Err(AccessError::local(AccessKind::WrongScope));
@@ -97,7 +97,29 @@ impl GitHubWriter<'_> {
         }) {
             return Err(AccessError::received(AccessKind::IdentityMismatch, 200));
         }
-        Ok(rows)
+        Ok((rows, RateLimit::from_headers(&headers)))
+    }
+
+    pub async fn review_line(
+        &self,
+        pull: &VerifiedPull,
+        review: &ObservedReview,
+        id: NonZeroU64,
+        cancel: &CancellationToken,
+    ) -> Result<(ReviewedLine, RateLimit), AccessError> {
+        self.check_pull(pull)?;
+        if review.repository != self.repository() || review.pull != pull.id {
+            return Err(AccessError::local(AccessKind::WrongScope));
+        }
+        let path = format!("pulls/comments/{id}");
+        let (row, headers): (ReviewedLine, _) = self.get(&path, cancel).await?;
+        if row.id != id
+            || row.review != review.id
+            || !self.check_pull_url(&row.pull_request_url, pull.number)
+        {
+            return Err(AccessError::received(AccessKind::IdentityMismatch, 200));
+        }
+        Ok((row, RateLimit::from_headers(&headers)))
     }
 
     pub async fn observe_pull_for_review(

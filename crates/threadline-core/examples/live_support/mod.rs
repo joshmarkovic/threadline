@@ -12,6 +12,7 @@ pub struct Scope {
     pub repository: &'static str,
     pub actor: u64,
     pub profile: &'static str,
+    pub allow_readback: bool,
 }
 
 pub fn checkpoint(directory: &Path, name: &str, data: &impl Serialize) -> io::Result<()> {
@@ -26,6 +27,7 @@ pub fn checkpoint(directory: &Path, name: &str, data: &impl Serialize) -> io::Re
 
 pub struct Options {
     pub stdin: bool,
+    pub readback_only: bool,
     oauth: bool,
     pub journal: PathBuf,
 }
@@ -37,7 +39,7 @@ impl Options {
         let mut args = args.into_iter();
         let (mut repo, mut actor, mut journal, mut source) = (None, None, None, None);
         let mut profile = None;
-        let (mut allow, mut oauth) = (false, false);
+        let (mut allow, mut oauth, mut readback) = (false, false, false);
         while let Some(arg) = args.next() {
             match arg.as_str() {
                 "--repo" if repo.is_none() => repo = args.next(),
@@ -51,6 +53,7 @@ impl Options {
                         .map(PathBuf::from)
                 }
                 "--allow-live-writes" if !allow => allow = true,
+                "--readback-only" if expected.allow_readback && !readback => readback = true,
                 "--profile" if profile.is_none() => profile = args.next(),
                 "--credential-stdin" if source.is_none() => source = Some(true),
                 "--credential-env" if source.is_none() => source = Some(false),
@@ -61,7 +64,7 @@ impl Options {
         if repo.as_deref() != Some(expected.repository)
             || actor != Some(expected.actor)
             || profile.as_deref() != Some(expected.profile)
-            || !allow
+            || allow == readback
         {
             return Err("write_scope_or_opt_in_missing");
         }
@@ -71,6 +74,7 @@ impl Options {
         }
         Ok(Self {
             stdin,
+            readback_only: readback,
             oauth,
             journal: journal.ok_or("journal_location_missing")?,
         })
