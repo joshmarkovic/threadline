@@ -11,7 +11,7 @@ AC-03,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-04,windows,04,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,The reader supports cached and provider reads. Native historical browsing remains unverified. docs/reports/sprint-04.md
 AC-04,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-04,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-05,windows,06,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
+AC-05,windows,06,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Windows native E2E-005 passed two revision-bound diffs and a delayed linked issue across tab switches. docs/reports/sprint-06.md"
 AC-05,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-05,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-06,windows,04,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"E2E-003 restored the same reader item, two panes, 20 tabs and the exact draft in a fresh process while signed out and offline. docs/reports/evidence/sprint-04/windows-cached-restart.json"
@@ -29,10 +29,10 @@ AC-09,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-10,windows,04,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Storage integration verifies clear-cache retains the draft and Outbox fixtures. Later writer sprints extend the retained types. docs/reports/sprint-04.md
 AC-10,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-10,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-11,windows,05,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Timezone/DST policies and restored offline settings passed. Full Windows lifecycle journey remains open. docs/reports/sprint-05.md
+AC-11,windows,05,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows native restart restored UTC and all controls. No requests occurred while offline. Pure timezone and DST tests passed. Actual sleep and wake stay open. docs/reports/sprint-05.md
 AC-11,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-11,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-12,windows,05,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,HTTP throttling and durable read floors passed; the entire native control journey is still open. docs/reports/sprint-05.md
+AC-12,windows,05,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Native Check now displayed HTTP 429 and retained connectivity. Durable retry floors passed in SQLite. Cache editing during throttling is a separate check. docs/reports/sprint-05.md
 AC-12,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-12,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-13,windows,07,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Existing-issue writes, cancellation, recovery and scoped LIVE-002. docs/reports/sprint-07.md"
@@ -167,7 +167,7 @@ AC-55,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-56,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-56,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-56,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-57,windows,05,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Current versus stale/late reachability and separate auth/throttle results passed in core. The Windows control journey remains open. docs/reports/sprint-05.md
+AC-57,windows,05,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Native Check now distinguished HTTP 503 and HTTP 429 from transport loss. Core tests covered stale and cancelled responses. Actual sleep and network changes stay open. docs/reports/sprint-05.md
 AC-57,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-57,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-58,windows,07,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
@@ -233,10 +233,10 @@ AC-77,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-78,windows,08,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-78,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-78,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-79,windows,06,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
+AC-79,windows,06,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Parser and scoped target checks passed in core and SQLite. E2E-005 verified a real fixture issue through the native reader. Additional reference conditions stay in the scenario matrix. docs/reports/sprint-06.md"
 AC-79,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-79,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-80,windows,06,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
+AC-80,windows,06,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"E2E-005 passed two tabs with a delayed linked issue. Earlier storage tests cover body changes and scoped proofs. Other unavailable and offline states have separate coverage. docs/reports/sprint-06.md"
 AC-80,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-80,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-81,windows,09,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,

@@ -128,5 +128,90 @@
       1
     ],
     "outcome": "The driver treated the optional pull_request observation as required while polling."
+  },
+  "windows_e2e005_rerun": {
+    "run": "e2e-1795042448446-33812",
+    "lane": "e2e",
+    "suite": "full",
+    "seed": 12345,
+    "host": {
+      "os": "windows",
+      "architecture": "x86_64",
+      "version": "Microsoft Windows [Version 10.0.22631.7652]",
+      "display_session": "Windows desktop availability is checked by native driver"
+    },
+    "source_revision": "8a22b8d339d1a93882f7a74e02e7514a514dff89",
+    "source_dirty": false,
+    "cargo_lock_sha256": "f1717e262ce2964d9b398759e2febce1fb143d9ff41043330c6556ef5e2883d8",
+    "fixture_revision": "s06-pr-reading-v1",
+    "status": "Pass",
+    "command": {
+      "program": "xtask",
+      "argv": [
+        "test",
+        "e2e",
+        "--suite",
+        "full",
+        "--case",
+        "E2E-005",
+        "--binary",
+        "<binary-path>",
+        "--seed",
+        "12345",
+        "--report-dir",
+        "<report-dir>"
+      ],
+      "redacted": true
+    },
+    "exit_code": 0,
+    "started_at_unix_ms": 1795042448444,
+    "finished_at_unix_ms": 1795042475529,
+    "case": "E2E-005",
+    "app_source": "8a22b8d339d1a93882f7a74e02e7514a514dff89",
+    "app_sha256": "b661853acf0e7ed5168ae850730fce8e93e4a639f9245bf46293ebea5ceb1eae",
+    "dpi": 144,
+    "successful_action_count": 27,
+    "sha256": {
+      "result.json": "7df4de7eb338566316c2596aaa3c57b945d4e0c1519d65e2c33127529ac681a4",
+      "pr-native.json": "69f08ede4d5912f5d9114894c83c9efd528b23abf3fb6b32472f78f0e35ad4f2",
+      "binary.json": "5100217e1c3a8d376d1564144e3d9e22fafa012436f1a8f175a7e78eafc941e8",
+      "github-access-trace.json": "e8f8feb426578e6bfde046a93f3dcb1295147622cff9e9c9ce060a9e8024cff6",
+      "ui-observation.json": "b0c9cfb3c4768e2affac8500a3ac510be76c0ed887f195da1041c50059e750e7"
+    },
+    "independent_tabs": {
+      "first_item": 1,
+      "second_item": 2,
+      "first_head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "second_head": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "first_file": "src/first.rs",
+      "second_file": "src/second.rs",
+      "pane_tab_count": 2
+    },
+    "delayed_reply": {
+      "foreground_item": 2,
+      "foreground_head": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "foreground_file": "src/second.rs",
+      "previous_issue_displayed": false
+    },
+    "returned_context": {
+      "item": 1,
+      "linked_issue": 3,
+      "file": "src/first.rs",
+      "diff_mode": "Split"
+    },
+    "previous_attempt": {
+      "run": "e2e-1795040192779-46764",
+      "source_revision": "4f1e2087d726c7208f937fd6510ea346c5471198",
+      "status": "Fail",
+      "exit_code": 1,
+      "successful_action_count": 24,
+      "sha256": {
+        "result.json": "d2588b67a82f472936eda0f70b8a743614b12cd92bf50ce5ac8d1ba00cd8366f",
+        "pr-native.json": "43a4a3cd66661d2ac7ef244cdd599956c41f673069dc5b4d207faf201f78123b",
+        "ui-observation.json": "14e384dcb744d661da114d7492e392139abb1102b04969536cd9c388366eeefb",
+        "github-access-trace.json": "e8f8feb426578e6bfde046a93f3dcb1295147622cff9e9c9ce060a9e8024cff6"
+      },
+      "outcome": "The delayed A result stayed out of B. Returning to A reused an inactive cached view that had missed the completed verification."
+    }
   }
 }

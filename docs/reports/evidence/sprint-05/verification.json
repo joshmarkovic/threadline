@@ -376,5 +376,104 @@
     "trace_sha256": "6b5ef9bf05cca973b87e8f855c766963aabd58a850e1910ce06b967eac7defb1",
     "termination": "Driver timeout opening the native Accounts panel after restart.",
     "app_source": "24c21ed"
+  },
+  "native_controls_rerun": {
+    "run": "e2e-1795042515369-46980",
+    "lane": "e2e",
+    "suite": "full",
+    "seed": 12345,
+    "host": {
+      "os": "windows",
+      "architecture": "x86_64",
+      "version": "Microsoft Windows [Version 10.0.22631.7652]",
+      "display_session": "Windows desktop availability is checked by native driver"
+    },
+    "source_revision": "8a22b8d339d1a93882f7a74e02e7514a514dff89",
+    "source_dirty": false,
+    "cargo_lock_sha256": "f1717e262ce2964d9b398759e2febce1fb143d9ff41043330c6556ef5e2883d8",
+    "fixture_revision": "s05-sync-v1",
+    "status": "Pass",
+    "command": {
+      "program": "xtask",
+      "argv": [
+        "test",
+        "e2e",
+        "--suite",
+        "full",
+        "--case",
+        "S05-WINDOWS-SYNC",
+        "--binary",
+        "<binary-path>",
+        "--seed",
+        "12345",
+        "--report-dir",
+        "<report-dir>"
+      ],
+      "redacted": true
+    },
+    "exit_code": 0,
+    "started_at_unix_ms": 1795042515368,
+    "finished_at_unix_ms": 1795042543125,
+    "case": "S05-WINDOWS-SYNC",
+    "app_source": "8a22b8d339d1a93882f7a74e02e7514a514dff89",
+    "app_sha256": "b661853acf0e7ed5168ae850730fce8e93e4a639f9245bf46293ebea5ceb1eae",
+    "dpi": 144,
+    "successful_action_count": 20,
+    "sha256": {
+      "result.json": "b6836939ab1ab2428b1e6bd430e127b6a133a685eba51d3f71acd6869214161a",
+      "sync-native.json": "68f7077f8ea0bf5a05b347d4257c3581ec3bef2c2cb3a73e20d5f361c2578981",
+      "binary.json": "5100217e1c3a8d376d1564144e3d9e22fafa012436f1a8f175a7e78eafc941e8",
+      "github-access-trace.json": "3d8c02781656a7afadcac5ac189ac1640309ccf1a737b2f7187508b3920f6bb1",
+      "reader-restart-observation.json": "e5c0885c1b15981f92440d5feb42bee0d8d4255b1ccb90cc7eecbe82c8ff3806"
+    },
+    "separate_process": true,
+    "same_sqlite_profile": true,
+    "retained": {
+      "work_offline": true,
+      "pause_background": true,
+      "pause_queued_actions": true,
+      "notification_quiet": true,
+      "timezone": "UTC"
+    },
+    "offline_request_count": 0,
+    "http": [
+      {
+        "phase": "sync_live",
+        "route": "updated_comments",
+        "status": 200
+      },
+      {
+        "phase": "sync_live",
+        "route": "updated_items",
+        "status": 200
+      },
+      {
+        "phase": "sync_service",
+        "route": "user",
+        "status": 503
+      },
+      {
+        "phase": "sync_throttle",
+        "route": "user",
+        "status": 429
+      },
+      {
+        "phase": "sync_transport",
+        "route": "user",
+        "status": 0
+      }
+    ],
+    "previous_attempt": {
+      "run": "e2e-1795041063013-26320",
+      "source_revision": "1df3c637a28a3648dbd0fc336896e404f3e18066",
+      "status": "Fail",
+      "exit_code": 1,
+      "sha256": {
+        "result.json": "082cea7d3daaf19882b318ab2612bf0d1ddedb27323da695736f310d0515dd19",
+        "sync-native.json": "0871bbbdcbdbee7e267489288a01a77b02c8eb9d4b3fff8ccfad890b05ee789c",
+        "reader-restart-observation.json": "da5ae5ec52faa0317a95035beb2633d2cb6c838f42cf0d1f0e6f5efcf2cf3980"
+      },
+      "outcome": "After restart the panel painted, but the already-published offline snapshot had been dropped before the account loaded."
+    }
   }
 }
