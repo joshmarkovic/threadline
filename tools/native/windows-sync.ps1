@@ -102,12 +102,18 @@ function Wait-FixtureQuietSchedule([int]$StartMinute, [int]$EndMinute) {
     }
 }
 
+function Test-NotificationSyncReady($Snapshot) {
+    $controls = $Snapshot.controls
+    return $Snapshot.connection -ceq 'Reachable' -and $Snapshot.cache_generation -ge 2 -and
+        $null -ne $controls -and !$controls.work_offline -and !$controls.pause_background -and
+        !$controls.pause_queued_actions -and !$controls.notification_quiet
+}
+
 function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
     Wait-SeededFixtureAccount
+    Open-SyncSettings $Window
     $null = Wait-Sync 'the normal authenticated issue and comment polling before pauses' {
-        param($sync)
-        $sync.connection -ceq 'Reachable' -and $sync.cache_generation -ge 2 -and !$sync.controls.work_offline -and
-            !$sync.controls.pause_background -and !$sync.controls.pause_queued_actions -and !$sync.controls.notification_quiet
+        param($sync) Test-NotificationSyncReady $sync
     }
     Open-NotificationSchedule $Window
     Wait-For 'the native Enable quiet hours control' {
@@ -170,6 +176,7 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
     Add-Evidence 'Observe the isolated event in the native feed with the exact Quiet Hours decision' ([ordered]@{
         delivery = 'FeedOnly'; popup_suppressed_by = 'QuietHours'; sound = $false
     })
+    Open-SyncSettings $restarted
     Open-NotificationSchedule $restarted
     $restored = Wait-FixtureQuietSchedule $startMinute $endMinute
     $controls = $restored.cached_reader.shared_sync.controls

@@ -22,6 +22,11 @@ if (@($helpers.Name | Sort-Object -Unique).Count -ne 5 -or $helpers.Count -ne 5)
 . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1')
 . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
 
+$notLoaded = '{"connection":"Reachable","cache_generation":2,"panel_open":false,"controls":null}' | ConvertFrom-Json
+if (Test-NotificationSyncReady $notLoaded) { throw 'Reachable fixture transport did not prove saved Sync controls had loaded.' }
+$loaded = '{"connection":"Reachable","cache_generation":2,"panel_open":true,"controls":{"work_offline":false,"pause_background":false,"pause_queued_actions":false,"notification_quiet":false}}' | ConvertFrom-Json
+if (!(Test-NotificationSyncReady $loaded)) { throw 'The observed loaded Sync controls did not permit the quiet-hours journey.' }
+
 function Read-Observation {
     if ($script:observations.Count -gt 1) { return $script:observations.Dequeue() }
     return $script:observations.Peek()
