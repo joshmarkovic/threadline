@@ -166,7 +166,7 @@ pub struct ResourcePage<'a> {
     pub fetched_at_ms: i64,
 }
 
-fn missing_state() -> ResourceState {
+pub(crate) fn missing_state() -> ResourceState {
     ResourceState {
         coverage: Coverage::Missing,
         fetch: FetchState::Idle,
@@ -221,6 +221,9 @@ pub(crate) fn state_in(conn: &Connection, key: ResourceKey) -> Result<ResourceSt
     let Some(id) = resource_id(conn, key)? else {
         return Ok(missing_state());
     };
+    state_by_id(conn, id)
+}
+pub(crate) fn state_by_id(conn: &Connection, id: i64) -> Result<ResourceState> {
     Ok(conn.query_row(
         "SELECT coverage,fetch,error,last_page_at_ms,last_fetch_at_ms,last_validation_at_ms,
                  etag,last_modified,revision FROM cached_resources WHERE id=?1",
@@ -267,6 +270,13 @@ fn require_walk(
     expected: &ResourceProgress,
 ) -> Result<(i64, bool)> {
     let id = resource_id(conn, key)?.ok_or(Error::Conflict("resource fetch does not exist"))?;
+    require_walk_id(conn, id, expected)
+}
+pub(crate) fn require_walk_id(
+    conn: &Connection,
+    id: i64,
+    expected: &ResourceProgress,
+) -> Result<(i64, bool)> {
     match read_progress(conn, id)? {
         Some((current, FetchState::Downloading, has_page)) if current == *expected => {
             Ok((id, has_page))
@@ -294,51 +304,16 @@ impl Store {
         key: ResourceKey,
         mode: WalkMode,
     ) -> Result<ResourceProgress> {
-        self.write(|tx| {
-            let id = ensure_resource(tx, key)?;
-            let coverage: Coverage = tx.query_row(
-                "SELECT coverage FROM cached_resources WHERE id=?1",
-                [id],
-                |row| row.get(0),
-            )?;
-            if mode == WalkMode::Incremental && coverage != Coverage::Complete {
-                return Err(Error::Conflict(
-                    "an incremental walk needs complete cached coverage",
-                ));
-            }
-            discard_walk(tx, id)?;
-            let generation = tx.query_row(
-                "UPDATE cached_resources SET generation=generation+1, fetch=1, error=NULL,
-                 walk_mode=?2, continuation=NULL, has_page=0 WHERE id=?1 RETURNING generation",
-                params![id, mode as i64],
-                |row| row.get(0),
-            )?;
-            Ok(ResourceProgress {
-                resource_id: id,
-                generation,
-                cursor: None,
-                mode,
-            })
-        })
+        self.write(|tx| start_walk_in(tx, ensure_resource(tx, key)?, mode))
     }
 
     /// Resume an interrupted attempt using the cursor committed with its preceding page.
     pub fn resume_resource_fetch(&self, key: ResourceKey) -> Result<Option<ResourceProgress>> {
         self.write(|tx| {
-            let Some(id) = resource_id(tx, key)? else { return Ok(None); };
-            let error: Option<ResourceError> = tx.query_row("SELECT error FROM cached_resources WHERE id=?1", [id], |row| row.get(0))?;
-            if error == Some(ResourceError::CursorExpired) { return Ok(None); }
-            match read_progress(tx, id)? {
-                Some((mut progress, fetch, _)) if fetch != FetchState::Idle => {
-                    progress.generation = tx.query_row(
-                        "UPDATE cached_resources SET generation=generation+1,fetch=1,error=NULL WHERE id=?1 RETURNING generation",
-                        [id],
-                        |row| row.get(0),
-                    )?;
-                    Ok(Some(progress))
-                }
-                _ => Ok(None),
-            }
+            let Some(id) = resource_id(tx, key)? else {
+                return Ok(None);
+            };
+            resume_walk_in(tx, id)
         })
     }
 
@@ -374,18 +349,7 @@ impl Store {
     ) -> Result<()> {
         self.write(|tx| {
             let (id, has_page) = require_walk(tx, key, expected)?;
-            if has_page || (matched.etag.is_none() && matched.last_modified.is_none()) {
-                return Err(Error::Conflict("conditional validation requires an unchanged complete resource"));
-            }
-            let updated = tx.execute(
-                "UPDATE cached_resources SET fetch=0,error=NULL,last_validation_at_ms=?2
-                 WHERE id=?1 AND coverage=2 AND etag IS ?3 AND last_modified IS ?4 AND revision IS ?5",
-                params![id,at_ms,matched.etag,matched.last_modified,matched.revision],
-            )?;
-            if updated != 1 {
-                return Err(Error::Conflict("conditional response does not match cached validators"));
-            }
-            Ok(())
+            accept_not_modified(tx, id, has_page, matched, at_ms)
         })
     }
 
@@ -397,18 +361,116 @@ impl Store {
     ) -> Result<()> {
         self.write(|tx| {
             let (id, _) = require_walk(tx, key, expected)?;
-            tx.execute(
-                "UPDATE cached_resources SET fetch=?2,error=?3 WHERE id=?1",
-                params![id, reason.fetch_state() as i64, reason as i64],
-            )?;
-            Ok(())
+            set_fetch_error(tx, id, reason)
         })
+    }
+}
+
+pub(crate) fn accept_not_modified(
+    tx: &Transaction<'_>,
+    id: i64,
+    has_page: bool,
+    matched: &Validators,
+    at_ms: i64,
+) -> Result<()> {
+    if has_page || (matched.etag.is_none() && matched.last_modified.is_none()) {
+        return Err(Error::Conflict(
+            "Conditional validation requires an unchanged complete resource",
+        ));
+    }
+    let changed = tx.execute(
+        "UPDATE cached_resources SET fetch=0,error=NULL,last_validation_at_ms=?2
+         WHERE id=?1 AND coverage=2 AND etag IS ?3 AND last_modified IS ?4 AND revision IS ?5",
+        params![
+            id,
+            at_ms,
+            matched.etag,
+            matched.last_modified,
+            matched.revision
+        ],
+    )?;
+    if changed != 1 {
+        return Err(Error::Conflict(
+            "Conditional response does not match cached validators",
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn set_fetch_error(tx: &Transaction<'_>, id: i64, reason: ResourceError) -> Result<()> {
+    tx.execute(
+        "UPDATE cached_resources SET fetch=?2,error=?3 WHERE id=?1",
+        params![id, reason.fetch_state() as i64, reason as i64],
+    )?;
+    Ok(())
+}
+
+pub(crate) fn start_walk_in(
+    tx: &Transaction<'_>,
+    id: i64,
+    mode: WalkMode,
+) -> Result<ResourceProgress> {
+    let coverage: Coverage = tx.query_row(
+        "SELECT coverage FROM cached_resources WHERE id=?1",
+        [id],
+        |row| row.get(0),
+    )?;
+    if mode == WalkMode::Incremental && coverage != Coverage::Complete {
+        return Err(Error::Conflict(
+            "an incremental walk needs complete cached coverage",
+        ));
+    }
+    discard_walk(tx, id)?;
+    let generation = tx.query_row(
+        "UPDATE cached_resources SET generation=generation+1, fetch=1, error=NULL,
+                 walk_mode=?2, continuation=NULL, has_page=0 WHERE id=?1 RETURNING generation",
+        params![id, mode as i64],
+        |row| row.get(0),
+    )?;
+    Ok(ResourceProgress {
+        resource_id: id,
+        generation,
+        cursor: None,
+        mode,
+    })
+}
+
+pub(crate) fn resume_walk_in(tx: &Transaction<'_>, id: i64) -> Result<Option<ResourceProgress>> {
+    let error: Option<ResourceError> = tx.query_row(
+        "SELECT error FROM cached_resources WHERE id=?1",
+        [id],
+        |row| row.get(0),
+    )?;
+    if error == Some(ResourceError::CursorExpired) {
+        return Ok(None);
+    }
+    match read_progress(tx, id)? {
+        Some((mut progress, fetch, _)) if fetch != FetchState::Idle => {
+            progress.generation = tx.query_row(
+                        "UPDATE cached_resources SET generation=generation+1,fetch=1,error=NULL WHERE id=?1 RETURNING generation",
+                        [id],
+                        |row| row.get(0),
+                    )?;
+            Ok(Some(progress))
+        }
+        _ => Ok(None),
     }
 }
 
 pub(crate) fn commit_page_in(
     tx: &Transaction<'_>,
     key: ResourceKey,
+    expected: &ResourceProgress,
+    page: ResourcePage<'_>,
+    terminal_error: Option<ResourceError>,
+) -> Result<Option<ResourceProgress>> {
+    let (id, _) = require_walk(tx, key, expected)?;
+    commit_page_by_id(tx, id, expected, page, terminal_error)
+}
+
+pub(crate) fn commit_page_by_id(
+    tx: &Transaction<'_>,
+    id: i64,
     expected: &ResourceProgress,
     page: ResourcePage<'_>,
     terminal_error: Option<ResourceError>,
@@ -421,7 +483,7 @@ pub(crate) fn commit_page_in(
         return Err(Error::InvalidInput("invalid resource page metadata"));
     }
 
-    let (id, _) = require_walk(tx, key, expected)?;
+    require_walk_id(tx, id, expected)?;
     if let Some(cursor) = page.next_cursor {
         let fresh = tx.execute(
                     "INSERT INTO cached_resource_cursors(resource_id,cursor) VALUES (?1,?2) ON CONFLICT DO NOTHING",
@@ -1076,14 +1138,14 @@ pub(crate) fn clear_resource_cache(tx: &Transaction<'_>, account: AccountId) -> 
     // Mid-walk records and cursors form one checkpoint. Keep them together.
     tx.execute(
         "DELETE FROM cached_resource_records WHERE resource_id IN (
-        SELECT id FROM cached_resources WHERE account_id=?1 AND has_page=0 AND NOT EXISTS(
+        SELECT id FROM cached_resources WHERE account_id=?1 AND has_page=0 AND id NOT IN (SELECT resource_id FROM pr_pinned_resources) AND NOT EXISTS(
         SELECT 1 FROM issue_downloads d WHERE d.item_id=cached_resources.item_id AND d.state IN ('pending','active','complete')))",
         [account.0],
     )?;
     tx.execute(
         "UPDATE cached_resources SET coverage=0,fetch=0,error=NULL,generation=generation+1,
         continuation=NULL,last_page_at_ms=NULL,last_fetch_at_ms=NULL,last_validation_at_ms=NULL,
-        etag=NULL,last_modified=NULL,revision=NULL WHERE account_id=?1 AND has_page=0 AND NOT EXISTS(
+        etag=NULL,last_modified=NULL,revision=NULL WHERE account_id=?1 AND has_page=0 AND id NOT IN (SELECT resource_id FROM pr_pinned_resources) AND NOT EXISTS(
         SELECT 1 FROM issue_downloads d WHERE d.item_id=cached_resources.item_id AND d.state IN ('pending','active','complete'))",
         [account.0],
     )?;

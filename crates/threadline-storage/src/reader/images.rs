@@ -57,9 +57,14 @@ impl Store {
                 WHERE cached_images.stored_at<=excluded.stored_at",
                 params![account, repository, stable_url, mime, bytes, at_ms],
             )?;
+            let pinned_bytes:i64=tx.query_row(
+                "SELECT COALESCE(SUM(length(c.bytes)),0) FROM cached_images c JOIN pr_pinned_images p USING(account_id,repository_id,stable_url)
+                 WHERE c.account_id=?",[account],|row|row.get(0),
+            )?;
+            if pinned_bytes>ACCOUNT_LIMIT { return Err(Error::Conflict("Pinned image bytes exceed the account cache limit")); }
             tx.execute("DELETE FROM cached_images WHERE account_id=?1 AND (repository_id,stable_url) IN (
                 SELECT repository_id,stable_url FROM (SELECT repository_id,stable_url,
-                sum(length(bytes)) OVER(ORDER BY stored_at DESC,repository_id,stable_url ROWS UNBOUNDED PRECEDING) AS retained
+                sum(length(bytes)) OVER(ORDER BY EXISTS(SELECT 1 FROM pr_pinned_images p WHERE p.account_id=cached_images.account_id AND p.repository_id=cached_images.repository_id AND p.stable_url=cached_images.stable_url) DESC,stored_at DESC,repository_id,stable_url ROWS UNBOUNDED PRECEDING) AS retained
                 FROM cached_images WHERE account_id=?1) WHERE retained>?2)", params![account, ACCOUNT_LIMIT])?;
             Ok(())
         })

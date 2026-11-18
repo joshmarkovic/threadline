@@ -402,14 +402,20 @@ impl Store {
     pub fn clear_cache(&self, account: AccountId) -> Result<()> {
         self.write(|tx| {
             clear_resource_cache(tx, account)?;
-            tx.execute("DELETE FROM cached_images WHERE account_id=?", [account])?;
+            tx.execute(
+                "UPDATE pr_revisions SET header='{}',body=NULL,body_at=NULL WHERE account_id=? AND NOT EXISTS(
+                 SELECT 1 FROM pr_downloads d WHERE d.revision_id=pr_revisions.id AND d.state IN ('pending','active','partial','complete'))",
+                [account],
+            )?;
+            tx.execute("DELETE FROM cached_images WHERE account_id=? AND (repository_id,stable_url) NOT IN (SELECT repository_id,stable_url FROM pr_pinned_images WHERE account_id=cached_images.account_id)", [account])?;
             tx.execute("DELETE FROM reader_facets WHERE item_id IN (SELECT id FROM items WHERE account_id=?1)
+                AND item_id NOT IN (SELECT item_id FROM pr_pinned_items WHERE account_id=?1)
                 AND item_id NOT IN (SELECT item_id FROM issue_downloads WHERE account_id=?1 AND state IN ('pending','active','complete'))
                 AND item_id NOT IN (SELECT i.id FROM items i JOIN cached_resources c ON c.repository_id=i.repository_id
                     WHERE i.account_id=?1 AND c.family='repository-items' AND c.has_page=1)",[account])?;
             tx.execute(
                 "UPDATE items SET title = NULL, title_at = NULL, body = NULL, body_at = NULL,
-                    closed = NULL, closed_at = NULL WHERE account_id = ?1 AND NOT EXISTS(
+                    closed = NULL, closed_at = NULL WHERE account_id = ?1 AND id NOT IN (SELECT item_id FROM pr_pinned_items) AND NOT EXISTS(
                         SELECT 1 FROM issue_downloads d WHERE d.item_id=items.id AND d.state IN ('pending','active','complete')) AND NOT EXISTS(
                         SELECT 1 FROM cached_resources c WHERE c.repository_id=items.repository_id AND c.family='repository-items' AND c.has_page=1)",
                 [account],
@@ -417,6 +423,7 @@ impl Store {
             tx.execute(
                 "DELETE FROM reader_issue_fields WHERE item_id IN (
                      SELECT i.id FROM items i WHERE i.account_id=?1
+                     AND i.id NOT IN (SELECT item_id FROM pr_pinned_items WHERE account_id=?1)
                      AND NOT EXISTS(SELECT 1 FROM issue_downloads d WHERE d.item_id=i.id AND d.state IN ('pending','active','complete'))
                      AND NOT EXISTS(SELECT 1 FROM cached_resources c WHERE c.repository_id=i.repository_id AND c.family='repository-items' AND c.has_page=1))",
                 [account],

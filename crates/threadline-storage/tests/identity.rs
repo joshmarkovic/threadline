@@ -490,6 +490,7 @@ fn previous_workspace(item: ItemId) -> Workspace {
                     id: "work-91".into(),
                     item,
                     view: TabView {
+                        pr_reader: None,
                         scroll_offset: 17,
                         scroll_anchor: Some("comment-4".into()),
                         navigation: Some("conversation".into()),

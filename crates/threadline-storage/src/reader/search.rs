@@ -12,6 +12,8 @@ pub struct SearchHit {
     pub source: HitSource,
     pub anchor: Option<String>,
     pub excerpt: String,
+    /// Exact PR comparison resource when this match is in a revision-bound formal review or thread.
+    pub pr_revision: Option<i64>,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CacheUsage {
@@ -58,15 +60,17 @@ impl Store {
                     row: item,
                     source: HitSource::Summary,
                     anchor: None,
+                    pr_revision: None,
                     excerpt: row.get(10)?,
                 });
             }
             if hits.len() == limit {
                 return Ok(hits);
             }
-            let discussion_sql = format!("SELECT {ROW_FIELDS},c.family,k.record_key,conversation_search.rowid FROM conversation_search
+            let discussion_sql = format!("SELECT {ROW_FIELDS},c.family,k.record_key,conversation_search.rowid,p.revision_id FROM conversation_search
                  JOIN reader_document_keys k ON k.id=conversation_search.rowid
                  JOIN cached_resources c ON c.id=k.resource_id JOIN reader_rows v ON v.id=c.item_id
+                 LEFT JOIN pr_family_resources p ON p.resource_id=c.id
                  WHERE conversation_search MATCH ?3 AND {SCOPE} ORDER BY conversation_search.rowid");
             let mut discussion = db.prepare_cached(&discussion_sql)?;
             let mut excerpts = db.prepare_cached("SELECT snippet(conversation_search,0,'[',']','…',18)
@@ -87,6 +91,7 @@ impl Store {
                     row: row_at(row, 0)?,
                     source,
                     anchor: Some(row.get(11)?),
+                    pr_revision: row.get(13)?,
                     excerpt,
                 });
                 if hits.len() == limit {
@@ -102,8 +107,9 @@ impl Store {
               SELECT count(*) AS n,coalesce(sum(coalesce(length(cast(title AS BLOB)),0)+coalesce(length(cast(body AS BLOB)),0)),0) AS bytes
               FROM items WHERE account_id=?1 AND (title_at IS NOT NULL OR body_at IS NOT NULL)),
               records_total AS (SELECT count(*) AS n,coalesce(sum(length(cast(r.body AS BLOB))),0) AS bytes
-              FROM cached_resources c JOIN cached_resource_records r ON c.id=r.resource_id WHERE c.account_id=?1 AND c.family IN ('comments','reviews','review-threads'))
+              FROM cached_resources c JOIN cached_resource_records r ON c.id=r.resource_id WHERE c.account_id=?1 AND (c.family IN ('comments','reviews','review-threads') OR c.family GLOB 'pr:reviews:*' OR c.family GLOB 'pr:threads:*'))
               SELECT i.n,r.n,i.bytes+r.bytes,(SELECT count(*) FROM issue_downloads WHERE account_id=?1 AND state='complete')
+                  +(SELECT COUNT(*) FROM pr_downloads d JOIN pr_revisions p ON p.id=d.revision_id WHERE p.account_id=?1 AND d.state='complete')
               FROM items_total i CROSS JOIN records_total r", [account], |r| {
                 Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
             })?;

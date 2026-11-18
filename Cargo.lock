@@ -7211,6 +7211,8 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "iana-time-zone",
+ "markdown",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
@@ -7232,6 +7234,7 @@ dependencies = [
 name = "threadline-storage"
 version = "0.1.0"
 dependencies = [
+ "regex",
  "rusqlite",
  "serde",
  "serde_json",

@@ -11,6 +11,8 @@ pub struct Tab {
 }
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct TabView {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr_reader: Option<crate::pr::PrTabView>,
     pub scroll_offset: u64,
     pub scroll_anchor: Option<String>,
     pub navigation: Option<String>,
@@ -114,6 +116,11 @@ fn validate_workspace(
                 return Err(Error::InvalidInput("duplicate or empty tab identity"));
             }
             check_item(db, account, tab.item)?;
+            if tab.view.pr_reader.is_some() && item_kind(db, account, tab.item)? != "pull_request" {
+                return Err(Error::InvalidInput(
+                    "PR view requires a confirmed pull request",
+                ));
+            }
             if let Some(context) = &tab.view.context {
                 check_context(db, account, tab.item, context)?;
             }
@@ -337,38 +344,7 @@ impl Store {
         revision: &str,
         candidates: &[ReferenceCandidate],
     ) -> Result<()> {
-        self.write(|tx|{
-            if revision.is_empty() || item_kind(tx,account,pr)?!="pull_request" {return Err(Error::InvalidInput("invalid PR reference source"))}
-            let current:Option<String>=tx.query_row("SELECT body_revision FROM pr_reference_sets WHERE account_id=? AND pr_id=?",params![account,pr],|r|r.get(0)).optional()?;
-            if current.as_deref()!=previous {return Err(Error::Conflict("PR body revision changed"))}
-            // Carry forward only a previously verified identical reference and provenance.
-            let previous_candidates=read_candidates(tx,account,pr)?;
-            tx.execute("INSERT INTO pr_reference_sets VALUES(?,?,?) ON CONFLICT(account_id,pr_id) DO UPDATE SET body_revision=excluded.body_revision",params![account,pr,revision])?;
-            tx.execute("DELETE FROM pr_reference_candidates WHERE account_id=? AND pr_id=?",params![account,pr])?;
-            for candidate in candidates {
-                if candidate.position<0 || candidate.raw.is_empty() || candidate.provenance.is_empty(){return Err(Error::InvalidInput("invalid PR reference candidate"))}
-                let verified=candidate.verified.or_else(||{
-                    previous_candidates.iter().find(|p|p.raw==candidate.raw && p.provenance==candidate.provenance).and_then(|p|p.verified)
-                });
-                if let Some((issue,_))=verified && item_kind(tx,account,issue)?!="issue" {return Err(Error::InvalidInput("reference target must be a verified issue"))}
-                tx.execute("INSERT INTO pr_reference_candidates VALUES(?,?,?,?,?,?,?)",params![account,pr,candidate.position,candidate.raw,candidate.provenance,verified.map(|v|v.0),verified.map(|v|v.1)])?;
-            }
-            tx.execute("UPDATE pr_contexts SET body_revision=?3 WHERE account_id=?1 AND pr_id=?2",params![account,pr,revision])?;
-            tx.execute("UPDATE pr_contexts AS c SET mode='pr',issue_id=NULL,provenance='' WHERE account_id=?1 AND pr_id=?2 AND mode='issue'
-                AND NOT EXISTS(SELECT 1 FROM pr_reference_candidates r WHERE r.account_id=c.account_id AND r.pr_id=c.pr_id AND r.verified_issue=c.issue_id AND r.provenance=c.provenance)",params![account,pr])?;
-            let layout:Option<String>=tx.query_row("SELECT layout FROM workspaces WHERE account_id=?",[account],|r|r.get(0)).optional()?;
-            if let Some(raw)=layout{
-                let mut layout:Workspace=parse(&raw)?;
-                for tab in layout.panes.iter_mut().flat_map(|p|&mut p.tabs).filter(|t|t.item==pr) {
-                    if let Some(ctx)=&mut tab.view.context {
-                        ctx.body_revision=revision.to_owned();
-                        if ctx.selected_issue.is_some() && !verified_context(tx,account,pr,ctx)? {ctx.selected_issue=None;ctx.provenance.clear();}
-                    }
-                }
-                write_workspace(tx,account,&layout)?;
-            }
-            Ok(())
-        })
+        self.write(|tx| replace_refs_in(tx, account, pr, previous, revision, candidates))
     }
     pub fn pr_references(&self, account: AccountId, pr: ItemId) -> Result<Vec<ReferenceCandidate>> {
         self.read(|db| read_candidates(db, account, pr))
@@ -379,12 +355,43 @@ impl Store {
         pr: ItemId,
         context: &PrContext,
     ) -> Result<()> {
-        self.write(|tx|{
-            check_context(tx,account,pr,context)?;
-            tx.execute("INSERT INTO pr_contexts VALUES(?,?,?,?,?,?,?) ON CONFLICT(account_id,pr_id) DO UPDATE SET mode=excluded.mode,issue_id=excluded.issue_id,
-                body_revision=excluded.body_revision,provenance=excluded.provenance,context_ratio=excluded.context_ratio",
-                params![account,pr,if context.selected_issue.is_some(){"issue"}else{"pr"},context.selected_issue,context.body_revision,context.provenance,context.ratio])?;
-            Ok(())
+        self.write(|tx| put_context(tx, account, pr, context))
+    }
+    /// Remember the verified selection as the PR default and update only the named open tab.
+    pub fn set_pr_tab_context(
+        &self,
+        account: AccountId,
+        pr: ItemId,
+        tab_id: &str,
+        context: &PrContext,
+        mode: crate::pr::PrContextMode,
+    ) -> Result<()> {
+        if mode == crate::pr::PrContextMode::Issue && context.selected_issue.is_none() {
+            return Err(Error::Conflict("Issue context requires a verified issue"));
+        }
+        self.write(|tx| {
+            put_context(tx, account, pr, context)?;
+            let raw = tx
+                .query_row(
+                    "SELECT layout FROM workspaces WHERE account_id=?",
+                    [account],
+                    |r| r.get::<_, String>(0),
+                )
+                .optional()?
+                .ok_or(Error::NotFound)?;
+            let mut workspace: Workspace = parse(&raw)?;
+            let tab = workspace
+                .panes
+                .iter_mut()
+                .flat_map(|p| &mut p.tabs)
+                .find(|t| t.id == tab_id && t.item == pr)
+                .ok_or(Error::Conflict("The target PR tab has changed"))?;
+            tab.view.context = Some(context.clone());
+            tab.view
+                .pr_reader
+                .get_or_insert_with(Default::default)
+                .context_mode = mode;
+            write_workspace(tx, account, &workspace)
         })
     }
     pub fn pr_context(&self, account: AccountId, pr: ItemId) -> Result<Option<PrContext>> {
@@ -464,6 +471,138 @@ impl Store {
     ) -> Result<bool> {
         self.write(|tx|Ok(tx.execute("DELETE FROM drafts WHERE account_id=? AND id=? AND editor=? AND editor_until>? AND revision=?",params![account,id,editor,now,revision])?==1))
     }
+}
+
+pub(crate) fn replace_refs_in(
+    tx: &Transaction<'_>,
+    account: AccountId,
+    pr: ItemId,
+    previous: Option<&str>,
+    revision: &str,
+    candidates: &[ReferenceCandidate],
+) -> Result<()> {
+    if revision.is_empty() || item_kind(tx, account, pr)? != "pull_request" {
+        return Err(Error::InvalidInput("invalid PR reference source"));
+    }
+    let current: Option<String> = tx
+        .query_row(
+            "SELECT body_revision FROM pr_reference_sets WHERE account_id=? AND pr_id=?",
+            params![account, pr],
+            |r| r.get(0),
+        )
+        .optional()?;
+    if current.as_deref() != previous {
+        return Err(Error::Conflict("PR body revision changed"));
+    }
+    // Carry forward only a previously verified identical reference and provenance.
+    let previous_candidates = read_candidates(tx, account, pr)?;
+    tx.execute("INSERT INTO pr_reference_sets VALUES(?,?,?) ON CONFLICT(account_id,pr_id) DO UPDATE SET body_revision=excluded.body_revision",params![account,pr,revision])?;
+    tx.execute(
+        "DELETE FROM pr_reference_candidates WHERE account_id=? AND pr_id=?",
+        params![account, pr],
+    )?;
+    for candidate in candidates {
+        if candidate.position < 0 || candidate.raw.is_empty() || candidate.provenance.is_empty() {
+            return Err(Error::InvalidInput("invalid PR reference candidate"));
+        }
+        let verified = candidate.verified.or_else(|| {
+            previous_candidates
+                .iter()
+                .find(|p| p.raw == candidate.raw && p.provenance == candidate.provenance)
+                .and_then(|p| p.verified)
+        });
+        if let Some((issue, _)) = verified
+            && item_kind(tx, account, issue)? != "issue"
+        {
+            return Err(Error::InvalidInput(
+                "reference target must be a verified issue",
+            ));
+        }
+        tx.execute(
+            "INSERT INTO pr_reference_candidates VALUES(?,?,?,?,?,?,?)",
+            params![
+                account,
+                pr,
+                candidate.position,
+                candidate.raw,
+                candidate.provenance,
+                verified.map(|v| v.0),
+                verified.map(|v| v.1)
+            ],
+        )?;
+    }
+    refresh_contexts_in(tx, account, pr, revision)
+}
+
+fn put_context(
+    tx: &Transaction<'_>,
+    account: AccountId,
+    pr: ItemId,
+    context: &PrContext,
+) -> Result<()> {
+    check_context(tx, account, pr, context)?;
+    tx.execute(
+        "INSERT INTO pr_contexts VALUES(?,?,?,?,?,?,?) ON CONFLICT(account_id,pr_id) DO UPDATE SET
+         mode=excluded.mode,issue_id=excluded.issue_id,body_revision=excluded.body_revision,
+         provenance=excluded.provenance,context_ratio=excluded.context_ratio",
+        params![
+            account,
+            pr,
+            if context.selected_issue.is_some() {
+                "issue"
+            } else {
+                "pr"
+            },
+            context.selected_issue,
+            context.body_revision,
+            context.provenance,
+            context.ratio
+        ],
+    )?;
+    Ok(())
+}
+
+pub(crate) fn refresh_contexts_in(
+    tx: &Transaction<'_>,
+    account: AccountId,
+    pr: ItemId,
+    revision: &str,
+) -> Result<()> {
+    tx.execute(
+        "UPDATE pr_contexts SET body_revision=?3 WHERE account_id=?1 AND pr_id=?2",
+        params![account, pr, revision],
+    )?;
+    tx.execute("UPDATE pr_contexts AS c SET mode='pr',issue_id=NULL,provenance='' WHERE account_id=?1 AND pr_id=?2 AND mode='issue'
+                AND NOT EXISTS(SELECT 1 FROM pr_reference_candidates r WHERE r.account_id=c.account_id AND r.pr_id=c.pr_id AND r.verified_issue=c.issue_id AND r.provenance=c.provenance)",params![account,pr])?;
+    let layout: Option<String> = tx
+        .query_row(
+            "SELECT layout FROM workspaces WHERE account_id=?",
+            [account],
+            |r| r.get(0),
+        )
+        .optional()?;
+    if let Some(raw) = layout {
+        let mut layout: Workspace = parse(&raw)?;
+        for tab in layout
+            .panes
+            .iter_mut()
+            .flat_map(|p| &mut p.tabs)
+            .filter(|t| t.item == pr)
+        {
+            if let Some(ctx) = &mut tab.view.context {
+                ctx.body_revision = revision.to_owned();
+                if ctx.selected_issue.is_some() && !verified_context(tx, account, pr, ctx)? {
+                    ctx.selected_issue = None;
+                    if let Some(reader) = &mut tab.view.pr_reader {
+                        reader.context_mode = crate::pr::PrContextMode::Body;
+                    }
+                    ctx.provenance.clear();
+                }
+            }
+        }
+        write_workspace(tx, account, &layout)?;
+    }
+    Ok(())
 }
 
 fn item_kind(db: &rusqlite::Connection, account: AccountId, item: ItemId) -> Result<String> {
