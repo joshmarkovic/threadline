@@ -241,24 +241,36 @@ impl ReaderWorkspace {
         cx: &mut Context<Self>,
     ) {
         let Some(account) = self.account else { return };
+        let actor = self.actor;
         let id = tab.id;
+        let query = cursor.clone();
         self.launch(
             window,
             cx,
-            move |store| store.discussion_page(account, tab.item, Some(&cursor), PAGE),
+            move |store| {
+                let page = store.discussion_page(account, tab.item, Some(&query), PAGE)?;
+                let editable =
+                    super::outbox::editable_comments(store, account, tab.item, actor, &page)?;
+                Ok((page, editable))
+            },
             move |this, result, _, cx| {
                 let Some(view) = this.tab_views.get_mut(&id) else {
                     return;
                 };
-                if let Ok(page) = result {
-                    for record in &page.records {
+                if view.data.discussion.next.as_ref() != Some(&cursor) {
+                    return;
+                }
+                if let Ok((page, editable)) = result {
+                    for record in page.records {
                         if !view.notes.iter().any(|(key, _)| *key == record.key) {
                             view.notes.push((
                                 record.key.clone(),
                                 media::CachedMarkdown::new(&record.body, cx),
                             ));
+                            view.data.discussion.records.push(record);
                         }
                     }
+                    view.data.editable_comments.extend(editable);
                     view.data.discussion.metadata.extend(page.metadata);
                     view.data.discussion.next = page.next;
                     view.data.discussion.state = page.state;
@@ -412,12 +424,16 @@ impl ReaderWorkspace {
                     this.browse(false, window, cx);
                 }),
             ))
-            .child(rail(
+            .child(self.observed_control(
                 "reader-outbox",
-                "Outbox",
-                "active account",
-                outbox,
-                cx.listener(|this, _, window, cx| this.show_outbox(false, window, cx)),
+                rail(
+                    "reader-outbox",
+                    "Outbox",
+                    "active account",
+                    outbox,
+                    cx.listener(|this, _, window, cx| this.show_outbox(false, window, cx)),
+                ),
+                false,
             ));
         div()
             .id("reader-navigation")
@@ -999,7 +1015,7 @@ impl ReaderWorkspace {
             _ => "State not downloaded",
         };
         let mut notes = div().flex().flex_col().gap_3();
-        for (key, text) in &view.notes {
+        for (index, (key, text)) in view.notes.iter().enumerate() {
             let selected = tab.view.scroll_anchor.as_ref() == Some(key);
             let metadata = view
                 .data
@@ -1023,7 +1039,34 @@ impl ReaderWorkspace {
                             time_label(Some(entry.created_at_ms))
                         ))
                     }))
-                    .child(self.markdown_element(text, Some(item.locator.repository), palette, cx)),
+                    .child(self.markdown_element(text, Some(item.locator.repository), palette, cx))
+                    .children(
+                        view.data
+                            .editable_comments
+                            .get(key)
+                            .copied()
+                            .zip(view.data.discussion.records.get(index))
+                            .map(|(comment, original)| {
+                                let id = format!("reader-edit-comment-{pane}-{index}");
+                                let body = original.body.clone();
+                                let tab = tab.clone();
+                                self.observed_control(
+                                    id.clone(),
+                                    control(id, "Edit my comment").on_click(cx.listener(
+                                        move |this, _, window, cx| {
+                                            this.edit_comment(
+                                                tab.clone(),
+                                                comment,
+                                                body.clone(),
+                                                window,
+                                                cx,
+                                            );
+                                        },
+                                    )),
+                                    false,
+                                )
+                            }),
+                    ),
             );
         }
         let job = view
@@ -1117,19 +1160,8 @@ impl ReaderWorkspace {
                         }
                     }))
             }).collect::<Vec<_>>())
-            .children(view.data.projections.iter().map(|projection| {
-                div()
-                    .p_2()
-                    .border_1()
-                    .border_color(palette.accent)
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(palette.accent)
-                            .child(format!("Pending local action · {:?}", projection.state)),
-                    )
-                    .child(div().text_sm().child(projection.value.clone()))
-            }))
+            .children(view.data.projections.iter().enumerate().map(|(index,projection)|
+                self.pending_write_projection(pane,index,tab,projection,palette,cx)).collect::<Vec<_>>())
             .children(view.data.discussion.next.as_ref().map(|cursor| {
                 let cursor = cursor.clone();
                 let more = tab.clone();
@@ -1148,19 +1180,39 @@ impl ReaderWorkspace {
             .flex_wrap()
             .gap_2()
             .children((item.kind == ItemKind::Issue).then(|| {
-                control(format!("reader-edit-issue-{pane}"), "Edit issue draft").on_click(
-                    cx.listener(move |this, _, window, cx| {
-                        this.edit(edit.clone(), DraftKind::IssueEdit, window, cx)
-                    }),
+                let id = format!("reader-edit-issue-{pane}");
+                self.observed_control(
+                    id.clone(),
+                    control(id, "Edit issue draft").on_click(cx.listener(
+                        move |this, _, window, cx| {
+                            this.edit(edit.clone(), DraftKind::IssueEdit, window, cx)
+                        },
+                    )),
+                    false,
                 )
             }))
-            .child(
+            .children((item.kind == ItemKind::Issue && self.can_fetch()).then(|| {
+                let tab = tab.clone();
+                let id = format!("reader-edit-choices-{pane}");
+                self.observed_control(
+                    id.clone(),
+                    control(id, "Download editing choices").on_click(cx.listener(
+                        move |this, _, window, cx| {
+                            this.fetch_editing_options(tab.clone(), window, cx)
+                        },
+                    )),
+                    false,
+                )
+            }))
+            .child(self.observed_control(
+                format!("reader-draft-comment-{pane}"),
                 control(format!("reader-draft-comment-{pane}"), "Draft a comment").on_click(
                     cx.listener(move |this, _, window, cx| {
                         this.edit(comment.clone(), DraftKind::Comment, window, cx)
                     }),
                 ),
-            )
+                false,
+            ))
             .children((item.kind == ItemKind::Issue).then(|| {
                 let name = format!("reader-download-{pane}");
                 let disabled = job.is_some_and(|(_, state)| state == DownloadState::Complete);
@@ -1256,6 +1308,13 @@ impl ReaderWorkspace {
                     .flex()
                     .flex_col()
                     .gap_2()
+                    .child(self.issue_option_controls(
+                        pane,
+                        editor,
+                        view.data.write_choices.as_ref(),
+                        palette,
+                        cx,
+                    ))
                     .child(
                         div().id(format!("reader-draft-input-{pane}")).child(
                             self.observed_control(
@@ -1275,8 +1334,17 @@ impl ReaderWorkspace {
                         "Saving local draft…"
                     }))
                     .child(
-                        control(format!("reader-draft-preview-{pane}"), "Preview draft")
-                            .on_click(cx.listener(move |this, _, _, cx| this.preview(&id, cx))),
+                        div()
+                            .flex()
+                            .gap_2()
+                            .items_center()
+                            .child(
+                                control(format!("reader-draft-preview-{pane}"), "Preview draft")
+                                    .on_click(
+                                        cx.listener(move |this, _, _, cx| this.preview(&id, cx)),
+                                    ),
+                            )
+                            .child(self.submit_control(pane, editor, cx)),
                     )
                     .children(editor.preview.as_ref().map(|text| {
                         self.markdown_element(text, Some(item.locator.repository), palette, cx)
@@ -1485,16 +1553,7 @@ impl ReaderWorkspace {
         match self.surface {
             Surface::Sync=>div().flex_1().min_h_0().children(self.sync_panel.clone()).into_any_element(),
             Surface::Browse=>self.browse_view(palette,cx).into_any_element(),
-            Surface::Outbox=>div().p_3().flex().flex_col().gap_3().id("reader-outbox-list").overflow_y_scroll().flex_1()
-                .child(div().text_lg().child("Outbox"))
-                .child(div().text_sm().child("Submitted work stays here while it is pending. Drafts and downloads use separate controls."))
-                .children(self.queue.iter().map(|row|{
-                    let item=row.item;
-                    control(format!("reader-outbox-{}",row.sequence),format!("{:?} · {:?} · item {}",row.kind,row.state,item.0))
-                        .on_click(cx.listener(move |this,_,window,cx|this.open(item,None,false,false,window,cx)))
-                }).collect::<Vec<_>>())
-                .children((self.queue.len()>=usize::from(PAGE)).then(||control("reader-more-outbox","More actions")
-                    .on_click(cx.listener(|this,_,window,cx|this.show_outbox(true,window,cx))))).into_any_element(),
+            Surface::Outbox=>self.outbox_view(palette,cx),
             Surface::Storage=>div().id("reader-storage-usage").flex().flex_col().gap_3().p_4()
                 .child(div().text_lg().child("Downloaded content"))
                 .children(self.cache.map(|cache|div().child(format!("{} summaries · {} discussion records · {} text bytes · {} offline downloads",

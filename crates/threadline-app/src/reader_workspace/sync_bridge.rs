@@ -68,6 +68,10 @@ impl ReaderWorkspace {
             self.resume_visible_pr_downloads(window, cx);
         }
         if changed {
+            self.refresh_sidebar_counts(window, cx);
+            if self.surface == Surface::Outbox {
+                self.show_outbox(false, window, cx);
+            }
             let visible = self
                 .layout
                 .panes

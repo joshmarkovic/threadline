@@ -170,6 +170,7 @@ fn ui_008_cached_markdown_and_native_editor_survive_immediate_orderly_exit(
     );
 }
 
+#[track_caller]
 fn until(cx: &mut TestAppContext, mut check: impl FnMut(&TestAppContext) -> bool) {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(8);
     while std::time::Instant::now() < deadline {
@@ -926,5 +927,196 @@ fn ui_001_pr_context_changes_keep_the_immutable_native_diff_and_each_tabs_state(
     assert_eq!(
         duplicate.pr_reader.as_ref().unwrap().section,
         PrSection::Conversation
+    );
+}
+
+#[gpui_kit::test]
+fn ui_006_native_offline_edit_keeps_saved_text_and_cancels_the_original_queue_target(
+    cx: &mut TestAppContext,
+) {
+    use threadline_storage::{queue::State, writes::WriteIntent};
+    let setup = ReaderHarness::seeded();
+    let account = setup.fixture.account;
+    let item = setup.fixture.long_discussion;
+    let tab = Tab {
+        id: "existing-issue-write".into(),
+        item,
+        view: TabView::default(),
+    };
+    setup.one_pane(&tab);
+    let previous = setup.store.queue_page(account, 0, 100).unwrap();
+    let previous_title = setup.store.item(account, item).unwrap().unwrap().title;
+    let (window, reader) = setup.open(cx);
+    click(cx, window, "reader-edit-issue-0");
+    let draft_id = format!("issue-{}", item.0);
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let reader = reader.read(cx);
+            !reader.layout_busy && reader.drafts.contains_key(&draft_id)
+        })
+    });
+    cx.update_window(window, |_, window, cx| {
+        window.simulate_next_frame(cx);
+        window.render_frame(cx);
+        window.click("reader-issue-title-0", cx);
+        window.press("secondary-a", cx);
+        window.input("Revised title saved offline", cx);
+        let body = reader.read(cx).drafts[&draft_id].view.clone();
+        body.focus_handle(cx).focus(window, cx);
+        window.render_frame(cx);
+        window.press("secondary-a", cx);
+        window.input("Preserve this local Markdown after cancellation", cx);
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).drafts[&draft_id].saved())
+    });
+    assert_eq!(setup.store.queue_page(account, 0, 100).unwrap(), previous);
+    click(cx, window, "reader-submit-0");
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).drafts[&draft_id].submitted.is_some())
+    });
+    let page = setup.store.queue_page(account, 0, 100).unwrap();
+    assert_eq!(page.len(), previous.len() + 1);
+    let queued = page.last().unwrap();
+    assert_eq!(queued.item, item);
+    assert_eq!(queued.state, State::Queued);
+    let Some(WriteIntent::EditIssue(changes)) =
+        setup.store.write_intent(account, &queued.id).unwrap()
+    else {
+        panic!("expected existing issue write")
+    };
+    assert_eq!(changes.title.unwrap().wanted, "Revised title saved offline");
+    assert_eq!(
+        changes.body.unwrap().wanted.as_deref(),
+        Some("Preserve this local Markdown after cancellation")
+    );
+    assert_eq!(
+        setup.store.item(account, item).unwrap().unwrap().title,
+        previous_title
+    );
+
+    click(cx, window, "reader-outbox");
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).queue.iter().any(|row| row.id == queued.id))
+    });
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        window.click(format!("reader-outbox-action-{}", page.len() - 1), cx);
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).outbox.selected_state().as_deref() == Some("Queued"))
+    });
+    click(cx, window, "reader-outbox-cancel");
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).outbox.selected_state().as_deref() == Some("Cancelled"))
+    });
+    click(cx, window, "reader-outbox-filter-history");
+    click(cx, window, "reader-outbox-pause");
+    until(cx, |cx| cx.read(|cx| reader.read(cx).outbox.is_paused()));
+    let reopened = Store::open(&setup._directory.path().join("s04-ui.sqlite")).unwrap();
+    let saved = reopened.operation(account, &queued.id).unwrap().unwrap();
+    assert_eq!(saved.state, State::Cancelled);
+    assert_eq!(saved.item, item);
+    assert_eq!(
+        saved.snapshot.draft.unwrap().body,
+        "Preserve this local Markdown after cancellation"
+    );
+    assert!(
+        reopened
+            .sync_settings(account)
+            .unwrap()
+            .controls
+            .pause_queued_actions
+    );
+    assert_eq!(
+        reopened
+            .draft(account, &draft_id)
+            .unwrap()
+            .unwrap()
+            .content
+            .body,
+        "Preserve this local Markdown after cancellation"
+    );
+}
+
+#[gpui_kit::test]
+fn ui_006_registered_native_commands_offer_edits_and_comments_without_issue_creation(
+    cx: &mut TestAppContext,
+) {
+    use threadline_storage::{queue::ActionKind, writes::WriteIntent};
+    let setup = ReaderHarness::seeded();
+    let account = setup.fixture.account;
+    let item = setup.fixture.long_discussion;
+    let tab = Tab {
+        id: "issue-command-inventory".into(),
+        item,
+        view: TabView::default(),
+    };
+    setup.one_pane(&tab);
+    let previous = setup.store.queue_page(account, 0, 100).unwrap();
+    let (window, reader) = setup.open(cx);
+    let prohibit_issue_creation = |label: &str| {
+        let key: String = label
+            .chars()
+            .filter(char::is_ascii_alphabetic)
+            .map(|character| character.to_ascii_lowercase())
+            .collect();
+        assert!(
+            !key.contains("newissue") && !key.contains("createissue"),
+            "unexpected issue-creation command {label}"
+        );
+    };
+    cx.update_window(window, |_, window, cx| {
+        crate::workspace::bind_shortcuts(cx);
+        window.render_frame(cx);
+        assert!(window.find("reader-edit-issue-0").visible());
+        assert!(window.find("reader-draft-comment-0").visible());
+        for command in cx.all_action_names() {
+            prohibit_issue_creation(command);
+        }
+        for element in gpui_kit::base::test_support::snapshots(window) {
+            if let Some(label) = element.label() {
+                prohibit_issue_creation(label);
+            }
+        }
+        assert!(cx.build_action("threadline::NewIssue", None).is_err());
+        window.press("secondary-n", cx);
+        assert_eq!(reader.read(cx).layout.panes[0].tabs.len(), 1);
+    })
+    .unwrap();
+    assert_eq!(setup.store.queue_page(account, 0, 100).unwrap(), previous);
+    click(cx, window, "reader-draft-comment-0");
+    let draft_id = format!("comment-{}", item.0);
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let reader = reader.read(cx);
+            !reader.layout_busy && reader.drafts.contains_key(&draft_id)
+        })
+    });
+    cx.update_window(window, |_, window, cx| {
+        window.simulate_next_frame(cx);
+        window.render_frame(cx);
+        window.input("A regular comment on an existing issue", cx);
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).drafts[&draft_id].saved())
+    });
+    assert_eq!(setup.store.queue_page(account, 0, 100).unwrap(), previous);
+    click(cx, window, "reader-submit-0");
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).drafts[&draft_id].submitted.is_some())
+    });
+    let queued = setup.store.queue_page(account, 0, 100).unwrap();
+    assert_eq!(queued.len(), previous.len() + 1);
+    let queued = queued.last().unwrap();
+    assert_eq!((queued.kind, queued.item), (ActionKind::Comment, item));
+    assert_eq!(
+        setup.store.write_intent(account, &queued.id).unwrap(),
+        Some(WriteIntent::CreateComment {
+            body: "A regular comment on an existing issue".into()
+        })
     );
 }

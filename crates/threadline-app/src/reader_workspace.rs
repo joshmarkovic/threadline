@@ -19,6 +19,7 @@ use threadline_storage::{
 
 mod drafts;
 mod media;
+mod outbox;
 mod pr;
 mod pr_view;
 mod remote;
@@ -27,6 +28,7 @@ mod sync_bridge;
 #[cfg(all(test, feature = "e2e"))]
 mod tests;
 mod view;
+mod write_composer;
 pub(crate) use view::bind_shortcuts;
 
 const PAGE: u16 = 40;
@@ -54,6 +56,7 @@ pub(crate) struct ReaderObservation {
     pub tab_counts: Vec<usize>,
     pub focused_pane: usize,
     pub active_item: Option<i64>,
+    pub active_number: Option<u64>,
     pub cached_content_ready: bool,
     pub search_results: Option<usize>,
     pub search_generation: Option<u64>,
@@ -73,6 +76,11 @@ pub(crate) struct ReaderObservation {
     pub pull_request: Option<pr_view::PrObservation>,
     pub pending_pr_reads: usize,
     pub outbox: Option<u64>,
+    pub outbox_visible: bool,
+    pub outbox_action_state: Option<String>,
+    pub outbox_action_cancel_requested: bool,
+    pub outbox_paused: bool,
+    pub active_draft_submitted: Option<bool>,
 }
 
 #[cfg(feature = "e2e")]
@@ -110,6 +118,7 @@ pub(crate) struct ReaderWorkspace {
     pr_resume_attempts: std::collections::HashSet<(i64, i64)>,
     account: Option<AccountId>,
     login: String,
+    actor: Option<std::num::NonZeroU64>,
     access: AccessState,
     offline: bool,
     reachability: Reachability,
@@ -156,6 +165,7 @@ pub(crate) struct ReaderWorkspace {
     sync_render_watch: Option<Subscription>,
     cache: Option<CacheUsage>,
     queue: Vec<QueueRow>,
+    outbox: outbox::OutboxState,
     drafts: HashMap<String, drafts::Editor>,
     pending_draft: Option<String>,
     editor_to_focus: Option<String>,
@@ -182,6 +192,8 @@ struct ItemData {
     timeline: TimelinePage,
     linked_items: HashMap<String, ItemId>,
     projections: Vec<Projection>,
+    write_choices: Option<threadline_storage::writes::CachedRepositoryChoices>,
+    editable_comments: std::collections::HashMap<String, std::num::NonZeroU64>,
     download: Option<IssueDownload>,
 }
 
@@ -258,6 +270,9 @@ impl ReaderWorkspace {
                 .collect(),
             focused_pane: self.layout.focused_pane,
             active_item: active.map(|tab| tab.item.0),
+            active_number: cached
+                .and_then(|view| view.data.item.as_ref())
+                .map(|item| item.locator.number),
             cached_content_ready: active
                 .and_then(|tab| self.tab_views.get(&tab.id))
                 .is_some_and(|view| view.data.item.is_some()),
@@ -303,6 +318,12 @@ impl ReaderWorkspace {
             pull_request: active.and_then(|tab| self.pr_observation(tab, cx)),
             pending_pr_reads: self.pr_reads.len(),
             outbox: self.counts.map(|counts| counts.outbox),
+            outbox_visible: self.surface == Surface::Outbox,
+            outbox_action_state: self.outbox.selected_state(),
+            outbox_action_cancel_requested: self.outbox.cancel_requested(),
+            outbox_paused: self.outbox.is_paused(),
+            active_draft_submitted: draft
+                .map(|draft| draft.submitted == Some(draft.durable_revision)),
         }
     }
     pub(crate) fn new(
@@ -356,6 +377,7 @@ impl ReaderWorkspace {
             pr_resume_attempts: std::collections::HashSet::new(),
             account: None,
             login: String::new(),
+            actor: None,
             access: AccessState::Unchecked,
             offline: false,
             reachability: Reachability::NotAttempted,
@@ -402,6 +424,7 @@ impl ReaderWorkspace {
             sync_render_watch: None,
             cache: None,
             queue: Vec::new(),
+            outbox: outbox::OutboxState::default(),
             drafts: HashMap::new(),
             pending_draft: None,
             editor_to_focus: None,
@@ -499,6 +522,7 @@ impl ReaderWorkspace {
             .eq(repositories.iter().map(|repo| (repo.id, repo.selected)));
         self.offline = offline;
         self.access = profile.map_or(AccessState::Unchecked, |item| item.access);
+        self.actor = profile.map(|profile| profile.user_id);
         self.login = profile.map_or_else(String::new, |item| item.login.clone());
         if changed || can_fetch_before != self.can_fetch() {
             self.pr_resume_attempts.clear();
@@ -544,6 +568,7 @@ impl ReaderWorkspace {
             }
             self.rows.clear();
             self.queue.clear();
+            self.outbox = outbox::OutboxState::default();
             self.tab_views.clear();
             self.pending_tabs.clear();
             self.search_hits = None;
@@ -633,7 +658,11 @@ impl ReaderWorkspace {
             cx.notify();
             return;
         }
-        if self.drafts.values().any(|editor| !editor.saved()) {
+        if self
+            .drafts
+            .values()
+            .any(|editor| !editor.saved() || editor.submitting)
+        {
             self.status = Some("Saving drafts before leaving the workspace…");
             cx.notify();
             return;
@@ -810,6 +839,9 @@ impl ReaderWorkspace {
             self.surface = Surface::Outbox;
             self.surface_focus.focus(window, cx);
         }
+        self.refresh_outbox_state(window, cx);
+        self.outbox.queue_generation += 1;
+        let generation = self.outbox.queue_generation;
         let after = if more {
             self.queue.last().map_or(0, |row| row.sequence)
         } else {
@@ -819,14 +851,19 @@ impl ReaderWorkspace {
             window,
             cx,
             move |store| store.queue_page(account, after, PAGE),
-            move |this, result, _, _| match result {
-                Ok(rows) => {
-                    if !more {
-                        this.queue.clear();
-                    }
-                    this.queue.extend(rows);
+            move |this, result, _, _| {
+                if this.outbox.queue_generation != generation {
+                    return;
                 }
-                Err(_) => this.status = Some("The local Outbox could not be read."),
+                match result {
+                    Ok(rows) => {
+                        if !more {
+                            this.queue.clear();
+                        }
+                        this.queue.extend(rows);
+                    }
+                    Err(_) => this.status = Some("The local Outbox could not be read."),
+                }
             },
         );
         cx.notify();
@@ -919,6 +956,7 @@ impl ReaderWorkspace {
         let Some(account) = self.account else { return };
         let item = tab.item;
         let id = tab.id.clone();
+        let actor = self.actor;
         self.tab_generation += 1;
         let request = self.tab_generation;
         self.pending_tabs.insert(id.clone(), request);
@@ -954,6 +992,19 @@ impl ReaderWorkspace {
                 } else {
                     None
                 };
+                let write_choices = if cached
+                    .as_ref()
+                    .is_some_and(|item| item.kind == threadline_storage::ItemKind::Issue)
+                {
+                    Some(store.write_choices(
+                        account,
+                        cached.as_ref().expect("cached issue").locator.repository,
+                    )?)
+                } else {
+                    None
+                };
+                let editable_comments =
+                    outbox::editable_comments(store, account, item, actor, &discussion)?;
                 Ok(ItemData {
                     item: cached,
                     pr,
@@ -963,6 +1014,8 @@ impl ReaderWorkspace {
                     timeline,
                     linked_items,
                     projections: store.projections(account, item)?,
+                    write_choices,
+                    editable_comments,
                     download: store.issue_download(account, item)?,
                 })
             },

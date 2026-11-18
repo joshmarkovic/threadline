@@ -1,21 +1,24 @@
+use super::write_composer::{IssueEditor, WriteBase};
 use super::*;
 use gpui_kit::base::input::TextareaState;
 use gpui_kit::{Subscription, component::input::InputEvent};
 use threadline_storage::{
     queue::{DraftContent, DraftKind},
     resources::{ResourceFamily, ResourceKey, ResourceTarget},
+    writes::CommentTarget,
 };
 use tokio::{sync::watch, task::JoinHandle};
 
 #[derive(Clone)]
 struct DraftUpdate {
     serial: u64,
-    body: String,
+    content: DraftContent,
 }
 
 struct Acknowledgement {
     serial: Option<u64>,
     saved: bool,
+    revision: Option<i64>,
 }
 
 struct OwnedDraft {
@@ -23,7 +26,6 @@ struct OwnedDraft {
     id: String,
     lease: String,
     revision: i64,
-    content: DraftContent,
 }
 
 pub(super) struct Editor {
@@ -32,14 +34,24 @@ pub(super) struct Editor {
     pub(super) view: Entity<TextareaState>,
     pub(super) preview: Option<media::CachedMarkdown>,
     pub(super) failed: bool,
-    account: AccountId,
-    lease: String,
-    body: String,
+    pub(super) account: AccountId,
+    pub(super) item: ItemId,
+    pub(super) lease: String,
+    pub(super) body: String,
+    anchor: String,
+    base: String,
+    pub(super) durable_revision: i64,
+    pub(super) submitting: bool,
+    pub(super) submitted: Option<i64>,
+    pub(super) write_base: Option<WriteBase>,
+    pub(super) issue_choices: Option<IssueEditor>,
+    pub(super) issue_draft: bool,
+    pub(super) comment_edit: bool,
     serial: u64,
     persisted: u64,
     updates: watch::Sender<Option<Arc<DraftUpdate>>>,
     task: JoinHandle<()>,
-    _subscription: Subscription,
+    _subscriptions: Vec<Subscription>,
 }
 
 impl Editor {
@@ -47,19 +59,28 @@ impl Editor {
         self.serial == self.persisted && !self.failed
     }
 
-    fn capture(&mut self, cx: &gpui_kit::App) {
+    pub(super) fn capture(&mut self, cx: &gpui_kit::App) {
         let body = self.view.read(cx).text().to_string();
-        if self.body == body && !self.failed {
+        let anchor = self
+            .issue_choices
+            .as_ref()
+            .map_or_else(|| self.anchor.clone(), |form| form.stored_options(cx));
+        if self.body == body && self.anchor == anchor && !self.failed {
             return;
         }
         self.serial += 1;
         self.body = body.clone();
+        self.anchor = anchor.clone();
         self.preview = None;
         self.failed = self
             .updates
             .send(Some(Arc::new(DraftUpdate {
                 serial: self.serial,
-                body,
+                content: DraftContent {
+                    body,
+                    base: self.base.clone(),
+                    anchor,
+                },
             })))
             .is_err();
     }
@@ -76,7 +97,6 @@ async fn write_editor(
         id,
         lease,
         mut revision,
-        content,
     } = draft;
     let mut heartbeat = tokio::time::interval(std::time::Duration::from_millis(2000));
     loop {
@@ -92,11 +112,7 @@ async fn write_editor(
                 let id = id.clone();
                 let lease = lease.clone();
                 let serial = update.serial;
-                let pending = DraftContent {
-                    body: update.body.clone(),
-                    base: content.base.clone(),
-                    anchor: content.anchor.clone(),
-                };
+                let pending = update.content.clone();
                 let execution = tokio::task::spawn_blocking(move || {
                     let now = now_ms();
                     store.acquire_editor(account, &id, &lease, now, now + 10_000)?;
@@ -110,6 +126,7 @@ async fn write_editor(
                 acknowledgements.send_replace(Acknowledgement {
                     serial: Some(serial),
                     saved,
+                    revision: saved.then_some(revision),
                 });
             }
             None => {
@@ -125,12 +142,20 @@ async fn write_editor(
                     acknowledgements.send_replace(Acknowledgement {
                         serial: None,
                         saved: false,
+                        revision: None,
                     });
                 }
             }
         }
     }
     let _ = tokio::task::spawn_blocking(move || store.release_editor(account, &id, &lease)).await;
+}
+
+struct DraftEditorRequest {
+    kind: DraftKind,
+    id: String,
+    initial: Option<WriteBase>,
+    restore_only: bool,
 }
 
 impl ReaderWorkspace {
@@ -154,12 +179,25 @@ impl ReaderWorkspace {
         };
         let kind = if draft_id == format!("issue-{}", tab.item.0) {
             DraftKind::IssueEdit
-        } else if draft_id == format!("comment-{}", tab.item.0) {
+        } else if draft_id == format!("comment-{}", tab.item.0)
+            || draft_id.starts_with(&format!("comment-edit-{}-", tab.item.0))
+        {
             DraftKind::Comment
         } else {
             return;
         };
-        self.edit(tab, kind, window, cx);
+        let id = draft_id.to_owned();
+        self.edit_draft(
+            tab,
+            DraftEditorRequest {
+                kind,
+                id,
+                initial: None,
+                restore_only: true,
+            },
+            window,
+            cx,
+        );
     }
 
     pub(super) fn edit(
@@ -169,16 +207,89 @@ impl ReaderWorkspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        let id = match kind {
+            DraftKind::IssueEdit => format!("issue-{}", tab.item.0),
+            DraftKind::Comment => format!("comment-{}", tab.item.0),
+            _ => return,
+        };
+        self.edit_draft(
+            tab,
+            DraftEditorRequest {
+                kind,
+                id,
+                initial: None,
+                restore_only: false,
+            },
+            window,
+            cx,
+        );
+    }
+
+    pub(super) fn edit_comment(
+        &mut self,
+        tab: Tab,
+        remote: std::num::NonZeroU64,
+        body: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.edit_draft(
+            tab.clone(),
+            DraftEditorRequest {
+                kind: DraftKind::Comment,
+                id: format!("comment-edit-{}-{remote}", tab.item.0),
+                initial: Some(WriteBase::Comment {
+                    target: CommentTarget::Remote(remote),
+                    body,
+                }),
+                restore_only: false,
+            },
+            window,
+            cx,
+        );
+    }
+
+    pub(super) fn edit_pending_comment(
+        &mut self,
+        tab: Tab,
+        predecessor: String,
+        body: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.edit_draft(
+            tab.clone(),
+            DraftEditorRequest {
+                kind: DraftKind::Comment,
+                id: format!("comment-edit-{}-{}", tab.item.0, predecessor),
+                initial: Some(WriteBase::Comment {
+                    target: CommentTarget::CreatedBy(predecessor),
+                    body,
+                }),
+                restore_only: false,
+            },
+            window,
+            cx,
+        );
+    }
+
+    fn edit_draft(
+        &mut self,
+        tab: Tab,
+        request: DraftEditorRequest,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(account) = self.account else { return };
         if self.pending_draft.is_some() || self.departure.is_some() || self.layout_busy {
             return;
         }
-        let kind_key = match kind {
-            DraftKind::IssueEdit => "issue",
-            DraftKind::Comment => "comment",
-            _ => return,
-        };
-        let id = format!("{kind_key}-{}", tab.item.0);
+        let DraftEditorRequest {
+            kind,
+            id,
+            initial,
+            restore_only,
+        } = request;
         if let Some(editor) = self.drafts.get(&id) {
             let target = editor.tab_id.clone();
             let mut layout = self.layout.clone();
@@ -205,8 +316,24 @@ impl ReaderWorkspace {
             window,
             cx,
             move |store| {
-                let content = draft_base(store, account, item, kind)?;
-                store.create_draft(account, &draft_id, item, kind, &content)?;
+                if store.draft(account, &draft_id)?.is_none() {
+                    if restore_only {
+                        return Err(threadline_storage::Error::NotFound);
+                    }
+                    let content = if let Some(initial @ WriteBase::Comment { .. }) = initial {
+                        let WriteBase::Comment { body, .. } = &initial else {
+                            unreachable!()
+                        };
+                        DraftContent {
+                            body: body.clone(),
+                            base: initial.encode()?,
+                            anchor: String::new(),
+                        }
+                    } else {
+                        draft_base(store, account, item, kind)?
+                    };
+                    store.create_draft(account, &draft_id, item, kind, &content)?;
+                }
                 let now = now_ms();
                 if !store.acquire_editor(account, &draft_id, &editor_lease, now, now + 10_000)? {
                     return Ok(None);
@@ -240,7 +367,23 @@ impl ReaderWorkspace {
                     this.settle_departure(window, cx);
                     return;
                 }
+                let issue_draft = kind == DraftKind::IssueEdit;
+                let write_base = WriteBase::decode(&draft.content, issue_draft);
+                let initial_base = write_base
+                    .as_ref()
+                    .and_then(|base| base.encode().ok())
+                    .unwrap_or_else(|| draft.content.base.clone());
+                let issue_choices = match write_base.as_ref() {
+                    Some(WriteBase::Issue { fields, .. }) => {
+                        Some(IssueEditor::new(fields, &draft.content.anchor, window, cx))
+                    }
+                    _ => None,
+                };
                 let saved_body = draft.content.body.clone();
+                let saved_anchor = issue_choices.as_ref().map_or_else(
+                    || draft.content.anchor.clone(),
+                    |form| form.stored_options(cx),
+                );
                 let editor = cx.new(|cx| {
                     TextareaState::new(window, cx)
                         .auto_grow(5, 12)
@@ -250,6 +393,7 @@ impl ReaderWorkspace {
                 let (signals, mut acknowledgements) = watch::channel(Acknowledgement {
                     serial: Some(0),
                     saved: true,
+                    revision: Some(draft.revision),
                 });
                 let task = this.runtime.spawn(write_editor(
                     Arc::clone(&this.store),
@@ -258,7 +402,6 @@ impl ReaderWorkspace {
                         id: id.clone(),
                         lease: lease.clone(),
                         revision: draft.revision,
-                        content: draft.content,
                     },
                     receiver,
                     signals,
@@ -267,8 +410,11 @@ impl ReaderWorkspace {
                 let current_lease = lease.clone();
                 cx.spawn_in(window, async move |view, cx| {
                     while acknowledgements.changed().await.is_ok() {
-                        let Acknowledgement { serial, saved } =
-                            *acknowledgements.borrow_and_update();
+                        let Acknowledgement {
+                            serial,
+                            saved,
+                            revision,
+                        } = *acknowledgements.borrow_and_update();
                         if view
                             .update_in(cx, |this, window, cx| {
                                 if let Some(editor) = this.drafts.get_mut(&listening)
@@ -278,6 +424,9 @@ impl ReaderWorkspace {
                                     if saved {
                                         editor.persisted =
                                             editor.persisted.max(serial.unwrap_or_default());
+                                        if let Some(revision) = revision {
+                                            editor.durable_revision = revision;
+                                        }
                                     }
                                     if serial.is_none_or(|latest| latest == editor.serial) {
                                         editor.failed = !saved;
@@ -293,18 +442,19 @@ impl ReaderWorkspace {
                     }
                 })
                 .detach();
+                let mut subscriptions = Vec::new();
                 let observing = id.clone();
                 let started = lease.clone();
-                let subscription = cx.subscribe(&editor, move |this, _, event, cx| {
-                    if matches!(event, InputEvent::Change)
-                        && let Some(editor) = this.drafts.get_mut(&observing)
-                        && editor.account == account
-                        && editor.lease == started
-                    {
-                        editor.capture(cx);
-                        cx.notify();
-                    }
-                });
+                subscriptions.push(cx.subscribe(&editor, move |this, _, event, cx| {
+                    this.draft_changed(account, &observing, &started, event, cx);
+                }));
+                if let Some(title) = issue_choices.as_ref().and_then(|form| form.title.as_ref()) {
+                    let observing = id.clone();
+                    let started = lease.clone();
+                    subscriptions.push(cx.subscribe(title, move |this, _, event, cx| {
+                        this.draft_changed(account, &observing, &started, event, cx);
+                    }));
+                }
                 this.drafts.insert(
                     id.clone(),
                     Editor {
@@ -314,13 +464,23 @@ impl ReaderWorkspace {
                         preview: None,
                         failed: false,
                         account,
+                        item,
                         lease,
                         body: saved_body,
+                        anchor: saved_anchor,
+                        base: initial_base,
+                        durable_revision: draft.revision,
+                        submitting: false,
+                        submitted: None,
+                        write_base,
+                        issue_choices,
+                        issue_draft,
+                        comment_edit: id.starts_with("comment-edit-"),
                         serial: 0,
                         persisted: 0,
                         updates,
                         task,
-                        _subscription: subscription,
+                        _subscriptions: subscriptions,
                     },
                 );
                 let mut layout = this.layout.clone();
@@ -336,6 +496,24 @@ impl ReaderWorkspace {
                 this.save_layout(layout, window, cx);
             },
         );
+    }
+
+    fn draft_changed(
+        &mut self,
+        account: AccountId,
+        id: &str,
+        lease: &str,
+        event: &InputEvent,
+        cx: &mut Context<Self>,
+    ) {
+        if matches!(event, InputEvent::Change)
+            && let Some(editor) = self.drafts.get_mut(id)
+            && editor.account == account
+            && editor.lease == lease
+        {
+            editor.capture(cx);
+            cx.notify();
+        }
     }
 
     pub(super) fn release_drafts(&mut self) {
@@ -362,10 +540,9 @@ impl ReaderWorkspace {
             editor.capture(cx);
         }
         if self.pending_draft.is_some()
-            || self
-                .drafts
-                .values()
-                .any(|editor| tab_ids.contains(&editor.tab_id) && !editor.saved())
+            || self.drafts.values().any(|editor| {
+                tab_ids.contains(&editor.tab_id) && (!editor.saved() || editor.submitting)
+            })
         {
             self.status = Some("The draft is still saving. Its editor remains open.");
             return false;
@@ -400,12 +577,14 @@ fn draft_base(
         anchor: String::new(),
     };
     if kind == DraftKind::IssueEdit {
-        let issue = store
-            .reader_item_metadata(account, item)?
+        let fields = store
+            .issue_write_base(account, item)?
             .ok_or(threadline_storage::Error::NotFound)?;
-        if let Change::Value(body) = issue.body {
-            draft.body = body;
-        }
+        draft.body = fields
+            .body
+            .as_ref()
+            .and_then(|body| body.clone())
+            .unwrap_or_default();
         let key = ResourceKey {
             account,
             target: ResourceTarget::Item(item),
@@ -418,13 +597,12 @@ fn draft_base(
             .revision
             .or(state.validators.etag)
             .or(state.validators.last_modified)
-            .or_else(|| {
-                issue
-                    .remote_updated_at_ms
-                    .map(|revision| revision.to_string())
-            })
             .unwrap_or_default();
-        draft.anchor = draft.body.clone();
+        draft.base = WriteBase::Issue {
+            fields: Box::new(fields),
+            provider_revision: draft.base,
+        }
+        .encode()?;
     }
     Ok(draft)
 }
