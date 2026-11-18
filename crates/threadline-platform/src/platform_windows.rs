@@ -336,7 +336,7 @@ impl NetworkWatch {
                 &mut handle,
             )
         };
-        (result == ERROR_SUCCESS && !handle.is_null()).then_some(Self(handle))
+        (result == ERROR_SUCCESS && !handle.is_null()).then(|| Self(handle))
     }
 }
 
