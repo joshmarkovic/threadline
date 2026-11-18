@@ -15,6 +15,8 @@ The core defines request identity separately from the current view. A response c
 
 The feasibility UI uses a synthetic repository and pinned fixtures. Tests distinguish pure units, real loopback HTTP integration, in-process GPUI interaction, and a separate native process driven by the operating system. Release testing will add a clean-machine run of the exact published artifact. The [testing plan](../spec/TESTING_PLAN.md) defines each layer and the approved scope for live checks.
 
+The selected Windows driver is the repository’s PowerShell script and C# Win32 wrapper at `b992e45`, tested with Windows PowerShell 5.1.22621.7649. It uses Win32 `SendInput` to drive the real GPUI window and Windows UI Automation to invoke the matching Notification Center card. [Native driver and commands](../../tools/native/README.md) · [Windows 11 driver and executable evidence](../reports/evidence/windows-11-release/ci-release-replay.json)
+
 ## Target defaults
 
 | Target | First release gate | Local distribution design |

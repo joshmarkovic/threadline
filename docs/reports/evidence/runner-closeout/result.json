@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "lane": "unit",
+  "suite": null,
+  "seed": 12345,
+  "host": {
+    "os": "linux",
+    "architecture": "x86_64",
+    "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+    "display_session": "Wayland and X11 environment"
+  },
+  "source_revision": "7b02038ec768ada9a77a40b59335499d6dcaa1b9",
+  "source_dirty": false,
+  "cargo_lock_sha256": "405906dfb25c60d89416d7bfe596f8b2dbc11e946f361860f8bcbd8ad180ac82",
+  "package_version": "0.1.0",
+  "package_version_source": "checkout-app-manifest",
+  "fixture_revision": "s01-feasibility-v1",
+  "status": "Pass",
+  "cases": [
+    {
+      "case": "UT-021",
+      "status": "Pass",
+      "detail": "19 tests passed.",
+      "tests_passed": 19,
+      "evidence": "UT-021.log",
+      "requirement_ids": [
+        "TEST-01",
+        "TEST-02",
+        "TEST-08"
+      ],
+      "acceptance_ids": [
+        "AC-89"
+      ],
+      "child_exit_code": 0
+    }
+  ],
+  "command": {
+    "program": "xtask",
+    "argv": [
+      "test",
+      "unit",
+      "--case",
+      "UT-021",
+      "--seed",
+      "12345",
+      "--report-dir",
+      "artifacts/verification"
+    ],
+    "redacted": false
+  },
+  "started_at_unix_ms": 1795022148926,
+  "finished_at_unix_ms": 1795022150094,
+  "exit_code": 0
+}

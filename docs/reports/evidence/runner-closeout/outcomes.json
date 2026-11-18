@@ -1,0 +1,169 @@
+{
+  "source_revision": "7b02038ec768ada9a77a40b59335499d6dcaa1b9",
+  "source_dirty": false,
+  "cargo_lock_sha256": "405906dfb25c60d89416d7bfe596f8b2dbc11e946f361860f8bcbd8ad180ac82",
+  "package_version": "0.1.0",
+  "package_version_source": "checkout-app-manifest",
+  "fixture_revision": "s01-feasibility-v1",
+  "host": {
+    "os": "linux",
+    "architecture": "x86_64",
+    "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+    "display_session": "Wayland and X11 environment"
+  },
+  "runs": {
+    "integration": {
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "integration",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "artifacts/verification"
+        ],
+        "redacted": false
+      },
+      "status": "Pass",
+      "exit_code": 0,
+      "started_at_unix_ms": 1795022171602,
+      "finished_at_unix_ms": 1795022185748,
+      "cases": [
+        {
+          "case": "S01-SIMULATOR",
+          "status": "Pass",
+          "detail": "5 tests passed.",
+          "tests_passed": 5,
+          "requirement_ids": [
+            "FND-04",
+            "TEST-03",
+            "TEST-05"
+          ],
+          "acceptance_ids": [
+            "AC-90"
+          ],
+          "child_exit_code": 0
+        },
+        {
+          "case": "S01-PLATFORM",
+          "status": "Pass",
+          "detail": "2 tests passed.",
+          "tests_passed": 2,
+          "requirement_ids": [
+            "PORT-02",
+            "TEST-03"
+          ],
+          "acceptance_ids": [
+            "AC-83"
+          ],
+          "child_exit_code": 0
+        }
+      ],
+      "junit": {
+        "tests": 2,
+        "failures": 0,
+        "skipped": 0
+      },
+      "source_sha256": {
+        "result.json": "45e269009e0cde2fadcb682a28e25bf7d39f5c870f532665995ddb677dd4ce68",
+        "junit.xml": "b3c4bc63cb938ff77699d8bc8f93b03bcb31e6269aacc2b97a4c95d0a0d3a97c"
+      }
+    },
+    "invalid-request": {
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "unit",
+          "--case",
+          "<redacted-argument>",
+          "--report-dir",
+          "artifacts/verification"
+        ],
+        "redacted": true
+      },
+      "status": "Fail",
+      "exit_code": 1,
+      "started_at_unix_ms": 1795022168016,
+      "finished_at_unix_ms": 1795022168033,
+      "cases": [
+        {
+          "case": "request",
+          "status": "Fail",
+          "detail": "Unknown unit case.",
+          "tests_passed": null,
+          "requirement_ids": [],
+          "acceptance_ids": [],
+          "child_exit_code": null
+        }
+      ],
+      "junit": {
+        "tests": 1,
+        "failures": 1,
+        "skipped": 0
+      },
+      "source_sha256": {
+        "result.json": "a79de5f03cc4ccca04de61524d330543d545e3459f70fb6d8b1afc6129dd2cc4",
+        "junit.xml": "aecf21ebe6f418d6af7fb0d17e3a66a968a4665f8ab6ee59a38f0e332466970a"
+      }
+    },
+    "install": {
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "install",
+          "--artifact",
+          "docs/architecture/windows-budgets.json",
+          "--case",
+          "PKG-001",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "artifacts/verification"
+        ],
+        "redacted": false
+      },
+      "status": "Blocked",
+      "exit_code": 78,
+      "started_at_unix_ms": 1795022171911,
+      "finished_at_unix_ms": 1795022171967,
+      "cases": [
+        {
+          "case": "PKG-001",
+          "status": "Blocked",
+          "detail": "No packaging recipe or trusted installer test adapter is available in Sprint 01.",
+          "tests_passed": null,
+          "requirement_ids": [
+            "TEST-04",
+            "TEST-06",
+            "INSTALL-01",
+            "INSTALL-02",
+            "INSTALL-03",
+            "INSTALL-08"
+          ],
+          "acceptance_ids": [
+            "AC-36",
+            "AC-94"
+          ],
+          "child_exit_code": null
+        }
+      ],
+      "junit": {
+        "tests": 1,
+        "failures": 0,
+        "skipped": 1
+      },
+      "source_sha256": {
+        "result.json": "855319b1adebe28f23ef2f48c0c9e12df195cdb35ed7f9e4673af5db36171428",
+        "junit.xml": "a5e271d5de5964b6414156b4043c1146b17c1cc20ff9d2d735a8bbf37ea5b34a"
+      },
+      "inspected_fixture": {
+        "evidence_class": "candidate inspected only",
+        "sha256": "866bd75e9dea97579d6993c3b8183d25270c18d85a790d16928b14ada412f053",
+        "size_bytes": 197
+      }
+    }
+  }
+}

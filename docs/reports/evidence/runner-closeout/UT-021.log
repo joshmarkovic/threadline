@@ -1,0 +1,37 @@
+
+running 19 tests
+test catalog::tests::reports_catalog_and_internal_associations ... ok
+test cli::tests::accepts_the_documented_seed_and_scenario ... ok
+test catalog::tests::finds_associations_after_quoted_commas ... ok
+test cli::tests::accepts_the_registered_toast_case_as_native_e2e ... ok
+test cli::tests::knows_named_future_scenarios_so_they_can_be_reported_blocked ... ok
+test cli::tests::keeps_safe_paths_values_and_option_order_in_the_receipt ... ok
+test cli::tests::rejects_unknown_mismatched_and_duplicate_selectors ... ok
+test cli::tests::protects_private_inputs_and_rejected_arguments ... ok
+test report::tests::reads_the_app_package_version_even_when_it_differs_from_the_workspace ... ok
+test report::tests::stages_without_an_app_manifest_use_a_labeled_build_fallback ... ok
+test run::tests::registered_toast_cannot_start_from_the_smoke_suite ... ok
+test run::tests::distinguishes_positive_empty_and_ignored_cargo_output ... ok
+test run::tests::writes_need_more_than_the_flag_and_do_not_match_arbitrary_repositories ... ok
+test run::tests::missing_install_artifact_preserves_the_requested_scenario ... ok
+test report::tests::empty_blocked_and_failed_runs_cannot_pass ... ok
+test run::tests::future_selector_yields_explicit_blockage_with_no_child_command ... ok
+test run::tests::registered_toast_reports_only_its_case_on_an_unsupported_host ... ok
+UT-021: Blocked — deliberate <test> condition & quote "
+unit: Blocked (1 cases). Results: <temporary report directory>/result.json
+UT-021: Pass — test result
+unit: Pass (1 cases). Results: <temporary report directory>/result.json
+test report::tests::report_records_seed_host_and_result_in_machine_readable_form ... ok
+UT-021: Fail — test result
+unit: Fail (1 cases). Results: <temporary report directory>/result.json
+UT-021: Blocked — test result
+unit: Blocked (1 cases). Results: <temporary report directory>/result.json
+test report::tests::writes_timestamps_and_matching_exit_codes_for_all_outcomes ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+--- stderr ---
+   Compiling xtask v0.1.0 (xtask)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.09s
+     Running unittests src/main.rs (.build/target-linux/debug/deps/xtask-4afa9eed0f44ab9f)
