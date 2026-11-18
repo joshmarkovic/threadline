@@ -160,7 +160,7 @@ impl Report {
             cargo_lock_sha256: sha256(&root.join("Cargo.lock")).ok(),
             package_version,
             package_version_source,
-            fixture_revision: "Sprint 01 synthetic feasibility fixture",
+            fixture_revision: include_str!("../../fixtures/revision.txt").trim_ascii(),
             status: Status::Fail,
             cases: Vec::new(),
             started_at_unix_ms: command.started_at_unix_ms,
@@ -380,6 +380,10 @@ mod tests {
         let body = fs::read(dir.path().join("result.json")).unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json["seed"], 941);
+        assert_eq!(
+            json["fixture_revision"],
+            include_str!("../../fixtures/revision.txt").trim_ascii()
+        );
         assert_eq!(json["host"]["os"], std::env::consts::OS);
         assert_eq!(json["host"]["architecture"], std::env::consts::ARCH);
         assert_eq!(json["status"], "Blocked");

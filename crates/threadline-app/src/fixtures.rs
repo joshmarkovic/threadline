@@ -3,7 +3,7 @@ use std::fmt::Write;
 use gpui_kit::component::diff::DiffFile;
 
 #[cfg(feature = "e2e")]
-pub(crate) const REVISION: &str = "s01-feasibility-v1";
+pub(crate) use threadline_core::fixtures::FIXTURE_REVISION as REVISION;
 pub(crate) const COPY_SENTENCE: &str = "Offline review keeps cached changes close.";
 pub(crate) const DISCUSSION_LEAD_BLOCK: usize = 3;
 pub(crate) const PATCH_PATH: &str = "src/cache.rs";

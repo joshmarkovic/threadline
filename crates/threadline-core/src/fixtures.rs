@@ -1,7 +1,7 @@
 use crate::domain::{HostName, ItemKey, ItemKind, RepositoryKey, RepositoryName, Revision};
 use crate::github::{ItemSummary, ReadSummary};
 
-pub const FIXTURE_REVISION: &str = "s01-feasibility-v1";
+pub const FIXTURE_REVISION: &str = include_str!("../../../fixtures/revision.txt").trim_ascii();
 
 pub struct FeasibilityFixture {
     pub request: ReadSummary,
