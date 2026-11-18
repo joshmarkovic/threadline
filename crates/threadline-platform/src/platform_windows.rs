@@ -100,7 +100,7 @@ impl Drop for InstanceMutex {
 
 struct InstanceNames {
     mutex: Vec<u16>,
-    window: Vec<u16>,
+    class: Vec<u16>,
     activation_message: Vec<u16>,
 }
 
@@ -117,7 +117,7 @@ impl InstanceNames {
         Self {
             mutex: wide(&format!("Local\\{scope}")),
             activation_message: wide(&format!("{scope}.Activate")),
-            window: wide(&scope),
+            class: wide(&scope),
         }
     }
 }
@@ -174,13 +174,13 @@ fn forward_activation(
 ) -> Result<(), PlatformError> {
     let deadline = Instant::now() + Duration::from_secs(3);
     let window = loop {
-        // The instance window is hidden but is a top-level window on this desktop.
-        let window = unsafe { FindWindowW(names.window.as_ptr(), names.window.as_ptr()) };
+        // The profile-specific class identifies the hidden top-level window without a caption.
+        let window = unsafe { FindWindowW(names.class.as_ptr(), null()) };
         if !window.is_null() {
             break window;
         }
         if Instant::now() >= deadline {
-            return Err(PlatformError::Unavailable);
+            return Err(PlatformError::InstanceWindowNotFound);
         }
         thread::sleep(Duration::from_millis(25));
     };
@@ -207,7 +207,7 @@ fn forward_activation(
         return Err(last_error("Forward desktop activation"));
     }
     if acknowledged != 1 {
-        return Err(PlatformError::Unavailable);
+        return Err(PlatformError::ActivationRejected);
     }
     Ok(())
 }
@@ -235,7 +235,7 @@ fn run_desktop(
     let class = WNDCLASSW {
         lpfnWndProc: Some(window_proc),
         hInstance: module,
-        lpszClassName: names.window.as_ptr(),
+        lpszClassName: names.class.as_ptr(),
         ..Default::default()
     };
     // `state` remains at a fixed address until the window and its message pump are torn down.
@@ -247,8 +247,8 @@ fn run_desktop(
     let window = unsafe {
         CreateWindowExW(
             WS_EX_TOOLWINDOW,
-            names.window.as_ptr(),
-            names.window.as_ptr(),
+            names.class.as_ptr(),
+            null(),
             WS_POPUP,
             0,
             0,
@@ -277,7 +277,7 @@ fn run_desktop(
         if !window.is_null() && IsWindow(window) != 0 {
             DestroyWindow(window);
         }
-        UnregisterClassW(names.window.as_ptr(), module);
+        UnregisterClassW(names.class.as_ptr(), module);
     }
 }
 
@@ -475,7 +475,7 @@ unsafe extern "system" fn window_proc(
         // Win32 passes the live CREATESTRUCTW from CreateWindowExW with our worker-owned state pointer.
         let creation = unsafe { &*(lparam as *const CREATESTRUCTW) };
         unsafe { SetWindowLongPtrW(hwnd, GWLP_USERDATA, creation.lpCreateParams as isize) };
-        return 1;
+        return unsafe { DefWindowProcW(hwnd, message, wparam, lparam) };
     }
     // The state is thread-confined and remains valid until DestroyWindow finishes.
     let state = unsafe { (GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const WindowState).as_ref() };
@@ -585,7 +585,7 @@ mod tests {
         let other = InstanceNames::new(Some(Path::new("fixture-two")));
         let normal = InstanceNames::new(None);
         assert_eq!(first.mutex, replay.mutex);
-        assert_ne!(first.window, other.window);
+        assert_ne!(first.class, other.class);
         assert_ne!(first.activation_message, normal.activation_message);
     }
 }

@@ -40,6 +40,8 @@ pub enum PlatformError {
     Locked,
     Denied,
     InvalidProfileDirectory,
+    InstanceWindowNotFound,
+    ActivationRejected,
     Native { operation: &'static str, code: u32 },
 }
 
@@ -51,6 +53,12 @@ impl Display for PlatformError {
             Self::Locked => "The desktop service is locked",
             Self::Denied => "The desktop service denied this operation",
             Self::InvalidProfileDirectory => "The isolated profile must be an existing directory",
+            Self::InstanceWindowNotFound => {
+                "The running Threadline instance did not open its activation window"
+            }
+            Self::ActivationRejected => {
+                "The running Threadline instance could not accept activation"
+            }
             Self::Native { operation, code } => {
                 return write!(formatter, "{operation} failed (Windows code {code})");
             }

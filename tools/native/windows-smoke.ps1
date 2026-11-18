@@ -65,12 +65,20 @@ function Wait-For([string]$Description, [scriptblock]$Probe, [int]$Timeout = 800
 
 function Read-Observation {
     if (![IO.File]::Exists($script:reportFile)) { return $null }
+    $stream = $null
+    $reader = $null
     try {
-        return [IO.File]::ReadAllText($script:reportFile) | ConvertFrom-Json
+        $sharing = [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete
+        $stream = [IO.File]::Open($script:reportFile, [IO.FileMode]::Open, [IO.FileAccess]::Read, $sharing)
+        $reader = [IO.StreamReader]::new($stream)
+        return $reader.ReadToEnd() | ConvertFrom-Json
     } catch [System.IO.IOException] {
         return $null
     } catch [System.ArgumentException] {
         return $null
+    } finally {
+        if ($null -ne $reader) { $reader.Dispose() }
+        elseif ($null -ne $stream) { $stream.Dispose() }
     }
 }
 
@@ -337,14 +345,57 @@ function Measure-Scroll([IntPtr]$Window, [string]$Control) {
     $point = To-ScreenPoint $Window ($bounds[0] + $bounds[2] / 2) ($bounds[1] + $bounds[3] / 2) $state.scale_factor
     [ThreadlineWinInput]::Scroll($point, -25, 24)
     [ThreadlineWinInput]::Scroll($point, 25, 24)
-    $newFrames = @((Read-Observation).scroll_frame_times_ms |
-        Select-Object -Skip $before | Where-Object { $_ -gt 0 } | Sort-Object)
+
+    $latest = $state
+    $lastCount = $before
+    $deadline = [Diagnostics.Stopwatch]::StartNew()
+    $settling = [Diagnostics.Stopwatch]::StartNew()
+    while ($deadline.ElapsedMilliseconds -lt 1000) {
+        $observation = Read-Observation
+        if ($null -ne $observation) {
+            $count = @($observation.scroll_frame_times_ms).Count
+            if ($count -gt $lastCount) {
+                $latest = $observation
+                $lastCount = $count
+                $settling.Restart()
+            }
+        }
+        if ($lastCount -gt $before -and $settling.ElapsedMilliseconds -ge 240) { break }
+        Start-Sleep -Milliseconds 40
+    }
+
+    $newFrames = @($latest.scroll_frame_times_ms |
+        Select-Object -Skip $before | Where-Object { $_ -gt 0 })
+    $sortedFrames = @($newFrames | Sort-Object)
     return [ordered]@{
         sample_count = $newFrames.Count
+        frame_times_ms = $newFrames
         p95_ms = if ($newFrames.Count -ge 10) {
-            [double]$newFrames[[int][Math]::Ceiling($newFrames.Count * 0.95) - 1]
+            [double]$sortedFrames[[int][Math]::Ceiling($newFrames.Count * 0.95) - 1]
         } else { $null }
     }
+}
+
+function Compare-Measurement($Actual, [double]$Limit) {
+    if ($null -eq $Actual) { return 'Blocked' }
+    if ($Actual -gt $Limit) { return 'Fail' }
+    return 'Pass'
+}
+
+function Get-ScrollBudget($Breakdown, $Worst, [double]$Limit) {
+    $surfaces = [ordered]@{}
+    foreach ($surface in $Breakdown.Keys) {
+        $result = $Breakdown[$surface]
+        $surfaces[$surface] = [ordered]@{
+            value = $result.p95_ms
+            sample_count = $result.sample_count
+            limit = $Limit
+            status = Compare-Measurement $result.p95_ms $Limit
+        }
+    }
+    $statuses = $surfaces.Values.status
+    $status = if ($statuses -contains 'Fail') { 'Fail' } elseif ($statuses -contains 'Blocked') { 'Blocked' } else { 'Pass' }
+    return [ordered]@{ value = $Worst; limit = $Limit; status = $status; surfaces = $surfaces }
 }
 
 function Invoke-PlatformProof([IntPtr]$Window) {
@@ -460,8 +511,11 @@ function Invoke-Measurement([IntPtr]$Window, [double]$ColdMs) {
         $actual = $measurement[$metric]
         $limit = $budgets.$metric
         if ($limit -le 0) { throw "The budget for $metric must be positive." }
-        $assessment = if ($null -eq $actual) { 'Blocked' } elseif ($actual -le $limit) { 'Pass' } else { 'Fail' }
-        $evaluations[$metric] = [ordered]@{ value = $actual; limit = $limit; status = $assessment }
+        $evaluations[$metric] = if ($metric -eq 'scroll_frame_p95_ms') {
+            Get-ScrollBudget $measurement.scroll_breakdown $actual $limit
+        } else {
+            [ordered]@{ value = $actual; limit = $limit; status = Compare-Measurement $actual $limit }
+        }
     }
     $report.budgets = $evaluations
     if ($evaluations.Values.status -contains 'Fail') { throw 'One or more Windows performance budgets were exceeded.' }

@@ -110,21 +110,29 @@ impl Observer {
         }
     }
 
-    pub(crate) fn frame_report(&self, snapshot: Snapshot) -> impl IntoElement {
+    pub(crate) fn scroll_input(&self) -> impl IntoElement {
         let observer = self.clone();
         canvas(
             |_, _, _| {},
             move |_, _, window, _| {
                 if observer.0.borrow().measurement.is_some() {
-                    let measure = observer.clone();
                     window.on_mouse_event(move |_: &ScrollEvent, phase, _, _| {
                         if phase.capture() {
-                            measure.scrolled();
+                            observer.scrolled();
                         }
                     });
                 }
-                observer.write(snapshot, window);
             },
+        )
+        .absolute()
+        .size_0()
+    }
+
+    pub(crate) fn frame_report(&self, snapshot: Snapshot) -> impl IntoElement {
+        let observer = self.clone();
+        canvas(
+            |_, _, _| {},
+            move |_, _, window, _| observer.write(snapshot, window),
         )
         .absolute()
         .size_0()

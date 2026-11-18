@@ -1124,7 +1124,14 @@ impl gpui_kit::Render for Workspace {
             .on_mouse_up_out(
                 MouseButton::Left,
                 cx.listener(|this, _, _, _| this.drag = None),
-            )
+            );
+        // Register before any descendant scroller can claim the capture phase.
+        #[cfg(feature = "e2e")]
+        let window_content = window_content
+            .when_some(self.observer.as_ref(), |content, observer| {
+                content.child(observer.scroll_input())
+            });
+        let window_content = window_content
             .child(self.toolbar(palette, cx))
             .child(
                 div()
