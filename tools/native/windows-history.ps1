@@ -1,8 +1,8 @@
-function Wait-History([string]$Description, [scriptblock]$Check) {
+function Wait-History([string]$Description, [scriptblock]$HistoryPredicate) {
     Wait-Reader $Description {
         param($reader)
         $property = $reader.PSObject.Properties['history']
-        $null -ne $property -and $null -ne $property.Value -and (& $Check $property.Value $reader)
+        $null -ne $property -and $null -ne $property.Value -and (& $HistoryPredicate $property.Value $reader)
     }
 }
 
