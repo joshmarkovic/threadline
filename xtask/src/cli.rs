@@ -3,7 +3,7 @@ use std::path::PathBuf;
 pub const USAGE: &str =
     "cargo xtask test <unit|integration|ui> [--case ID] [--seed N] [--report-dir DIR]
 cargo xtask test e2e --suite <smoke|full> [--binary PATH] [--case ID] [--seed N] [--report-dir DIR]
-cargo xtask test e2e --suite full --case <E2E-012|E2E-018> --local-fixture TRUSTED_JSON [--report-dir DIR]
+cargo xtask test e2e --suite full --case <E2E-012|E2E-018|E2E-020> --local-fixture TRUSTED_JSON [--report-dir DIR]
 cargo xtask test install --artifact PATH [--local-fixture TRUSTED_JSON] [--case ID] [--report-dir DIR]
 cargo xtask test live --repo OWNER/REPO --case LIVE-001 [--credential-stdin [--allow-existing-cli-oauth]] [--first-issue-pr-page] [--report-dir DIR]
 cargo xtask test live --repo OWNER/REPO --case <LIVE-003|LIVE-004> [--allow-live-writes | --readback-only] --credential-stdin [--allow-existing-cli-oauth] [--report-dir DIR]
@@ -164,10 +164,14 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
     match lane {
         Lane::E2e
             if options.local_fixture.is_some()
-                && (!matches!(options.case.as_deref(), None | Some("E2E-012" | "E2E-018"))
-                    || options.suite.as_deref() != Some("full")) =>
+                && (!matches!(
+                    options.case.as_deref(),
+                    None | Some("E2E-012" | "E2E-018" | "E2E-020")
+                ) || options.suite.as_deref() != Some("full")) =>
         {
-            return Err("The installed activity fixture requires the full suite or a named installed activity case.".into());
+            return Err(
+                "Use the full suite or a named installed-package case with --local-fixture.".into(),
+            );
         }
         Lane::E2e if options.suite.is_none() => return Err("Specify --suite smoke or full".into()),
         Lane::Install if options.artifact.is_none() => return Err("Specify --artifact PATH".into()),
@@ -386,6 +390,23 @@ mod tests {
 
     fn arguments(args: &[&str]) -> Vec<String> {
         args.iter().map(|arg| (*arg).into()).collect()
+    }
+
+    #[test]
+    fn accepts_the_installed_runtime_fixture_for_its_named_full_case() {
+        let options = parse(&arguments(&[
+            "test",
+            "e2e",
+            "--suite",
+            "full",
+            "--case",
+            "E2E-020",
+            "--local-fixture",
+            "trusted.json",
+        ]))
+        .unwrap();
+        assert_eq!(options.local_fixture, Some("trusted.json".into()));
+        assert_eq!(options.case.as_deref(), Some("E2E-020"));
     }
 
     #[test]
