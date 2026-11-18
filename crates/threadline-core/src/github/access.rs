@@ -15,6 +15,7 @@ use std::{
     time::Duration,
 };
 pub use tokio_util::sync::CancellationToken;
+pub mod reader;
 mod response;
 pub use response::{AccessError, AccessKind, RateLimit, Reachability, SsoAction};
 use response::{RequestMode, partial_sso, request};
@@ -534,6 +535,18 @@ fn next_page(
     base: &Url,
     current: u32,
 ) -> Result<Option<NonZeroU32>, AccessError> {
+    let request = base
+        .join("user/repos?per_page=100")
+        .expect("fixed discovery route");
+    next_page_for(headers, &request, current, |path| path == "/user/repos")
+}
+
+fn next_page_for(
+    headers: &HeaderMap,
+    request: &Url,
+    current: u32,
+    accepts_path: impl Fn(&str) -> bool,
+) -> Result<Option<NonZeroU32>, AccessError> {
     let invalid = || AccessError::received(AccessKind::InvalidPagination, 200);
     let mut next = None;
     for header in headers.get_all(header::LINK) {
@@ -557,9 +570,9 @@ fn next_page(
             if !is_next {
                 continue;
             }
-            let url = base.join(target).map_err(|_| invalid())?;
-            if url.origin() != base.origin()
-                || url.path() != "/user/repos"
+            let url = request.join(target).map_err(|_| invalid())?;
+            if url.origin() != request.origin()
+                || !accepts_path(url.path())
                 || !url.username().is_empty()
                 || url.password().is_some()
                 || url.fragment().is_some()
@@ -567,12 +580,18 @@ fn next_page(
                 return Err(invalid());
             }
             let mut number = None;
+            let mut parameters = std::collections::HashSet::new();
             for (k, v) in url.query_pairs() {
+                if !parameters.insert(k.clone()) {
+                    return Err(invalid());
+                }
                 match k.as_ref() {
                     "page" if number.is_none() => {
                         number = Some(v.parse::<NonZeroU32>().map_err(|_| invalid())?)
                     }
-                    "per_page" if v == "100" => (),
+                    _ if request.query_pairs().any(|(expected_key, expected_value)| {
+                        expected_key == k && expected_value == v
+                    }) => {}
                     _ => return Err(invalid()),
                 }
             }
