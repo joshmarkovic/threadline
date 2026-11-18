@@ -1,0 +1,621 @@
+{
+  "windows_native_reviews": [
+    {
+      "run": "e2e-1795042579292-11356",
+      "case": "E2E-008",
+      "status": "Blocked",
+      "exit_code": 78,
+      "child_exit_code": 78,
+      "test_checkout_source": "8a22b8d339d1a93882f7a74e02e7514a514dff89",
+      "source_dirty": false,
+      "app_source_revision": null,
+      "runner_binary_source": null,
+      "binary": {
+        "sha256": "b661853acf0e7ed5168ae850730fce8e93e4a639f9245bf46293ebea5ceb1eae",
+        "size_bytes": 78850048,
+        "build": "external override",
+        "evidence_class": "test-build native process"
+      },
+      "app_version": "0.1.0",
+      "fixture_revision": "not-applicable",
+      "lock_sha256": "f1717e262ce2964d9b398759e2febce1fb143d9ff41043330c6556ef5e2883d8",
+      "seed": 12345,
+      "started_at_unix_ms": 1795042579291,
+      "finished_at_unix_ms": 1795042593941,
+      "dpi": 144,
+      "driver_status": "Blocked",
+      "driver_detail": "The visible fixture comparison has no safe native bounds.",
+      "action_count": 9,
+      "offline_profile_reopened": false,
+      "http": [],
+      "sha256": {
+        "result.json": "3eb27e8e0ae5f77ef86da458a0d474b2c8131338796dec3349134290d8041831",
+        "binary.json": "5100217e1c3a8d376d1564144e3d9e22fafa012436f1a8f175a7e78eafc941e8",
+        "review-context-native.json": "36c24ce2e53b9819ca329c2d1c1f26b15944f128f0d9ed5c5e126f6db7b3bb9c",
+        "github-access-trace.json": "ae6a6a1891fb0df1b158dec1e295398795673c22d1cc38fd898a3064eab59de4"
+      }
+    },
+    {
+      "run": "e2e-1795043135465-11400",
+      "case": "E2E-008",
+      "status": "Blocked",
+      "exit_code": 78,
+      "child_exit_code": 78,
+      "test_checkout_source": "40fe4d47cc1911e12b91b00b79e5d9d8bd651277",
+      "source_dirty": false,
+      "app_source_revision": null,
+      "runner_binary_source": null,
+      "binary": {
+        "sha256": "1d4b9e96f3445380fe07c196d1002c638441a963e271baec4f2426453bfc2560",
+        "size_bytes": 79883776,
+        "build": "external override",
+        "evidence_class": "test-build native process"
+      },
+      "app_version": "0.1.0",
+      "fixture_revision": "not-applicable",
+      "lock_sha256": "f1717e262ce2964d9b398759e2febce1fb143d9ff41043330c6556ef5e2883d8",
+      "seed": 12345,
+      "started_at_unix_ms": 1795043135464,
+      "finished_at_unix_ms": 1795043158592,
+      "dpi": 144,
+      "driver_status": "Blocked",
+      "driver_detail": "The maximized split comparison does not have a reachable native code region.",
+      "action_count": 10,
+      "offline_profile_reopened": false,
+      "http": [],
+      "sha256": {
+        "result.json": "f5584183fd8e96e6f9c5c7245686724145e9f4fd42abdf07c2614e28ed08f2f9",
+        "binary.json": "d3d6cd5a196722c6fb19a05c66e5c17ad19264205f15e8ffd181089adde6dbd6",
+        "review-context-native.json": "b2b283b804e3bbcf60dbbaf6ed0e82c0b7a5b086859c14fe9ca3a49289ab442f",
+        "github-access-trace.json": "ae6a6a1891fb0df1b158dec1e295398795673c22d1cc38fd898a3064eab59de4"
+      }
+    },
+    {
+      "run": "e2e-1795043267562-5248",
+      "case": "E2E-008",
+      "status": "Blocked",
+      "exit_code": 78,
+      "child_exit_code": 78,
+      "test_checkout_source": "66a04f19fbde1df05a075b8ed8f31224d5589ee9",
+      "source_dirty": false,
+      "app_source_revision": null,
+      "runner_binary_source": null,
+      "binary": {
+        "sha256": "1d4b9e96f3445380fe07c196d1002c638441a963e271baec4f2426453bfc2560",
+        "size_bytes": 79883776,
+        "build": "external override",
+        "evidence_class": "test-build native process"
+      },
+      "app_version": "0.1.0",
+      "fixture_revision": "not-applicable",
+      "lock_sha256": "f1717e262ce2964d9b398759e2febce1fb143d9ff41043330c6556ef5e2883d8",
+      "seed": 12345,
+      "started_at_unix_ms": 1795043267562,
+      "finished_at_unix_ms": 1795043288515,
+      "dpi": 144,
+      "driver_status": "Blocked",
+      "driver_detail": "Could not select the guarded native source line in the fixture split comparison.",
+      "action_count": 10,
+      "offline_profile_reopened": false,
+      "http": [],
+      "sha256": {
+        "result.json": "b84319ad997e5d4b15625c2dcacef3e9a598a4373618a7f74d9caf990dbf6b02",
+        "binary.json": "d3d6cd5a196722c6fb19a05c66e5c17ad19264205f15e8ffd181089adde6dbd6",
+        "review-context-native.json": "4964c2874ef5cb8f6217bb8d619e9b19355eb3734386124eb14f7d73afc8a41d",
+        "github-access-trace.json": "ae6a6a1891fb0df1b158dec1e295398795673c22d1cc38fd898a3064eab59de4"
+      }
+    },
+    {
+      "run": "e2e-1795044049860-43612",
+      "case": "E2E-008",
+      "status": "Fail",
+      "exit_code": 1,
+      "child_exit_code": 1,
+      "test_checkout_source": "43a288a7ea1325ab29d06ad96fea6f1a5f7509e2",
+      "source_dirty": false,
+      "app_source_revision": "43a288a7ea1325ab29d06ad96fea6f1a5f7509e2",
+      "runner_binary_source": "43a288a7ea1325ab29d06ad96fea6f1a5f7509e2",
+      "binary": {
+        "sha256": "22c4ef9c2bae65f0358dbe459dae2f6f4adb52af03a2c7b3ef24f51dc6ca2589",
+        "size_bytes": 79895552,
+        "build": "external override",
+        "evidence_class": "test-build native process"
+      },
+      "app_version": "0.1.0",
+      "fixture_revision": "s08-revision-bound-reviews-v1",
+      "lock_sha256": "f2092926683ea585d88545929599323405607777b5f355ce14882ba1c9611cee",
+      "seed": 12345,
+      "started_at_unix_ms": 1795044049859,
+      "finished_at_unix_ms": 1795044126075,
+      "dpi": 144,
+      "driver_status": "Fail",
+      "driver_detail": "Timed out waiting for account control reader-duplicate-tab.",
+      "action_count": 30,
+      "offline_profile_reopened": false,
+      "http": [
+        {
+          "phase": "pr_load",
+          "route": "pull_b",
+          "status": 200,
+          "count": 1
+        }
+      ],
+      "sha256": {
+        "result.json": "54d6a5c6e530964f5df1188b555eb33fd886ef2b98b5ea9f99db9de2b0be2817",
+        "binary.json": "76e82633f6bee0c81db1be3db18b7b98fbaf6b4a3c38b6ebb6e4242ef3d086f1",
+        "review-context-native.json": "40be9612c016ee2dba8567784bb7ad5df4d31b1042e1f508895c4df5fbeeee27",
+        "github-access-trace.json": "549575a46beba473af2a7541d51f58e4746c7f8c7a35a126c64c890c8ee21b6c"
+      }
+    },
+    {
+      "run": "e2e-1795044411292-20392",
+      "case": "E2E-008",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "test_checkout_source": "f632434aa882a612f016a62a7a349efe3f381e79",
+      "source_dirty": false,
+      "app_source_revision": "43a288a7ea1325ab29d06ad96fea6f1a5f7509e2",
+      "runner_binary_source": "43a288a7ea1325ab29d06ad96fea6f1a5f7509e2",
+      "binary": {
+        "sha256": "22c4ef9c2bae65f0358dbe459dae2f6f4adb52af03a2c7b3ef24f51dc6ca2589",
+        "size_bytes": 79895552,
+        "build": "external override",
+        "evidence_class": "test-build native process"
+      },
+      "app_version": "0.1.0",
+      "fixture_revision": "s08-revision-bound-reviews-v1",
+      "lock_sha256": "5b92e1a83782908953a4405e9c1ed8ce80e2dffaa10238f3e14ac04c0a524056",
+      "seed": 12345,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-008",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_unix_ms": 1795044411291,
+      "finished_at_unix_ms": 1795044496202,
+      "host": {
+        "os": "windows",
+        "architecture": "x86_64",
+        "version": "Microsoft Windows [Version 10.0.22631.7652]",
+        "display_session": "Windows desktop availability is checked by native driver"
+      },
+      "dpi": 96,
+      "driver_status": "Pass",
+      "driver_detail": "The real Windows review draft retained its source line, code comparison and original head through verified issue switches, app layout changes and a separate offline restart.",
+      "action_count": 40,
+      "action_observations": [
+        {
+          "action": "Enter and save a native inline review on the exact source line",
+          "observed": {
+            "item": 1,
+            "draft": "review-1",
+            "expected_head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "path": "src/first.rs",
+            "side": "Right",
+            "first_line": 1,
+            "last_line": 1
+          }
+        },
+        {
+          "action": "Switch both verified issues, return to the body, resize and collapse",
+          "observed": {
+            "first_link": 3,
+            "alternative_link": 4,
+            "original_head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "draft_retained": true
+          }
+        },
+        {
+          "action": "Switch PRs and use the narrow and restored code surfaces without moving the draft",
+          "observed": {
+            "original_item": 1,
+            "alternate_item": 2,
+            "original_draft": "review-1"
+          }
+        }
+      ],
+      "offline_profile_reopened": true,
+      "http": [
+        {
+          "phase": "pr_load",
+          "route": "compare_a",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_load",
+          "route": "compare_b",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_load",
+          "route": "item",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_load",
+          "route": "items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_load",
+          "route": "pull_a",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_load",
+          "route": "pull_b",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_load",
+          "route": "repository",
+          "status": 200,
+          "count": 8
+        },
+        {
+          "phase": "pr_load",
+          "route": "review_context_issue",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_load",
+          "route": "user",
+          "status": 200,
+          "count": 6
+        }
+      ],
+      "sha256": {
+        "result.json": "faad6bf58da6518bcd9293d29a23e52d3febd06f3c3695654fb9c12a3dfaf96e",
+        "binary.json": "76e82633f6bee0c81db1be3db18b7b98fbaf6b4a3c38b6ebb6e4242ef3d086f1",
+        "review-context-native.json": "438f8a8f32a0e673e6eea92791c15e4db2ee08ba39fd8a80b82f130704cba633",
+        "github-access-trace.json": "549575a46beba473af2a7541d51f58e4746c7f8c7a35a126c64c890c8ee21b6c",
+        "reader-restart-observation.json": "9a92325cdbafd7d3b121b0e702310bcd849fc4557aec33664b430f774b7dce0a"
+      }
+    },
+    {
+      "run": "e2e-1795044259759-46592",
+      "case": "E2E-007",
+      "status": "Fail",
+      "exit_code": 1,
+      "child_exit_code": 1,
+      "test_checkout_source": "43a288a7ea1325ab29d06ad96fea6f1a5f7509e2",
+      "source_dirty": false,
+      "app_source_revision": "43a288a7ea1325ab29d06ad96fea6f1a5f7509e2",
+      "runner_binary_source": "43a288a7ea1325ab29d06ad96fea6f1a5f7509e2",
+      "binary": {
+        "sha256": "22c4ef9c2bae65f0358dbe459dae2f6f4adb52af03a2c7b3ef24f51dc6ca2589",
+        "size_bytes": 79895552,
+        "build": "external override",
+        "evidence_class": "test-build native process"
+      },
+      "app_version": "0.1.0",
+      "fixture_revision": "s08-revision-bound-reviews-v1",
+      "lock_sha256": "f2092926683ea585d88545929599323405607777b5f355ce14882ba1c9611cee",
+      "seed": 12345,
+      "started_at_unix_ms": 1795044259758,
+      "finished_at_unix_ms": 1795044333546,
+      "dpi": 144,
+      "driver_status": "Fail",
+      "driver_detail": "Timed out waiting for the exact unchanged review has a confirmed native Outbox row.",
+      "action_count": 26,
+      "offline_profile_reopened": true,
+      "http": [
+        {
+          "phase": "pr_load",
+          "route": "updated_comments",
+          "status": 404,
+          "count": 1
+        },
+        {
+          "phase": "pr_load",
+          "route": "updated_items",
+          "status": 404,
+          "count": 1
+        },
+        {
+          "phase": "review_send",
+          "route": "review_created",
+          "status": 200,
+          "count": 1
+        }
+      ],
+      "sha256": {
+        "result.json": "f1e3a40141f6d8bda84b231c4f72a2f009eef793201e3a6cd75c0fe35b808c84",
+        "binary.json": "76e82633f6bee0c81db1be3db18b7b98fbaf6b4a3c38b6ebb6e4242ef3d086f1",
+        "review-draft-native.json": "872ef9a2f2e8c3ac20fe11e17dac49abf7495b9665f351e719eb653d6b7dbccd",
+        "github-access-trace.json": "89200d8fc17b2b6f483a8db9f8e8ab64705f5d76c38729a1f751545a3127768b",
+        "reader-restart-observation.json": "99086410f05450d443efe18487a6ef0f4bdcad99ceae118e353511a2ad57ba82"
+      }
+    },
+    {
+      "run": "e2e-1795045244593-47316",
+      "case": "E2E-007",
+      "status": "Blocked",
+      "exit_code": 78,
+      "child_exit_code": 78,
+      "test_checkout_source": "1bf7e77e8aa6cff3eb675790010602fcd2778c8e",
+      "source_dirty": false,
+      "app_source_revision": "1bf7e77e8aa6cff3eb675790010602fcd2778c8e",
+      "runner_binary_source": "1bf7e77e8aa6cff3eb675790010602fcd2778c8e",
+      "binary": {
+        "sha256": "dbd4d9e77a593a3a07d592f092aa995da85233428b2b8e57b48b534bb44b7fd4",
+        "size_bytes": 80149504,
+        "build": "external override",
+        "evidence_class": "test-build native process"
+      },
+      "app_version": "0.1.0",
+      "fixture_revision": "s08-revision-bound-reviews-v1",
+      "lock_sha256": "5b92e1a83782908953a4405e9c1ed8ce80e2dffaa10238f3e14ac04c0a524056",
+      "seed": 12345,
+      "started_at_unix_ms": 1795045244593,
+      "finished_at_unix_ms": 1795045406562,
+      "dpi": 96,
+      "driver_status": "Blocked",
+      "driver_detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible.",
+      "action_count": 53,
+      "offline_profile_reopened": true,
+      "http": [
+        {
+          "phase": "pr_load",
+          "route": "updated_comments",
+          "status": 404,
+          "count": 1
+        },
+        {
+          "phase": "pr_load",
+          "route": "updated_items",
+          "status": 404,
+          "count": 1
+        },
+        {
+          "phase": "review_changed",
+          "route": "pull_b",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "review_send",
+          "route": "pull_b",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "review_send",
+          "route": "review_created",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "review_send",
+          "route": "review_submitted",
+          "status": 200,
+          "count": 1
+        }
+      ],
+      "sha256": {
+        "result.json": "e6cb6f85f925033983c0f22d377006655fe712dcc147bbb2b5f0875c3a717c0b",
+        "binary.json": "f99ee501e5d8802094d51e4ee2e19f4ee53c45d02c133a9b6ccfb3625655983c",
+        "review-draft-native.json": "f5cab473b7245e60eafceca0c724cc553b9e87a6b4493b57cf98c2c8e234f6ef",
+        "github-access-trace.json": "01786652be8b4ea632c774845c737b1aa56960073ae30dd3645c9d7d566cbb2f",
+        "reader-restart-observation.json": "2cc0c0bf75b493358cc4e5258d709bea9b9d39d9a4cce2ec23211bae2c32a174"
+      }
+    },
+    {
+      "run": "e2e-1795045736949-45820",
+      "case": "E2E-007",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "test_checkout_source": "3d4fc49da5f13fdb4747e331f90e60832edaab00",
+      "source_dirty": false,
+      "app_source_revision": "c93a8cfd1240b0cd258577f0bce697dd26aad9ac",
+      "runner_binary_source": "c93a8cfd1240b0cd258577f0bce697dd26aad9ac",
+      "binary": {
+        "sha256": "304597568c644891fc92bf77449b6053d690d08a366d053d1ca2c321579398db",
+        "size_bytes": 80279040,
+        "build": "external override",
+        "evidence_class": "test-build native process"
+      },
+      "app_version": "0.1.0",
+      "fixture_revision": "s08-revision-bound-reviews-v1",
+      "lock_sha256": "5b92e1a83782908953a4405e9c1ed8ce80e2dffaa10238f3e14ac04c0a524056",
+      "seed": 12345,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-007",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_unix_ms": 1795045736946,
+      "finished_at_unix_ms": 1795045876454,
+      "host": {
+        "os": "windows",
+        "architecture": "x86_64",
+        "version": "Microsoft Windows [Version 10.0.22631.7652]",
+        "display_session": "Windows desktop availability is checked by native driver"
+      },
+      "dpi": 96,
+      "driver_status": "Pass",
+      "driver_detail": "Native review input survived an offline restart and confirmed the unchanged expected head. A second approval was held when provider preflight observed a different head, with original source and draft retained.",
+      "action_count": 55,
+      "action_observations": [
+        {
+          "action": "Save and resume an unchanged native review with an anchored comment",
+          "observed": {
+            "draft": "review-1",
+            "expected_head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "source": "src/first.rs:1/right",
+            "confirmed": true
+          }
+        },
+        {
+          "action": "Changed provider head holds the original approval and keeps its original note",
+          "observed": {
+            "draft": "review-2",
+            "expected_head": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "observed_replacement_head": "9999999999999999999999999999999999999999",
+            "source": "src/second.rs:1/right",
+            "held": true
+          }
+        }
+      ],
+      "offline_profile_reopened": true,
+      "http": [
+        {
+          "phase": "pr_load",
+          "route": "compare_a",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_load",
+          "route": "items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_load",
+          "route": "pull_a",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_load",
+          "route": "repository",
+          "status": 200,
+          "count": 4
+        },
+        {
+          "phase": "pr_load",
+          "route": "updated_comments",
+          "status": 404,
+          "count": 1
+        },
+        {
+          "phase": "pr_load",
+          "route": "updated_items",
+          "status": 404,
+          "count": 1
+        },
+        {
+          "phase": "pr_load",
+          "route": "user",
+          "status": 200,
+          "count": 4
+        },
+        {
+          "phase": "review_changed",
+          "route": "pull_b",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "review_changed",
+          "route": "repository",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "review_changed",
+          "route": "user",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "review_send",
+          "route": "compare_b",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "review_send",
+          "route": "pull_a",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "review_send",
+          "route": "pull_b",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "review_send",
+          "route": "repository",
+          "status": 200,
+          "count": 3
+        },
+        {
+          "phase": "review_send",
+          "route": "review_created",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "review_send",
+          "route": "review_list",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "review_send",
+          "route": "review_read",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "review_send",
+          "route": "review_submitted",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "review_send",
+          "route": "user",
+          "status": 200,
+          "count": 4
+        }
+      ],
+      "sha256": {
+        "result.json": "9d5ec6c8309c403e79d3354eb9efc8441ab3944e1590a760be9ffee534203a96",
+        "binary.json": "a87a7cdb97db7bc49de113b9e3b7327ca421fd4d62424005b57c6dd52faa8520",
+        "review-draft-native.json": "bc49a109e0e60734d8e822e7da5183c01146c71c67c1f3410c001f7fc1ce77c1",
+        "github-access-trace.json": "01786652be8b4ea632c774845c737b1aa56960073ae30dd3645c9d7d566cbb2f",
+        "reader-restart-observation.json": "b8221a0e410ef5d92e81bb2dff2a31c424c4cdfa2ee3e56610408116b7d3912a"
+      }
+    }
+  ]
+}
