@@ -207,7 +207,13 @@ function Invoke-ReviewDraftProof([IntPtr]$Window, [string]$Profile) {
     Set-WriteFixtureOffline $ready $false
     Click-AccountControl $ready 'reader-outbox'
     Click-AccountControl $ready 'reader-outbox-filter-pending'
-    Inspect-WriteFixtureAction $ready 0 'NeedsAttention'
+    $heldLabel = 'Review ' + [char]0x00b7 + ' Needs attention'
+    Wait-For 'the exact second native review Outbox row requiring attention' {
+        Invoke-OwnedFixtureControl $ready 'reader-outbox-action-1' $null $heldLabel
+    }
+    $null = Wait-Reader 'the held review is selected in the native Outbox' {
+        param($reader) $reader.outbox_visible -and $reader.outbox_action_state -ceq 'NeedsAttention'
+    }
     Click-AccountControl $ready 'reader-outbox-open'
     $kept = Wait-ExactFixtureReview $draftB $headB 'src/second.rs'
     if ($kept.cached_reader.active_item -ne $second.cached_reader.active_item) {
