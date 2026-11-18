@@ -6,6 +6,7 @@ param(
     [UInt64]$Seed = 12345,
     [switch]$Measure,
     [switch]$PlatformProof,
+    [switch]$ToastProof,
     [switch]$ManualTrayClick,
     [switch]$ManualNotificationClick,
     [string]$Artifact,
@@ -15,7 +16,15 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $null = New-Item -ItemType Directory -Force -Path $ReportDir
-$reportName = if ($Measure) { 'measurements.json' } elseif ($PlatformProof) { 'platform-native.json' } else { 'native.json' }
+$reportName = if ($Measure) {
+    'measurements.json'
+} elseif ($PlatformProof) {
+    'platform-native.json'
+} elseif ($ToastProof) {
+    'toast-native.json'
+} else {
+    'native.json'
+}
 $reportPath = Join-Path $ReportDir $reportName
 $events = New-Object 'System.Collections.Generic.List[object]'
 $report = [ordered]@{
@@ -44,6 +53,8 @@ $reportFile = Join-Path $ReportDir 'ui-observation.json'
 $blocked = $false
 $clipboardBackup = $null
 $copiedClipboardSequence = $null
+$toastFixture = $null
+$toastSubmissionAttempted = $false
 
 function Get-FileSha256 {
     param([string]$Path)
@@ -140,6 +151,10 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     if ($OpenReview) { $info.Arguments += ' --open-review' }
     $info.EnvironmentVariables['THREADLINE_PROFILE_DIR'] = $Profile
     $info.EnvironmentVariables['THREADLINE_TEST_SEED'] = $Seed.ToString([Globalization.CultureInfo]::InvariantCulture)
+    $info.EnvironmentVariables.Remove('THREADLINE_TEST_TOAST_TOKEN')
+    if ($ToastProof -and $null -ne $script:toastFixture) {
+        $info.EnvironmentVariables['THREADLINE_TEST_TOAST_TOKEN'] = $script:toastFixture.Token
+    }
     return [Diagnostics.Process]::Start($info)
 }
 
@@ -614,6 +629,82 @@ function Invoke-PlatformProof([IntPtr]$Window) {
     }
 }
 
+function Invoke-ToastProof([IntPtr]$Window) {
+    Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, WindowsBase
+    . (Join-Path $PSScriptRoot 'windows-notification-focus.ps1')
+    $fixtureTitle = 'Threadline review ' + $script:toastFixture.Token.Substring(0, 8)
+    $fixtureActionLabel = 'Open review ' + $script:toastFixture.Token.Substring(0, 8)
+    $fixtureAppDisplayName = $script:toastFixture.Display
+
+    $initial = Wait-State 'PR 72 in the original foreground app' {
+        param($state)
+        $state.pid -eq $script:app.Id -and $state.right_tab -eq 72 -and
+            [ThreadlineWinInput]::GetForegroundWindow() -eq $Window
+    }
+    if ($null -eq $initial.PSObject.Properties['notifications_submitted'] -or
+        $null -eq $initial.PSObject.Properties['notification_com_activations']) {
+        throw 'The selected executable lacks the registered toast test observations.'
+    }
+    [ThreadlineWinInput]::Chord(@(0x11, 0x32))
+    [ThreadlineWinInput]::Chord(@(0x11, 0x09))
+    $before = Wait-State 'PR 68 selected by native input in the original app' {
+        param($state) $state.pid -eq $initial.pid -and $state.right_tab -eq 68
+    }
+    Add-Evidence 'Select PR 68 before submitting the test toast' ([ordered]@{ pid = $before.pid; right_tab = $before.right_tab })
+    Initialize-FixtureNotificationProof
+    $script:toastSubmissionAttempted = $true
+    [ThreadlineWinInput]::Chord(@(0x11, 0x10, 0x78))
+    try {
+        $submitted = Wait-State 'one registered toast submission from the original app' {
+            param($state) $state.pid -eq $before.pid -and $state.notifications_submitted -eq $before.notifications_submitted + 1
+        }
+    } catch {
+        if ($script:app.HasExited) { throw 'Threadline exited before submitting the registered toast.' }
+        Stop-Blocked 'The original process did not report a successful registered toast submission.'
+    }
+    Add-Evidence 'Observe one new WinRT submission from the original app' $submitted.notifications_submitted
+    if (!(Invoke-FixtureCenterClick $Window)) {
+        Stop-Blocked 'The signed Notification Center did not expose a usable default card action or Open review button for this fixture.'
+    }
+
+    $activated = Wait-State 'registered shell action reaches COM and opens PR 72 in the original app' {
+        param($state)
+        $state.pid -eq $before.pid -and $state.right_tab -eq 72 -and
+            $state.activations -gt $before.activations -and
+            $state.notification_com_activations -eq $before.notification_com_activations + 1
+    }
+    Add-Evidence 'Open PR 72 through one COM activation in the existing process' ([ordered]@{
+        pid = $activated.pid; right_tab = $activated.right_tab
+        com_activations_before = $before.notification_com_activations
+        com_activations_after = $activated.notification_com_activations
+    })
+    $report.winrt_activation_verified = $true
+    Wait-For 'the original Threadline window returns to the foreground' { [ThreadlineWinInput]::GetForegroundWindow() -eq $Window }
+    Stop-ThroughUi
+    Add-Evidence 'Quit the isolated app with Ctrl+Q' 0
+}
+
+function Complete-AppToastFixture {
+    $historyClean = !$script:toastSubmissionAttempted
+    for ($attempt = 0; $attempt -lt 2 -and !$historyClean; $attempt++) {
+        try { $historyClean = Clear-AppToastFixtureHistory }
+        catch { $historyClean = $false }
+    }
+    if (!$historyClean) {
+        Add-Evidence 'Retain the owned registration so history cleanup can be retried' ([ordered]@{
+            app_identity = $script:toastFixture.Identity
+            class_id = $script:toastFixture.ClassName
+        })
+        $script:report.status = 'Fail'
+        $script:report.detail = 'The registered toast proof could not verify fixture history cleanup.'
+        return
+    }
+    if (!(Remove-AppToastFixture)) {
+        $script:report.status = 'Fail'
+        $script:report.detail = 'The registered toast proof could not verify shortcut and COM cleanup.'
+    }
+}
+
 function Invoke-Measurement([IntPtr]$Window, [double]$ColdMs) {
     # Wait once to sample the documented idle state. Interaction waits use live observation conditions.
     Start-Sleep -Seconds 3
@@ -679,7 +770,8 @@ function Invoke-Measurement([IntPtr]$Window, [double]$ColdMs) {
 }
 
 try {
-    if ($Measure -and $PlatformProof) { throw 'Select one native evidence mode per run.' }
+    if (@($Measure, $PlatformProof, $ToastProof | Where-Object { $_ }).Count -gt 1) { throw 'Select one native evidence mode per run.' }
+    if (($ManualTrayClick -or $ManualNotificationClick) -and !$PlatformProof) { throw 'Manual shell checkpoints require -PlatformProof.' }
     if ($report.session_id -eq 0 -or ![Environment]::UserInteractive) {
         Stop-Blocked 'The driver needs an unlocked interactive Windows desktop outside Session 0.'
     }
@@ -714,6 +806,13 @@ try {
     }
     $firstProfile = Join-Path $ProfileDir ('initial-' + [guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $firstProfile -Force
+    if ($ToastProof) {
+        if (!(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'windows-notification-focus.ps1') -PathType Leaf)) {
+            throw 'The registered toast action helper is missing from this test build.'
+        }
+        . (Join-Path $PSScriptRoot 'windows-app-toast.ps1')
+        Register-AppToastFixture
+    }
     $clock = [Diagnostics.Stopwatch]::StartNew()
     $app = Start-Threadline $firstProfile $reportFile
     $report.app_pid = $app.Id
@@ -731,6 +830,9 @@ try {
         $report.measurements = $measurement
         Invoke-Measurement $window $coldMs
         $report.detail = 'Windows baseline captured and compared with its numeric budgets.'
+    } elseif ($ToastProof) {
+        Invoke-ToastProof $window
+        $report.detail = 'The registered notification action reached COM and opened PR 72 in the original Threadline process.'
     } elseif ($PlatformProof) {
         Invoke-PlatformProof $window
         $report.detail = 'Observed native tray behavior, shell notification delivery and notification click into the existing process.'
@@ -759,7 +861,7 @@ try {
     $report.status = if ($blocked) { 'Blocked' } else { 'Fail' }
     $report.detail = $_.Exception.Message
     $report.driver_location = $_.InvocationInfo.PositionMessage
-    if ($app -and !$app.HasExited -and $app.MainWindowHandle -ne [IntPtr]::Zero) {
+    if (!$ToastProof -and $app -and !$app.HasExited -and $app.MainWindowHandle -ne [IntPtr]::Zero) {
         try {
             if ([ThreadlineWinInput]::GetForegroundWindow() -eq $app.MainWindowHandle) {
                 Crop-Screenshot $app.MainWindowHandle 'failure.png'
@@ -779,12 +881,18 @@ try {
             $report.detail = 'Could not restore the original Windows clipboard.'
         }
     }
-    if ($app) {
-        if (!$app.HasExited) {
-            $app.Kill()
-            $app.WaitForExit()
+    try {
+        if ($app) {
+            if (!$app.HasExited) {
+                $app.Kill()
+                $app.WaitForExit()
+            }
+            $app.Dispose()
         }
-        $app.Dispose()
+    } finally {
+        if ($ToastProof -and $null -ne $toastFixture) {
+            Complete-AppToastFixture
+        }
     }
     # The canonical Rust runner owns profile cleanup. An invocation made directly keeps isolated
     # fixture profiles for manual inspection until its caller removes them.

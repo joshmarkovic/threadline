@@ -110,6 +110,9 @@ jobs:
       - name: Test native wheel input validation
         shell: powershell
         run: ./tools/native/test-windows-wheel.ps1
+      - name: Test registered notification target validation
+        shell: powershell
+        run: ./tools/native/test-target-selection.ps1
       - name: Install pinned Rust
         run: rustup toolchain install 1.98.1 --profile minimal
       - name: Run the in-process GPUI suite
@@ -132,6 +135,9 @@ jobs:
             $build.binary
             'tools/native/windows-smoke.ps1'
             'tools/native/ThreadlineWinInput.cs'
+            'tools/native/windows-app-toast.ps1'
+            'tools/native/windows-notification-focus.ps1'
+            'tools/native/ThreadlineToastShortcut.cs'
             'docs/architecture/windows-budgets.json'
             'tools/native/README.md'
           )

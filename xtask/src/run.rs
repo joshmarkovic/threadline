@@ -65,40 +65,48 @@ pub fn execute(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
 }
 
 fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
-    let platform_case = "S01-WINDOWS-SHELL";
+    const WINDOWS_CASES: &[(&str, NativeMode, &str)] = &[
+        (
+            "S01-WINDOWS-SHELL",
+            NativeMode::WindowsShell,
+            "windows-shell",
+        ),
+        (
+            "S01-WINDOWS-TOAST",
+            NativeMode::WindowsToast,
+            "windows-toast",
+        ),
+    ];
+    let full = options.suite.as_deref() == Some("full");
     match options.case.as_deref() {
         Some("E2E-001") => {}
-        Some(id) if id == platform_case => {
-            if options.suite.as_deref() != Some("full") {
+        Some(id) => {
+            let Some(&(_, mode, _)) = WINDOWS_CASES.iter().find(|case| id == case.0) else {
+                return vec![unimplemented(id)];
+            };
+            if !full {
                 return vec![CaseResult::new(
                     id,
                     Status::Fail,
-                    "Use --suite full for Windows shell proof.",
+                    format!("Use --suite full for {id}."),
                 )];
             }
-            return vec![run_native(id, NativeMode::WindowsShell, options, root, dir)];
+            return vec![run_native(id, mode, options, root, dir)];
         }
-        Some(id) => return vec![unimplemented(id)],
         None => {}
     }
     let smoke = run_native("E2E-001", NativeMode::Smoke, options, root, dir);
     let mut cases = vec![smoke];
-    if options.case.is_none() && options.suite.as_deref() == Some("full") && cfg!(windows) {
-        let platform_dir = dir.join("windows-shell");
-        let mut platform = match fs::create_dir(&platform_dir) {
-            Ok(()) => run_native(
-                platform_case,
-                NativeMode::WindowsShell,
-                options,
-                root,
-                &platform_dir,
-            ),
-            Err(error) => CaseResult::new(platform_case, Status::Fail, error.to_string()),
-        };
-        platform.evidence = platform
-            .evidence
-            .map(|path| format!("windows-shell/{path}"));
-        cases.push(platform);
+    if options.case.is_none() && full && cfg!(windows) {
+        for &(id, mode, subdir) in WINDOWS_CASES {
+            let platform_dir = dir.join(subdir);
+            let mut platform = match fs::create_dir(&platform_dir) {
+                Ok(()) => run_native(id, mode, options, root, &platform_dir),
+                Err(error) => CaseResult::new(id, Status::Fail, error.to_string()),
+            };
+            platform.evidence = platform.evidence.map(|path| format!("{subdir}/{path}"));
+            cases.push(platform);
+        }
     }
     cases
 }
@@ -210,6 +218,7 @@ enum NativeMode {
     Smoke,
     Measure,
     WindowsShell,
+    WindowsToast,
 }
 
 fn run_native(
@@ -302,6 +311,9 @@ fn native_driver(
         if mode == NativeMode::WindowsShell {
             cmd.arg("-PlatformProof");
         }
+        if mode == NativeMode::WindowsToast {
+            cmd.arg("-ToastProof");
+        }
         cmd
     } else {
         let mut cmd = Command::new("bash");
@@ -322,6 +334,7 @@ fn native_driver(
         NativeMode::Smoke => "native.json",
         NativeMode::Measure => "measurements.json",
         NativeMode::WindowsShell => "platform-native.json",
+        NativeMode::WindowsToast => "toast-native.json",
     };
     let details = fs::read(dir.join(driver_report))
         .ok()
@@ -578,6 +591,52 @@ mod tests {
         let outcomes = execute(&options, dir.path(), dir.path());
         assert_eq!(outcomes.len(), 1);
         assert_eq!(outcomes[0].case, "UT-001");
+        assert_eq!(outcomes[0].status, Status::Blocked);
+        assert!(outcomes[0].evidence.is_none());
+    }
+
+    #[test]
+    fn registered_toast_cannot_start_from_the_smoke_suite() {
+        let options = crate::cli::parse(
+            &[
+                "test",
+                "e2e",
+                "--suite",
+                "smoke",
+                "--case",
+                "S01-WINDOWS-TOAST",
+            ]
+            .map(str::to_owned),
+        )
+        .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let outcomes = execute(&options, dir.path(), dir.path());
+        assert_eq!(outcomes.len(), 1);
+        assert_eq!(outcomes[0].case, "S01-WINDOWS-TOAST");
+        assert_eq!(outcomes[0].status, Status::Fail);
+        assert!(outcomes[0].detail.contains("--suite full"));
+        assert!(outcomes[0].evidence.is_none());
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn registered_toast_reports_only_its_case_on_an_unsupported_host() {
+        let options = crate::cli::parse(
+            &[
+                "test",
+                "e2e",
+                "--suite",
+                "full",
+                "--case",
+                "S01-WINDOWS-TOAST",
+            ]
+            .map(str::to_owned),
+        )
+        .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let outcomes = execute(&options, dir.path(), dir.path());
+        assert_eq!(outcomes.len(), 1);
+        assert_eq!(outcomes[0].case, "S01-WINDOWS-TOAST");
         assert_eq!(outcomes[0].status, Status::Blocked);
         assert!(outcomes[0].evidence.is_none());
     }

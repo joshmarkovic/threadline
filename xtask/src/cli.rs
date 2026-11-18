@@ -186,6 +186,7 @@ fn known_case(lane: Lane, case: &str) -> bool {
             | (Lane::Integration, "S01-PLATFORM")
             | (Lane::Ui, "S01-GPUI")
             | (Lane::E2e, "S01-WINDOWS-SHELL")
+            | (Lane::E2e, "S01-WINDOWS-TOAST")
     ) || catalog_cases(lane).any(|id| id == case)
 }
 
@@ -242,5 +243,22 @@ mod tests {
             .is_ok()
         );
         assert_eq!(catalog_cases(Lane::Live).count(), 4);
+    }
+
+    #[test]
+    fn accepts_the_registered_toast_case_as_native_e2e() {
+        let args = arguments(&[
+            "test",
+            "e2e",
+            "--suite",
+            "full",
+            "--case",
+            "S01-WINDOWS-TOAST",
+        ]);
+        assert_eq!(
+            parse(&args).unwrap().case.as_deref(),
+            Some("S01-WINDOWS-TOAST")
+        );
+        assert!(parse(&arguments(&["test", "unit", "--case", "S01-WINDOWS-TOAST"])).is_err());
     }
 }

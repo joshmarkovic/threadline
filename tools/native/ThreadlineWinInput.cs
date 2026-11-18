@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 
 public static class ThreadlineWinInput
@@ -101,6 +103,30 @@ public static class ThreadlineWinInput
     private static extern IntPtr WindowFromPoint(Point point);
 
     [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr window, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out Point point);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr window, out Rect bounds);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr window, StringBuilder name, int capacity);
+
+    private delegate bool WindowCallback(IntPtr window, IntPtr data);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(WindowCallback callback, IntPtr data);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr SendMessageTimeout(IntPtr window, uint message, UIntPtr count,
+        [Out] StringBuilder text, uint flags, uint timeout, out UIntPtr result);
+
+    [DllImport("shell32.dll")]
+    public static extern int SHQueryUserNotificationState(out int state);
+
+    [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -108,6 +134,9 @@ public static class ThreadlineWinInput
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmFlush();
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(IntPtr window, uint attribute, out uint value, uint size);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(uint count, Input[] input, int size);
@@ -291,6 +320,129 @@ public static class ThreadlineWinInput
         if (!SetCursorPos(point.X, point.Y)) throw new Win32Exception(Marshal.GetLastWin32Error());
         RequireShellTarget(point, shellProcess);
         ClickPointer(requireFocus: false);
+    }
+
+    public sealed class BannerWindow
+    {
+        public IntPtr Handle;
+        public uint ProcessId;
+        public string ClassName;
+        public Rect Bounds;
+        public bool FocusDerived;
+    }
+
+    private static bool IsShellProcess(uint processId)
+    {
+        if (processId == 0) return false;
+        string windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        try
+        {
+            using (var process = Process.GetProcessById((int)processId))
+            {
+                if (process.SessionId != Process.GetCurrentProcess().SessionId) return false;
+                string image = process.MainModule.FileName;
+                string name = Path.GetFileName(image);
+                if (String.Equals(image, Path.Combine(windows, "explorer.exe"), StringComparison.OrdinalIgnoreCase))
+                    return true;
+                bool shellHost = String.Equals(name, "ShellExperienceHost.exe", StringComparison.OrdinalIgnoreCase) ||
+                    String.Equals(name, "ShellHost.exe", StringComparison.OrdinalIgnoreCase);
+                return shellHost && (image.StartsWith(Path.Combine(windows, "SystemApps") + Path.DirectorySeparatorChar,
+                    StringComparison.OrdinalIgnoreCase) || String.Equals(image, Path.Combine(windows, "System32", name),
+                    StringComparison.OrdinalIgnoreCase));
+            }
+        }
+        catch (Win32Exception) { return false; }
+        catch (InvalidOperationException) { return false; }
+        catch (ArgumentException) { return false; }
+    }
+
+    private static BannerWindow ReadBannerWindow(IntPtr window, bool focusDerived = false)
+    {
+        if (window == IntPtr.Zero || !IsWindowVisible(window) || IsIconic(window)) return null;
+        uint cloaked;
+        if (DwmGetWindowAttribute(window, 14, out cloaked, sizeof(uint)) == 0 && cloaked != 0) return null;
+        var buffer = new StringBuilder(128);
+        if (GetClassName(window, buffer, buffer.Capacity) == 0) return null;
+        string name = buffer.ToString();
+        if (!focusDerived && name != "Windows.UI.NotificationToastWindow" && name != "Windows.UI.Core.CoreWindow" &&
+            name != "ToastWnd" && name != "tooltips_class32" && name != "Windows.UI.NotificationCenterWindow" &&
+            name != "XamlExplorerHostIslandWindow" && name != "Windows.UI.Composition.DesktopWindowContentBridge") return null;
+        uint processId = WindowProcessId(window);
+        Rect bounds;
+        if (!IsShellProcess(processId) || !GetWindowRect(window, out bounds) ||
+            bounds.Left >= bounds.Right || bounds.Top >= bounds.Bottom) return null;
+        return new BannerWindow { Handle = window, ProcessId = processId, ClassName = name, Bounds = bounds, FocusDerived = focusDerived };
+    }
+
+    public static BannerWindow ShellWindow(IntPtr window)
+    {
+        return ReadBannerWindow(GetAncestor(window, 2), focusDerived: true);
+    }
+
+    public static BannerWindow[] ShellBannerWindows()
+    {
+        var windows = new List<BannerWindow>();
+        EnumWindows((window, data) =>
+        {
+            var banner = ReadBannerWindow(window);
+            if (banner != null) windows.Add(banner);
+            return true;
+        }, IntPtr.Zero);
+        return windows.ToArray();
+    }
+
+    public static bool MatchesClassicBannerText(string text, string title, string body)
+    {
+        return text.Replace("\r\n", "\n") == title + "\n" + body;
+    }
+
+    public static BannerWindow FocusedShellBanner(IntPtr elementWindow, uint owner)
+    {
+        var root = GetAncestor(elementWindow, 2);
+        var foreground = GetForegroundWindow();
+        if (root == IntPtr.Zero || (foreground != root && foreground != TargetWindow)) return null;
+        var live = ReadBannerWindow(root, focusDerived: true);
+        return live != null && live.ProcessId == owner ? live : null;
+    }
+
+    public static bool ClassicBannerMatches(BannerWindow expected, string title, string body)
+    {
+        var live = ReadBannerWindow(expected.Handle);
+        if (!SameBanner(expected, live) || live.ClassName != "tooltips_class32") return false;
+        var text = new StringBuilder(192);
+        UIntPtr length;
+        // WM_GETTEXT is a system message marshalled across processes. Tooltip-specific WM_USER messages are not.
+        if (SendMessageTimeout(live.Handle, 0x000d, (UIntPtr)text.Capacity, text, 0x22, 50, out length) == IntPtr.Zero ||
+            length.ToUInt64() >= (ulong)text.Capacity - 1) return false;
+        return MatchesClassicBannerText(text.ToString(), title, body);
+    }
+
+    public static bool SameBanner(BannerWindow expected, BannerWindow live)
+    {
+        return live != null && expected.Handle == live.Handle && expected.ProcessId == live.ProcessId &&
+            expected.ClassName == live.ClassName;
+    }
+
+    public static bool BannerOwnsPoint(Point point, BannerWindow expected)
+    {
+        var root = GetAncestor(WindowFromPoint(point), 2);
+        var live = ReadBannerWindow(root, expected.FocusDerived);
+        return SameBanner(expected, live) && point.X >= live.Bounds.Left && point.X < live.Bounds.Right &&
+            point.Y >= live.Bounds.Top && point.Y < live.Bounds.Bottom;
+    }
+
+    public static bool MoveToBanner(Point point, BannerWindow expected)
+    {
+        return BannerOwnsPoint(point, expected) && SetCursorPos(point.X, point.Y);
+    }
+
+    public static bool ClickPreparedBanner(Point point, BannerWindow expected)
+    {
+        Point cursor;
+        if (!BannerOwnsPoint(point, expected) || !GetCursorPos(out cursor) || cursor.X != point.X || cursor.Y != point.Y)
+            return false;
+        ClickPointer(requireFocus: false);
+        return true;
     }
 
     private static void RequireShellTarget(Point point, uint shellProcess)

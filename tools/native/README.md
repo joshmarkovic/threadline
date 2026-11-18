@@ -8,7 +8,7 @@ Run the commands from the repository root. The runner writes a unique result dir
 | `cargo xtask test integration` | Isolated simulator and platform contract checks |
 | `cargo xtask test ui` | In-process GPUI view tests |
 | `cargo xtask test e2e --suite smoke` | External driver for the separate feasibility process on Windows and X11 |
-| `cargo xtask test e2e --suite full` | Native smoke plus Windows notification and tray proof on Windows |
+| `cargo xtask test e2e --suite full` | Native smoke plus the legacy Windows shell and tray case and the registered toast case on Windows |
 | `cargo xtask test install --artifact <path>` | Inspect the candidate digest and size. Installer verification remains blocked until packaging. |
 | `cargo xtask test live --repo OWNER/REPO` | Validate the requested scope without connecting to GitHub. Sprint 01 has no live adapter. |
 
@@ -23,9 +23,12 @@ Run on an unlocked Windows 11 x64 desktop. Windows PowerShell 5.1 drives Win32 k
 ```powershell
 cargo xtask test e2e --suite smoke --case E2E-001 --seed 12345
 cargo xtask test e2e --suite full --case S01-WINDOWS-SHELL
+cargo xtask test e2e --suite full --case S01-WINDOWS-TOAST
 ```
 
 The smoke test checks the actual clipboard, pointer-driven splitters, draft input, focus, tab and context selection, background preview, forwarding into the existing instance, quit, and relaunch. Review the PNG window captures and `native.json` with the build digest. The GPUI observer supplies current bounds and the results of the externally injected interactions. Capture a separate run on a 125% or 150% display to verify high-DPI behavior. The driver records the actual DPI and does not modify display settings.
+
+`S01-WINDOWS-TOAST` uses a unique Start Menu shortcut and COM registration under the current user. It submits a fixture from the running app, opens Windows Notification Center, activates the matching action in the signed shell, and verifies that one COM activation opens PR #72 in the original process. The case checks removal of its notification history, shortcut, and COM entry before reporting Pass in `toast-native.json`. The Windows full suite includes this case and the separate legacy shell case. Smoke does not create the toast fixture. Run `--case S01-WINDOWS-TOAST` when you need just the registered path.
 
 When source and a test-build executable are already local to Windows, use the direct driver. Supply a new evidence directory for each invocation. Use a disposable profile or provide the driver a test-owned temporary directory. The canonical Rust command automatically removes the temporary profiles it creates.
 
@@ -64,7 +67,7 @@ If RemoteSigned or another local policy blocks the downloaded script, use the dr
 ```powershell
 $checkout = 'C:\src\threadline'
 if ((git -C $checkout rev-parse HEAD) -cne $expectedCommit) { throw 'Use the build manifest commit.' }
-git -C $checkout diff --quiet HEAD -- tools/native/windows-smoke.ps1 tools/native/ThreadlineWinInput.cs
+git -C $checkout diff --quiet HEAD -- tools/native
 if ($LASTEXITCODE -ne 0) { throw 'Review the checked-out driver files.' }
 $driver = Join-Path $checkout 'tools\native\windows-smoke.ps1'
 ```
@@ -77,6 +80,8 @@ powershell.exe -NoProfile -Sta -File $driver -Binary $binary -ReportDir $evidenc
 ```
 
 This artifact is for development tests. Keep the completed report with `build.json`. The included `windows-budgets.json` supplies the budget for a separate run with `-Measure -BudgetFile .\windows-budgets.json`.
+
+Use `-ToastProof` with a fresh evidence directory to run just the registered case from a verified development build that includes the toast helpers.
 
 To replay a development build on hosted Windows Server x64, dispatch **Hosted Windows desktop replay** from `main` and select the ID of a successful **Build and test** push run on `main`. Download `hosted-windows-server-replay` for the original measurement and shell reports. Keep this hosted evidence separate from the Windows 11 reference desktop results. Package measurement still requires a candidate installer.
 
