@@ -3,6 +3,7 @@
 mod database;
 mod identity;
 
+pub mod access;
 pub mod fixtures;
 pub mod queue;
 pub mod resources;

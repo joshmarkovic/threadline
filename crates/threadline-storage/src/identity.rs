@@ -274,21 +274,7 @@ impl Store {
         owner: &str,
         name: &str,
     ) -> Result<RepositoryId> {
-        let name = RepositoryName::new(owner, name)
-            .map_err(|_| Error::InvalidInput("Invalid provider repository name"))?;
-        let provider_repository_id = provider_number(provider_repository_id)?;
-        self.write(|tx| {
-            let id = tx.query_row(
-                "INSERT INTO repositories (account_id, provider_repository_id, owner, name)
-                 VALUES (?1, ?2, ?3, ?4)
-                 ON CONFLICT (account_id, provider_repository_id)
-                    DO UPDATE SET owner = excluded.owner, name = excluded.name
-                 RETURNING id",
-                params![account, provider_repository_id, name.owner(), name.name()],
-                |row| row.get(0),
-            )?;
-            Ok(id)
-        })
+        self.write(|tx| ensure_repository_in(tx, account, provider_repository_id, owner, name))
     }
 
     pub fn ensure_placeholder(
@@ -451,6 +437,27 @@ impl Store {
             Ok(())
         })
     }
+}
+
+pub(crate) fn ensure_repository_in(
+    connection: &rusqlite::Connection,
+    account: AccountId,
+    provider_repository_id: u64,
+    owner: &str,
+    name: &str,
+) -> Result<RepositoryId> {
+    let name = RepositoryName::new(owner, name)
+        .map_err(|_| Error::InvalidInput("Invalid provider repository name"))?;
+    let provider_repository_id = provider_number(provider_repository_id)?;
+    Ok(connection.query_row(
+        "INSERT INTO repositories (account_id, provider_repository_id, owner, name)
+         VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT (account_id, provider_repository_id)
+            DO UPDATE SET owner = excluded.owner, name = excluded.name
+         RETURNING id",
+        params![account, provider_repository_id, name.owner(), name.name()],
+        |row| row.get(0),
+    )?)
 }
 
 fn provider_number(value: u64) -> Result<String> {
