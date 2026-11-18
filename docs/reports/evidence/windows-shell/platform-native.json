@@ -1,0 +1,150 @@
+{
+    "schema":  1,
+    "status":  "Blocked",
+    "detail":  "Windows reported the banner shown, but UI Automation could not identify its clickable title. Use the manual notification click mode on this target.",
+    "driver":  "Windows PowerShell / Win32 SendInput",
+    "shell_version":  "5.1.22621.7649",
+    "seed":  12345,
+    "os_version":  "10.0.22631",
+    "session_id":  2,
+    "architecture":  "AMD64",
+    "app_pid":  44308,
+    "restarted_pid":  null,
+    "native_window":  2299762,
+    "dpi":  96,
+    "binary_sha256":  "7ac75ecb43636e50b9a63c99a50ad18e80e4fae8e77ca9498b73e25d739da7f2",
+    "executable_bytes":  26760192,
+    "actions":  [
+                    {
+                        "action":  "Attempt focus through a verified native pointer target",
+                        "observed":  {
+                                         "prior_foreground_pid":  28088,
+                                         "injected":  true
+                                     }
+                    },
+                    {
+                        "action":  "Use Keep in tray to opt into native background residence",
+                        "observed":  true
+                    },
+                    {
+                        "action":  "Close the main window while tray is enabled",
+                        "observed":  {
+                                         "pid":  44308,
+                                         "minimized":  true
+                                     }
+                    },
+                    {
+                        "action":  "Open the identified Windows notification area overflow",
+                        "observed":  true
+                    },
+                    {
+                        "action":  "Click the actual Windows tray icon",
+                        "observed":  44308
+                    },
+                    {
+                        "action":  "Windows shell confirmed the test banner displayed",
+                        "observed":  1
+                    }
+                ],
+    "windows_product":  "Microsoft Windows 11 Enterprise",
+    "machine":  {
+                    "manufacturer":  "Microsoft Corporation",
+                    "model":  "Virtual Machine",
+                    "ram_bytes":  34358562816,
+                    "processors":  [
+                                       {
+                                           "Name":  "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+                                           "NumberOfCores":  4,
+                                           "NumberOfLogicalProcessors":  8
+                                       }
+                                   ],
+                    "graphics":  [
+                                     {
+                                         "Name":  "Microsoft Hyper-V Video",
+                                         "DriverVersion":  "10.0.22621.1"
+                                     },
+                                     {
+                                         "Name":  "Microsoft Remote Display Adapter",
+                                         "DriverVersion":  "10.0.22621.7649"
+                                     }
+                                 ],
+                    "storage":  [
+                                    {
+                                        "Model":  "Microsoft Virtual Disk",
+                                        "InterfaceType":  "SCSI",
+                                        "MediaType":  "Fixed hard disk media"
+                                    }
+                                ],
+                    "display":  {
+                                    "width":  2544,
+                                    "height":  1324
+                                }
+                },
+    "loaded_modules":  [
+                           "advapi32.dll",
+                           "ApplicationTargetedFeatureDatabase.dll",
+                           "bcrypt.dll",
+                           "bcryptprimitives.dll",
+                           "clbcatq.dll",
+                           "combase.dll",
+                           "comctl32.dll",
+                           "CRYPTBASE.dll",
+                           "CRYPTSP.dll",
+                           "d3d10warp.dll",
+                           "d3d11.dll",
+                           "d3dcompiler_47.dll",
+                           "dataexchange.dll",
+                           "dcomp.dll",
+                           "directmanipulation.dll",
+                           "directxdatabasehelper.dll",
+                           "dwmapi.dll",
+                           "dwrite.dll",
+                           "dxcore.dll",
+                           "dxgi.dll",
+                           "GDI32.dll",
+                           "gdi32full.dll",
+                           "gdiplus.dll",
+                           "icu.DLL",
+                           "icuuc.dll",
+                           "imm32.dll",
+                           "kernel.appcore.dll",
+                           "KERNEL32.DLL",
+                           "KERNELBASE.dll",
+                           "MSCTF.dll",
+                           "msvcp_win.dll",
+                           "msvcrt.dll",
+                           "ntdll.dll",
+                           "ole32.dll",
+                           "Oleacc.dll",
+                           "oleaut32.dll",
+                           "powrprof.dll",
+                           "profapi.dll",
+                           "RPCRT4.dll",
+                           "RpcRtRemote.dll",
+                           "rsaenh.dll",
+                           "sechost.dll",
+                           "shcore.dll",
+                           "shell32.dll",
+                           "SHLWAPI.dll",
+                           "sxs.dll",
+                           "textinputframework.dll",
+                           "TextShaping.dll",
+                           "threadline-optimized.exe",
+                           "twinapi.appcore.dll",
+                           "ucrtbase.dll",
+                           "uiautomationcore.dll",
+                           "UMPDC.dll",
+                           "user32.dll",
+                           "userenv.dll",
+                           "uxtheme.dll",
+                           "VCRUNTIME140.dll",
+                           "win32u.dll",
+                           "windows.storage.dll",
+                           "Windows.UI.dll",
+                           "Windows.UI.Immersive.dll",
+                           "WindowsCodecs.dll",
+                           "winmm.dll",
+                           "wintypes.dll"
+                       ],
+    "driver_location":  "At C:\\Users\\test-user\\AppData\\Local\\Temp\\threadline-s01.jlYsIu\\workspace\\tools\\native\\windows-smoke.ps1:54 char:5\r\n+     throw $Message\r\n+     ~~~~~~~~~~~~~~"
+}

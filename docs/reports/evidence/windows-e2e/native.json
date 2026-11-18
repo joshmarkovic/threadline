@@ -1,0 +1,186 @@
+{
+    "schema":  1,
+    "status":  "Pass",
+    "detail":  "Exercised the native window, Markdown selection, independent focus and tabs, review input, and both splitters.",
+    "driver":  "Windows PowerShell / Win32 SendInput",
+    "shell_version":  "5.1.22621.7649",
+    "seed":  12345,
+    "os_version":  "10.0.22631",
+    "session_id":  2,
+    "architecture":  "AMD64",
+    "app_pid":  30812,
+    "restarted_pid":  44196,
+    "native_window":  3151962,
+    "dpi":  96,
+    "binary_sha256":  "7ac75ecb43636e50b9a63c99a50ad18e80e4fae8e77ca9498b73e25d739da7f2",
+    "executable_bytes":  26760192,
+    "actions":  [
+                    {
+                        "action":  "Attempt focus through a verified native pointer target",
+                        "observed":  {
+                                         "prior_foreground_pid":  28088,
+                                         "injected":  true
+                                     }
+                    },
+                    {
+                        "action":  "Launch native window",
+                        "observed":  {
+                                         "left_tab":  41,
+                                         "right_tab":  72,
+                                         "context_ratio":  0.33
+                                     }
+                    },
+                    {
+                        "action":  "Pointer select formatted Markdown and copy",
+                        "observed":  {
+                                         "verified":  true,
+                                         "copy_attempts":  1
+                                     }
+                    },
+                    {
+                        "action":  "Type into the right review input while background preview is pending and copy its value",
+                        "observed":  {
+                                         "tab":  72,
+                                         "text":  "native draft 72",
+                                         "copy_attempts":  1
+                                     }
+                    },
+                    {
+                        "action":  "Change the active tab and return to the same draft target",
+                        "observed":  {
+                                         "switched":  68,
+                                         "restored":  72,
+                                         "draft":  "native draft 72"
+                                     }
+                    },
+                    {
+                        "action":  "Switch context to linked issue",
+                        "observed":  "issue"
+                    },
+                    {
+                        "action":  "Resize workspace panes with the pointer",
+                        "observed":  0.34341612
+                    },
+                    {
+                        "action":  "Resize PR context and code with the pointer",
+                        "observed":  0.38265175
+                    },
+                    {
+                        "action":  "Forward a second launch through the Windows instance channel",
+                        "observed":  {
+                                         "existing_pid":  30812,
+                                         "secondary_pid":  37412,
+                                         "right_tab":  72
+                                     }
+                    },
+                    {
+                        "action":  "Quit with the native keyboard shortcut",
+                        "observed":  0
+                    },
+                    {
+                        "action":  "Relaunch a fresh isolated feasibility profile and quit again",
+                        "observed":  44196
+                    }
+                ],
+    "windows_product":  "Microsoft Windows 11 Enterprise",
+    "machine":  {
+                    "manufacturer":  "Microsoft Corporation",
+                    "model":  "Virtual Machine",
+                    "ram_bytes":  34358562816,
+                    "processors":  [
+                                       {
+                                           "Name":  "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+                                           "NumberOfCores":  4,
+                                           "NumberOfLogicalProcessors":  8
+                                       }
+                                   ],
+                    "graphics":  [
+                                     {
+                                         "Name":  "Microsoft Hyper-V Video",
+                                         "DriverVersion":  "10.0.22621.1"
+                                     },
+                                     {
+                                         "Name":  "Microsoft Remote Display Adapter",
+                                         "DriverVersion":  "10.0.22621.7649"
+                                     }
+                                 ],
+                    "storage":  [
+                                    {
+                                        "Model":  "Microsoft Virtual Disk",
+                                        "InterfaceType":  "SCSI",
+                                        "MediaType":  "Fixed hard disk media"
+                                    }
+                                ],
+                    "display":  {
+                                    "width":  2544,
+                                    "height":  1324
+                                }
+                },
+    "loaded_modules":  [
+                           "advapi32.dll",
+                           "ApplicationTargetedFeatureDatabase.dll",
+                           "bcrypt.dll",
+                           "bcryptprimitives.dll",
+                           "clbcatq.dll",
+                           "combase.dll",
+                           "comctl32.dll",
+                           "CRYPTBASE.dll",
+                           "CRYPTSP.dll",
+                           "d3d10warp.dll",
+                           "d3d11.dll",
+                           "d3dcompiler_47.dll",
+                           "dataexchange.dll",
+                           "dcomp.dll",
+                           "directmanipulation.dll",
+                           "directxdatabasehelper.dll",
+                           "dwmapi.dll",
+                           "dwrite.dll",
+                           "dxcore.dll",
+                           "dxgi.dll",
+                           "GDI32.dll",
+                           "gdi32full.dll",
+                           "gdiplus.dll",
+                           "icu.DLL",
+                           "icuuc.dll",
+                           "imm32.dll",
+                           "kernel.appcore.dll",
+                           "KERNEL32.DLL",
+                           "KERNELBASE.dll",
+                           "MSCTF.dll",
+                           "msvcp_win.dll",
+                           "msvcrt.dll",
+                           "ntdll.dll",
+                           "ole32.dll",
+                           "Oleacc.dll",
+                           "oleaut32.dll",
+                           "powrprof.dll",
+                           "profapi.dll",
+                           "RPCRT4.dll",
+                           "RpcRtRemote.dll",
+                           "rsaenh.dll",
+                           "sechost.dll",
+                           "shcore.dll",
+                           "shell32.dll",
+                           "SHLWAPI.dll",
+                           "sxs.dll",
+                           "textinputframework.dll",
+                           "TextShaping.dll",
+                           "threadline-optimized.exe",
+                           "twinapi.appcore.dll",
+                           "ucrtbase.dll",
+                           "uiautomationcore.dll",
+                           "UMPDC.dll",
+                           "user32.dll",
+                           "userenv.dll",
+                           "uxtheme.dll",
+                           "VCRUNTIME140.dll",
+                           "win32u.dll",
+                           "windows.storage.dll",
+                           "Windows.UI.dll",
+                           "Windows.UI.Immersive.dll",
+                           "WindowsCodecs.dll",
+                           "winmm.dll",
+                           "wintypes.dll"
+                       ],
+    "original_clipboard_restored":  true
+}

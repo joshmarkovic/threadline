@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "status": "Pass",
+  "detail": "Exercised the X11 window, Markdown selection, independent focus and tabs, review input, and both splitters",
+  "driver": "X11 xdotool, xclip, ImageMagick",
+  "seed": "12345",
+  "kernel": "Linux 6.18.40.1-microsoft-standard-WSL2",
+  "architecture": "x86_64",
+  "session_type": "unknown",
+  "wsl_distro": "Debian",
+  "app_pid": "955010",
+  "restarted_pid": "955407",
+  "actions": [
+    {
+      "action": "Launch native window",
+      "observed": {
+        "left_tab": 41,
+        "right_tab": 72,
+        "context_ratio": 0.33,
+        "scale_factor": 1.0
+      }
+    },
+    {
+      "action": "Select and copy formatted Markdown",
+      "observed": "Synthetic Markdown token arrived on the X11 clipboard"
+    },
+    {
+      "action": "Type and copy after activating the right pane while background preview is pending",
+      "observed": {
+        "right_tab": 72,
+        "right_input": "native draft 72",
+        "left_input": ""
+      }
+    },
+    {
+      "action": "Change active PR tab and return to the draft",
+      "observed": 72
+    },
+    {
+      "action": "Choose linked issue context",
+      "observed": "issue"
+    },
+    {
+      "action": "Resize workspace divider",
+      "observed": 0.33875698
+    },
+    {
+      "action": "Resize context divider",
+      "observed": 0.38227713
+    },
+    {
+      "action": "Quit with the native keyboard shortcut",
+      "observed": 0
+    },
+    {
+      "action": "Relaunch a fresh isolated feasibility profile and quit again",
+      "observed": 955407
+    }
+  ]
+}

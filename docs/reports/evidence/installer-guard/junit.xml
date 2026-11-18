@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="install" tests="9" failures="0" skipped="9">
+  <testcase classname="install" name="PKG-001"><skipped message="Blocked: No packaging recipe or trusted installer test adapter is available in Sprint 01." /></testcase>
+  <testcase classname="install" name="PKG-002"><skipped message="Blocked: No packaging recipe or trusted installer test adapter is available in Sprint 01." /></testcase>
+  <testcase classname="install" name="PKG-003"><skipped message="Blocked: No packaging recipe or trusted installer test adapter is available in Sprint 01." /></testcase>
+  <testcase classname="install" name="PKG-004"><skipped message="Blocked: No packaging recipe or trusted installer test adapter is available in Sprint 01." /></testcase>
+  <testcase classname="install" name="PKG-005"><skipped message="Blocked: No packaging recipe or trusted installer test adapter is available in Sprint 01." /></testcase>
+  <testcase classname="install" name="PKG-006"><skipped message="Blocked: No packaging recipe or trusted installer test adapter is available in Sprint 01." /></testcase>
+  <testcase classname="install" name="PKG-007"><skipped message="Blocked: No packaging recipe or trusted installer test adapter is available in Sprint 01." /></testcase>
+  <testcase classname="install" name="PKG-008"><skipped message="Blocked: No packaging recipe or trusted installer test adapter is available in Sprint 01." /></testcase>
+  <testcase classname="install" name="PKG-009"><skipped message="Blocked: No packaging recipe or trusted installer test adapter is available in Sprint 01." /></testcase>
+</testsuite>

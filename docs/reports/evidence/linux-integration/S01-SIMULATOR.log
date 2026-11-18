@@ -1,0 +1,15 @@
+
+running 5 tests
+test test_endpoint_rejects_non_loopback_addresses ... ok
+test delay_allows_other_http_work_and_cancelled_selection_cannot_publish ... ok
+test same_item_number_from_another_repository_cannot_be_relabelled ... ok
+test reads_a_versioned_issue_endpoint_with_correct_pr_identity_and_revision ... ok
+test reports_http_and_payload_failures_and_ignores_redirects ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+
+--- stderr ---
+   Compiling threadline-core v0.1.0 (<workspace>/crates/threadline-core)
+    Finished `test` profile [unoptimized] target(s) in 3.18s
+     Running tests/foundation.rs (.build/target-linux/debug/deps/foundation-2cc55d651e072a2b)

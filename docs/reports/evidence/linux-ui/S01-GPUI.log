@@ -1,0 +1,13 @@
+
+running 3 tests
+test markdown_drag_then_copy_uses_the_toolkit_selection ... ok
+test resize_drag_geometry_survives_scale_change ... ok
+test focus_tabs_and_context_keep_the_active_draft ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.99s
+
+
+--- stderr ---
+   Compiling threadline-app v0.1.0 (<workspace>/crates/threadline-app)
+    Finished `test` profile [unoptimized] target(s) in 15.14s
+     Running tests/feasibility_ui.rs (.build/target-linux/debug/deps/feasibility_ui-b9fb4d6a0b19068c)

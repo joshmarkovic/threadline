@@ -1,0 +1,252 @@
+{
+    "schema":  1,
+    "status":  "Fail",
+    "detail":  "One or more Windows performance budgets were exceeded.",
+    "driver":  "Windows PowerShell / Win32 SendInput",
+    "shell_version":  "5.1.22621.7649",
+    "seed":  12345,
+    "os_version":  "10.0.22631",
+    "session_id":  2,
+    "architecture":  "AMD64",
+    "app_pid":  42396,
+    "restarted_pid":  null,
+    "native_window":  2823804,
+    "dpi":  96,
+    "binary_sha256":  "1ab834eb1c71dda821a48a7c1f53439820dc566f2062722d0c52bd6d9897041d",
+    "executable_bytes":  54573568,
+    "actions":  [
+                    {
+                        "action":  "Attempt focus through a verified native pointer target",
+                        "observed":  {
+                                         "prior_foreground_pid":  28088,
+                                         "injected":  true
+                                     }
+                    }
+                ],
+    "windows_product":  "Microsoft Windows 11 Enterprise",
+    "machine":  {
+                    "manufacturer":  "Microsoft Corporation",
+                    "model":  "Virtual Machine",
+                    "ram_bytes":  34358562816,
+                    "processors":  [
+                                       {
+                                           "Name":  "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+                                           "NumberOfCores":  4,
+                                           "NumberOfLogicalProcessors":  8
+                                       }
+                                   ],
+                    "graphics":  [
+                                     {
+                                         "Name":  "Microsoft Hyper-V Video",
+                                         "DriverVersion":  "10.0.22621.1"
+                                     },
+                                     {
+                                         "Name":  "Microsoft Remote Display Adapter",
+                                         "DriverVersion":  "10.0.22621.7649"
+                                     }
+                                 ],
+                    "storage":  [
+                                    {
+                                        "Model":  "Microsoft Virtual Disk",
+                                        "InterfaceType":  "SCSI",
+                                        "MediaType":  "Fixed hard disk media"
+                                    }
+                                ],
+                    "display":  {
+                                    "width":  2544,
+                                    "height":  1324
+                                }
+                },
+    "loaded_modules":  [
+                           "advapi32.dll",
+                           "ApplicationTargetedFeatureDatabase.dll",
+                           "bcrypt.dll",
+                           "bcryptprimitives.dll",
+                           "clbcatq.dll",
+                           "combase.dll",
+                           "comctl32.dll",
+                           "CRYPTBASE.dll",
+                           "CRYPTSP.dll",
+                           "d3d10warp.dll",
+                           "d3d11.dll",
+                           "d3dcompiler_47.dll",
+                           "dataexchange.dll",
+                           "dcomp.dll",
+                           "directmanipulation.dll",
+                           "directxdatabasehelper.dll",
+                           "dwmapi.dll",
+                           "dwrite.dll",
+                           "dxcore.dll",
+                           "dxgi.dll",
+                           "GDI32.dll",
+                           "gdi32full.dll",
+                           "gdiplus.dll",
+                           "icu.DLL",
+                           "icuuc.dll",
+                           "imm32.dll",
+                           "kernel.appcore.dll",
+                           "KERNEL32.DLL",
+                           "KERNELBASE.dll",
+                           "MSCTF.dll",
+                           "msvcp_win.dll",
+                           "msvcrt.dll",
+                           "ntdll.dll",
+                           "ole32.dll",
+                           "Oleacc.dll",
+                           "oleaut32.dll",
+                           "powrprof.dll",
+                           "profapi.dll",
+                           "RPCRT4.dll",
+                           "RpcRtRemote.dll",
+                           "rsaenh.dll",
+                           "sechost.dll",
+                           "shcore.dll",
+                           "shell32.dll",
+                           "SHLWAPI.dll",
+                           "sxs.dll",
+                           "textinputframework.dll",
+                           "TextShaping.dll",
+                           "threadline.exe",
+                           "twinapi.appcore.dll",
+                           "ucrtbase.dll",
+                           "uiautomationcore.dll",
+                           "UMPDC.dll",
+                           "user32.dll",
+                           "userenv.dll",
+                           "uxtheme.dll",
+                           "VCRUNTIME140.dll",
+                           "win32u.dll",
+                           "windows.storage.dll",
+                           "Windows.UI.dll",
+                           "Windows.UI.Immersive.dll",
+                           "WindowsCodecs.dll",
+                           "winmm.dll",
+                           "wintypes.dll"
+                       ],
+    "measurements":  {
+                         "idle_working_set_bytes":  102141952,
+                         "cold_start_ms":  2412.87,
+                         "peak_working_set_bytes":  105668608,
+                         "gpu_breakdown":  {
+                                               "idle":  {
+                                                            "dedicated_bytes":  0,
+                                                            "shared_bytes":  0
+                                                        },
+                                               "after_scroll":  {
+                                                                    "dedicated_bytes":  0,
+                                                                    "shared_bytes":  0
+                                                                }
+                                           },
+                         "gpu_memory_bytes":  0,
+                         "scroll_breakdown":  {
+                                                  "large_diff":  {
+                                                                     "sample_count":  24,
+                                                                     "frame_times_ms":  [
+                                                                                            93.4107,
+                                                                                            87.7327,
+                                                                                            92.92920000000001,
+                                                                                            90.961,
+                                                                                            103.29180000000001,
+                                                                                            114.4204,
+                                                                                            148.4636,
+                                                                                            90.5878,
+                                                                                            83.8976,
+                                                                                            99.24810000000001,
+                                                                                            77.0682,
+                                                                                            74.9308,
+                                                                                            102.2452,
+                                                                                            100.7174,
+                                                                                            96.1604,
+                                                                                            75.688,
+                                                                                            84.56909999999999,
+                                                                                            100.9422,
+                                                                                            120.7554,
+                                                                                            107.6936,
+                                                                                            105.0717,
+                                                                                            77.5228,
+                                                                                            92.0548,
+                                                                                            112.356
+                                                                                        ],
+                                                                     "p95_ms":  120.7554
+                                                                 },
+                                                  "markdown_discussion":  {
+                                                                              "sample_count":  22,
+                                                                              "frame_times_ms":  [
+                                                                                                     78.2736,
+                                                                                                     79.1814,
+                                                                                                     107.5961,
+                                                                                                     98.3005,
+                                                                                                     105.7775,
+                                                                                                     98.9583,
+                                                                                                     108.6757,
+                                                                                                     119.05590000000001,
+                                                                                                     121.67500000000001,
+                                                                                                     115.3357,
+                                                                                                     103.7539,
+                                                                                                     73.13690000000001,
+                                                                                                     107.8567,
+                                                                                                     95.9964,
+                                                                                                     82.7284,
+                                                                                                     74.94839999999999,
+                                                                                                     126.70339999999999,
+                                                                                                     94.9855,
+                                                                                                     85.89620000000001,
+                                                                                                     146.6791,
+                                                                                                     100.6978,
+                                                                                                     105.1429
+                                                                                                 ],
+                                                                              "p95_ms":  126.7034
+                                                                          }
+                                              },
+                         "scroll_frame_p95_ms":  126.7034,
+                         "package_bytes":  null,
+                         "package_sha256":  null
+                     },
+    "budgets":  {
+                    "idle_working_set_bytes":  {
+                                                   "value":  102141952,
+                                                   "limit":  209715200,
+                                                   "status":  "Pass"
+                                               },
+                    "peak_working_set_bytes":  {
+                                                   "value":  105668608,
+                                                   "limit":  471859200,
+                                                   "status":  "Pass"
+                                               },
+                    "gpu_memory_bytes":  {
+                                             "value":  0,
+                                             "limit":  268435456,
+                                             "status":  "Pass"
+                                         },
+                    "package_bytes":  {
+                                          "value":  null,
+                                          "limit":  52428800,
+                                          "status":  "Blocked"
+                                      },
+                    "cold_start_ms":  {
+                                          "value":  2412.87,
+                                          "limit":  3000,
+                                          "status":  "Pass"
+                                      },
+                    "scroll_frame_p95_ms":  {
+                                                "value":  126.7034,
+                                                "limit":  20,
+                                                "status":  "Fail",
+                                                "surfaces":  {
+                                                                 "large_diff":  {
+                                                                                    "value":  120.7554,
+                                                                                    "sample_count":  24,
+                                                                                    "limit":  20,
+                                                                                    "status":  "Fail"
+                                                                                },
+                                                                 "markdown_discussion":  {
+                                                                                             "value":  126.7034,
+                                                                                             "sample_count":  22,
+                                                                                             "limit":  20,
+                                                                                             "status":  "Fail"
+                                                                                         }
+                                                             }
+                                            }
+                },
+    "driver_location":  "At C:\\Users\\test-user\\AppData\\Local\\Temp\\threadline-s01.jlYsIu\\windows-smoke.ps1:521 char:56\r\n+ ... s \u0027Fail\u0027) { throw \u0027One or more Windows performance budgets were excee ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+}

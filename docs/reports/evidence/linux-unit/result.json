@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "lane": "unit",
+  "suite": null,
+  "seed": 12345,
+  "host": {
+    "os": "linux",
+    "architecture": "x86_64",
+    "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+    "display_session": "Wayland and X11 environment"
+  },
+  "source_revision": "39ce43674f3905c597d07cf270caa205b631218c",
+  "source_dirty": false,
+  "cargo_lock_sha256": "00d232dc36582a00dddaddfaf4f4225b9be0af05c50dd26803bd7054e8f30f86",
+  "package_version": "0.1.0",
+  "fixture_revision": "Sprint 01 synthetic feasibility fixture",
+  "status": "Pass",
+  "cases": [
+    {
+      "case": "UT-021",
+      "status": "Pass",
+      "detail": "8 tests passed.",
+      "tests_passed": 8,
+      "evidence": "UT-021.log"
+    },
+    {
+      "case": "S01-CORE",
+      "status": "Pass",
+      "detail": "6 tests passed.",
+      "tests_passed": 6,
+      "evidence": "S01-CORE.log"
+    },
+    {
+      "case": "S01-DIFF-FIXTURE",
+      "status": "Pass",
+      "detail": "1 tests passed.",
+      "tests_passed": 1,
+      "evidence": "S01-DIFF-FIXTURE.log"
+    }
+  ]
+}

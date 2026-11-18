@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "lane": "e2e",
+  "suite": "smoke",
+  "seed": 12345,
+  "host": {
+    "os": "windows",
+    "architecture": "x86_64",
+    "version": "Microsoft Windows [Version 10.0.22631.7652]",
+    "display_session": "Windows desktop availability is checked by native driver"
+  },
+  "source_revision": null,
+  "source_dirty": null,
+  "cargo_lock_sha256": "00d232dc36582a00dddaddfaf4f4225b9be0af05c50dd26803bd7054e8f30f86",
+  "package_version": "0.1.0",
+  "fixture_revision": "Sprint 01 synthetic feasibility fixture",
+  "status": "Pass",
+  "cases": [
+    {
+      "case": "E2E-001",
+      "status": "Pass",
+      "detail": "Exercised the native window, Markdown selection, independent focus and tabs, review input, and both splitters. See native-driver.log.",
+      "tests_passed": null,
+      "evidence": "native.json"
+    }
+  ]
+}

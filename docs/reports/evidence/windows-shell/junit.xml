@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="e2e" tests="1" failures="0" skipped="1">
+  <testcase classname="e2e" name="S01-WINDOWS-SHELL"><skipped message="Blocked: Windows reported the banner shown, but UI Automation could not identify its clickable title. Use the manual notification click mode on this target. See native-driver.log." /></testcase>
+</testsuite>

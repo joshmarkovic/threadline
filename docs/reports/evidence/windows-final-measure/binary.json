@@ -1,0 +1,7 @@
+{
+  "sha256": "7ac75ecb43636e50b9a63c99a50ad18e80e4fae8e77ca9498b73e25d739da7f2",
+  "size_bytes": 26760192,
+  "binary": "C:\\Users\\test-user\\AppData\\Local\\Temp\\threadline-s01.jlYsIu\\threadline-optimized.exe",
+  "build": "external override",
+  "evidence_class": "test-build native process"
+}

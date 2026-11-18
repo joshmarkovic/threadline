@@ -1,14 +1,14 @@
 requirement_id,platform,release_phase,initial_implementation_sprint,platform_verification_sprint,release_gate_sprint,applicable,status,scope_reason,evidence
-FND-01,windows,Windows first release,01,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+FND-01,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Target dependency inventories and loaded renderer modules.
 FND-01,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-01,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-FND-02,windows,Windows first release,01,01,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+FND-02,windows,Windows first release,01,01,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Windows workspace process smoke: Pass. Windows shell proof: Blocked.
 FND-02,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-02,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-03,windows,Windows first release,02,02,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-03,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-03,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-FND-04,windows,Windows first release,01,05,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+FND-04,windows,Windows first release,01,05,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Typed cancellable work, seeded fake, and real loopback HTTP integration."
 FND-04,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-04,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-05,windows,Windows first release,03,03,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -20,22 +20,22 @@ FND-06,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required;
 FND-07,windows,Windows first release,04,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-07,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-07,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PORT-01,windows,Windows first release,01,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+PORT-01,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Windows, macOS, and Linux support defaults and phase gates documented."
 PORT-01,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-01,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PORT-02,windows,Windows first release,01,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+PORT-02,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Portable core and separate native platform adapter. Later services remain assigned.
 PORT-02,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-02,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PORT-03,windows,Windows first release,01,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+PORT-03,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Windows workspace process smoke: Pass. Early WSLg X11 smoke passed. A macOS host was unavailable.
 PORT-03,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-03,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-04,windows,Windows first release,03,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-04,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-04,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PORT-05,windows,Windows first release,11,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+PORT-05,windows,Windows first release,11,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Windows development shell proof: Blocked. Production packaged activation remains Sprint 11.
 PORT-05,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-05,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PORT-06,windows,Windows first release,01,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+PORT-06,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Native keyboard, clipboard, focus and lifecycle slice. 2× geometry in-process and native 96 DPI."
 PORT-06,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-06,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-07,windows,Windows first release,13,,12,no,Not applicable,Requirement is specific to another platform release.,
@@ -263,7 +263,7 @@ PR-03,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required; 
 PR-04,windows,Windows first release,06,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PR-04,macos,macOS release,06,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PR-04,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PR-05,windows,Windows first release,06,08,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+PR-05,windows,Windows first release,06,08,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Synthetic bound 33/67 review context with view switching and splitters.
 PR-05,macos,macOS release,06,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PR-05,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PR-06,windows,Windows first release,06,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -326,7 +326,7 @@ GRAPH-06,linux,Linux release,10,14,14,yes,Planned,Actual target evidence require
 GRAPH-07,windows,Windows first release,10,10,12,yes,Planned,Future option: record object-cache deferral. No clone or bare-object cache is mandatory.,
 GRAPH-07,macos,macOS release,10,13,13,yes,Planned,Future option: record object-cache deferral. No clone or bare-object cache is mandatory.,
 GRAPH-07,linux,Linux release,10,14,14,yes,Planned,Future option: record object-cache deferral. No clone or bare-object cache is mandatory.,
-NOTIFY-01,windows,Windows first release,11,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+NOTIFY-01,windows,Windows first release,11,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Windows notification-area prototype proof: Blocked. Durable activity and packaged tests remain Sprint 11.
 NOTIFY-01,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-01,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-02,windows,Windows first release,05,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -470,19 +470,19 @@ DATA-09,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required
 DATA-10,windows,Windows first release,02,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DATA-10,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DATA-10,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-UX-01,windows,Windows first release,04,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+UX-01,windows,Windows first release,04,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Native focus and keyboard/pointer paths. Actual high-DPI desktop proof remains open.
 UX-01,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 UX-01,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 UX-02,windows,Windows first release,04,10,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 UX-02,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 UX-02,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-INSTALL-01,windows,Windows first release,01,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+INSTALL-01,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Documented projected one-to-three-command prebuilt installer paths.
 INSTALL-01,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-01,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-INSTALL-02,windows,Windows first release,01,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+INSTALL-02,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Documented candidate architecture, version, channel, and compatibility fields."
 INSTALL-02,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-02,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-INSTALL-03,windows,Windows first release,01,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+INSTALL-03,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Documented publisher identity and artifact digest policy.
 INSTALL-03,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-03,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-04,windows,Windows first release,02,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -500,27 +500,27 @@ INSTALL-07,linux,Linux release,12,14,14,yes,Planned,Actual target evidence requi
 INSTALL-08,windows,Windows first release,12,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-08,macos,macOS release,12,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 INSTALL-08,linux,Linux release,12,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-TEST-01,windows,Windows first release,01,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+TEST-01,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Cargo runner with unit, integration, UI, E2E, installation and live commands."
 TEST-01,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-01,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-TEST-02,windows,Windows first release,01,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+TEST-02,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Deterministic unit coverage and repository-owned case validation.
 TEST-02,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-02,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-03,windows,Windows first release,02,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-03,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-03,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-TEST-04,windows,Windows first release,01,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+TEST-04,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Separate native process controls on Windows (Pass) and early Linux WSLg (Pass).
 TEST-04,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-04,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-TEST-05,windows,Windows first release,01,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+TEST-05,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Exact-artifact command returns Blocked pending packaging and approved release infrastructure.
 TEST-05,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-05,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-TEST-06,windows,Windows first release,01,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+TEST-06,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Three-host Actions jobs configured. Native desktop process runs recorded separately from hosted CI.
 TEST-06,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-06,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-07,windows,Windows first release,03,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-07,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-07,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-TEST-08,windows,Windows first release,01,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+TEST-08,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. JUnit and JSON artifacts with build, seed, target, and sprint evidence."
 TEST-08,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-08,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,

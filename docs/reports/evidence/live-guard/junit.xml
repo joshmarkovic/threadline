@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="live" tests="4" failures="0" skipped="4">
+  <testcase classname="live" name="LIVE-001"><skipped message="Blocked: An explicitly configured authorized repository and credential profile are required." /></testcase>
+  <testcase classname="live" name="LIVE-002"><skipped message="Blocked: An explicitly configured authorized repository and credential profile are required." /></testcase>
+  <testcase classname="live" name="LIVE-003"><skipped message="Blocked: An explicitly configured authorized repository and credential profile are required." /></testcase>
+  <testcase classname="live" name="LIVE-004"><skipped message="Blocked: An explicitly configured authorized repository and credential profile are required." /></testcase>
+</testsuite>

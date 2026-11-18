@@ -1,0 +1,7 @@
+{
+  "binary": "<workspace>/.build/feasibility/threadline-linux",
+  "build": "external override",
+  "evidence_class": "test-build native process",
+  "sha256": "a6d833f33255dc2456c3d09d49ae1967e080bd385073fb211011fca44da6d36e",
+  "size_bytes": 174464144
+}

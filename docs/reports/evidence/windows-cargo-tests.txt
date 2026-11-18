@@ -1,0 +1,61 @@
+Running feasibility_ui-054176ff63e0b39a.exe
+
+running 3 tests
+test focus_tabs_and_context_keep_the_active_draft ... ok
+test markdown_drag_then_copy_uses_the_toolkit_selection ... ok
+test resize_drag_geometry_survives_scale_change ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.04s
+
+Running foundation-622e28219e890c23.exe
+
+running 5 tests
+test delay_allows_other_http_work_and_cancelled_selection_cannot_publish ... ok
+test reads_a_versioned_issue_endpoint_with_correct_pr_identity_and_revision ... ok
+test reports_http_and_payload_failures_and_ignores_redirects ... ok
+test same_item_number_from_another_repository_cannot_be_relabelled ... ok
+test test_endpoint_rejects_non_loopback_addresses ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+Running threadline_app-914a6b603b058145.exe
+
+running 1 test
+test fixtures::tests::native_diff_fixture_has_reviewed_files_and_large_hunks ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+Running threadline_core-70b70282966553f7.exe
+
+running 6 tests
+test domain::tests::remote_route_components_cannot_become_paths_or_authorities ... ok
+test domain::tests::visible_number_is_scoped_to_repository_and_account ... ok
+test fixtures::tests::seeded_fixture_replays_without_changing_resource_identity ... ok
+test sync::tests::cancellation_and_queue_limit_do_not_dispatch_unwanted_requests ... ok
+test sync::tests::mismatched_provider_item_is_rejected_even_for_a_current_selection ... ok
+test sync::tests::simulated_time_controls_completion_and_stale_view_rejection ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+Running threadline_platform-d1b677689103e837.exe
+
+running 3 tests
+test platform_windows::tests::activation_message_accepts_only_known_routes ... ok
+test platform_windows::tests::isolated_instances_get_separate_native_names ... ok
+test tests::rejects_missing_profile_directory_without_starting_desktop_services ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+Running xtask-7f1e613a3b8d38d7.exe
+
+running 8 tests
+test cli::tests::accepts_the_documented_seed_and_scenario ... ok
+test cli::tests::knows_named_future_scenarios_so_they_can_be_reported_blocked ... ok
+test cli::tests::rejects_unknown_mismatched_and_duplicate_selectors ... ok
+test report::tests::empty_blocked_and_failed_runs_cannot_pass ... ok
+test report::tests::report_records_seed_host_and_result_in_machine_readable_form ... ok
+test run::tests::distinguishes_positive_empty_and_ignored_cargo_output ... ok
+test run::tests::future_selector_yields_explicit_blockage_with_no_child_command ... ok
+test run::tests::writes_need_more_than_the_flag_and_do_not_match_arbitrary_repositories ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s

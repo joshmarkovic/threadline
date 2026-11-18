@@ -245,10 +245,10 @@ AC-81,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-82,windows,07,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-82,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-82,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-83,windows,01,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-83,windows,01,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/sprint-01.md#test-evidence. Three native CI jobs configured. Hosted job execution remains open.
 AC-83,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-83,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-84,windows,01,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-84,windows,01,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/sprint-01.md#test-evidence and ../reports/evidence/windows-e2e/native.json. Earlier Linux and macOS results recorded separately.
 AC-84,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-84,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-85,windows,03,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
@@ -263,7 +263,7 @@ AC-87,linux,,14,no,Not applicable,Scenario belongs to another platform-only mile
 AC-88,windows,,12,no,Not applicable,Scenario belongs to another platform-only milestone.,
 AC-88,macos,,13,no,Not applicable,Scenario belongs to another platform-only milestone.,
 AC-88,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-89,windows,01,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-89,windows,01,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/evidence/linux-unit/result.json and ../reports/evidence/windows-cargo-tests.txt.
 AC-89,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-89,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-90,windows,03,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,

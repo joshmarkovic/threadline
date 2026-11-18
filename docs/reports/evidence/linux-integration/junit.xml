@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="integration" tests="2" failures="0" skipped="0">
+  <testcase classname="integration" name="S01-SIMULATOR"></testcase>
+  <testcase classname="integration" name="S01-PLATFORM"></testcase>
+</testsuite>

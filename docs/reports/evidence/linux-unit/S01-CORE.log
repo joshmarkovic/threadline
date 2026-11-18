@@ -1,0 +1,22 @@
+
+running 6 tests
+test domain::tests::remote_route_components_cannot_become_paths_or_authorities ... ok
+test domain::tests::visible_number_is_scoped_to_repository_and_account ... ok
+test sync::tests::mismatched_provider_item_is_rejected_even_for_a_current_selection ... ok
+test sync::tests::cancellation_and_queue_limit_do_not_dispatch_unwanted_requests ... ok
+test fixtures::tests::seeded_fixture_replays_without_changing_resource_identity ... ok
+test sync::tests::simulated_time_controls_completion_and_stale_view_rejection ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+--- stderr ---
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.46
+   Compiling rustls-webpki v0.103.17
+   Compiling tokio-rustls v0.26.6
+   Compiling hyper-rustls v0.27.10
+   Compiling reqwest v0.12.28
+   Compiling threadline-core v0.1.0 (<workspace>/crates/threadline-core)
+    Finished `test` profile [unoptimized] target(s) in 21.88s
+     Running unittests src/lib.rs (.build/target-linux/debug/deps/threadline_core-fbc67adb46d6d6c7)

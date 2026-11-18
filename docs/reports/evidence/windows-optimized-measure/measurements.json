@@ -1,0 +1,298 @@
+{
+    "schema":  1,
+    "status":  "Fail",
+    "detail":  "One or more Windows performance budgets were exceeded.",
+    "driver":  "Windows PowerShell / Win32 SendInput",
+    "shell_version":  "5.1.22621.7649",
+    "seed":  12345,
+    "os_version":  "10.0.22631",
+    "session_id":  2,
+    "architecture":  "AMD64",
+    "app_pid":  41880,
+    "restarted_pid":  null,
+    "native_window":  5900826,
+    "dpi":  96,
+    "binary_sha256":  "b1b5bd1e6b7c090743fd905b831dd9e6dbd279a49b47b106f3f20d305a9d1305",
+    "executable_bytes":  26693632,
+    "actions":  [
+                    {
+                        "action":  "Attempt focus through a verified native pointer target",
+                        "observed":  {
+                                         "prior_foreground_pid":  28088,
+                                         "injected":  true
+                                     }
+                    }
+                ],
+    "windows_product":  "Microsoft Windows 11 Enterprise",
+    "machine":  {
+                    "manufacturer":  "Microsoft Corporation",
+                    "model":  "Virtual Machine",
+                    "ram_bytes":  34358562816,
+                    "processors":  [
+                                       {
+                                           "Name":  "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+                                           "NumberOfCores":  4,
+                                           "NumberOfLogicalProcessors":  8
+                                       }
+                                   ],
+                    "graphics":  [
+                                     {
+                                         "Name":  "Microsoft Hyper-V Video",
+                                         "DriverVersion":  "10.0.22621.1"
+                                     },
+                                     {
+                                         "Name":  "Microsoft Remote Display Adapter",
+                                         "DriverVersion":  "10.0.22621.7649"
+                                     }
+                                 ],
+                    "storage":  [
+                                    {
+                                        "Model":  "Microsoft Virtual Disk",
+                                        "InterfaceType":  "SCSI",
+                                        "MediaType":  "Fixed hard disk media"
+                                    }
+                                ],
+                    "display":  {
+                                    "width":  2544,
+                                    "height":  1324
+                                }
+                },
+    "loaded_modules":  [
+                           "advapi32.dll",
+                           "ApplicationTargetedFeatureDatabase.dll",
+                           "bcrypt.dll",
+                           "bcryptprimitives.dll",
+                           "clbcatq.dll",
+                           "combase.dll",
+                           "comctl32.dll",
+                           "CRYPTBASE.dll",
+                           "CRYPTSP.dll",
+                           "d3d10warp.dll",
+                           "d3d11.dll",
+                           "d3dcompiler_47.dll",
+                           "dataexchange.dll",
+                           "dcomp.dll",
+                           "directmanipulation.dll",
+                           "directxdatabasehelper.dll",
+                           "dwmapi.dll",
+                           "dwrite.dll",
+                           "dxcore.dll",
+                           "dxgi.dll",
+                           "GDI32.dll",
+                           "gdi32full.dll",
+                           "gdiplus.dll",
+                           "icu.DLL",
+                           "icuuc.dll",
+                           "imm32.dll",
+                           "kernel.appcore.dll",
+                           "KERNEL32.DLL",
+                           "KERNELBASE.dll",
+                           "MSCTF.dll",
+                           "msvcp_win.dll",
+                           "msvcrt.dll",
+                           "ntdll.dll",
+                           "ole32.dll",
+                           "Oleacc.dll",
+                           "oleaut32.dll",
+                           "powrprof.dll",
+                           "profapi.dll",
+                           "RPCRT4.dll",
+                           "RpcRtRemote.dll",
+                           "rsaenh.dll",
+                           "sechost.dll",
+                           "shcore.dll",
+                           "shell32.dll",
+                           "SHLWAPI.dll",
+                           "sxs.dll",
+                           "textinputframework.dll",
+                           "TextShaping.dll",
+                           "threadline-optimized.exe",
+                           "twinapi.appcore.dll",
+                           "ucrtbase.dll",
+                           "uiautomationcore.dll",
+                           "UMPDC.dll",
+                           "user32.dll",
+                           "userenv.dll",
+                           "uxtheme.dll",
+                           "VCRUNTIME140.dll",
+                           "win32u.dll",
+                           "windows.storage.dll",
+                           "Windows.UI.dll",
+                           "Windows.UI.Immersive.dll",
+                           "WindowsCodecs.dll",
+                           "winmm.dll",
+                           "wintypes.dll"
+                       ],
+    "measurements":  {
+                         "idle_working_set_bytes":  93896704,
+                         "cold_start_ms":  2817.38,
+                         "peak_working_set_bytes":  97058816,
+                         "gpu_breakdown":  {
+                                               "idle":  {
+                                                            "dedicated_bytes":  0,
+                                                            "shared_bytes":  0
+                                                        },
+                                               "after_scroll":  {
+                                                                    "dedicated_bytes":  0,
+                                                                    "shared_bytes":  0
+                                                                }
+                                           },
+                         "gpu_memory_bytes":  0,
+                         "scroll_breakdown":  {
+                                                  "large_diff":  {
+                                                                     "sample_count":  43,
+                                                                     "frame_times_ms":  [
+                                                                                            28.2768,
+                                                                                            17.5677,
+                                                                                            18.2879,
+                                                                                            38.693400000000004,
+                                                                                            45.8091,
+                                                                                            38.5342,
+                                                                                            32.9502,
+                                                                                            42.0912,
+                                                                                            68.41669999999999,
+                                                                                            13.7113,
+                                                                                            32.1363,
+                                                                                            41.3339,
+                                                                                            65.76859999999999,
+                                                                                            58.4941,
+                                                                                            13.4416,
+                                                                                            14.5412,
+                                                                                            35.257200000000005,
+                                                                                            15.7747,
+                                                                                            20.0114,
+                                                                                            63.526399999999995,
+                                                                                            17.229499999999998,
+                                                                                            30.344,
+                                                                                            24.2926,
+                                                                                            78.6716,
+                                                                                            24.151100000000003,
+                                                                                            49.4084,
+                                                                                            12.8833,
+                                                                                            26.0251,
+                                                                                            26.6257,
+                                                                                            52.784,
+                                                                                            29.9212,
+                                                                                            35.982800000000005,
+                                                                                            66.65889999999999,
+                                                                                            71.747,
+                                                                                            24.8052,
+                                                                                            37.8535,
+                                                                                            27.6021,
+                                                                                            40.4784,
+                                                                                            79.1086,
+                                                                                            28.9937,
+                                                                                            50.8602,
+                                                                                            30.1069,
+                                                                                            26.665399999999998
+                                                                                        ],
+                                                                     "p95_ms":  71.747
+                                                                 },
+                                                  "markdown_discussion":  {
+                                                                              "sample_count":  49,
+                                                                              "frame_times_ms":  [
+                                                                                                     67.75,
+                                                                                                     8.696,
+                                                                                                     9.9918,
+                                                                                                     37.589999999999996,
+                                                                                                     39.6969,
+                                                                                                     79.81679999999999,
+                                                                                                     67.7672,
+                                                                                                     11.6961,
+                                                                                                     59.9124,
+                                                                                                     89.92410000000001,
+                                                                                                     65.7688,
+                                                                                                     60.5899,
+                                                                                                     11.369900000000001,
+                                                                                                     67.5031,
+                                                                                                     11.7902,
+                                                                                                     62.282,
+                                                                                                     68.3464,
+                                                                                                     59.6496,
+                                                                                                     12.3427,
+                                                                                                     37.170700000000004,
+                                                                                                     38.9834,
+                                                                                                     69.4036,
+                                                                                                     11.5555,
+                                                                                                     69.5265,
+                                                                                                     63.6735,
+                                                                                                     11.9655,
+                                                                                                     34.5212,
+                                                                                                     46.713499999999996,
+                                                                                                     64.4306,
+                                                                                                     39.8031,
+                                                                                                     43.6143,
+                                                                                                     40.0459,
+                                                                                                     40.5299,
+                                                                                                     58.8041,
+                                                                                                     11.2701,
+                                                                                                     19.2012,
+                                                                                                     37.9387,
+                                                                                                     27.3845,
+                                                                                                     30.1609,
+                                                                                                     29.9483,
+                                                                                                     52.8762,
+                                                                                                     46.8433,
+                                                                                                     55.051700000000004,
+                                                                                                     65.599,
+                                                                                                     11.4029,
+                                                                                                     16.4751,
+                                                                                                     32.0308,
+                                                                                                     37.0822,
+                                                                                                     49.631
+                                                                                                 ],
+                                                                              "p95_ms":  69.5265
+                                                                          }
+                                              },
+                         "scroll_frame_p95_ms":  71.747,
+                         "package_bytes":  null,
+                         "package_sha256":  null
+                     },
+    "budgets":  {
+                    "idle_working_set_bytes":  {
+                                                   "value":  93896704,
+                                                   "limit":  209715200,
+                                                   "status":  "Pass"
+                                               },
+                    "peak_working_set_bytes":  {
+                                                   "value":  97058816,
+                                                   "limit":  471859200,
+                                                   "status":  "Pass"
+                                               },
+                    "gpu_memory_bytes":  {
+                                             "value":  0,
+                                             "limit":  268435456,
+                                             "status":  "Pass"
+                                         },
+                    "package_bytes":  {
+                                          "value":  null,
+                                          "limit":  52428800,
+                                          "status":  "Blocked"
+                                      },
+                    "cold_start_ms":  {
+                                          "value":  2817.38,
+                                          "limit":  3000,
+                                          "status":  "Pass"
+                                      },
+                    "scroll_frame_p95_ms":  {
+                                                "value":  71.747,
+                                                "limit":  20,
+                                                "status":  "Fail",
+                                                "surfaces":  {
+                                                                 "large_diff":  {
+                                                                                    "value":  71.747,
+                                                                                    "sample_count":  43,
+                                                                                    "limit":  20,
+                                                                                    "status":  "Fail"
+                                                                                },
+                                                                 "markdown_discussion":  {
+                                                                                             "value":  69.5265,
+                                                                                             "sample_count":  49,
+                                                                                             "limit":  20,
+                                                                                             "status":  "Fail"
+                                                                                         }
+                                                             }
+                                            }
+                },
+    "driver_location":  "At C:\\Users\\test-user\\AppData\\Local\\Temp\\threadline-s01.jlYsIu\\windows-smoke.ps1:582 char:56\r\n+ ... s \u0027Fail\u0027) { throw \u0027One or more Windows performance budgets were excee ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+}

@@ -1,0 +1,3 @@
+Blocked: Windows reported the banner shown, but UI Automation could not identify its clickable title. Use the manual notification click mode on this target.
+
+--- stderr ---
