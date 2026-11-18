@@ -25,7 +25,7 @@ The feasibility UI uses a synthetic repository and pinned fixtures. Tests distin
 
 Keep credential storage, application paths, desktop notifications, lifecycle, and preferences behind platform contracts. Windows uses its native adapter first. Later releases supply Keychain or Secret Service and their own native notification and lifecycle integrations. Durable user data and drafts belong in persistent per-user data directories. A credential store error holds remote work. Discardable cache and runtime files have separate locations. See the [cross-platform contract](../spec/CROSS_PLATFORM_PLAN.md).
 
-The Windows notification-area prototype has a development-time notification identity and a single-instance activation path. Verify the actual banner, click, and close/reopen behavior on an interactive Windows desktop. Sprint 11 owns persistent activity and packaged cold activation. [Windows notification-area API](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shell_notifyiconw)
+With a matching per-user Start shortcut and COM registration, Threadline sends a Windows Runtime notification. On the Windows 11 reference desktop, the Notification Center card opened PR 72 in the running process. Without a registered identity, the development app uses a notification-area balloon. Its physical click remains unverified. Sprint 11 owns persistent activity and cold activation. Sprint 12 verifies the installed package. [Windows reference evidence](../reports/evidence/windows-11-release/registered-notification.json) · [Windows notification-area API](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shell_notifyiconw)
 
 ## Distribution contract
 

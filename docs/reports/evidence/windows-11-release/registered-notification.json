@@ -1,0 +1,206 @@
+{
+  "standard_case": "S01-WINDOWS-TOAST",
+  "command": "xtask.exe test e2e --suite full --case S01-WINDOWS-TOAST --binary <windows-exe> --seed 12345 --report-dir <reports>",
+  "seed": 12345,
+  "fixture_revision": "s01-feasibility-v1",
+  "instrumented_product": {
+    "source_revision": "ce7ccd27eecc54fdd9b19b46ef4a6df0ec118a8c",
+    "equivalent_main_product_revision": "9a96c4526b88ff695c50f7842205fc3ee26134c6",
+    "sha256": "53a1596fa68ed95e71bce54d16722641c28029e0e4abb49054f690b30b7060c3",
+    "size_bytes": 26929152
+  },
+  "os": "Microsoft Windows 11 Enterprise",
+  "version": "Microsoft Windows [Version 10.0.22631.7652]",
+  "architecture": "AMD64",
+  "display": {
+    "width": 3840,
+    "height": 2160
+  },
+  "window_dpi": 144,
+  "gpui_scale_factor": 1.5,
+  "user_notification_state": "AcceptsNotifications",
+  "canonical_verified_run": {
+    "source_revision": "42f1e4bf574580792de19934a35bd5c588a7f60a",
+    "source_dirty": false,
+    "xtask_sha256": "9c9dc0add25e37ec21202e4435af462a1d178f411f7199d7d0135e8a833cfe06",
+    "cargo_lock_sha256": "7282e31e0e4ad73378c96998c0527da8f0b152d19e399cad14c370e533cdffc7",
+    "native_driver_sha256": {
+      "tools/native/windows-smoke.ps1": "4dbe1d79827db5c5b16cff3cb6155176329ce5908df7d31a5be283ae578613cb",
+      "tools/native/ThreadlineWinInput.cs": "dc5973c51d0214d1d3a4df27c1a7635a5c25cdfd085b7d24af15ab184d2c7135",
+      "tools/native/ThreadlineToastShortcut.cs": "57d493b22fa39895bdfa015d7d1f5f2d4d71949aafdb38f0f56df6d04bacb379",
+      "tools/native/windows-notification-focus.ps1": "c34588065cff7bbe8149fdefa5486b8ebc0923e04415be2c1afb368cccd8314a",
+      "tools/native/windows-app-toast.ps1": "06d91f784fd37def2c73d342b9253a77c50d4f531596e5620bb8a5abeff937f8"
+    },
+    "source_files_sha256": {
+      "result.json": "dd5ef40b92ec9226d0bca56b39cb9fa958626d6c1827b3cb2c912ea4e2114659",
+      "binary.json": "2484222ab14ebe04f8c61fac6e8e767b5c36869d3d580071732e2672764fd4b3",
+      "junit.xml": "64d5935811779250f154ae8ff856f841a34e8bfadb660d9327136d16bc66f450",
+      "toast-native.json": "154afcf645d69b416e24a18827a160a5344f07fc53cdc91bc0fc52c565f7a4f8",
+      "ui-observation.json": "6bb19a0711ab0450467657f70b84d98408d9f10a17efe24fa9de0378cf3d65e1"
+    },
+    "status": "Pass",
+    "junit": {
+      "tests": 1,
+      "failures": 0,
+      "skipped": 0
+    },
+    "case": "S01-WINDOWS-TOAST",
+    "start_index_ms": 3637,
+    "preexisting_fixture_matches": 0,
+    "new_submissions": 1,
+    "target": {
+      "role": "ControlType.ListItem",
+      "window_class": "Windows.UI.Core.CoreWindow",
+      "action": "default card",
+      "method": "UI Automation InvokePattern"
+    },
+    "card_search": {
+      "polls": 3,
+      "verified_center_reads": 1,
+      "title_matches": 1,
+      "body_matches": 1,
+      "verified_card_reads": 2,
+      "default_invoke_reads": 2,
+      "default_points": 0,
+      "action_matches": 0,
+      "click_attempts": 0,
+      "invoke_attempts": 1,
+      "elapsed_ms": 1486
+    },
+    "before": {
+      "pid": 24880,
+      "right_tab": 68
+    },
+    "after": {
+      "pid": 24880,
+      "right_tab": 72,
+      "com_activations_before": 0,
+      "com_activations_after": 1
+    },
+    "final_total_activations": 1,
+    "cleanup": {
+      "notification_center_closed": true,
+      "quit_exit_code": 0,
+      "app_history_verified_empty": true,
+      "app_history_cleanup_exit_code": 0,
+      "shortcut_and_class_removed": {
+        "shortcut": true,
+        "class_registration": true
+      }
+    }
+  },
+  "earlier_canonical_candidate": {
+    "source_revision": "9a96c4526b88ff695c50f7842205fc3ee26134c6",
+    "source_dirty": true,
+    "status": "Pass",
+    "junit": {
+      "tests": 1,
+      "failures": 0,
+      "skipped": 0
+    },
+    "source_files_sha256": {
+      "result.json": "e397d8199bf0e41545262770eb69b7ed874410f795bccfa1be7857b06050ae35",
+      "binary.json": "2484222ab14ebe04f8c61fac6e8e767b5c36869d3d580071732e2672764fd4b3",
+      "junit.xml": "64d5935811779250f154ae8ff856f841a34e8bfadb660d9327136d16bc66f450",
+      "toast-native.json": "c2a1d63ab12fb5ae5993fe2cf0617d12ac8d166ef0b256f6bfd5833305b69644",
+      "ui-observation.json": "62f4c6a22f14b0c13bd5122f156de32ac7035406ea3a45f2ab8234a772676f18"
+    },
+    "card_search": {
+      "polls": 2,
+      "verified_center_reads": 1,
+      "title_matches": 1,
+      "body_matches": 1,
+      "verified_card_reads": 2,
+      "default_invoke_reads": 2,
+      "default_points": 0,
+      "action_matches": 0,
+      "click_attempts": 0,
+      "invoke_attempts": 1,
+      "elapsed_ms": 1190
+    },
+    "before": {
+      "pid": 40844,
+      "right_tab": 68
+    },
+    "after": {
+      "pid": 40844,
+      "right_tab": 72,
+      "com_activations_before": 0,
+      "com_activations_after": 1
+    },
+    "cleanup": {
+      "notification_center_closed": true,
+      "quit_exit_code": 0,
+      "app_history_verified_empty": true,
+      "app_history_cleanup_exit_code": 0,
+      "shortcut_and_class_removed": {
+        "shortcut": true,
+        "class_registration": true
+      }
+    }
+  },
+  "earlier_direct_diagnostic": {
+    "status": "Pass",
+    "driver_sha256": {
+      "windows-smoke.ps1": "289798a6410ca76e9c32873576c7f830767dacb291ffdea18eec9f12e3ddf418",
+      "ThreadlineWinInput.cs": "8f24234210b33835027135a0481420c804b881622ff8f437992dfdab1a2f11e6",
+      "ThreadlineToastShortcut.cs": "57d493b22fa39895bdfa015d7d1f5f2d4d71949aafdb38f0f56df6d04bacb379",
+      "windows-notification-focus.ps1": "c34588065cff7bbe8149fdefa5486b8ebc0923e04415be2c1afb368cccd8314a",
+      "windows-app-toast.ps1": "06d91f784fd37def2c73d342b9253a77c50d4f531596e5620bb8a5abeff937f8",
+      "test-target-selection.ps1": "b10cfd4bddf0ec561c2162e5eb3a96f70ba39ca028966f3eb5332da186aba4c7"
+    },
+    "source_files_sha256": {
+      "platform-native.json": "7e0654678172f6707d81b70b1a319d7dd0da32e0159eec6a9bd4d735397bea2b",
+      "ui-observation.json": "a00138ad402ffc62382664056bf7ce1deb82f7c2a879d0436a57f3b6f4706a2b"
+    },
+    "start_index": {
+      "found": true,
+      "elapsed_ms": 3273
+    },
+    "preexisting_fixture_matches": 0,
+    "new_submissions": 1,
+    "card_search": {
+      "polls": 2,
+      "verified_center_reads": 1,
+      "title_matches": 1,
+      "body_matches": 1,
+      "verified_card_reads": 2,
+      "default_invoke_reads": 2,
+      "default_points": 0,
+      "action_matches": 0,
+      "click_attempts": 0,
+      "invoke_attempts": 1,
+      "elapsed_ms": 1293
+    },
+    "before": {
+      "pid": 8292,
+      "right_tab": 68
+    },
+    "after": {
+      "pid": 8292,
+      "right_tab": 72,
+      "activations_before": 0,
+      "activations_after": 1,
+      "com_activations_before": 0,
+      "com_activations_after": 1
+    },
+    "cleanup": {
+      "notification_center_closed": true,
+      "quit_exit_code": 0,
+      "app_history": {
+        "verified_absent": true,
+        "exit_code": 0,
+        "native_result": {
+          "verified_absent": true,
+          "removed": 0
+        }
+      },
+      "fixture_profile_removed": true,
+      "shortcut_and_class_removed": {
+        "shortcut": true,
+        "class_registration": true
+      },
+      "prior_focus_restored": true
+    }
+  }
+}

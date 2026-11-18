@@ -95,7 +95,7 @@ AC-31,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-32,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-32,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-32,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-33,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-33,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Sprint 01 verified warm activation of the registered fixture into PR 72. Full cached-item and cold-launch acceptance remains due. ../reports/evidence/windows-11-release/registered-notification.json
 AC-33,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-33,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-34,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,

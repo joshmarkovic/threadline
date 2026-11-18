@@ -2,7 +2,7 @@ requirement_id,platform,release_phase,initial_implementation_sprint,platform_ver
 FND-01,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Target dependency inventories and loaded renderer modules.
 FND-01,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-01,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-FND-02,windows,Windows first release,01,01,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/evidence/windows-virtualized-e2e/native.json. Native workspace passed. Windows notification click is blocked.
+FND-02,windows,Windows first release,01,01,12,yes,Verified,Actual target evidence required; earlier-platform results do not close this row.,"Native Windows workspace, independent focus, tray restore and registered notification opening PR 72 in the original process verified for Sprint 01. ../reports/evidence/windows-virtualized-e2e/native.json. ../reports/evidence/windows-11-release/registered-notification.json"
 FND-02,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,../reports/evidence/macos-native-window/macos-window-probe.json. Early native window and AppKit Quit passed. Full toolkit interaction validation remains due.
 FND-02,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-03,windows,Windows first release,02,02,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -32,7 +32,7 @@ PORT-03,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required
 PORT-04,windows,Windows first release,03,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-04,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-04,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PORT-05,windows,Windows first release,11,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Windows development shell proof: Blocked. Production packaged activation remains Sprint 11.
+PORT-05,windows,Windows first release,11,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,Windows warm activation into the original process passed in Sprint 01. Verify cold activation and shipped-package behavior in Sprints 11 and 12. ../reports/evidence/windows-11-release/registered-notification.json
 PORT-05,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-05,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PORT-06,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Native keyboard, clipboard, focus and lifecycle slice. 2× geometry in-process. Windows 11 passed at 96 and 144 DPI. Hosted Windows Server passed at 144 DPI. ../reports/evidence/windows-11-release/native.json. ../reports/evidence/windows-hosted-high-dpi/native.json"
@@ -326,7 +326,7 @@ GRAPH-06,linux,Linux release,10,14,14,yes,Planned,Actual target evidence require
 GRAPH-07,windows,Windows first release,10,10,12,yes,Planned,Future option: record object-cache deferral. No clone or bare-object cache is mandatory.,
 GRAPH-07,macos,macOS release,10,13,13,yes,Planned,Future option: record object-cache deferral. No clone or bare-object cache is mandatory.,
 GRAPH-07,linux,Linux release,10,14,14,yes,Planned,Future option: record object-cache deferral. No clone or bare-object cache is mandatory.,
-NOTIFY-01,windows,Windows first release,11,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/evidence/windows-notification-center/platform-native.json. The shell reported showing the fixture after which the Notification Center diagnostic could not identify a fresh fixture card. Durable activity and packaged tests remain Sprint 11.
+NOTIFY-01,windows,Windows first release,11,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,Windows Notification Center opened PR 72 in the running process. Persistent activity and notification rules remain due in Sprint 11. ../reports/evidence/windows-11-release/registered-notification.json
 NOTIFY-01,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-01,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-02,windows,Windows first release,05,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
