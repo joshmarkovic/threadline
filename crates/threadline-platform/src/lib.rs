@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use tokio::sync::mpsc::{self, UnboundedReceiver};
 
+mod credentials;
 mod paths;
 #[cfg(windows)]
 mod platform_windows;
@@ -14,6 +15,7 @@ mod toast_registration;
 #[cfg(windows)]
 mod toast_windows;
 
+pub use credentials::NativeCredentialStore;
 pub use paths::NativePaths;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -48,6 +50,8 @@ pub enum PlatformError {
     Unavailable,
     Locked,
     Denied,
+    InvalidCredentialReference,
+    InvalidCredentialValue,
     InvalidProfileDirectory,
     InstanceWindowNotFound,
     ActivationRejected,
@@ -61,6 +65,8 @@ impl Display for PlatformError {
             Self::Unavailable => "Desktop service is temporarily unavailable",
             Self::Locked => "The desktop service is locked",
             Self::Denied => "The desktop service denied this operation",
+            Self::InvalidCredentialReference => "The protected credential reference is invalid",
+            Self::InvalidCredentialValue => "The protected credential has an invalid size",
             Self::InvalidProfileDirectory => "The isolated profile must be an existing directory",
             Self::InstanceWindowNotFound => {
                 "The running Threadline instance did not open its activation window"
