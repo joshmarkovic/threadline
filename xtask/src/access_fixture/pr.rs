@@ -18,6 +18,7 @@ pub(super) fn route(path: &str) -> Option<Route> {
     match path {
         "/repositories/71/pulls/42" => Some(Route::PullA),
         "/repositories/71/pulls/43" => Some(Route::PullB),
+        "/repos/fixture-org/private/issues/44" => Some(Route::ReviewContextIssue),
         _ => None,
     }
 }
@@ -38,7 +39,7 @@ fn data(route: Route) -> Option<Value> {
         summary(
             42,
             "First fixture pull request",
-            "Closes #41",
+            "Closes #41. Resolves #44.",
             "2021-01-01T00:00:00Z",
         )
     };
@@ -77,6 +78,12 @@ fn data(route: Route) -> Option<Value> {
         Route::Item => Some(json!({
             "id":410,"node_id":"I_410","number":41,"title":"First pull request issue",
             "state":"closed","body":"Only the first pull request references this synthetic issue.",
+            "updated_at":"2018-01-01T00:00:00Z",
+            "repository_url":"https://api.github.com/repos/fixture-org/private"
+        })),
+        Route::ReviewContextIssue => Some(json!({
+            "id":414,"node_id":"I_414","number":44,"title":"Alternate review context issue",
+            "state":"closed","body":"The other synthetic issue directly referenced by the pull request.",
             "updated_at":"2018-01-01T00:00:00Z",
             "repository_url":"https://api.github.com/repos/fixture-org/private"
         })),
@@ -130,6 +137,26 @@ pub(super) fn trace(records: &[RequestEvidence]) -> bool {
             })
             .count()
             == 1
+}
+
+pub(super) fn trace_review_context(records: &[RequestEvidence]) -> bool {
+    records
+        .iter()
+        .all(|row| row.fixture_authorization && row.route != Route::Unexpected)
+        && [
+            Route::PullA,
+            Route::PullB,
+            Route::CompareA,
+            Route::CompareB,
+            Route::Item,
+            Route::ReviewContextIssue,
+        ]
+        .into_iter()
+        .all(|route| {
+            records
+                .iter()
+                .any(|row| row.route == route && row.status == 200)
+        })
 }
 
 #[cfg(test)]

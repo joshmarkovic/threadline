@@ -111,6 +111,7 @@ enum Route {
     PullB,
     CompareA,
     CompareB,
+    ReviewContextIssue,
     CommentCreated,
     CommentReplyLost,
     Unexpected,
@@ -138,6 +139,7 @@ pub enum TraceCheck {
     ReaderResume,
     SyncJourney,
     PullRequestJourney,
+    ReviewContextJourney,
     WritesWithLoss,
     WriteSurface,
 }
@@ -184,6 +186,7 @@ impl AccessFixture {
             TraceCheck::ReaderResume => complete_reader_resume(&records),
             TraceCheck::SyncJourney => complete_sync_journey(&records),
             TraceCheck::PullRequestJourney => pr::trace(&records),
+            TraceCheck::ReviewContextJourney => pr::trace_review_context(&records),
             TraceCheck::WritesWithLoss => writes::trace(&records, true),
             TraceCheck::WriteSurface => writes::trace(&records, false),
         };

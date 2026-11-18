@@ -8,7 +8,10 @@ use gpui_kit::{
     AnyElement, InteractiveElement, IntoElement, ParentElement, Role, StatefulInteractiveElement,
     Styled,
     base::ElementExt,
-    component::{Disableable, Selectable, diff::Diff},
+    component::{
+        Disableable, Selectable,
+        diff::{Diff, DiffLineRange, DiffSide},
+    },
     div,
 };
 use threadline_storage::{
@@ -1178,10 +1181,37 @@ impl ReaderWorkspace {
             let id = format!("pr-{pane}-review-add-inline");
             let diff = diff.clone();
             let target = tab.clone();
+            let code = file.summary.path.clone();
+            let revision = pr.data.revision.clone();
             let note = control(id.clone(), "Comment on selected source lines")
                 .disabled(self.review_controls_busy(tab.item))
                 .on_click(cx.listener(move |this, _, window, cx| {
-                    if let Some(range) = diff.read(cx).selected_lines() {
+                    let range = diff.read(cx).selected_lines().or_else(|| {
+                        let anchor = this
+                            .layout
+                            .panes
+                            .iter()
+                            .flat_map(|pane| &pane.tabs)
+                            .find(|tab| tab.id == target.id)?
+                            .view
+                            .pr_reader
+                            .as_ref()?
+                            .code_anchor
+                            .as_ref()?;
+                        if anchor.path != code {
+                            return None;
+                        }
+                        let (side, oid) = match anchor.side {
+                            SourceSide::Left => (DiffSide::Original, revision.merge_base.as_ref()),
+                            SourceSide::Right => (DiffSide::Modified, Some(&revision.head)),
+                        };
+                        if !oid.is_some_and(|oid| oid.as_str() == anchor.original_oid) {
+                            return None;
+                        }
+                        let position = anchor.line as usize;
+                        Some(DiffLineRange::new(code.clone(), side, position, position))
+                    });
+                    if let Some(range) = range {
                         this.begin_inline(target.clone(), &range, window, cx);
                     } else {
                         this.status = Some("Select one or more source lines in the diff first.");
