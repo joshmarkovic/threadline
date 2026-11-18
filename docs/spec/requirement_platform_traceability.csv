@@ -5,7 +5,7 @@ FND-01,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required;
 FND-02,windows,Windows first release,01,01,12,yes,Verified,Actual target evidence required; earlier-platform results do not close this row.,"Native Windows workspace, independent focus, tray restore and registered notification opening PR 72 in the original process verified for Sprint 01. ../reports/evidence/windows-virtualized-e2e/native.json. ../reports/evidence/windows-11-release/registered-notification.json"
 FND-02,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,../reports/evidence/macos-native-window/macos-window-probe.json. Early native window and AppKit Quit passed. Full toolkit interaction validation remains due.
 FND-02,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-FND-03,windows,Windows first release,02,02,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+FND-03,windows,Windows first release,02,02,12,yes,Pass,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-02.md WAL, FTS5, bounded connections, migrations, backups and native development profile restart."
 FND-03,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-03,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 FND-04,windows,Windows first release,01,05,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Typed cancellable work, seeded fake, and real loopback HTTP integration."
@@ -146,7 +146,7 @@ CACHE-01,linux,Linux release,04,14,14,yes,Planned,Actual target evidence require
 CACHE-02,windows,Windows first release,04,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-02,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-02,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-CACHE-03,windows,Windows first release,02,02,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+CACHE-03,windows,Windows first release,02,02,12,yes,Pass,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-02.md Independent family coverage, freshness, validators, atomic page progress and failure recovery."
 CACHE-03,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-03,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-04,windows,Windows first release,04,04,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -158,16 +158,16 @@ CACHE-05,linux,Linux release,04,14,14,yes,Planned,Actual target evidence require
 CACHE-06,windows,Windows first release,04,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-06,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-06,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-CACHE-07,windows,Windows first release,02,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+CACHE-07,windows,Windows first release,02,09,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-02.md Cache cleanup preserves edit/review snapshots, drafts, Outbox steps and dependencies."
 CACHE-07,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-07,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-CACHE-08,windows,Windows first release,02,04,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+CACHE-08,windows,Windows first release,02,04,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-02.md Account-bound database references and workspace validation. Identity switching and cached reading follow in Sprints 03 and 04.
 CACHE-08,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-08,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-CACHE-09,windows,Windows first release,02,10,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+CACHE-09,windows,Windows first release,02,10,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-02.md Stored comparison identity and merge-state provenance. Additional resource integrations follow.
 CACHE-09,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-09,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-CACHE-10,windows,Windows first release,02,05,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+CACHE-10,windows,Windows first release,02,05,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-02.md Independent family coverage, freshness, validators, atomic page progress and failure recovery."
 CACHE-10,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-10,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-11,windows,Windows first release,04,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -176,7 +176,7 @@ CACHE-11,linux,Linux release,04,14,14,yes,Planned,Actual target evidence require
 CACHE-12,windows,Windows first release,04,04,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-12,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-12,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-CACHE-13,windows,Windows first release,02,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+CACHE-13,windows,Windows first release,02,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-02.md Normal-exit storage contract and persistent sign-out holds. Later workflows extend the restart matrix.
 CACHE-13,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 CACHE-13,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OFFLINE-01,windows,Windows first release,04,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -410,10 +410,10 @@ MERGE-03,linux,Linux release,09,14,14,yes,Planned,Required direct-merge state ha
 MERGE-04,windows,Windows first release,09,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 MERGE-04,macos,macOS release,09,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 MERGE-04,linux,Linux release,09,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-OUTBOX-01,windows,Windows first release,02,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+OUTBOX-01,windows,Windows first release,02,09,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-02.md Immutable operation ID, snapshot, dependencies and pending projection."
 OUTBOX-01,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OUTBOX-01,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-OUTBOX-02,windows,Windows first release,02,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+OUTBOX-02,windows,Windows first release,02,09,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-02.md Claim, cancel, recover and reconcile after an uncertain send. Writer integration follows in Sprints 07–09."
 OUTBOX-02,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OUTBOX-02,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OUTBOX-03,windows,Windows first release,07,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -425,7 +425,7 @@ OUTBOX-04,linux,Linux release,07,14,14,yes,Planned,Actual target evidence requir
 OUTBOX-05,windows,Windows first release,07,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OUTBOX-05,macos,macOS release,07,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OUTBOX-05,linux,Linux release,07,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-OUTBOX-06,windows,Windows first release,02,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+OUTBOX-06,windows,Windows first release,02,09,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-02.md Multi-step receipts and stable remote IDs survive retry, restore and migration."
 OUTBOX-06,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OUTBOX-06,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OUTBOX-07,windows,Windows first release,07,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -437,37 +437,37 @@ OUTBOX-08,linux,Linux release,07,14,14,yes,Planned,Actual target evidence requir
 OUTBOX-09,windows,Windows first release,03,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OUTBOX-09,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OUTBOX-09,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-OUTBOX-10,windows,Windows first release,02,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+OUTBOX-10,windows,Windows first release,02,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-02.md Snapshot, anchors, evidence and holds survive cleanup and migration."
 OUTBOX-10,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 OUTBOX-10,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-DATA-01,windows,Windows first release,02,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+DATA-01,windows,Windows first release,02,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-02.md Prior-profile migration, integrity errors and restore-to-new-file reconciliation. Final installed upgrade is due in Sprint 12."
 DATA-01,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DATA-01,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-DATA-02,windows,Windows first release,02,05,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+DATA-02,windows,Windows first release,02,05,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-02.md Stored UTC milliseconds and monotonic in-process deadlines. Local scheduling and DST are due in Sprint 05.
 DATA-02,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DATA-02,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-DATA-03,windows,Windows first release,02,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+DATA-03,windows,Windows first release,02,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-02.md SQLite display errors omit content and paths. Final diagnostics and remote content coverage are due in Sprint 12.
 DATA-03,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DATA-03,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DATA-04,windows,Windows first release,03,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DATA-04,macos,macOS release,03,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DATA-04,linux,Linux release,03,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-DATA-05,windows,Windows first release,02,04,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+DATA-05,windows,Windows first release,02,04,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-02.md Shared namespace, distinct provider IDs, concurrent ingestion and verified transfers in actual SQLite."
 DATA-05,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DATA-05,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-DATA-06,windows,Windows first release,02,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+DATA-06,windows,Windows first release,02,06,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-02.md Shared namespace, distinct provider IDs, concurrent ingestion and verified transfers in actual SQLite."
 DATA-06,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DATA-06,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-DATA-07,windows,Windows first release,02,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+DATA-07,windows,Windows first release,02,06,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-02.md Shared namespace, distinct provider IDs, concurrent ingestion and verified transfers in actual SQLite."
 DATA-07,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DATA-07,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-DATA-08,windows,Windows first release,02,09,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+DATA-08,windows,Windows first release,02,09,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-02.md Stable kind-specific drafts and operation guards. Full writer subset is due by Sprint 09.
 DATA-08,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DATA-08,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-DATA-09,windows,Windows first release,02,04,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+DATA-09,windows,Windows first release,02,04,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-02.md Verified historical locators, unresolved collisions and stable workspace references. Cached-reader integration is due in Sprint 04."
 DATA-09,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DATA-09,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-DATA-10,windows,Windows first release,02,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+DATA-10,windows,Windows first release,02,06,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-02.md Stored body reference revision, candidate evidence, selected verified issue and separate per-tab PR context."
 DATA-10,macos,macOS release,02,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DATA-10,linux,Linux release,02,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 UX-01,windows,Windows first release,04,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Native focus and keyboard/pointer paths. Windows 11 and hosted Windows Server passed the 144-DPI feasibility smoke. Integrated release verification remains due. ../reports/evidence/windows-11-release/native.json. ../reports/evidence/windows-hosted-high-dpi/native.json

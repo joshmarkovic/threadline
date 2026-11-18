@@ -146,10 +146,10 @@ AC-48,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-49,windows,04,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-49,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-49,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-50,windows,02,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-50,windows,02,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"../reports/sprint-02.md Shared namespace, distinct provider IDs, concurrent ingestion and verified transfers in actual SQLite."
 AC-50,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-50,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-51,windows,02,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-51,windows,02,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"../reports/sprint-02.md Shared namespace, distinct provider IDs, concurrent ingestion and verified transfers in actual SQLite."
 AC-51,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-51,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-52,windows,06,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
@@ -161,7 +161,7 @@ AC-53,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-54,windows,05,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-54,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-54,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-55,windows,02,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-55,windows,02,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"../reports/sprint-02.md Shared namespace, distinct provider IDs, concurrent ingestion and verified transfers in actual SQLite."
 AC-55,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-55,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-56,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
@@ -266,7 +266,7 @@ AC-88,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-89,windows,01,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/evidence/linux-unit/result.json and ../reports/evidence/windows-cargo-tests.txt.
 AC-89,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-89,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-90,windows,03,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-90,windows,03,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/sprint-02.md Real SQLite subset passed. Authenticated HTTP has its own Sprint 03 checks.
 AC-90,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-90,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-91,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,

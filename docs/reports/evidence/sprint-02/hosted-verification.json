@@ -1,0 +1,192 @@
+{
+  "format": 1,
+  "original_run_id": 44369144668,
+  "original_source": "f8ea378866cd5d4e468c0c725b708a7f512ed9c0",
+  "windows_smoke": {
+    "status": "Pass",
+    "os_version": "10.0.26100",
+    "windows_product": "Microsoft Windows Server 2025 Datacenter",
+    "architecture": "AMD64",
+    "binary_sha256": "a4294066c65d27618d25dedc99817356a174e65e19d7c97aebc377a64d75377a",
+    "executable_bytes": 28676608,
+    "seed": 12345,
+    "driver": "Windows PowerShell / Win32 SendInput",
+    "original_clipboard_restored": true,
+    "source_native_sha256": "df1878cad9a21071b23518b8b4df5f518f22a516d099d43f39eacd2258176179",
+    "artifact_id": 14459846953,
+    "actions": [
+      "Launch native window",
+      "Pointer select formatted Markdown and copy",
+      "Type into the right review input while background preview is pending and copy its value",
+      "Change the active tab and return to the same draft target",
+      "Switch context to linked issue",
+      "Resize workspace panes with the pointer",
+      "Resize PR context and code with the pointer",
+      "Forward a second launch through the Windows instance channel",
+      "Quit with the native keyboard shortcut",
+      "Relaunch the same isolated profile and retain its SQLite database"
+    ],
+    "retained_profile": {
+      "sqlite_header": true,
+      "retained": true,
+      "initial_sqlite_sha256": "ff8f1b9cecb21c9629571ef0bfccf527f8aef452c6a63e874327bb64866f35ab",
+      "restart_sqlite_sha256": "ff8f1b9cecb21c9629571ef0bfccf527f8aef452c6a63e874327bb64866f35ab"
+    }
+  },
+  "original_macos_probe": {
+    "status": "Fail",
+    "phase": "Swift probe compilation",
+    "cause": "duplicate local environment binding"
+  },
+  "corrected_run_id": 44370589333,
+  "corrected_source": "6806291d55b7907b5eda71980c2070c1eed261f9",
+  "corrected_core_jobs": {
+    "windows-2025": 135035971851,
+    "macos-15": 135035972302,
+    "ubuntu-24.04": 135035972721
+  },
+  "corrected_macos_probe": {
+    "status": "Pass",
+    "scope": "Early macOS native window and AppKit quit probe",
+    "os_version": "Version 15.8.2 (Build 24H232)",
+    "probe_architecture": "arm64",
+    "binary_bytes": 100938720,
+    "binary_sha256": "5c88897e4c073eaaa988594783764eb552b7d5e2184fe14b11c6a00aff544a6c",
+    "appkit_quit_requested": true,
+    "child_termination_status": 0,
+    "isolated_profile_sqlite_header": true,
+    "window_observed": true,
+    "artifact_id": 14457544560,
+    "source_native_sha256": "d93407facdcaa012f0c4c4fe52bbfcbfd173fd028ee4dd6d831f9a33b0ab2682"
+  },
+  "corrected_windows_gui": {
+    "job_id": 135035972397,
+    "status": "Pass",
+    "steps": [
+      "GPUI in-process tests",
+      "native process smoke",
+      "stage Windows test build",
+      "upload build and GUI artifacts"
+    ]
+  },
+  "corrected_reference_job": {
+    "job_id": 135035974739,
+    "status": "Skipped",
+    "target": "separately dispatched Windows 11 reference desktop"
+  },
+  "corrected_macos_core_cases": [
+    {
+      "lane": "integration",
+      "host": {
+        "os": "macos",
+        "architecture": "aarch64",
+        "version": "15.8.2",
+        "display_session": "macOS desktop availability is checked by native driver"
+      },
+      "source_revision": "6806291d55b7907b5eda71980c2070c1eed261f9",
+      "source_dirty": false,
+      "status": "Pass",
+      "exit_code": 0,
+      "seed": 12345,
+      "source_result_sha256": "006719de2df3b7cfe0b57877d2eb8d1d687846b3148344305a1872ef035ef1f8",
+      "cases": [
+        {
+          "case": "S01-SIMULATOR",
+          "status": "Pass",
+          "tests_passed": 5
+        },
+        {
+          "case": "S01-PLATFORM",
+          "status": "Pass",
+          "tests_passed": 2
+        },
+        {
+          "case": "IT-001",
+          "status": "Pass",
+          "tests_passed": 8,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "IT-002",
+          "status": "Pass",
+          "tests_passed": 1,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "S02-RESOURCE-CONTRACTS",
+          "status": "Pass",
+          "tests_passed": 3,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "S02-DURABILITY",
+          "status": "Pass",
+          "tests_passed": 10,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "S02-FIXTURES",
+          "status": "Pass",
+          "tests_passed": 2,
+          "fixture_revision": "s02-storage-v1"
+        }
+      ]
+    },
+    {
+      "lane": "unit",
+      "host": {
+        "os": "macos",
+        "architecture": "aarch64",
+        "version": "15.8.2",
+        "display_session": "macOS desktop availability is checked by native driver"
+      },
+      "source_revision": "6806291d55b7907b5eda71980c2070c1eed261f9",
+      "source_dirty": false,
+      "status": "Pass",
+      "exit_code": 0,
+      "seed": 12345,
+      "source_result_sha256": "f169e2935194fd4a1155b083016ba360038d5624413a91a8ff766be24f73f01a",
+      "cases": [
+        {
+          "case": "UT-021",
+          "status": "Pass",
+          "tests_passed": 19
+        },
+        {
+          "case": "S01-CORE",
+          "status": "Pass",
+          "tests_passed": 6
+        },
+        {
+          "case": "S01-DIFF-FIXTURE",
+          "status": "Pass",
+          "tests_passed": 3
+        },
+        {
+          "case": "UT-001",
+          "status": "Pass",
+          "tests_passed": 1,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "UT-003",
+          "status": "Pass",
+          "tests_passed": 1,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "UT-004",
+          "status": "Pass",
+          "tests_passed": 1,
+          "fixture_revision": "s02-storage-v1"
+        },
+        {
+          "case": "UT-009",
+          "status": "Pass",
+          "tests_passed": 1,
+          "fixture_revision": "s02-storage-v1"
+        }
+      ]
+    }
+  ]
+}

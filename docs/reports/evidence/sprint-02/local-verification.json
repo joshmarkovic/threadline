@@ -1,0 +1,506 @@
+{
+  "format": 1,
+  "source": "Clean development checkout. Case names and counters are copied from runner receipts and child logs. Paths and build output are omitted.",
+  "runs": [
+    {
+      "lane": "unit",
+      "suite": null,
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "Wayland and X11 environment"
+      },
+      "seed": 12345,
+      "source_revision": "f8ea378866cd5d4e468c0c725b708a7f512ed9c0",
+      "source_dirty": false,
+      "cargo_lock_sha256": "28bee3e09919c863e231337b56b492b90c22105e2a20cfdffee740a032623844",
+      "package_version": "0.1.0",
+      "fixture_revision": "s01-feasibility-v1",
+      "status": "Pass",
+      "exit_code": 0,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "unit",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_unix_ms": 1795026218341,
+      "finished_at_unix_ms": 1795026269813,
+      "source_result_sha256": "9748d2d04cf6c32c72c4171a91c21f6f14fade7e9fe7578bf779663954782ae0",
+      "cases": [
+        {
+          "case": "UT-021",
+          "status": "Pass",
+          "child_exit_code": 0,
+          "tests_passed": 19,
+          "acceptance_ids": [
+            "AC-89"
+          ],
+          "requirement_ids": [
+            "TEST-01",
+            "TEST-02",
+            "TEST-08"
+          ],
+          "source_log_sha256": "cdf09ee3b96798052b72e0de38fde4aa3d30b8f4aa2c2729be4d1c8ab202f40f",
+          "passed_tests": [
+            "catalog::tests::reports_catalog_and_internal_associations",
+            "cli::tests::accepts_the_documented_seed_and_scenario",
+            "catalog::tests::finds_associations_after_quoted_commas",
+            "cli::tests::keeps_safe_paths_values_and_option_order_in_the_receipt",
+            "cli::tests::accepts_the_registered_toast_case_as_native_e2e",
+            "cli::tests::knows_named_future_scenarios_so_they_can_be_reported_blocked",
+            "cli::tests::protects_private_inputs_and_rejected_arguments",
+            "cli::tests::rejects_unknown_mismatched_and_duplicate_selectors",
+            "report::tests::empty_blocked_and_failed_runs_cannot_pass",
+            "run::tests::distinguishes_positive_empty_and_ignored_cargo_output",
+            "report::tests::stages_without_an_app_manifest_use_a_labeled_build_fallback",
+            "run::tests::registered_toast_cannot_start_from_the_smoke_suite",
+            "run::tests::future_selector_yields_explicit_blockage_with_no_child_command",
+            "run::tests::writes_need_more_than_the_flag_and_do_not_match_arbitrary_repositories",
+            "run::tests::missing_install_artifact_preserves_the_requested_scenario",
+            "run::tests::registered_toast_reports_only_its_case_on_an_unsupported_host",
+            "report::tests::reads_the_app_package_version_even_when_it_differs_from_the_workspace",
+            "report::tests::report_records_seed_host_and_result_in_machine_readable_form",
+            "report::tests::writes_timestamps_and_matching_exit_codes_for_all_outcomes"
+          ]
+        },
+        {
+          "case": "S01-CORE",
+          "status": "Pass",
+          "child_exit_code": 0,
+          "tests_passed": 6,
+          "acceptance_ids": [
+            "AC-89"
+          ],
+          "requirement_ids": [
+            "FND-04",
+            "DATA-05",
+            "DATA-06",
+            "TEST-02"
+          ],
+          "source_log_sha256": "3e72622039a94deb80dc1b3bce72036e6b34e24d2af718ab25bcffb441f6573f",
+          "passed_tests": [
+            "domain::tests::remote_route_components_cannot_become_paths_or_authorities",
+            "domain::tests::visible_number_is_scoped_to_repository_and_account",
+            "fixtures::tests::seeded_fixture_replays_without_changing_resource_identity",
+            "sync::tests::mismatched_provider_item_is_rejected_even_for_a_current_selection",
+            "sync::tests::simulated_time_controls_completion_and_stale_view_rejection",
+            "sync::tests::cancellation_and_queue_limit_do_not_dispatch_unwanted_requests"
+          ]
+        },
+        {
+          "case": "S01-DIFF-FIXTURE",
+          "status": "Pass",
+          "child_exit_code": 0,
+          "tests_passed": 3,
+          "acceptance_ids": [
+            "AC-89"
+          ],
+          "requirement_ids": [
+            "FND-02",
+            "TEST-02"
+          ],
+          "source_log_sha256": "34164964c9e1ed932bbb01b79f083e324ef161c878cd46cf6025af69e0634891",
+          "passed_tests": [
+            "tests::reporting_without_an_isolated_profile_fails_before_startup",
+            "fixtures::tests::native_diff_fixture_has_reviewed_files_and_large_hunks",
+            "tests::bootstrap_uses_only_the_explicit_unicode_fixture_and_preserves_an_invalid_database"
+          ]
+        },
+        {
+          "case": "UT-001",
+          "status": "Pass",
+          "child_exit_code": 0,
+          "tests_passed": 1,
+          "fixture_revision": "s02-storage-v1",
+          "acceptance_ids": [
+            "AC-50"
+          ],
+          "requirement_ids": [
+            "DATA-05",
+            "DATA-06",
+            "TEST-02"
+          ],
+          "source_log_sha256": "0faf7bef3ee88ecb766ff8f64c0f8152e1937892b578be08fb2cc30484626149",
+          "passed_tests": [
+            "identity::tests::ut_001_item_locator_scopes_number_and_requires_pr_evidence"
+          ]
+        },
+        {
+          "case": "UT-003",
+          "status": "Pass",
+          "child_exit_code": 0,
+          "tests_passed": 1,
+          "fixture_revision": "s02-storage-v1",
+          "acceptance_ids": [
+            "AC-51",
+            "AC-52"
+          ],
+          "requirement_ids": [
+            "DATA-07",
+            "CACHE-09",
+            "TEST-02"
+          ],
+          "source_log_sha256": "5dd61a154b749c760bd760d089954ada3be5b1a50ddb3196688450922e073a55",
+          "passed_tests": [
+            "identity::tests::ut_003_partial_and_stale_evidence_preserve_richer_state"
+          ]
+        },
+        {
+          "case": "UT-004",
+          "status": "Pass",
+          "child_exit_code": 0,
+          "tests_passed": 1,
+          "fixture_revision": "s02-storage-v1",
+          "acceptance_ids": [
+            "AC-07"
+          ],
+          "requirement_ids": [
+            "CACHE-03",
+            "CACHE-04",
+            "TEST-02"
+          ],
+          "source_log_sha256": "1ca1f05f8b29259761e8f20b9fdab65c9c9aaa36cfb2780577abdf19da76d670",
+          "passed_tests": [
+            "resources::tests::ut_004_only_complete_empty_coverage_can_show_empty"
+          ]
+        },
+        {
+          "case": "UT-009",
+          "status": "Pass",
+          "child_exit_code": 0,
+          "tests_passed": 1,
+          "fixture_revision": "s02-storage-v1",
+          "acceptance_ids": [
+            "AC-60",
+            "AC-61"
+          ],
+          "requirement_ids": [
+            "OUTBOX-01",
+            "OUTBOX-02",
+            "OUTBOX-07",
+            "TEST-02"
+          ],
+          "source_log_sha256": "6d6a586c6256746e4d237013c0f3b625fcd2c8a9eb56ada4424c168813fc3388",
+          "passed_tests": [
+            "queue::dispatch::tests::ut_009_cancellation_preserves_remote_ambiguity_and_terminal_confirmation"
+          ]
+        }
+      ]
+    },
+    {
+      "lane": "integration",
+      "suite": null,
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "Wayland and X11 environment"
+      },
+      "seed": 12345,
+      "source_revision": "f8ea378866cd5d4e468c0c725b708a7f512ed9c0",
+      "source_dirty": false,
+      "cargo_lock_sha256": "28bee3e09919c863e231337b56b492b90c22105e2a20cfdffee740a032623844",
+      "package_version": "0.1.0",
+      "fixture_revision": "s01-feasibility-v1",
+      "status": "Pass",
+      "exit_code": 0,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "integration",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_unix_ms": 1795026218349,
+      "finished_at_unix_ms": 1795026318659,
+      "source_result_sha256": "2a6b3bfce7f2250e1815539e044e0eae0f34504e831791028505ff77dbc09d61",
+      "cases": [
+        {
+          "case": "S01-SIMULATOR",
+          "status": "Pass",
+          "child_exit_code": 0,
+          "tests_passed": 5,
+          "acceptance_ids": [
+            "AC-90"
+          ],
+          "requirement_ids": [
+            "FND-04",
+            "TEST-03",
+            "TEST-05"
+          ],
+          "source_log_sha256": "0c28ed4e513f16a3f55b11ab0724458049cc0a768d3b6d5c7ab304d24cbc8e57",
+          "passed_tests": [
+            "test_endpoint_rejects_non_loopback_addresses",
+            "reads_a_versioned_issue_endpoint_with_correct_pr_identity_and_revision",
+            "delay_allows_other_http_work_and_cancelled_selection_cannot_publish",
+            "same_item_number_from_another_repository_cannot_be_relabelled",
+            "reports_http_and_payload_failures_and_ignores_redirects"
+          ]
+        },
+        {
+          "case": "S01-PLATFORM",
+          "status": "Pass",
+          "child_exit_code": 0,
+          "tests_passed": 3,
+          "acceptance_ids": [
+            "AC-83"
+          ],
+          "requirement_ids": [
+            "PORT-02",
+            "TEST-03"
+          ],
+          "source_log_sha256": "7fe17aba859b6d07a7b8da7a8aa3c079156c8b1c15b03d3f803c8490d3309e06",
+          "passed_tests": [
+            "paths::tests::accepts_absolute_xdg_values_and_preserves_unicode",
+            "tests::foreground_start_remains_available_without_tray_or_notifications",
+            "tests::rejects_missing_profile_directory_without_starting_desktop_services"
+          ]
+        },
+        {
+          "case": "IT-001",
+          "status": "Pass",
+          "child_exit_code": 0,
+          "tests_passed": 8,
+          "fixture_revision": "s02-storage-v1",
+          "acceptance_ids": [
+            "AC-50",
+            "AC-51",
+            "AC-55",
+            "AC-90"
+          ],
+          "requirement_ids": [
+            "FND-03",
+            "DATA-01",
+            "DATA-05",
+            "DATA-06",
+            "DATA-07",
+            "DATA-09",
+            "TEST-03"
+          ],
+          "source_log_sha256": "686247346ab8ca4def25030c02d0b3a3aa7797ea40e52bd8624a28ecd5f563a2",
+          "passed_tests": [
+            "separate_wal_writers_ingest_one_item_and_extension",
+            "transfers_require_matching_identity_and_keep_previous_locator",
+            "corruption_and_incompatible_or_foreign_databases_are_preserved",
+            "pr_first_and_reverse_preserve_provider_namespaces_and_fresh_fields",
+            "real_wal_snapshot_search_cleanup_and_redacted_errors",
+            "shared_number_namespace_and_pr_extension_are_enforced_by_sqlite",
+            "failed_upgrade_rolls_back_changes_and_preserves_prior_profile",
+            "prior_profile_upgrade_backup_restore_transfer_and_cleanup_preserve_durable_state"
+          ]
+        },
+        {
+          "case": "IT-002",
+          "status": "Pass",
+          "child_exit_code": 0,
+          "tests_passed": 1,
+          "fixture_revision": "s02-storage-v1",
+          "acceptance_ids": [
+            "AC-08",
+            "AC-90"
+          ],
+          "requirement_ids": [
+            "CACHE-05",
+            "SYNC-11",
+            "TEST-03"
+          ],
+          "source_log_sha256": "9f0baff9fc5ca811bcdbf1e9b0e278388b1f18cdd827db9188db8ba71ecb5f19",
+          "passed_tests": [
+            "it_002_failed_page_is_not_partially_committed_and_restarts_without_duplicates"
+          ]
+        },
+        {
+          "case": "S02-RESOURCE-CONTRACTS",
+          "status": "Pass",
+          "child_exit_code": 0,
+          "tests_passed": 3,
+          "fixture_revision": "s02-storage-v1",
+          "acceptance_ids": [
+            "AC-07",
+            "AC-08",
+            "AC-90"
+          ],
+          "requirement_ids": [
+            "CACHE-03",
+            "CACHE-05",
+            "CACHE-09",
+            "CACHE-10",
+            "SYNC-11",
+            "NOTIFY-15"
+          ],
+          "source_log_sha256": "65a36d9ad2570d8522c7cbd6b0f52b9af76dc430c1b74aca2be140322281d5da",
+          "passed_tests": [
+            "resource_activity_requires_a_current_or_verified_historical_locator",
+            "resource_graph_comparisons_and_events_are_revision_and_account_scoped",
+            "resource_coverage_freshness_errors_and_families_remain_independent"
+          ]
+        },
+        {
+          "case": "S02-DURABILITY",
+          "status": "Pass",
+          "child_exit_code": 0,
+          "tests_passed": 10,
+          "fixture_revision": "s02-storage-v1",
+          "acceptance_ids": [
+            "AC-10",
+            "AC-68",
+            "AC-73",
+            "AC-74",
+            "AC-92"
+          ],
+          "requirement_ids": [
+            "CACHE-07",
+            "CACHE-13",
+            "OUTBOX-10",
+            "DATA-01",
+            "TEST-03",
+            "TEST-05"
+          ],
+          "source_log_sha256": "3c66c974054e4ed7078e0237f41cfb05aa3ab61ad0bb02e72ec6fd99da21f6ce",
+          "passed_tests": [
+            "inspect_pages_and_dispatch_controls_without_reading_unrelated_payloads",
+            "older_payloads_migrate_without_losing_snapshots_or_pending_intent",
+            "sqlite_and_workspace_reads_reject_cross_account_targets",
+            "ut_009_atomic_submission_dependencies_and_edits_after_enqueue",
+            "ut_009_claim_and_cancel_compete_across_connections",
+            "ut_009_recovery_does_not_blindly_replay_and_preserves_step_mapping",
+            "verified_transfer_keeps_original_locator_and_requires_new_preflight",
+            "a_snapshot_from_before_dispatch_cannot_repeat_a_remote_success",
+            "workspace_views_drafts_refs_and_preferences_survive_cache_cleanup_and_restart",
+            "signout_scope_pause_and_backup_hold_survive_restart"
+          ]
+        },
+        {
+          "case": "S02-FIXTURES",
+          "status": "Pass",
+          "child_exit_code": 0,
+          "tests_passed": 2,
+          "fixture_revision": "s02-storage-v1",
+          "acceptance_ids": [
+            "AC-35",
+            "AC-90"
+          ],
+          "requirement_ids": [
+            "TEST-02",
+            "TEST-03",
+            "TEST-05"
+          ],
+          "source_log_sha256": "ee50a09b1c3afa6ab5ef40a303a24ea5a57c1533360c525ce6a709cfff1d260d",
+          "passed_tests": [
+            "same_seed_reproduces_small_fixture_and_workspace",
+            "section_16_fixture_contains_full_persisted_workload"
+          ]
+        }
+      ]
+    },
+    {
+      "lane": "e2e",
+      "suite": "smoke",
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "X11 environment"
+      },
+      "seed": 12345,
+      "source_revision": "f8ea378866cd5d4e468c0c725b708a7f512ed9c0",
+      "source_dirty": false,
+      "cargo_lock_sha256": "28bee3e09919c863e231337b56b492b90c22105e2a20cfdffee740a032623844",
+      "package_version": "0.1.0",
+      "fixture_revision": "s01-feasibility-v1",
+      "status": "Pass",
+      "exit_code": 0,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "smoke",
+          "--case",
+          "E2E-001",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_unix_ms": 1795026305408,
+      "finished_at_unix_ms": 1795026317617,
+      "source_result_sha256": "7a38a11da72129996672f8d6f134df2701d231b631fed38c51d50d753a99e369",
+      "cases": [
+        {
+          "case": "E2E-001",
+          "status": "Pass",
+          "child_exit_code": 0,
+          "tests_passed": null,
+          "acceptance_ids": [
+            "AC-84",
+            "AC-91"
+          ],
+          "requirement_ids": [
+            "FND-01",
+            "FND-02",
+            "TEST-04",
+            "PORT-03"
+          ]
+        }
+      ],
+      "binary": {
+        "sha256": "8853370360355943068b4b027731d74202c8395e6c85f0d27d425766171b0ce9",
+        "size_bytes": 177151168
+      },
+      "source_driver_sha256": "cfb94af0e8928fec1bb512b466d284777bb74ffc5a625aeba9e060111be52b98",
+      "native_driver": "X11 xdotool, xclip, ImageMagick",
+      "native_actions": [
+        "Launch native window",
+        "Select and copy formatted Markdown",
+        "Type and copy after activating the right pane while background preview is pending",
+        "Change active PR tab and return to the draft",
+        "Choose linked issue context",
+        "Resize workspace divider",
+        "Resize context divider",
+        "Quit with the native keyboard shortcut",
+        "Relaunch the same isolated profile and retain its SQLite database"
+      ],
+      "retained_profile": {
+        "sqlite_header": true,
+        "initial_sqlite_sha256": "b1c8e2512536049b66c749deb295294d6171cfa7d226d9e0fae63eb02c9ee78b",
+        "restart_sqlite_sha256": "b1c8e2512536049b66c749deb295294d6171cfa7d226d9e0fae63eb02c9ee78b",
+        "retained": true
+      }
+    }
+  ],
+  "persisted_section_16_assertions": {
+    "summaries": 50000,
+    "comments": 250000,
+    "long_discussion_comments": 5005,
+    "comparison_files": 40,
+    "commits": 400,
+    "mixed_outbox_actions": 1000,
+    "panes": 2,
+    "tabs": 20,
+    "review_drafts": 1,
+    "additional_checks": [
+      "history includes merges",
+      "outbox includes dependencies and queued, attention and confirmed states",
+      "two PR contexts retain their separate settings"
+    ]
+  }
+}
