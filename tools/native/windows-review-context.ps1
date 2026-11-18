@@ -1,41 +1,18 @@
-function Select-FixtureRightReviewLine([IntPtr]$Window, [string]$FixturePath = 'src/first.rs') {
+function Select-FixtureRightReviewLine([IntPtr]$Window, [string]$Head, [string]$FixturePath = 'src/first.rs') {
     if ($FixturePath -cnotin @('src/first.rs', 'src/second.rs')) { throw 'Unknown native fixture comparison.' }
-    $settling = [Diagnostics.Stopwatch]::StartNew()
-    $bounds = $null
-    while ($settling.ElapsedMilliseconds -lt 5000) {
-        $state = Read-Observation
-        $property = $state.bounds.PSObject.Properties['pr-0-diff']
-        if ($null -ne $property -and $property.Value.Count -eq 4 -and
-            $property.Value[2] -ge 180 -and $property.Value[3] -ge 32) {
-            $bounds = $property.Value
-            break
-        }
-        Start-Sleep -Milliseconds 100
+    $null = Wait-PrReader 'the exact loaded comparison before source navigation' {
+        param($pr)
+        $pr.head -ceq $Head -and $pr.selected_file -ceq $FixturePath -and $pr.diff_mode -ceq 'Split'
     }
-    if ($null -eq $bounds) { Stop-Blocked 'The maximized split comparison does not have a reachable native code region.' }
-    Set-WindowFocus $Window
-    $originX = $bounds[0] + $bounds[2] * 0.75
-    # The isolated fixture comparison contains one change on line one. Probe
-    # only its visible right-side code region, then accept the reported source.
-    foreach ($offset in @(20, 33, 46, 59, 72, 85, 98)) {
-        if ($offset + 12 -gt $bounds[3]) { break }
-        $state = Read-Observation
-        $current = $state.bounds.PSObject.Properties['pr-0-diff']
-        if ($null -eq $current -or (Compare-Object $bounds $current.Value -SyncWindow 0)) {
-            Stop-Blocked 'The native comparison moved while selecting the fixture line.'
-        }
-        $point = To-ClientPoint $originX ($bounds[1] + $offset) $state.scale_factor
-        [ThreadlineWinInput]::ClickClient($Window, $point, $script:app.Id, [uint32][Math]::Round($state.scale_factor * 96))
-        $wait = [Diagnostics.Stopwatch]::StartNew()
-        while ($wait.ElapsedMilliseconds -lt 900) {
-            $state = Read-Observation
-            $anchor = $state.cached_reader.pull_request.source_anchor
-            if ($null -ne $anchor -and $anchor.path -ceq $FixturePath -and
-                $anchor.side -ceq 'Right' -and $anchor.line -eq 1) { return }
-            Start-Sleep -Milliseconds 75
-        }
+    Wait-For 'the owned native Next change action' {
+        Invoke-OwnedFixtureControl $Window 'pr-0-next-change' $null 'Next change'
     }
-    Stop-Blocked 'Could not select the guarded native source line in the fixture split comparison.'
+    $null = Wait-PrReader 'the exact modified source line selected by the native action' {
+        param($pr)
+        $anchor = $pr.source_anchor
+        $pr.head -ceq $Head -and $pr.selected_source_line -eq 1 -and $null -ne $anchor -and
+            $anchor.path -ceq $FixturePath -and $anchor.side -ceq 'Right' -and $anchor.line -eq 1
+    }
 }
 
 function Wait-ExactFixtureReview([string]$DraftId, [string]$Head, [string]$FixturePath = 'src/first.rs') {
@@ -65,7 +42,7 @@ function Invoke-ReviewContextProof([IntPtr]$Window, [string]$Profile) {
         param($pr) $pr.head -ceq $head -and $pr.diff_mode -ceq 'Split'
     }
     Click-AccountControl $Window 'reader-maximize-pane'
-    Select-FixtureRightReviewLine $Window
+    Select-FixtureRightReviewLine $Window $head
     Click-AccountControl $Window 'pr-0-review-add-inline'
     $draftReady = Wait-PrReader 'one draft anchored to the chosen native source line' {
         param($pr)
@@ -151,7 +128,7 @@ function Enter-FixtureAnchoredReview([IntPtr]$Window, [string]$Head, [string]$Fi
         param($pr) $pr.head -ceq $Head -and $pr.selected_file -ceq $FixturePath -and $pr.diff_mode -ceq 'Split'
     }
     Click-AccountControl $Window 'reader-maximize-pane'
-    Select-FixtureRightReviewLine $Window $FixturePath
+    Select-FixtureRightReviewLine $Window $Head $FixturePath
     Click-AccountControl $Window 'pr-0-review-add-inline'
     $receipt = Wait-PrReader 'the anchored review opened in the chosen pane' {
         param($pr)

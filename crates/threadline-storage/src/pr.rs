@@ -296,12 +296,34 @@ impl Store {
     pub fn pr_file(&self, rev: &PrRevision, path: &str) -> Result<Option<PrRecord>> {
         self.pr_record(rev, PrFamily::Files, path)
     }
+
+    pub fn pr_file_with_source_lines(
+        &self,
+        rev: &PrRevision,
+        path: &str,
+    ) -> Result<Option<(PrRecord, Vec<SourceLine>)>> {
+        Ok(self
+            .pr_stored_record(rev, PrFamily::Files, path)?
+            .map(|row| (row.record, row.mappings)))
+    }
+
     pub fn pr_record(
         &self,
         rev: &PrRevision,
         family: PrFamily,
         key: &str,
     ) -> Result<Option<PrRecord>> {
+        Ok(self
+            .pr_stored_record(rev, family, key)?
+            .map(|row| row.record))
+    }
+
+    fn pr_stored_record(
+        &self,
+        rev: &PrRevision,
+        family: PrFamily,
+        key: &str,
+    ) -> Result<Option<StoredRecord>> {
         self.read(|db| {
             let tx = db.unchecked_transaction()?;
             let Some(id) = family_id(&tx, rev, family)? else {
@@ -314,9 +336,7 @@ impl Store {
                     |row| row.get::<_, String>(0),
                 )
                 .optional()?;
-            raw.as_deref()
-                .map(|text| Ok(decoded::<StoredRecord>(text)?.record))
-                .transpose()
+            raw.as_deref().map(decoded).transpose()
         })
     }
     pub fn pr_page(

@@ -6,7 +6,7 @@ use threadline_storage::{
     pr::{
         BodyReference, NarrowSurface, PatchEvidence, PrContextMode, PrDiffMode, PrDownload,
         PrFamily, PrHeader, PrPage, PrRecord, PrRevision, PrSection, PrTabView, ReviewAnchor,
-        SourceSide, Verification,
+        SourceLine, SourceSide, Verification,
     },
     queue::PrContext,
     resources::ResourceState,
@@ -53,6 +53,7 @@ pub(super) struct SelectedFile {
     pub summary: FileSummary,
     pub patch: Option<DiffFile>,
     pub problem: Option<&'static str>,
+    pub changes: Vec<DiffLinePosition>,
     evidence: PatchEvidence,
 }
 
@@ -158,32 +159,29 @@ impl FilePage {
     ) -> Outcome<Self> {
         let page = store.pr_page(revision, PrFamily::Files, after, 20)?;
         let viewed = store.pr_viewed_files(revision)?;
-        let mut exact = None;
         let mut rows = Vec::with_capacity(page.rows.len());
         for (_, record) in page.rows {
-            let Some((summary, patch)) = file_parts(record, &viewed) else {
-                continue;
-            };
-            if selected.map_or(rows.is_empty(), |selected| selected == summary.path) {
-                exact = Some((summary.clone(), patch));
+            if let Some((summary, _)) = file_parts(record, &viewed) {
+                rows.push(summary);
             }
-            rows.push(summary);
         }
-        if exact.is_none()
-            && let Some(path) = selected
-        {
-            exact = store
-                .pr_file(revision, path)?
-                .and_then(|record| file_parts(record, &viewed));
-        }
-        let selected = exact.map(|(summary, evidence)| {
+        let selected = match selected.or_else(|| rows.first().map(|file| file.path.as_str())) {
+            Some(path) => store.pr_file_with_source_lines(revision, path)?,
+            None => None,
+        };
+        let selected = selected.and_then(|(record, source)| {
+            let (summary, evidence) = file_parts(record, &viewed)?;
             let (patch, problem) = parse_patch(&summary, &evidence);
-            SelectedFile {
+            let changes = patch.as_ref().map_or_else(Vec::new, |patch| {
+                change_positions(patch, &source, revision.merge_base.is_some())
+            });
+            Some(SelectedFile {
                 summary,
                 patch,
                 problem,
+                changes,
                 evidence,
-            }
+            })
         });
         Ok(Self {
             rows,
@@ -192,6 +190,43 @@ impl FilePage {
             selected,
         })
     }
+}
+
+fn change_positions(
+    patch: &DiffFile,
+    source: &[SourceLine],
+    has_base: bool,
+) -> Vec<DiffLinePosition> {
+    // Stop at context or a hunk boundary. A replacement selects the first
+    // modified line. A deletion-only group still has an original source line.
+    let mut changes = Vec::new();
+    let mut first = None;
+    let mut previous = None::<u32>;
+    for line in source.iter().map(Some).chain(std::iter::once(None)) {
+        let contiguous = line.is_some_and(|line| {
+            previous.and_then(|number| number.checked_add(1)) == Some(line.patch_line)
+                && (line.left.is_none() || line.right.is_none())
+        });
+        if !contiguous && let Some((side, line)) = first.take() {
+            changes.push(DiffLinePosition::new(
+                patch.path().clone(),
+                side,
+                line as usize,
+            ));
+        }
+        let Some(line) = line else { break };
+        previous = Some(line.patch_line);
+        match (line.left, line.right) {
+            (None, Some(line)) if !matches!(first, Some((DiffSide::Modified, _))) => {
+                first = Some((DiffSide::Modified, line));
+            }
+            (Some(line), None) if has_base && first.is_none() => {
+                first = Some((DiffSide::Original, line));
+            }
+            _ => {}
+        }
+    }
+    changes
 }
 
 fn file_parts(record: PrRecord, viewed: &[String]) -> Option<(FileSummary, PatchEvidence)> {

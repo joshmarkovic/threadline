@@ -864,7 +864,11 @@ fn ui_008_observed_reader_controls_follow_the_visible_panes(cx: &mut TestAppCont
             .is_none()
     );
     assert!(observation.test_control_bounds("reader-result-0").is_none());
-    assert!(observation.test_control_bounds("reader-maximize-pane").is_some());
+    assert!(
+        observation
+            .test_control_bounds("reader-maximize-pane")
+            .is_some()
+    );
     setup.runtime.block_on(writer.finish()).unwrap();
 }
 
@@ -889,7 +893,7 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
         ItemLocator,
         pr::{
             PatchEvidence, PrContextMode, PrFamily, PrHeader, PrInputPage, PrRecord, PrSection,
-            ReferenceObservation,
+            ReferenceObservation, SourceSide,
         },
         resources::{CommitOid, WalkMode},
     };
@@ -1083,6 +1087,22 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
         })
     });
     click(cx, window, "pr-0-diff-split");
+    until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+    click(cx, window, "pr-0-next-change");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let reader = reader.read(cx);
+            !reader.layout_busy
+                && pr::tab_settings(&reader.layout.panes[0].tabs[0])
+                    .code_anchor
+                    .is_some_and(|anchor| {
+                        anchor.line == 21
+                            && anchor.path == filenames[1]
+                            && anchor.side == SourceSide::Right
+                            && anchor.original_oid == revision.head.as_str()
+                    })
+        })
+    });
     let diff = cx
         .update_window(window, |_, _, cx| {
             let diff = reader.read(cx).tab_views[&tab.id]
@@ -1093,13 +1113,8 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
                 .as_ref()
                 .unwrap()
                 .clone();
-            diff.update(cx, |state, cx| {
-                state.set_selected_lines(
-                    Some(DiffLineRange::new(filenames[1], DiffSide::Modified, 21, 21)),
-                    cx,
-                )
-            });
             assert_eq!(diff.read(cx).mode(), DiffMode::Split);
+            assert_eq!(diff.read(cx).selected_lines().unwrap().start(), 21);
             assert!(diff.read(cx).selected_text(cx).contains("new line"));
             diff
         })

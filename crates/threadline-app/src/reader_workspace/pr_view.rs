@@ -35,14 +35,21 @@ enum Command {
     Resize(f64),
     File(String),
     DiffMode(PrDiffMode),
-    Change(bool),
+    Change {
+        next: bool,
+        revision: i64,
+        path: String,
+    },
     Viewed(String, bool),
     Choose(PrContext),
     Verify(String, i64),
     CachedPage(PrFamily, Option<String>),
     Fetch(PrFamily),
     Source(String, SourceSide, u32),
-    Download { context: bool, media: bool },
+    Download {
+        context: bool,
+        media: bool,
+    },
     CancelDownload(i64),
 }
 
@@ -1242,18 +1249,26 @@ impl ReaderWorkspace {
                     &format!("pr-{pane}-previous-change"),
                     "Previous change",
                     tab,
-                    Command::Change(false),
+                    Command::Change {
+                        next: false,
+                        revision: pr.data.revision.id,
+                        path: path.clone(),
+                    },
                     false,
-                    false,
+                    file.changes.is_empty(),
                     cx,
                 ))
                 .child(self.pr_control(
                     &format!("pr-{pane}-next-change"),
                     "Next change",
                     tab,
-                    Command::Change(true),
+                    Command::Change {
+                        next: true,
+                        revision: pr.data.revision.id,
+                        path: path.clone(),
+                    },
                     false,
-                    false,
+                    file.changes.is_empty(),
                     cx,
                 ));
         }
@@ -1382,20 +1397,12 @@ impl ReaderWorkspace {
                 }
                 self.edit_pr_tab(tab, |view| view.diff_mode = mode, window, cx);
             }
-            Command::Change(next) => {
-                if let Some(diff) = self
-                    .tab_views
-                    .get(&tab.id)
-                    .and_then(|view| view.pr.as_ref()?.diff.as_ref())
-                {
-                    diff.update(cx, |state, cx| {
-                        if next {
-                            state.next_change(cx)
-                        } else {
-                            state.previous_change(cx)
-                        }
-                    });
-                }
+            Command::Change {
+                next,
+                revision,
+                path,
+            } => {
+                self.select_pr_change(tab, (revision, &path), next, window, cx);
             }
             Command::Choose(context) => self.choose_linked_issue(tab.clone(), context, window, cx),
             Command::Viewed(path, viewed) => self.set_pr_viewed(tab, path, viewed, window, cx),
@@ -1416,6 +1423,61 @@ impl ReaderWorkspace {
                 self.pr_download(tab, DownloadAction::Cancel(generation), window, cx)
             }
         }
+    }
+
+    fn select_pr_change(
+        &mut self,
+        tab: &Tab,
+        target: (i64, &str),
+        next: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(pr) = self
+            .tab_views
+            .get(&tab.id)
+            .and_then(|view| view.pr.as_ref())
+        else {
+            return;
+        };
+        let Some(file) = pr
+            .data
+            .files
+            .as_ref()
+            .and_then(|files| files.selected.as_ref())
+        else {
+            return;
+        };
+        let Some(diff) = pr.diff.as_ref() else { return };
+        if target != (pr.data.revision.id, file.summary.path.as_str()) || file.changes.is_empty() {
+            return;
+        }
+        let selected = diff.read(cx).selected_lines();
+        let position_index = file.changes.iter().position(|point| {
+            selected.as_ref().is_some_and(|selection| {
+                selection.path() == point.path()
+                    && selection.side() == point.side()
+                    && selection.start() == point.line()
+                    && selection.end() == point.line()
+            })
+        });
+        let last = file.changes.len() - 1;
+        let index = match (next, position_index) {
+            (true, Some(index)) if index < last => index + 1,
+            (false, Some(index)) if index > 0 => index - 1,
+            (true, _) => 0,
+            (false, _) => last,
+        };
+        let position = file.changes[index].clone();
+        let line = position.line();
+        diff.update(cx, |state, cx| {
+            let selection =
+                DiffLineRange::new(position.path().clone(), position.side(), line, line);
+            state.set_selected_lines(Some(selection), cx);
+            state.scroll_to_line(position.clone(), cx);
+        });
+        let revision = pr.data.revision.clone();
+        self.code_selection(tab.clone(), &revision, position, window, cx);
     }
 
     fn resize_pr_context(
