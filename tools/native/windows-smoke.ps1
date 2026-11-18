@@ -172,10 +172,15 @@ function Set-WindowFocus([IntPtr]$Window) {
     [ThreadlineWinInput]::TargetWindow = $Window
 }
 
-function To-ScreenPoint([IntPtr]$Window, [double]$X, [double]$Y, [double]$Scale) {
+function To-ClientPoint([double]$X, [double]$Y, [double]$Scale) {
     $point = New-Object ThreadlineWinInput+Point
     $point.X = [int][Math]::Round($X * $Scale)
     $point.Y = [int][Math]::Round($Y * $Scale)
+    return $point
+}
+
+function To-ScreenPoint([IntPtr]$Window, [double]$X, [double]$Y, [double]$Scale) {
+    $point = To-ClientPoint $X $Y $Scale
     if (![ThreadlineWinInput]::ClientToScreen($Window, [ref]$point)) {
         throw 'Could not map the current control bounds to the desktop.'
     }
@@ -413,19 +418,61 @@ function Get-GpuProcessMemory([int]$ProcessId) {
     }
 }
 
+function Assert-ScrollProcess {
+    if ($script:app.HasExited) {
+        throw "Threadline exited during scroll measurement with code $($script:app.ExitCode) before the driver requested Quit."
+    }
+}
+
+function Stop-ScrollBlocked([string]$Reason) {
+    Assert-ScrollProcess
+    Stop-Blocked $Reason
+}
+
 function Measure-Scroll([IntPtr]$Window, [string]$Control) {
+    Assert-ScrollProcess
     $state = Read-Observation
-    $bounds = $state.bounds.PSObject.Properties[$Control].Value
+    $dpi = [ThreadlineWinInput]::GetDpiForWindow($Window)
+    if ($null -eq $state -or !$state.ready -or $state.pid -ne $script:app.Id -or $dpi -eq 0 -or
+        [Math]::Abs($state.scale_factor * 96 - $dpi) -gt 0.01) {
+        Stop-ScrollBlocked 'The native window and rendered wheel target disagree on child identity or DPI.'
+    }
+    $property = $state.bounds.PSObject.Properties[$Control]
+    if ($null -eq $property -or @($property.Value).Count -ne 4 -or $property.Value[2] -le 0 -or $property.Value[3] -le 0) {
+        Stop-ScrollBlocked "Threadline did not report a visible $Control target."
+    }
+    $bounds = $property.Value
     $before = @($state.scroll_frame_times_ms).Count
-    $point = To-ScreenPoint $Window ($bounds[0] + $bounds[2] / 2) ($bounds[1] + $bounds[3] / 2) $state.scale_factor
-    [ThreadlineWinInput]::Scroll($point, -25, 24)
-    [ThreadlineWinInput]::Scroll($point, 25, 24)
+    $point = To-ClientPoint ($bounds[0] + $bounds[2] / 2) ($bounds[1] + $bounds[3] / 2) $state.scale_factor
+    $wheel = [ThreadlineWinInput+WheelEvidence]::new()
+    try {
+        [ThreadlineWinInput]::Scroll($Window, $script:app.Id, $dpi, $point, $wheel)
+    } catch {
+        $cause = $_.Exception.GetBaseException()
+        if ($cause -is [ThreadlineWinInput+TargetUnavailableException]) {
+            Stop-ScrollBlocked $cause.Message
+        }
+        throw
+    } finally {
+        $measurement.wheel_input[$Control] = [ordered]@{
+            calibrated = $wheel.Calibrated
+            accepted_down = $wheel.AcceptedDown
+            accepted_up = $wheel.AcceptedUp
+            physical_target_readbacks = $wheel.PhysicalReadbacks
+            repositioned_strokes = $wheel.Repositioned
+            interrupted_stroke = $wheel.StrokeInProgress
+            first_missed_readback = $wheel.FirstMissedReadback
+            mean_gap_ms = [Math]::Round($wheel.MeanGapMs, 2)
+            longest_gap_ms = [Math]::Round($wheel.LongestGapMs, 2)
+        }
+    }
 
     $latest = $state
     $lastCount = $before
     $deadline = [Diagnostics.Stopwatch]::StartNew()
     $settling = [Diagnostics.Stopwatch]::StartNew()
     while ($deadline.ElapsedMilliseconds -lt 1000) {
+        Assert-ScrollProcess
         $observation = Read-Observation
         if ($null -ne $observation) {
             $count = @($observation.scroll_frame_times_ms).Count
@@ -438,6 +485,7 @@ function Measure-Scroll([IntPtr]$Window, [string]$Control) {
         if ($lastCount -gt $before -and $settling.ElapsedMilliseconds -ge 240) { break }
         Start-Sleep -Milliseconds 40
     }
+    Assert-ScrollProcess
 
     $newFrames = @($latest.scroll_frame_times_ms |
         Select-Object -Skip $before | Where-Object { $_ -gt 0 })
@@ -445,9 +493,10 @@ function Measure-Scroll([IntPtr]$Window, [string]$Control) {
     return [ordered]@{
         sample_count = $newFrames.Count
         frame_times_ms = $newFrames
-        p95_ms = if ($newFrames.Count -ge 10) {
+        p95_ms = if ($wheel.Complete -and $newFrames.Count -ge 10) {
             [double]$sortedFrames[[int][Math]::Ceiling($newFrames.Count * 0.95) - 1]
         } else { $null }
+        input_detail = if (!$wheel.Complete) { 'At least one accepted wheel stroke lacked a matching physical pointer readback.' } else { $null }
     }
 }
 
@@ -457,15 +506,23 @@ function Compare-Measurement($Actual, [double]$Limit) {
     return 'Pass'
 }
 
+function Get-GpuBudget($ObservedMaximum, [int]$Samples, [double]$Limit) {
+    $status = Compare-Measurement $ObservedMaximum $Limit
+    if ($Samples -lt 2 -and $status -eq 'Pass') { $status = 'Blocked' }
+    return [ordered]@{ value = $ObservedMaximum; sample_count = $Samples; limit = $Limit; status = $status }
+}
+
 function Get-ScrollBudget($Breakdown, $Worst, [double]$Limit) {
     $surfaces = [ordered]@{}
     foreach ($surface in $Breakdown.Keys) {
         $result = $Breakdown[$surface]
+        $value = if ($null -ne $result) { $result.p95_ms } else { $null }
+        $sampleCount = if ($null -ne $result) { $result.sample_count } else { $null }
         $surfaces[$surface] = [ordered]@{
-            value = $result.p95_ms
-            sample_count = $result.sample_count
+            value = $value
+            sample_count = $sampleCount
             limit = $Limit
-            status = Compare-Measurement $result.p95_ms $Limit
+            status = Compare-Measurement $value $Limit
         }
     }
     $statuses = $surfaces.Values.status
@@ -564,24 +621,41 @@ function Invoke-Measurement([IntPtr]$Window, [double]$ColdMs) {
     $measurement.idle_working_set_bytes = $script:app.WorkingSet64
     $measurement.cold_start_ms = [Math]::Round($ColdMs, 2)
     $gpuIdle = Get-GpuProcessMemory $script:app.Id
-    $diffScroll = Measure-Scroll $Window 'diff'
-    $markdownScroll = Measure-Scroll $Window 'markdown_copy'
-    $script:app.Refresh()
-    $measurement.peak_working_set_bytes = $script:app.PeakWorkingSet64
-    $gpuAfterScroll = Get-GpuProcessMemory $script:app.Id
+    $measurement.wheel_input = [ordered]@{}
+    $measurement.scroll_breakdown = [ordered]@{ large_diff = $null; markdown_discussion = $null }
+    $scrollInterrupted = $null
+    $gpuAfterScroll = $null
+    try {
+        $measurement.scroll_breakdown.large_diff = Measure-Scroll $Window 'diff'
+        $measurement.scroll_breakdown.markdown_discussion = Measure-Scroll $Window 'markdown_copy'
+    } catch {
+        if (!$script:blocked) { throw }
+        $script:blocked = $false
+        Assert-ScrollProcess
+        $scrollInterrupted = $_.Exception.Message
+        $measurement.scroll_interruption = $scrollInterrupted
+    }
+    if (!$scrollInterrupted) {
+        $script:app.Refresh()
+        $measurement.peak_working_set_bytes = $script:app.PeakWorkingSet64
+        $gpuAfterScroll = Get-GpuProcessMemory $script:app.Id
+    }
     $measurement.gpu_breakdown = [ordered]@{ idle = $gpuIdle; after_scroll = $gpuAfterScroll }
     $gpuTotals = @($gpuIdle, $gpuAfterScroll | Where-Object { $null -ne $_ } | ForEach-Object { $_.dedicated_bytes + $_.shared_bytes })
     $measurement.gpu_memory_bytes = if ($gpuTotals.Count -gt 0) { ($gpuTotals | Measure-Object -Maximum).Maximum } else { $null }
-    $measurement.scroll_breakdown = [ordered]@{ large_diff = $diffScroll; markdown_discussion = $markdownScroll }
-    $measurement.scroll_frame_p95_ms = if ($null -ne $diffScroll.p95_ms -and $null -ne $markdownScroll.p95_ms) {
-        [Math]::Max($diffScroll.p95_ms, $markdownScroll.p95_ms)
-    } else { $null }
+    $surfaceP95 = @($measurement.scroll_breakdown.Values | Where-Object { $null -ne $_ -and $null -ne $_.p95_ms } | ForEach-Object { $_.p95_ms })
+    $measurement.scroll_frame_p95_ms = if ($surfaceP95.Count -eq 2) { [Math]::Max($surfaceP95[0], $surfaceP95[1]) } else { $null }
     $measurement.package_bytes = if ($Artifact) { (Get-Item -LiteralPath $Artifact).Length } else { $null }
     $measurement.package_sha256 = if ($Artifact) { Get-FileSha256 $Artifact } else { $null }
-    Crop-Screenshot $Window 'measurement.png'
-    Stop-ThroughUi
+    if (!$scrollInterrupted) {
+        Assert-ScrollProcess
+        Crop-Screenshot $Window 'measurement.png'
+        Assert-ScrollProcess
+        Stop-ThroughUi
+    }
 
     if (!$BudgetFile -or !(Test-Path -LiteralPath $BudgetFile -PathType Leaf)) {
+        if ($scrollInterrupted) { Stop-Blocked $scrollInterrupted }
         Stop-Blocked 'Measurements captured. The reviewed Windows budget file is unavailable.'
     }
     $budgets = Get-Content -LiteralPath $BudgetFile -Raw | ConvertFrom-Json
@@ -592,12 +666,15 @@ function Invoke-Measurement([IntPtr]$Window, [double]$ColdMs) {
         if ($limit -le 0) { throw "The budget for $metric must be positive." }
         $evaluations[$metric] = if ($metric -eq 'scroll_frame_p95_ms') {
             Get-ScrollBudget $measurement.scroll_breakdown $actual $limit
+        } elseif ($metric -eq 'gpu_memory_bytes') {
+            Get-GpuBudget $actual $gpuTotals.Count $limit
         } else {
             [ordered]@{ value = $actual; limit = $limit; status = Compare-Measurement $actual $limit }
         }
     }
     $report.budgets = $evaluations
     if ($evaluations.Values.status -contains 'Fail') { throw 'One or more Windows performance budgets were exceeded.' }
+    if ($scrollInterrupted) { Stop-Blocked $scrollInterrupted }
     if ($evaluations.Values.status -contains 'Blocked') { Stop-Blocked 'One or more Windows performance measurements are unavailable. See individual budget results.' }
 }
 

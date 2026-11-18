@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -9,6 +10,7 @@ public static class ThreadlineWinInput
     private const uint KeyUp = 2;
     private const uint LeftDown = 2;
     private const uint LeftUp = 4;
+    private const uint AbsoluteVirtualDesktopMove = 0x0001 | 0x4000 | 0x8000;
     private static readonly int InputSize = Marshal.SizeOf(typeof(Input));
 
     public static IntPtr TargetWindow { get; set; }
@@ -63,6 +65,9 @@ public static class ThreadlineWinInput
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool SetProcessDpiAwarenessContext(IntPtr context);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+
     [DllImport("user32.dll")]
     public static extern uint GetDpiForWindow(IntPtr window);
 
@@ -77,6 +82,20 @@ public static class ThreadlineWinInput
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetCursorPos(int x, int y);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetPhysicalCursorPos(out Point point);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetClipCursor(out Rect bounds);
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int index);
+
+    private delegate bool MonitorEnumerator(IntPtr monitor, IntPtr dc, ref Rect bounds, IntPtr data);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumDisplayMonitors(IntPtr dc, IntPtr clip, MonitorEnumerator callback, IntPtr data);
 
     [DllImport("user32.dll")]
     private static extern IntPtr WindowFromPoint(Point point);
@@ -96,7 +115,7 @@ public static class ThreadlineWinInput
     private static void RequireTargetFocus()
     {
         if (TargetWindow == IntPtr.Zero || GetForegroundWindow() != TargetWindow)
-            throw new InvalidOperationException("The Threadline test window lost foreground focus.");
+            throw new TargetUnavailableException("The Threadline test window lost foreground focus.");
     }
 
     private static void Send(Input[] input, bool requireFocus = true)
@@ -106,14 +125,19 @@ public static class ThreadlineWinInput
         try
         {
             accepted = SendInput((uint)input.Length, input, InputSize);
-            if (accepted != input.Length)
-                throw new Win32Exception(Marshal.GetLastWin32Error(), "SendInput did not inject every event.");
+            RequireAllEvents(accepted, input.Length);
         }
         finally
         {
             if (accepted > 0 && accepted < input.Length)
                 ReleaseInterruptedInput(input, (int)accepted);
         }
+    }
+
+    internal static void RequireAllEvents(uint accepted, int expected)
+    {
+        if (accepted != expected)
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "SendInput accepted " + accepted + " of " + expected + " events.");
     }
 
     private static List<Input> PendingReleases(Input[] input, int accepted)
@@ -298,14 +322,164 @@ public static class ThreadlineWinInput
         finally { SetWindowPos(window, new IntPtr(-2), 0, 0, 0, 0, flags); }
     }
 
-    public static void Scroll(Point point, int notches, int intervalMilliseconds)
+    public sealed class TargetUnavailableException : InvalidOperationException
     {
-        Move(point);
-        int movement = notches < 0 ? -120 : 120;
-        for (int index = 0; index < Math.Abs(notches); index++)
+        internal TargetUnavailableException(string message) : base(message) { }
+    }
+
+    public sealed class WheelEvidence
+    {
+        public bool Calibrated { get; internal set; }
+        public int AcceptedDown { get; internal set; }
+        public int AcceptedUp { get; internal set; }
+        public int PhysicalReadbacks { get; internal set; }
+        public int Repositioned { get; internal set; }
+        public int? FirstMissedReadback { get; internal set; }
+        public int? StrokeInProgress { get; internal set; }
+        public double LongestGapMs { get; internal set; }
+        public double MeanGapMs { get; internal set; }
+
+        public bool Complete { get { return Calibrated && AcceptedDown == 25 && AcceptedUp == 25 && PhysicalReadbacks == 50; } }
+    }
+
+    private static bool Contains(Rect bounds, Point point)
+    {
+        return point.X >= bounds.Left && point.X < bounds.Right && point.Y >= bounds.Top && point.Y < bounds.Bottom;
+    }
+
+    private static bool SamePoint(Point first, Point second)
+    {
+        return first.X == second.X && first.Y == second.Y;
+    }
+
+    private static bool SameRect(Rect first, Rect second)
+    {
+        return first.Left == second.Left && first.Top == second.Top && first.Right == second.Right && first.Bottom == second.Bottom;
+    }
+
+    private static Rect VirtualDesktop()
+    {
+        const int left = 76, top = 77, width = 78, height = 79;
+        int x = GetSystemMetrics(left), y = GetSystemMetrics(top);
+        return new Rect { Left = x, Top = y, Right = x + GetSystemMetrics(width), Bottom = y + GetSystemMetrics(height) };
+    }
+
+    private static Rect VerifiedVirtualDesktop()
+    {
+        Rect desktop = new Rect { Left = int.MaxValue, Top = int.MaxValue, Right = int.MinValue, Bottom = int.MinValue };
+        bool enumerated = EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero,
+            (IntPtr monitor, IntPtr dc, ref Rect bounds, IntPtr data) => {
+                desktop.Left = Math.Min(desktop.Left, bounds.Left);
+                desktop.Top = Math.Min(desktop.Top, bounds.Top);
+                desktop.Right = Math.Max(desktop.Right, bounds.Right);
+                desktop.Bottom = Math.Max(desktop.Bottom, bounds.Bottom);
+                return true;
+            }, IntPtr.Zero);
+        if (!enumerated || !SameRect(desktop, VirtualDesktop()))
+            throw new TargetUnavailableException("Physical monitor bounds and the virtual desktop disagree.");
+        return desktop;
+    }
+
+    internal static int NormalizePixel(int coordinate, int origin, int extent)
+    {
+        const int units = 65536;
+        long pixel = (long)coordinate - origin;
+        if (extent <= 0 || extent > units || pixel < 0 || pixel >= extent)
+            throw new InvalidOperationException("The target pixel is outside the representable virtual desktop.");
+        // Choose an integer inside the bin that maps back to this physical pixel.
+        long first = (pixel * units + extent - 1) / extent;
+        long last = ((pixel + 1) * units + extent - 1) / extent - 1;
+        return (int)((first + last) / 2);
+    }
+
+    internal static void RequireWheelOwner(IntPtr window, IntPtr foreground, IntPtr hit, uint owner, uint child, bool visible)
+    {
+        if (window == IntPtr.Zero || owner != child || child == 0 || !visible)
+            throw new TargetUnavailableException("The wheel target is no longer the visible Threadline child window.");
+        if (foreground != window)
+            throw new TargetUnavailableException("Threadline lost foreground focus during wheel input.");
+        if (hit != window)
+            throw new TargetUnavailableException("The planned wheel point is covered by a different native window.");
+    }
+
+    private static void RequireWheelTarget(IntPtr window, uint child, Point target)
+    {
+        RequireWheelOwner(window, GetForegroundWindow(), WindowFromPoint(target), WindowProcessId(window), child, IsWindowVisible(window));
+        Rect clip;
+        if (!GetClipCursor(out clip) || !Contains(clip, target))
+            throw new TargetUnavailableException("Cursor clipping does not allow the planned wheel point.");
+    }
+
+    public static void Scroll(IntPtr window, uint child, uint dpi, Point client, WheelEvidence evidence)
+    {
+        IntPtr previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        if (previous == IntPtr.Zero)
+            throw new TargetUnavailableException("Could not select per-monitor physical coordinates for wheel input.");
+        try
         {
-            Send(new[] { MouseEvent(0x0800, movement) });
-            Thread.Sleep(intervalMilliseconds);
+            RequireTargetFocus();
+            Rect originalClient;
+            var target = client;
+            if (window != TargetWindow || child == 0 || dpi == 0)
+                throw new ArgumentException("Wheel input needs the configured child window, process and DPI.");
+            if (GetDpiForWindow(window) != dpi ||
+                !GetClientRect(window, out originalClient) || !Contains(originalClient, client) || !ClientToScreen(window, ref target))
+                throw new TargetUnavailableException("Threadline did not expose the expected native wheel viewport at its current DPI.");
+            RequireWheelTarget(window, child, target);
+            Rect desktop = VerifiedVirtualDesktop();
+
+            var move = MouseEvent(AbsoluteVirtualDesktopMove);
+            move.Data.Mouse.X = NormalizePixel(target.X, desktop.Left, desktop.Right - desktop.Left);
+            move.Data.Mouse.Y = NormalizePixel(target.Y, desktop.Top, desktop.Bottom - desktop.Top);
+            RequireWheelTarget(window, child, target);
+            Send(new[] { move });
+            Point cursor;
+            var calibration = Stopwatch.StartNew();
+            do
+            {
+                RequireWheelTarget(window, child, target);
+                evidence.Calibrated = GetPhysicalCursorPos(out cursor) && SamePoint(cursor, target);
+                if (evidence.Calibrated) break;
+                Thread.Sleep(2);
+            } while (calibration.ElapsedMilliseconds < 40);
+            if (!evidence.Calibrated)
+                throw new TargetUnavailableException("Windows did not confirm the calibrated physical wheel point.");
+
+            long first = 0, last = 0;
+            for (int stroke = 1; stroke <= 50; stroke++)
+            {
+                evidence.StrokeInProgress = stroke;
+                Rect currentClient;
+                var currentTarget = client;
+                if (GetDpiForWindow(window) != dpi || !GetClientRect(window, out currentClient) ||
+                    !SameRect(originalClient, currentClient) || !ClientToScreen(window, ref currentTarget) ||
+                    !SamePoint(target, currentTarget) || !SameRect(desktop, VirtualDesktop()))
+                    throw new TargetUnavailableException("Display or window geometry changed during wheel input.");
+                if (!GetPhysicalCursorPos(out cursor))
+                    throw new TargetUnavailableException("Windows did not report the physical pointer before wheel input.");
+                bool repositioned = !SamePoint(cursor, target);
+                RequireWheelTarget(window, child, target);
+                long now = Stopwatch.GetTimestamp();
+                // SendInput keeps the move and wheel consecutive in the native input stream.
+                Send(new[] { move, MouseEvent(0x0800, stroke <= 25 ? -120 : 120) });
+                if (stroke <= 25) evidence.AcceptedDown++; else evidence.AcceptedUp++;
+                if (repositioned) evidence.Repositioned++;
+                if (GetPhysicalCursorPos(out cursor) && SamePoint(cursor, target)) evidence.PhysicalReadbacks++;
+                else if (!evidence.FirstMissedReadback.HasValue) evidence.FirstMissedReadback = stroke;
+                if (stroke == 1) first = now;
+                else
+                {
+                    evidence.LongestGapMs = Math.Max(evidence.LongestGapMs, (now - last) * 1000.0 / Stopwatch.Frequency);
+                    evidence.MeanGapMs = (now - first) * 1000.0 / Stopwatch.Frequency / (stroke - 1);
+                }
+                last = now;
+                evidence.StrokeInProgress = null;
+                Thread.Sleep(24);
+            }
+        }
+        finally
+        {
+            SetThreadDpiAwarenessContext(previous);
         }
     }
 }

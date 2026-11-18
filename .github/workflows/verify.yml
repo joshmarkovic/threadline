@@ -107,6 +107,9 @@ jobs:
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
+      - name: Test native wheel input validation
+        shell: powershell
+        run: ./tools/native/test-windows-wheel.ps1
       - name: Install pinned Rust
         run: rustup toolchain install 1.98.1 --profile minimal
       - name: Run the in-process GPUI suite
