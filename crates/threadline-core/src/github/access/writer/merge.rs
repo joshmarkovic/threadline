@@ -99,6 +99,13 @@ pub struct DirectMergeFailure {
 
 const POLICY: &str = "query ThreadlineMergePolicy($id:ID!) { node(id:$id) { ... on PullRequest { id number baseRefName baseRefOid headRefOid state isDraft merged mergeable mergeStateStatus reviewDecision mergeQueue { id } repository { id viewerPermission mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed } } } }";
 
+const MERGED_PULL: &str = "query ThreadlineMergedPull($id:ID!) { node(id:$id) { ... on PullRequest { id number baseRefName baseRefOid headRefOid repository { id } state merged mergeCommit { oid } mergedBy { __typename ... on User { databaseId } } } } }";
+
+pub struct ObservedMergedPull {
+    pub oid: String,
+    pub actor: Option<NonZeroU64>,
+}
+
 const OPTIONAL_CHECKS: &str = "query ThreadlineOptionalMergeChecks($id:ID!) { node(id:$id) { ... on PullRequest { id number baseRefName baseRefOid headRefOid repository { id } isMergeQueueEnabled mergeStateStatus reviewDecision state isDraft merged mergeable baseRef { name target { oid } branchProtectionRule { id } } commits(last:1) { nodes { commit { oid statusCheckRollup { contexts(first:100) { totalCount pageInfo { hasNextPage } nodes { __typename ... on CheckRun { isRequired(pullRequestId:$id) } ... on StatusContext { isRequired(pullRequestId:$id) } } } } } } } } } }";
 
 pub struct OptionalChecks {
@@ -302,6 +309,38 @@ impl GitHubWriter<'_> {
             policy.value.branch_rules = MergeGate::Satisfied;
         }
         Ok(RateLimit::from_headers(&headers))
+    }
+
+    /// Read the authoritative merge commit for this exact PR and head.
+    pub async fn observe_merged_pull(
+        &self,
+        pull: &VerifiedPull,
+        cancel: &CancellationToken,
+    ) -> Result<(Option<ObservedMergedPull>, RateLimit), AccessError> {
+        let (node, rate) = self.merge_graph(pull, MERGED_PULL, cancel).await?;
+        if node["merged"] != true || node["state"] != "MERGED" {
+            return Ok((None, rate));
+        }
+        let Some(raw) = node["mergeCommit"]["oid"].as_str() else {
+            return Ok((None, rate));
+        };
+        let oid = raw.to_ascii_lowercase();
+        if raw.len() != 40 || !raw.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(AccessError::received(AccessKind::MalformedResponse, 200));
+        }
+        let actor = &node["mergedBy"];
+        let actor = (actor["__typename"] == "User")
+            .then(|| actor["databaseId"].as_u64().and_then(NonZeroU64::new))
+            .flatten();
+        if pull.merge_oid().is_some_and(|rest| rest != oid)
+            || pull
+                .merged_by()
+                .zip(actor)
+                .is_some_and(|(rest, graph)| rest != graph)
+        {
+            return Err(AccessError::received(AccessKind::IdentityMismatch, 200));
+        }
+        Ok((Some(ObservedMergedPull { oid, actor }), rate))
     }
 
     fn matches_policy(&self, pull: &VerifiedPull, policy: &VerifiedMergePolicy) -> bool {

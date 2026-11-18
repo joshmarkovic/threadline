@@ -286,8 +286,18 @@ async fn run(
     evidence.target_verified = true;
     if !merged.is_merged()
         || merged.is_open()
-        || merged.merge_oid() != Some(&accepted.merge_oid)
-        || merged.merged_by() != NonZeroU64::new(ACTOR)
+        || merged.merged_by().is_some_and(|actor| actor.get() != ACTOR)
+    {
+        return Err("merge_readback_not_confirmed");
+    }
+    let (graph, rate) = writer
+        .observe_merged_pull(&merged, &cancel)
+        .await
+        .map_err(|_| "merge_readback_not_confirmed")?;
+    if held(rate)
+        || graph.is_none_or(|proof| {
+            proof.oid != accepted.merge_oid || proof.actor != NonZeroU64::new(ACTOR)
+        })
     {
         return Err("merge_readback_not_confirmed");
     }
@@ -467,9 +477,39 @@ mod tests {
                 let mut merged = pull;
                 merged["merged"] = true.into();
                 merged["state"] = "closed".into();
-                merged["merge_commit_sha"] = expected_merge.clone().into();
+
                 merged["merged_by"] = json!({"id":ACTOR,"login":"joshmarkovic"});
+                sim.enqueue(Method::GET, NUMERIC_PR, reply(merged.clone()));
+                let graph = |oid: Value| {
+                    json!({"data":{"node":{
+                        "id":NODE,"number":NUMBER,"baseRefName":BASE_REF,"baseRefOid":BASE,"headRefOid":HEAD,
+                        "repository":{"id":"fixture-repo"},"state":"MERGED","merged":true,
+                        "mergeCommit":oid,"mergedBy":{"__typename":"User","databaseId":ACTOR}
+                    }}})
+                };
+                sim.enqueue(
+                    Method::POST,
+                    "/graphql",
+                    reply(graph(Value::Null))
+                        .graph_node_without_cursor("ThreadlineMergedPull", NODE),
+                );
+                // A later process reads the same PR without reissuing the PUT.
+                sim.enqueue(
+                    Method::GET,
+                    "/user",
+                    reply(json!({"id":ACTOR,"login":"joshmarkovic"})),
+                );
+                sim.enqueue(Method::GET, "/repos/joshmarkovic/threadline", reply(json!({
+                    "id":REPO_ID,"node_id":"fixture-repo","owner":{"login":"joshmarkovic"},"name":"threadline",
+                    "private":true,"permissions":{"pull":true,"push":true,"admin":true}
+                })));
                 sim.enqueue(Method::GET, NUMERIC_PR, reply(merged));
+                sim.enqueue(
+                    Method::POST,
+                    "/graphql",
+                    reply(graph(json!({"oid":expected_merge})))
+                        .graph_node_without_cursor("ThreadlineMergedPull", NODE),
+                );
             }
             evidence.readback_only = false;
             let actual = run(&client, SecretToken::fixture(), &journal, &mut evidence).await;
@@ -477,9 +517,25 @@ mod tests {
                 assert_eq!(actual, Err(reason));
                 assert!(!journal.join(ARMED).exists());
             } else {
-                assert_eq!(actual, Ok(()));
+                assert_eq!(actual, Err("merge_readback_not_confirmed"));
+                assert_eq!(evidence.provider_status, Some(200));
+                assert!(journal.join(ACCEPTED).is_file());
+                assert!(
+                    run(&client, SecretToken::fixture(), &journal, &mut evidence)
+                        .await
+                        .is_err()
+                );
+                evidence = Evidence {
+                    dispatch: "not_sent",
+                    readback_only: true,
+                    ..Evidence::default()
+                };
+                assert_eq!(
+                    run(&client, SecretToken::fixture(), &journal, &mut evidence).await,
+                    Ok(())
+                );
                 assert!(evidence.own_action && evidence.read_back);
-                assert_eq!(evidence.verified_optional_contexts, Some(2));
+                assert!(evidence.readback_only);
                 assert_eq!(evidence.merge_oid.as_deref(), Some(expected_merge.as_str()));
                 assert!(journal.join(COMPLETE).is_file());
                 assert!(
@@ -490,7 +546,7 @@ mod tests {
             }
             let observations = sim.take_observations();
             let expected = if reason.is_none() {
-                8
+                13
             } else if protected {
                 6
             } else {
@@ -503,7 +559,7 @@ mod tests {
                     .enumerate()
                     .all(|(index, row)| row.matched
                         && row.authorization_sent
-                        && (matches!(index, 3 | 4) || row.versioned)),
+                        && (matches!(index, 3 | 4 | 8 | 12) || row.versioned)),
                 "{observations:?}"
             );
         }
