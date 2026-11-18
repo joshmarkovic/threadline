@@ -32,7 +32,7 @@ function Find-OwnedFixtureControl([IntPtr]$Window, [string]$Id) {
     return $controls[0]
 }
 
-function Invoke-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwatch]$InputClock) {
+function Invoke-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwatch]$InputClock, [string]$ExpectedName) {
     $element = Find-OwnedFixtureControl $Window $Id
     if ($null -eq $element) { return $false }
     $pattern = $null
@@ -41,7 +41,9 @@ function Invoke-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [Diagnostics.S
         !$element.TryGetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern, [ref]$pattern))) {
         return $false
     }
-    if (!(Test-OwnedFixtureWindow $Window) -or !(Test-OwnedAutomationProperties $element.Current $Id $script:app.Id)) {
+    $properties = $element.Current
+    if (!(Test-OwnedFixtureWindow $Window) -or !(Test-OwnedAutomationProperties $properties $Id $script:app.Id) -or
+        ($ExpectedName -and $properties.Name -cne $ExpectedName)) {
         Stop-Blocked 'The owned accessibility control changed before Invoke.'
     }
     if ($null -ne $InputClock) { $InputClock.Restart() }

@@ -62,6 +62,22 @@ if (Test-OwnedAutomationProperties $control 'reader-tab-0-0' 41) {
     throw 'The accessibility guard accepted an offscreen native control.'
 }
 
+$resultA = "Pull request fixture-org/private #42 $([char]0x00b7) First fixture pull request"
+$resultB = "Pull request fixture-org/private #43 $([char]0x00b7) Second fixture pull request"
+$serverOrder = @(
+    [pscustomobject]@{ Id = 'reader-result-0'; Name = $resultB }
+    [pscustomobject]@{ Id = 'reader-result-1'; Name = $resultA }
+)
+$restoredTabs = @(
+    [pscustomobject]@{ Id = 'reader-tab-0-0'; Name = 'Issue fixture-org/private #41 Existing issue' }
+    [pscustomobject]@{ Id = 'reader-tab-0-1'; Name = 'Pull request fixture-org/private #43 Second fixture pull request' }
+    [pscustomobject]@{ Id = 'reader-tab-0-2'; Name = 'Pull request fixture-org/private #42 First fixture pull request' }
+)
+if ((Find-FixturePrChoice $serverOrder $resultA) -cne 'reader-result-1' -or
+    (Find-FixturePrChoice $restoredTabs 'Pull request fixture-org/private #42 First fixture pull request') -cne 'reader-tab-0-2') {
+    throw 'The native pull request journey assumed repository order or tab position.'
+}
+
 $script:observations.Clear()
 $script:observations.Enqueue([pscustomobject]@{ cached_reader = $null })
 $script:observations.Enqueue([pscustomobject]@{ cached_reader = @{ active_item = 43; cached_content_ready = $true } })
