@@ -1,0 +1,16 @@
+# Sprint 06 pull request reading
+
+Threadline can open a downloaded pull request in independent conversation and file views. Each tab keeps its comparison, file and scroll position as the reader changes between the PR body and a verified issue. Clean Linux tests and native Windows application tests passed. The first Windows native-process journey reached a cached PR and stopped in the driver before it could verify switching between two tabs. [Sprint requirements](../spec/sprints/sprint_06_pr_reading_and_diffs.md) · [Verification receipts](evidence/sprint-06/verification.json)
+
+## Reading and verification
+
+GitHub REST and GraphQL reads supply commits, comparison files, checks, statuses, reviews and threaded replies. Each resource has its own completion state and checkpoint. SQLite retains the exact base, head, merge base and source coordinates. A file can report a missing, binary or truncated patch. The reader verifies a closing-style reference against its account, repository and ordinary issue identity. A body refresh invalidates proof from an older body. Reading a linked issue in a different repository preserves the original monitoring selection. [Provider reads](../../crates/threadline-core/src/github/access/reader) · [SQLite PR resources](../../crates/threadline-storage/src/pr.rs) · [Closing-reference parser](../../crates/threadline-core/src/references.rs)
+
+| Environment | Command or scope | Result |
+| --- | --- | --- |
+| Linux x64, clean `8d93bc1`, seed 12345 | `cargo xtask test unit`, `integration` and `ui` with `--seed 12345` | Pass. Eighteen unit cases ran 73 tests, 22 integration cases ran 85, and five UI cases ran 11. UT-011 and UT-012 covered source mapping and Markdown references. IT-016 covered revision-bound resources and offline pins. IT-017 covered scoped reference provenance and consistency across a body refresh. |
+| Windows 11 native x64 and WSL Linux, same revision | All application framework tests, including UI-001 and delayed PR responses | Pass. Each host ran 24 tests. Windows completed in 48.10 s and Linux in 18.38 s. The Windows test executable and both log hashes are in the receipt. Workspace Clippy with all targets and warnings denied also passed on Linux. |
+| Earlier Windows x64 native executables | Core, SQLite PR resources and local GitHub HTTP fixtures | Pass. The suites ran 17, six and two tests respectively. The receipt identifies which PR selections ran on Windows before the integrated application run. |
+| Windows 11 build 22631 at 150%, clean native driver `c17b4ed` | `cargo xtask test e2e --suite full --case E2E-005 --binary <binary-path> --seed 12345` | Fail, exit 1. Guarded input connected the synthetic account and selected the repository. The app painted the cached PR Files view with its Body context. The driver failed on an optional observation property before the two-tab and offline checks. |
+
+Hosted run 44398090069 recorded zero executed steps after GitHub blocked the jobs for account billing. Earlier hosted platform results remain associated with their original revisions. Exact-package checks and later macOS and Linux release reruns remain open. [Hosted run](https://github.com/joshmarkovic/threadline/actions/runs/44398090069) · [Scenario ledger](../spec/test_scenarios.csv) · [Platform ledger](../spec/test_platform_traceability.csv)

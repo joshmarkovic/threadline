@@ -1,0 +1,44 @@
+{
+  "source_revision": "8d93bc11d2867e0ce3c8addb47f5b6861738dadf",
+  "source_report_sha256": "57381564528dad3278959d0b717063e6698ea249148a3d6cd39dfc509ed719ba",
+  "receipt": {
+    "authenticated_user": {
+      "http_status": 200,
+      "matched": true
+    },
+    "credential_kind": "existing_cli_oauth",
+    "credential_source": "stdin_pipe",
+    "dogfood_read": "Pass",
+    "expected_github_repository_id": 1462273296,
+    "expected_github_user_id": 52184130,
+    "graphql_repository_read": {
+      "complete": true,
+      "errors": [],
+      "http_status": 200,
+      "immutable_node_matched": true
+    },
+    "issue_pr_page": {
+      "coverage": "complete",
+      "has_next_page": false,
+      "http_status": 200,
+      "issues": 1,
+      "oldest_age_days": 0,
+      "page": 1,
+      "pull_requests": 1,
+      "records": 2,
+      "status": "Pass"
+    },
+    "private_repository_read": {
+      "http_status": 200,
+      "immutable_id_matched": true,
+      "private": true,
+      "repository_metadata_read": "verified",
+      "write_grants": "unverified"
+    },
+    "reason": "read_proven_with_cli_oauth_pat_unverified",
+    "repository": "joshmarkovic/threadline",
+    "scenario": "LIVE-001",
+    "sso_challenge": "no_explicit_challenge_observed",
+    "status": "Blocked"
+  }
+}

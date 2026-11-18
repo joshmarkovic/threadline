@@ -251,25 +251,25 @@ ISSUE-05,linux,Linux release,07,14,14,yes,Planned,Actual target evidence require
 ISSUE-06,windows,Windows first release,07,07,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 ISSUE-06,macos,macOS release,07,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 ISSUE-06,linux,Linux release,07,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PR-01,windows,Windows first release,06,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+PR-01,windows,Windows first release,06,06,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
 PR-01,macos,macOS release,06,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PR-01,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PR-02,windows,Windows first release,06,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+PR-02,windows,Windows first release,06,06,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
 PR-02,macos,macOS release,06,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PR-02,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PR-03,windows,Windows first release,06,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+PR-03,windows,Windows first release,06,06,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
 PR-03,macos,macOS release,06,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PR-03,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PR-04,windows,Windows first release,06,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+PR-04,windows,Windows first release,06,06,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
 PR-04,macos,macOS release,06,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PR-04,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PR-05,windows,Windows first release,06,08,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Synthetic bound 33/67 review context with view switching and splitters.
+PR-05,windows,Windows first release,06,08,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/sprint-01.md. Synthetic bound 33/67 review context with view switching and splitters. Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
 PR-05,macos,macOS release,06,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PR-05,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PR-06,windows,Windows first release,06,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+PR-06,windows,Windows first release,06,06,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
 PR-06,macos,macOS release,06,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PR-06,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-PR-07,windows,Windows first release,06,08,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+PR-07,windows,Windows first release,06,08,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
 PR-07,macos,macOS release,06,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 PR-07,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 REVIEW-01,windows,Windows first release,08,08,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -284,7 +284,7 @@ REVIEW-03,linux,Linux release,08,14,14,yes,Planned,Actual target evidence requir
 REVIEW-04,windows,Windows first release,08,08,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 REVIEW-04,macos,macOS release,08,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 REVIEW-04,linux,Linux release,08,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-DIFF-01,windows,Windows first release,06,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+DIFF-01,windows,Windows first release,06,06,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
 DIFF-01,macos,macOS release,06,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DIFF-01,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DIFF-02,windows,Windows first release,08,08,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -299,10 +299,10 @@ DIFF-04,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required
 DIFF-05,windows,Windows first release,08,08,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DIFF-05,macos,macOS release,08,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DIFF-05,linux,Linux release,08,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-DIFF-06,windows,Windows first release,06,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+DIFF-06,windows,Windows first release,06,06,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
 DIFF-06,macos,macOS release,06,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DIFF-06,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-DIFF-07,windows,Windows first release,06,06,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+DIFF-07,windows,Windows first release,06,06,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
 DIFF-07,macos,macOS release,06,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DIFF-07,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 GRAPH-01,windows,Windows first release,10,10,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,

@@ -1,0 +1,132 @@
+{
+  "source_revision": "8d93bc11d2867e0ce3c8addb47f5b6861738dadf",
+  "source_dirty": false,
+  "canonical_linux": {
+    "unit": {
+      "run": "unit-1795036016437-1870283",
+      "result_sha256": "565aa4114158b92eb4653eb912278c11c0a29e0b0f0cce969fe58a5f94f7cb75",
+      "seed": 12345,
+      "exit_code": 0,
+      "case_count": 18,
+      "tests_passed": 73,
+      "selected_case_tests": {
+        "UT-011": 2,
+        "UT-012": 1
+      }
+    },
+    "integration": {
+      "run": "integration-1795036016448-1870454",
+      "result_sha256": "9473889fe1cc1925e23abdccadf632551db0e8c117fb6f790cf91879babfe5ac",
+      "seed": 12345,
+      "exit_code": 0,
+      "case_count": 22,
+      "tests_passed": 85,
+      "selected_case_tests": {
+        "IT-006": 3,
+        "IT-016": 4,
+        "IT-017": 3
+      }
+    },
+    "ui": {
+      "run": "ui-1795036016458-1870508",
+      "result_sha256": "d36148306ded7f568c5368b0c0e0c6c3321d088514a6dc18362ccf07940d007b",
+      "seed": 12345,
+      "exit_code": 0,
+      "case_count": 5,
+      "tests_passed": 11,
+      "selected_case_tests": {
+        "UI-001": 1
+      }
+    }
+  },
+  "app_framework": {
+    "linux": {
+      "log_sha256": "09cc3c55e9b48aec12b2f7ff66a692051276b6e893536b76555aa18514db92a3",
+      "passed": 24,
+      "elapsed_seconds": 18.38,
+      "selected_tests": [
+        "reader::pr_reads::flights::tests::pr_service_one_departing_subscriber_cannot_cancel_the_other",
+        "reader_workspace::tests::ui_001_pr_context_changes_keep_the_immutable_native_diff_and_each_tabs_state"
+      ]
+    },
+    "windows": {
+      "log_sha256": "3b18b611fd6ed0401ea3149e8f5639597a1db4357bd7f3f44f87d10997766d1f",
+      "passed": 24,
+      "elapsed_seconds": 48.1,
+      "selected_tests": [
+        "reader::pr_reads::flights::tests::pr_service_one_departing_subscriber_cannot_cancel_the_other",
+        "reader_workspace::tests::ui_001_pr_context_changes_keep_the_immutable_native_diff_and_each_tabs_state"
+      ],
+      "executable_sha256": "09056f6dfd16297e8577c8be9ad24c6e195bbd6d5a4e50c88428507a6bc4bcdb"
+    }
+  },
+  "earlier_windows_native": {
+    "core": {
+      "log_sha256": "79ca028ca8869cb3915d1e51fcf7b572802b4aaa85d8d51b219c4b6987168a5f",
+      "passed": 17,
+      "selected_tests": [
+        "references::tests::ut_012_closing_markdown_normalizes_routes_and_skips_code_and_untrusted_destinations"
+      ]
+    },
+    "pr": {
+      "log_sha256": "38c2793d285319fa4a0a6e103c101ae6ae6d1e58f6076bbdab24b96b14e8f1d1",
+      "passed": 6,
+      "selected_tests": [
+        "it_016_scheduled_pr_pages_checkpoint_first_etag_and_reject_changed_access",
+        "it_016_independent_pr_families_source_anchors_search_partial_and_stale_heads_survive_restart",
+        "it_017_cross_owner_issue_verification_does_not_select_or_monitor_the_other_repository",
+        "it_017_actual_body_references_verify_original_identity_and_reject_delayed_evidence",
+        "nested_inline_pages_keep_distinct_replies_anchors_and_category_baselines",
+        "selected_offline_download_pins_one_revision_and_safe_retry_survives_restart"
+      ]
+    },
+    "provider": {
+      "log_sha256": "9cd1998217a59c75c6670f426fa455d4af6e6bd9269a9f86bf479a13789cbbd6",
+      "passed": 2,
+      "selected_tests": [
+        "graph_reads_verify_current_pr_identity_and_resume_a_single_thread_without_flattening_it",
+        "pr_compare_checks_and_statuses_keep_immutable_source_and_explicit_partial_data"
+      ]
+    }
+  },
+  "workspace_clippy": {
+    "log_sha256": "9a1cf6f97bca0d5eb220802e47cb663e98c2a39380c524dd482a6b8c342b7e1b",
+    "status": "Pass",
+    "warnings": "denied",
+    "targets": "all"
+  },
+  "windows_e2e005_first_attempt": {
+    "source_revision": "c17b4edf8806a88037fcae1a62f161616cb6b093",
+    "source_dirty": false,
+    "status": "Fail",
+    "exit_code": 1,
+    "seed": 12345,
+    "run": "e2e-1795036393488-41988",
+    "sha256": {
+      "result.json": "91844c52f3fb0d28b9afef575bf916e52c02399a0719fb09754a7a21404a2003",
+      "pr-native.json": "5c6b6f50a56716bca83b72bb07ceba48d9157bc21ece8fbee051a375070079d0",
+      "ui-observation.json": "e806eed2ea57ad71a974c3ecd56dbc6b4eaadb552b71ab37120584e6a3793d42",
+      "binary.json": "546b44989ca305161e126f4b0dc0b162a2711b5de96e335f2b27b623e85677a5"
+    },
+    "product_binary_sha256": "67b08d34c6e474350961d497ece22854b17d354a9aba182cbebd1b8e5c4c8a40",
+    "exe_bytes": 72343040,
+    "win_build": "10.0.22631",
+    "dpi": 144,
+    "scale": 1.5,
+    "successful_action_count": 4,
+    "actions": [
+      "Attempt focus through a verified native pointer target",
+      "Verify native input reached both authorization fields",
+      "Connect through native repository and password controls",
+      "Select the verified repository"
+    ],
+    "cached_content_ready": true,
+    "section": "Files",
+    "context_mode": "Body",
+    "panes": 1,
+    "tab_counts": [
+      1
+    ],
+    "outcome": "The driver treated the optional pull_request observation as required while polling."
+  }
+}
