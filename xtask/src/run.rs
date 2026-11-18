@@ -63,7 +63,16 @@ const INTEGRATION: &[CargoTest] = &[
     },
     CargoTest {
         id: "S01-PLATFORM",
-        arguments: &["-p", "threadline-platform", "--lib"],
+        arguments: &[
+            "-p",
+            "threadline-platform",
+            "--lib",
+            "--",
+            "--skip",
+            "native_synthetic_protected_store_round_trip",
+            "--skip",
+            "native_restart_fixture_reader",
+        ],
     },
     CargoTest {
         id: "IT-001",

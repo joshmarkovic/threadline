@@ -6,7 +6,7 @@ use std::{num::NonZeroU64, sync::Arc, time::Duration};
 use support::{Reply, Simulator};
 use threadline_core::domain::{RepositoryApiId, RepositoryName};
 use threadline_core::github::*;
-use tokio::sync::Notify;
+use tokio::{io::AsyncReadExt, net::TcpListener, sync::Notify};
 
 const REPO_PATH: &str = "/repos/fixture-org/private";
 const PAGE_ONE: &str = "/user/repos?per_page=100&page=1";
@@ -477,19 +477,23 @@ async fn it_004_cancels_pending_reads_and_distinguishes_no_response_from_identit
     assert_eq!(precancelled.reachability, Reachability::NotAttempted);
     gate.notify_waiters();
 
-    // A bound socket that has not started listening cannot receive a request.
-    let socket = tokio::net::TcpSocket::new_v4().unwrap();
-    socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
-    let offline = GitHubClient::loopback(socket.local_addr().unwrap()).unwrap();
-    let error = offline
-        .authenticate(
-            SecretToken::fixture(),
-            scope("fixture-org"),
-            None,
-            &CancellationToken::new(),
-        )
-        .await
-        .unwrap_err();
+    // Accept the request and close without response bytes. A bound-only port can
+    // drop the SYN on some hosts, which tests the connection timeout instead.
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let offline = GitHubClient::loopback(listener.local_addr().unwrap()).unwrap();
+    let close_without_headers = async {
+        let (mut socket, _) = listener.accept().await.unwrap();
+        let mut request = [0; 1024];
+        assert!(socket.read(&mut request).await.unwrap() > 0);
+    };
+    let cancel = CancellationToken::new();
+    let reading = offline.authenticate(SecretToken::fixture(), scope("fixture-org"), None, &cancel);
+    let (result, ()) = tokio::time::timeout(Duration::from_secs(3), async {
+        tokio::join!(reading, close_without_headers)
+    })
+    .await
+    .unwrap();
+    let error = result.unwrap_err();
     assert_eq!(
         (error.kind, error.reachability),
         (AccessKind::Transport, Reachability::NoResponse)
