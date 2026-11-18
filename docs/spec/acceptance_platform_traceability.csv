@@ -101,7 +101,7 @@ AC-33,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-34,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-34,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-34,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-35,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/evidence/windows-virtualized-measure/measurements.json. Sprint 01 two-surface scroll baseline exceeded budget. Full release measurements are still due in Sprint 12.
+AC-35,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/evidence/windows-virtualized-measure/measurements.json. Sprint 01 cross-built baseline exceeded the scroll budget. The native release-build measurement is blocked by desktop availability. ../reports/evidence/windows-hosted/reference-readiness/measure-desktop.json
 AC-35,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-35,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-36,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
@@ -248,7 +248,7 @@ AC-82,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-83,windows,01,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/sprint-01.md#hosted-build-and-core-tests
 AC-83,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-83,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-84,windows,01,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/evidence/windows-virtualized-e2e/native.json. Windows native input passed at 96 DPI.
+AC-84,windows,01,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/evidence/windows-virtualized-e2e/native.json. Native Windows 11 workspace passed at 96 DPI. Hosted Windows Server regression passed. ../reports/evidence/windows-hosted/e2e/result.json
 AC-84,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"../reports/evidence/macos-native-window/macos-window-probe.json. Early on-screen window and AppKit Quit passed. Full target input, focus, clipboard and splitter proof remains due."
 AC-84,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/evidence/linux-virtualized-e2e/native.json. Early instrumented smoke passed on isolated Debian Xvfb. Full Ubuntu GNOME desktop proof remains due.
 AC-85,windows,03,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,

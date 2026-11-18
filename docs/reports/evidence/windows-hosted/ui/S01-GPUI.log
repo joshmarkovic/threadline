@@ -1,0 +1,8 @@
+Test output excerpt. The full compile and test log is in the hosted Windows GUI job.
+
+running 3 tests
+test resize_drag_geometry_survives_scale_change ... ok
+test focus_tabs_and_context_keep_the_active_draft ... ok
+test virtualized_markdown_scroll_and_copy_preserve_the_document ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.29s

@@ -1,0 +1,18 @@
+{
+  "lane": "measure",
+  "ready": false,
+  "sample_count": 50,
+  "observed_states": [
+    {
+      "session_id": 2,
+      "interactive": true,
+      "remote_session_metric": 1,
+      "wts_connection_state": 4,
+      "wts_session_flags": 0,
+      "input_desktop": null,
+      "input_open_error": 5,
+      "read_cursor": false,
+      "cursor_error": 5
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "binary_sha256": "2d6c06948bf3273973ec448c3f78176f87ce9a1dd7c02c20b9d326ee415a7aa4",
+  "outcomes": [
+    {
+      "exit": 78,
+      "result": "Input desktop unavailable. No input sent for this lane.",
+      "lane": "measure"
+    }
+  ]
+}

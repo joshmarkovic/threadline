@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "status": "Blocked",
+  "detail": "Notification Center exposed no uniquely identified fresh card with both complete fixture tokens.",
+  "driver": "Windows PowerShell / Win32 SendInput",
+  "shell_version": "5.1.22621.7649",
+  "seed": 12345,
+  "os_version": "10.0.22631",
+  "session_id": 2,
+  "architecture": "AMD64",
+  "app_pid": 38100,
+  "restarted_pid": null,
+  "native_window": 7342712,
+  "dpi": 96,
+  "binary_sha256": "657ffefe2b6a6215ecfb7bbfc999d8082b027da58da0b9c96b89de09041adb2b",
+  "executable_bytes": 26833408,
+  "actions": [
+    {
+      "action": "Attempt focus through a verified native pointer target",
+      "observed": {
+        "injected": true
+      }
+    },
+    {
+      "action": "Activate the identified Windows taskbar clock through its accessibility action",
+      "observed": true
+    },
+    {
+      "action": "Baseline only exact Threadline fixture tokens in Notification Center",
+      "observed": {
+        "title_count": 0,
+        "body_count": 0,
+        "composite_count": 0,
+        "window_class": "Windows.UI.Core.CoreWindow"
+      }
+    },
+    {
+      "action": "Windows shell confirmed the specific fixture banner displayed",
+      "observed": 1
+    },
+    {
+      "action": "Activate the identified Windows taskbar clock through its accessibility action",
+      "observed": true
+    },
+    {
+      "action": "Inspect Notification Center only for exact fresh fixture tokens",
+      "observed": {
+        "title": 0,
+        "body": 0,
+        "composite": 0,
+        "fresh_cards": 0,
+        "window_class": "Windows.UI.Core.CoreWindow",
+        "polls": 7
+      }
+    },
+    {
+      "action": "Restore original closed Notification Center state",
+      "observed": true
+    }
+  ],
+  "windows_product": "Microsoft Windows 11 Enterprise"
+}

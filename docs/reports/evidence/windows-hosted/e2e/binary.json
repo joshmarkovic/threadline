@@ -1,0 +1,7 @@
+{
+  "binary": "threadline.exe",
+  "build": "release with e2e feature",
+  "evidence_class": "test-build native process",
+  "sha256": "2d6c06948bf3273973ec448c3f78176f87ce9a1dd7c02c20b9d326ee415a7aa4",
+  "size_bytes": 26802688
+}

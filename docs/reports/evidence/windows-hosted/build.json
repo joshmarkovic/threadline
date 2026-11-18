@@ -1,0 +1,10 @@
+{
+  "purpose": "Development executable for Windows reference desktop tests",
+  "build": "release with e2e feature",
+  "source_revision": "acd7ce73e51f3d0ba1e4ada4243779d211d21904",
+  "cargo_lock_sha256": "756bd3b3f162735b175102c7f1bb8ac1262e56a7c6f869855b6be4f44b905a06",
+  "workflow_run": "44235734818",
+  "target": "x86_64-pc-windows-msvc",
+  "executable_sha256": "2d6c06948bf3273973ec448c3f78176f87ce9a1dd7c02c20b9d326ee415a7aa4",
+  "executable_bytes": 26802688
+}

@@ -326,7 +326,7 @@ GRAPH-06,linux,Linux release,10,14,14,yes,Planned,Actual target evidence require
 GRAPH-07,windows,Windows first release,10,10,12,yes,Planned,Future option: record object-cache deferral. No clone or bare-object cache is mandatory.,
 GRAPH-07,macos,macOS release,10,13,13,yes,Planned,Future option: record object-cache deferral. No clone or bare-object cache is mandatory.,
 GRAPH-07,linux,Linux release,10,14,14,yes,Planned,Future option: record object-cache deferral. No clone or bare-object cache is mandatory.,
-NOTIFY-01,windows,Windows first release,11,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"../reports/evidence/windows-notification-diagnostic/platform-native.json. The shell confirmed the banner display. A fresh, verified click target was unavailable. Durable activity and packaged tests remain Sprint 11."
+NOTIFY-01,windows,Windows first release,11,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/evidence/windows-notification-center/platform-native.json. The shell reported showing the fixture after which the Notification Center diagnostic could not identify a fresh fixture card. Durable activity and packaged tests remain Sprint 11.
 NOTIFY-01,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-01,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-02,windows,Windows first release,05,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
@@ -515,7 +515,7 @@ TEST-04,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required
 TEST-05,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md. Exact-artifact command returns Blocked pending packaging and approved release infrastructure.
 TEST-05,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-05,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-TEST-06,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md#hosted-build-and-core-tests. Three hosted build and core-test jobs passed. Native desktop results are recorded separately.
+TEST-06,windows,Windows first release,01,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,../reports/sprint-01.md#hosted-build-and-core-tests. Three hosted build and core-test jobs passed. Hosted native Windows GUI passed. ../reports/evidence/windows-hosted/e2e/result.json
 TEST-06,macos,macOS release,01,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,../reports/evidence/macos-native-window/macos-window-probe.json. Early hosted macOS launch and AppKit Quit passed. Complete target verification remains due in Sprint 13.
 TEST-06,linux,Linux release,01,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 TEST-07,windows,Windows first release,03,12,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,

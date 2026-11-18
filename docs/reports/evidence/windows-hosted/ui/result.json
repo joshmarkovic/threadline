@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "lane": "ui",
+  "suite": null,
+  "seed": 12345,
+  "host": {
+    "os": "windows",
+    "architecture": "x86_64",
+    "version": "Microsoft Windows [Version 10.0.26100.33674]",
+    "display_session": "Windows desktop availability is checked by native driver"
+  },
+  "source_revision": "acd7ce73e51f3d0ba1e4ada4243779d211d21904",
+  "source_dirty": false,
+  "cargo_lock_sha256": "756bd3b3f162735b175102c7f1bb8ac1262e56a7c6f869855b6be4f44b905a06",
+  "package_version": "0.1.0",
+  "fixture_revision": "Sprint 01 synthetic feasibility fixture",
+  "status": "Pass",
+  "cases": [
+    {
+      "case": "S01-GPUI",
+      "status": "Pass",
+      "detail": "3 tests passed.",
+      "tests_passed": 3,
+      "evidence": "S01-GPUI.log"
+    }
+  ]
+}
