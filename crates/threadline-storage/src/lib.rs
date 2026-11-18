@@ -1,6 +1,7 @@
 //! Synchronous, account-scoped SQLite storage. Run operations on background workers.
 
 mod database;
+pub mod history;
 mod identity;
 
 pub mod access;

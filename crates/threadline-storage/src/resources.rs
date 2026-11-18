@@ -573,7 +573,11 @@ fn discard_walk(tx: &Transaction<'_>, id: i64) -> Result<()> {
     Ok(())
 }
 
-fn require_repository(conn: &Connection, account: AccountId, repo: RepositoryId) -> Result<()> {
+pub(crate) fn require_repository(
+    conn: &Connection,
+    account: AccountId,
+    repo: RepositoryId,
+) -> Result<()> {
     let exists: bool = conn.query_row(
         "SELECT EXISTS(SELECT 1 FROM repositories WHERE id=?1 AND account_id=?2)",
         params![repo.0, account.0],
@@ -615,8 +619,22 @@ fn query_many<T>(
         .collect::<rusqlite::Result<_>>()?)
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, serde::Serialize, serde::Deserialize,
+)]
+#[serde(try_from = "String", into = "String")]
 pub struct CommitOid(String);
+impl TryFrom<String> for CommitOid {
+    type Error = Error;
+    fn try_from(raw: String) -> Result<Self> {
+        Self::parse(&raw)
+    }
+}
+impl From<CommitOid> for String {
+    fn from(oid: CommitOid) -> Self {
+        oid.0
+    }
+}
 
 impl CommitOid {
     pub fn parse(value: &str) -> Result<Self> {
@@ -651,6 +669,45 @@ pub struct ComparisonFile {
     pub patch: Option<String>,
 }
 
+pub(crate) fn save_commits_in(
+    tx: &Transaction<'_>,
+    account: AccountId,
+    repo: RepositoryId,
+    commits: &[GraphCommit],
+) -> Result<()> {
+    require_repository(tx, account, repo)?;
+    let mut insert = tx.prepare_cached(
+        "INSERT INTO cached_commits(repository_id,oid,title,committed_at_ms) VALUES (?1,?2,?3,?4)
+                 ON CONFLICT DO NOTHING",
+    )?;
+    let mut insert_parent = tx.prepare_cached(
+                "INSERT INTO cached_commit_parents(repository_id,child_oid,parent_index,parent_oid) VALUES (?1,?2,?3,?4)",
+            )?;
+    for commit in commits {
+        if commit.parents.contains(&commit.oid) {
+            return Err(Error::InvalidInput("commit cannot be its own parent"));
+        }
+        let inserted = insert.execute(params![
+            repo.0,
+            commit.oid.as_str(),
+            commit.title,
+            commit.committed_at_ms
+        ])?;
+        if inserted == 0 {
+            if graph_commit(tx, repo, &commit.oid)?.as_ref() != Some(commit) {
+                return Err(Error::Conflict("immutable commit contents changed"));
+            }
+            continue;
+        }
+        for (index, parent) in commit.parents.iter().enumerate() {
+            let index =
+                i64::try_from(index).map_err(|_| Error::InvalidInput("too many commit parents"))?;
+            insert_parent.execute(params![repo.0, commit.oid.as_str(), index, parent.as_str()])?;
+        }
+    }
+    Ok(())
+}
+
 fn comparison_id(conn: &Connection, key: &ComparisonKey) -> Result<Option<i64>> {
     Ok(conn.query_row(
         "SELECT id FROM cached_comparisons WHERE repository_id=?1 AND base_commit=?2 AND head_commit=?3
@@ -683,7 +740,7 @@ pub struct GraphCommit {
     pub parents: Vec<CommitOid>,
 }
 
-fn graph_commit(
+pub(crate) fn graph_commit(
     conn: &Connection,
     repo: RepositoryId,
     oid: &CommitOid,
@@ -785,31 +842,7 @@ impl Store {
         repo: RepositoryId,
         commits: &[GraphCommit],
     ) -> Result<()> {
-        self.write(|tx| {
-            require_repository(tx, account, repo)?;
-            let mut insert = tx.prepare_cached(
-                "INSERT INTO cached_commits(repository_id,oid,title,committed_at_ms) VALUES (?1,?2,?3,?4)
-                 ON CONFLICT DO NOTHING",
-            )?;
-            let mut insert_parent = tx.prepare_cached(
-                "INSERT INTO cached_commit_parents(repository_id,child_oid,parent_index,parent_oid) VALUES (?1,?2,?3,?4)",
-            )?;
-            for commit in commits {
-                if commit.parents.contains(&commit.oid) { return Err(Error::InvalidInput("commit cannot be its own parent")); }
-                let inserted = insert.execute(params![repo.0,commit.oid.as_str(),commit.title,commit.committed_at_ms])?;
-                if inserted == 0 {
-                    if graph_commit(tx, repo, &commit.oid)?.as_ref() != Some(commit) {
-                        return Err(Error::Conflict("immutable commit contents changed"));
-                    }
-                    continue;
-                }
-                for (index,parent) in commit.parents.iter().enumerate() {
-                    let index = i64::try_from(index).map_err(|_| Error::InvalidInput("too many commit parents"))?;
-                    insert_parent.execute(params![repo.0,commit.oid.as_str(),index,parent.as_str()])?;
-                }
-            }
-            Ok(())
-        })
+        self.write(|tx| save_commits_in(tx, account, repo, commits))
     }
 
     pub fn load_commit(
@@ -1154,7 +1187,12 @@ pub(crate) fn clear_resource_cache(tx: &Transaction<'_>, account: AccountId) -> 
     tx.execute("DELETE FROM cached_revision_states WHERE item_id IN (
         SELECT items.id FROM items JOIN repositories ON items.repository_id=repositories.id WHERE repositories.account_id=?1)",
         [account.0])?;
-    for table in ["cached_comparisons", "cached_commits", "cached_refs"] {
+    for table in [
+        "history_series",
+        "cached_comparisons",
+        "cached_commits",
+        "cached_refs",
+    ] {
         tx.execute(
             &format!("DELETE FROM {table} WHERE repository_id IN (SELECT id FROM repositories WHERE account_id=?1)"),
             [account.0],
