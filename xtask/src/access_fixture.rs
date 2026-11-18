@@ -64,6 +64,8 @@ enum Phase {
     PrLoad,
     PrDelay,
     PrRelease,
+    ReviewSend,
+    ReviewChanged,
     History,
     WriteOnline,
     WriteDrop,
@@ -87,6 +89,8 @@ impl Phase {
             "pr-load" => Ok(Self::PrLoad),
             "pr-delay" => Ok(Self::PrDelay),
             "pr-release" => Ok(Self::PrRelease),
+            "review-send" => Ok(Self::ReviewSend),
+            "review-changed" => Ok(Self::ReviewChanged),
             "history" => Ok(Self::History),
             "write-online" => Ok(Self::WriteOnline),
             "write-drop" => Ok(Self::WriteDrop),
@@ -115,6 +119,10 @@ enum Route {
     CompareA,
     CompareB,
     ReviewContextIssue,
+    ReviewList,
+    ReviewRead,
+    ReviewCreated,
+    ReviewSubmitted,
     HistoryBranches,
     HistoryTags,
     HistoryBranch,
@@ -150,6 +158,7 @@ pub enum TraceCheck {
     SyncJourney,
     PullRequestJourney,
     ReviewContextJourney,
+    ReviewDraftJourney,
     HistoryJourney,
     WritesWithLoss,
     WriteSurface,
@@ -198,6 +207,7 @@ impl AccessFixture {
             TraceCheck::SyncJourney => complete_sync_journey(&records),
             TraceCheck::PullRequestJourney => pr::trace(&records),
             TraceCheck::ReviewContextJourney => pr::trace_review_context(&records),
+            TraceCheck::ReviewDraftJourney => pr::trace_review_draft(&records),
             TraceCheck::HistoryJourney => history::trace(&records),
             TraceCheck::WritesWithLoss => writes::trace(&records, true),
             TraceCheck::WriteSurface => writes::trace(&records, false),
@@ -440,7 +450,8 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
         let payload = serde_json::from_slice::<Value>(&body).ok();
         if route != Route::Graphql {
             route = payload.as_ref().map_or(Route::Unexpected, |body| {
-                writes::post(phase, &post_path, body)
+                pr::post(phase, &post_path, body)
+                    .unwrap_or_else(|| writes::post(phase, &post_path, body))
             });
         } else if !payload.is_some_and(|body| {
             body.pointer("/variables/owner").and_then(Value::as_str) == Some("fixture-org")
@@ -504,7 +515,8 @@ fn response(phase: Phase, route: Route, authorized: bool) -> Response {
     }
     let repository = json!({
         "id":71, "node_id":"R_71", "name":"private", "owner":{"login":"fixture-org"},
-        "default_branch":"main","private":true, "permissions":{"pull":true,"push":false,"admin":false}
+        "default_branch":"main","private":true,
+        "permissions":{"pull":true,"push":matches!(phase, Phase::ReviewSend | Phase::ReviewChanged),"admin":false}
     });
     let item = || {
         json!({

@@ -34,7 +34,7 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if matches!(case, "UT-016" | "S10-HISTORY-HTTP") {
         return Some("s10-history-dag-v1");
     }
-    if matches!(case, "IT-011" | "IT-013") {
+    if matches!(case, "IT-011" | "IT-013" | "UI-004" | "E2E-007" | "E2E-008") {
         return Some("s08-revision-bound-reviews-v1");
     }
     if matches!(

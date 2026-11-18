@@ -526,6 +526,11 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
         ),
         ("S05-WINDOWS-SYNC", NativeMode::WindowsSync, "windows-sync"),
         ("E2E-005", NativeMode::WindowsPullRequest, "windows-pr"),
+        (
+            "E2E-007",
+            NativeMode::WindowsReviewDraft,
+            "windows-review-draft",
+        ),
         ("E2E-011", NativeMode::WindowsHistory, "windows-history"),
         (
             "E2E-008",
@@ -716,6 +721,7 @@ enum NativeMode {
     WindowsSync,
     WindowsPullRequest,
     WindowsHistory,
+    WindowsReviewDraft,
     WindowsReviewContext,
     WindowsIssueWrites,
     WindowsWriteSurface,
@@ -780,6 +786,7 @@ fn native_driver(
         NativeMode::WindowsSync => Some("Sync"),
         NativeMode::WindowsPullRequest => Some("PullRequest"),
         NativeMode::WindowsHistory => Some("History"),
+        NativeMode::WindowsReviewDraft => Some("ReviewDraft"),
         NativeMode::WindowsReviewContext => Some("ReviewContext"),
         NativeMode::WindowsIssueWrites => Some("Writes"),
         NativeMode::WindowsWriteSurface => Some("WriteSurface"),
@@ -874,6 +881,7 @@ fn native_driver(
         NativeMode::WindowsSync => "sync-native.json",
         NativeMode::WindowsPullRequest => "pr-native.json",
         NativeMode::WindowsHistory => "history-native.json",
+        NativeMode::WindowsReviewDraft => "review-draft-native.json",
         NativeMode::WindowsReviewContext => "review-context-native.json",
         NativeMode::WindowsIssueWrites | NativeMode::WindowsWriteSurface => "writes-native.json",
     };
@@ -915,6 +923,7 @@ fn native_driver(
             (Status::Pass, NativeMode::WindowsSync) => TraceCheck::SyncJourney,
             (Status::Pass, NativeMode::WindowsPullRequest) => TraceCheck::PullRequestJourney,
             (Status::Pass, NativeMode::WindowsHistory) => TraceCheck::HistoryJourney,
+            (Status::Pass, NativeMode::WindowsReviewDraft) => TraceCheck::ReviewDraftJourney,
             (Status::Pass, NativeMode::WindowsReviewContext) => TraceCheck::ReviewContextJourney,
             (Status::Pass, NativeMode::WindowsIssueWrites) => TraceCheck::WritesWithLoss,
             (Status::Pass, NativeMode::WindowsWriteSurface) => TraceCheck::WriteSurface,

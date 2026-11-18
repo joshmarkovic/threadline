@@ -7,6 +7,9 @@ const A_MERGE: &str = "cccccccccccccccccccccccccccccccccccccccc";
 const B_BASE: &str = "dddddddddddddddddddddddddddddddddddddddd";
 const B_HEAD: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const B_MERGE: &str = "ffffffffffffffffffffffffffffffffffffffff";
+const B_NEW_HEAD: &str = "9999999999999999999999999999999999999999";
+const REVIEW_SUMMARY: &str = "Threadline synthetic review summary.";
+const INLINE_NOTE: &str = "Threadline synthetic inline review note.";
 
 pub(super) fn route(path: &str) -> Option<Route> {
     if path == format!("/repositories/71/compare/{A_BASE}...{A_HEAD}?per_page=20&page=1") {
@@ -19,15 +22,26 @@ pub(super) fn route(path: &str) -> Option<Route> {
         "/repositories/71/pulls/42" => Some(Route::PullA),
         "/repositories/71/pulls/43" => Some(Route::PullB),
         "/repos/fixture-org/private/issues/44" => Some(Route::ReviewContextIssue),
+        "/repos/fixture-org/private/pulls/42/reviews?per_page=100&page=1" => {
+            Some(Route::ReviewList)
+        }
+        "/repos/fixture-org/private/pulls/42/reviews/91" => Some(Route::ReviewRead),
         _ => None,
     }
 }
 
 pub(super) fn applies(phase: Phase) -> bool {
-    matches!(phase, Phase::PrLoad | Phase::PrDelay | Phase::PrRelease)
+    matches!(
+        phase,
+        Phase::PrLoad
+            | Phase::PrDelay
+            | Phase::PrRelease
+            | Phase::ReviewSend
+            | Phase::ReviewChanged
+    )
 }
 
-fn data(route: Route) -> Option<Value> {
+fn data(phase: Phase, route: Route) -> Option<Value> {
     let summary = |number, title, body, date: &str| {
         json!({
             "id": 400+number, "node_id": format!("I_{number}"), "number":number, "title":title,
@@ -59,6 +73,8 @@ fn data(route: Route) -> Option<Value> {
         value["changed_files"] = json!(1);
         value["merged"] = json!(false);
         value["draft"] = json!(false);
+        value["locked"] = json!(false);
+        value["user"] = json!({"id":75,"login":"fixture-author"});
         value
     };
     let compare = |base, head, merge, path| {
@@ -72,7 +88,16 @@ fn data(route: Route) -> Option<Value> {
     match route {
         Route::Items => Some(json!([first(), second()])),
         Route::PullA => Some(pull(first(), 42, A_BASE, A_HEAD)),
-        Route::PullB => Some(pull(second(), 43, B_BASE, B_HEAD)),
+        Route::PullB => Some(pull(
+            second(),
+            43,
+            B_BASE,
+            if phase == Phase::ReviewChanged {
+                B_NEW_HEAD
+            } else {
+                B_HEAD
+            },
+        )),
         Route::CompareA => Some(compare(A_BASE, A_HEAD, A_MERGE, "src/first.rs")),
         Route::CompareB => Some(compare(B_BASE, B_HEAD, B_MERGE, "src/second.rs")),
         Route::Item => Some(json!({
@@ -87,6 +112,16 @@ fn data(route: Route) -> Option<Value> {
             "updated_at":"2018-01-01T00:00:00Z",
             "repository_url":"https://api.github.com/repos/fixture-org/private"
         })),
+        Route::ReviewList => Some(json!([])),
+        Route::ReviewRead | Route::ReviewCreated | Route::ReviewSubmitted
+            if phase == Phase::ReviewSend =>
+        {
+            Some(
+                json!({"id":91,"state": if route == Route::ReviewSubmitted { "COMMENTED" } else { "PENDING" },
+                "user":{"id":41,"login":"fixture-user"},"commit_id":A_HEAD, "body":REVIEW_SUMMARY,
+                "pull_request_url":"https://api.github.com/repos/fixture-org/private/pulls/42"}),
+            )
+        }
         _ => None,
     }
 }
@@ -98,9 +133,54 @@ pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
     Some(Response {
         status: 200,
         reason: "OK",
-        body: data(route)?,
+        body: data(phase, route)?,
         sso: None,
     })
+}
+
+pub(super) fn post(phase: Phase, path: &str, body: &Value) -> Option<Route> {
+    if phase != Phase::ReviewSend {
+        return None;
+    }
+    match path {
+        "/repos/fixture-org/private/pulls/42/reviews"
+            if *body
+                == json!({
+                    "commit_id": A_HEAD, "body": REVIEW_SUMMARY,
+                    "comments": [{"path":"src/first.rs", "line":1, "side":"RIGHT", "body":INLINE_NOTE}]
+                }) =>
+        {
+            Some(Route::ReviewCreated)
+        }
+        "/repos/fixture-org/private/pulls/42/reviews/91/events"
+            if *body
+                == json!({
+                    "event":"COMMENT", "body": REVIEW_SUMMARY,
+                }) =>
+        {
+            Some(Route::ReviewSubmitted)
+        }
+        _ => None,
+    }
+}
+
+pub(super) fn trace_review_draft(records: &[RequestEvidence]) -> bool {
+    let exact = |route, phase| {
+        records
+            .iter()
+            .filter(|row| row.route == route && row.phase == phase && row.status == 200)
+            .count()
+    };
+    records
+        .iter()
+        .all(|row| row.fixture_authorization && row.route != Route::Unexpected)
+        && exact(Route::ReviewCreated, Phase::ReviewSend) == 1
+        && exact(Route::ReviewSubmitted, Phase::ReviewSend) == 1
+        && exact(Route::PullB, Phase::ReviewChanged) >= 1
+        && records.iter().all(|row| {
+            row.phase != Phase::ReviewChanged
+                || !matches!(row.route, Route::ReviewCreated | Route::ReviewSubmitted)
+        })
 }
 
 pub(super) fn wait_for_release(phase_file: &Path, stopping: &AtomicBool) -> io::Result<()> {
