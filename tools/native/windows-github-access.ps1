@@ -36,8 +36,15 @@ function Open-AccountFixture {
     return Wait-Account 'open the native account panel' { param($account) $account.panel_open }
 }
 
-function Connect-FixtureAccount([IntPtr]$Window) {
-    $null = Open-AccountFixture
+function Connect-FixtureAccount([IntPtr]$Window, [switch]$FromVisibleControl) {
+    if ($FromVisibleControl) {
+        Click-AccountControl $Window 'account-open'
+        $null = Wait-Account 'open the native account panel through its visible control' {
+            param($account) $account.panel_open
+        }
+    } else {
+        $null = Open-AccountFixture
+    }
     Click-AccountControl $Window 'account-repository'
     $null = Wait-Account 'focus in the native repository field' {
         param($account) $account.panel_open -and $account.fixture_route_focused
