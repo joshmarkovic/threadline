@@ -8,6 +8,45 @@ pub struct ReconciliationTarget {
     pub comment_id: NonZeroU64,
 }
 
+fn reconciliation_candidates(
+    db: &Connection,
+    account: AccountId,
+    through: i64,
+    limit: u16,
+) -> Result<Vec<(ReconciliationTarget, i64)>> {
+    let mut query=db.prepare(
+        "SELECT a.operation_id,a.attempt,a.remote_id,e.route,o.retry_at
+         FROM write_accepted_objects a
+         JOIN operations o ON o.account_id=a.account_id AND o.id=a.operation_id AND o.attempt=a.attempt
+         JOIN write_evidence e USING(account_id,operation_id,attempt)
+         JOIN operation_gates g ON g.account_id=o.account_id AND g.id=o.id
+         WHERE a.account_id=? AND a.kind='comment' AND o.state IN ('waiting','unknown')
+           AND g.hold IS NULL AND o.retry_at<=?
+         ORDER BY o.retry_at,o.sequence LIMIT ?")?;
+    let rows = query.query_map(params![account, through, i64::from(limit)], |r| {
+        Ok((
+            r.get::<_, String>(0)?,
+            r.get(1)?,
+            r.get::<_, String>(2)?,
+            r.get::<_, String>(3)?,
+            r.get(4)?,
+        ))
+    })?;
+    rows.map(|row| {
+        let (operation_id, attempt, remote, raw, retry_at) = row?;
+        Ok((
+            ReconciliationTarget {
+                operation_id,
+                attempt,
+                route: decode(&raw)?,
+                comment_id: numeric(&remote)?,
+            },
+            retry_at,
+        ))
+    })
+    .collect()
+}
+
 impl Store {
     /// Earliest queued attempt or expiring lease for the worker. Paused and unselected work supplies no demand.
     pub fn next_write_due(&self, account: AccountId, now: i64) -> Result<Option<i64>> {
@@ -22,7 +61,9 @@ impl Store {
             let lease=tx.query_row("SELECT MIN(q.lease_until) FROM operations q JOIN write_intents w
                         ON w.account_id=q.account_id AND w.operation_id=q.id WHERE q.account_id=? AND q.state IN ('validating','sending')",
                         [account],|r|r.get::<_,Option<i64>>(0))?.map(|t|t.max(now));
-            Ok(work.into_iter().chain(lease).min())
+            let readback = reconciliation_candidates(&tx,account,i64::MAX,1)?
+                .first().map(|(_,at)|(*at).max(floor));
+            Ok(work.into_iter().chain(lease).chain(readback).min())
         })
     }
 
@@ -70,31 +111,53 @@ impl Store {
             return Err(Error::InvalidInput("Invalid reconciliation page size"));
         }
         self.read(|db| {
-            let tx = db.unchecked_transaction()?;
-            let mut query=tx.prepare("SELECT a.operation_id,a.attempt,a.remote_id,e.route FROM write_accepted_objects a
-                        JOIN operations o ON o.account_id=a.account_id AND o.id=a.operation_id AND o.attempt=a.attempt
-                        JOIN write_evidence e USING(account_id,operation_id,attempt) JOIN operation_gates g ON g.account_id=o.account_id AND g.id=o.id
-                        WHERE a.account_id=? AND a.kind='comment' AND o.state IN ('waiting','unknown') AND g.hold IS NULL
-                        ORDER BY o.sequence LIMIT ?")?;
-            let rows = query.query_map(params![account, i64::from(limit)], |r| {
-                Ok((
-                    r.get::<_, String>(0)?,
-                    r.get::<_, i64>(1)?,
-                    r.get::<_, String>(2)?,
-                    r.get::<_, String>(3)?,
-                ))
-            })?;
-            let mut result = Vec::new();
-            for row in rows {
-                let (operation_id, attempt, remote, raw) = row?;
-                result.push(ReconciliationTarget {
-                    operation_id,
-                    attempt,
-                    route: decode(&raw)?,
-                    comment_id: numeric(&remote)?,
-                });
+            Ok(reconciliation_candidates(db, account, i64::MAX, limit)?
+                .into_iter()
+                .map(|(target, _)| target)
+                .collect())
+        })
+    }
+
+    /// Reserve one eligible exact-object GET. Its per-operation deadline survives process exit.
+    pub fn claim_write_reconciliation(
+        &self,
+        account: AccountId,
+        now: i64,
+        lease_until: i64,
+    ) -> Result<Option<ReconciliationTarget>> {
+        if lease_until <= now {
+            return Err(Error::InvalidInput("Invalid readback reservation"));
+        }
+        self.write(|tx| {
+            if deadline(tx, account)?.is_some_and(|floor| floor > now) {
+                return Ok(None);
             }
-            Ok(result)
+            let Some((target, _)) = reconciliation_candidates(tx, account, now, 1)?.pop() else {
+                return Ok(None);
+            };
+            tx.execute(
+                "UPDATE operations SET retry_at=? WHERE account_id=? AND id=? AND attempt=?",
+                params![lease_until, account, target.operation_id, target.attempt],
+            )?;
+            Ok(Some(target))
+        })
+    }
+
+    /// A missing or inaccessible accepted object retains its exact identity. Other items remain eligible.
+    pub fn defer_write_reconciliation(
+        &self,
+        target: &ReconciliationTarget,
+        not_before: i64,
+    ) -> Result<bool> {
+        self.write(|tx|{
+            let changed=tx.execute("UPDATE operations SET retry_at=MAX(retry_at,?1)
+                WHERE account_id=?2 AND id=?3 AND attempt=?4 AND state IN ('waiting','unknown')
+                  AND EXISTS(SELECT 1 FROM write_accepted_objects a JOIN write_evidence e USING(account_id,operation_id,attempt)
+                     WHERE a.account_id=?2 AND a.operation_id=?3 AND a.attempt=?4
+                       AND a.kind='comment' AND a.remote_id=?5 AND e.route=?6)",
+                params![not_before,target.route.account,target.operation_id,target.attempt,
+                    target.comment_id.to_string(),encode(&target.route)?])?;
+            Ok(changed==1)
         })
     }
 }

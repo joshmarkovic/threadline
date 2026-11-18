@@ -163,6 +163,11 @@ impl Store {
                     Delivery::Unknown("Mutation delivery remains unproved"),
                 );
             }
+            let accepted: bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM write_accepted_objects
+                WHERE account_id=? AND operation_id=? AND attempt=?)",params![account,id,attempt],|r|r.get(0))?;
+            if accepted {
+                return Err(Error::Conflict("The transport already acknowledged creation; the attempt cannot be replayed"));
+            }
             // Rejection/no-send proof must come from the same transport attempt; cached content is never such proof.
             let (reason, needs_attention, deadline) = match reason {
                 WriteFailure::DefinitelyUnsent => ("transport_proved_unsent", false, None),
@@ -280,6 +285,12 @@ impl Store {
                     ));
                 }
             };
+            let accepted=tx.query_row("SELECT remote_id FROM write_accepted_objects
+                WHERE account_id=? AND operation_id=? AND attempt=?",params![account,id,attempt],
+                |r|r.get::<_,String>(0)).optional()?;
+            if accepted.is_some_and(|ack|ack!=remote_id.to_string()) {
+                return Err(Error::Conflict("The response contradicts the acknowledged comment identity"));
+            }
             let evidence = match proof {
                 ConfirmationProof::MutationResponse { request_id: code } => {
                     request_id(code)?;

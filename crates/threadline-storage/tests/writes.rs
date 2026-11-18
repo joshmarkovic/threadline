@@ -217,6 +217,29 @@ fn it_009_timeout_and_cancel_never_replay_identity_free_matches_and_accepted_cre
     let mut wrong = pending[0].clone();
     wrong.comment_id = id(399);
     assert!(db.reconciliation_profile(&wrong).is_err());
+    assert!(
+        db.record_write_failure(
+            a,
+            &second,
+            c.attempt(),
+            WriteFailure::DefinitelyUnsent,
+            2_012
+        )
+        .is_err()
+    );
+    assert!(
+        db.confirm_write(
+            a,
+            &second,
+            c.attempt(),
+            ConfirmationProof::MutationResponse {
+                request_id: "wrong-object"
+            },
+            &reply(&c, ConfirmedObject::Comment(remote("accepted", 2_013))),
+            2_014
+        )
+        .is_err()
+    );
     let mut observed = remote("accepted", 2_013);
     observed.id = id(378);
     db.confirm_write(
@@ -699,4 +722,81 @@ fn it_010_interrupted_preflight_releases_only_the_exact_unsent_attempt() {
     assert!(!db.abandon_write_preflight(&claim, 10).unwrap());
     ticket(&db, &next, &obs(&next, 11), 11);
     assert!(!db.abandon_write_preflight(&next, 12).unwrap());
+}
+
+#[test]
+fn it_009_unreadable_accepted_comment_cannot_starve_another_item_after_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Store::open_profile(dir.path()).unwrap();
+    let (a, r, first) = setup(&db);
+    let second = issue(&db, a, r, 42);
+    for (item, at, remote) in [(first, 100, 601), (second, 1_200, 602)] {
+        submit(
+            &db,
+            a,
+            item,
+            &WriteIntent::CreateComment {
+                body: "same".into(),
+            },
+            at,
+        );
+        let claim = db.claim_write(a, at + 1, at + 900).unwrap().unwrap();
+        let t = ticket(&db, &claim, &obs(&claim, at + 2), at + 2);
+        db.accept_created_comment(&t, id(remote), "created")
+            .unwrap();
+    }
+    assert!(
+        db.claim_write_reconciliation(a, 1_205, 2_500)
+            .unwrap()
+            .is_none()
+    );
+    let target = db
+        .claim_write_reconciliation(a, 2_300, 3_300)
+        .unwrap()
+        .unwrap();
+    assert_eq!(target.comment_id, id(601));
+    assert!(db.defer_write_reconciliation(&target, 62_300).unwrap());
+    drop(db);
+    let db = Store::open_profile(dir.path()).unwrap();
+    assert_eq!(db.next_write_due(a, 2_301).unwrap(), Some(2_301));
+    let ready = db
+        .claim_write_reconciliation(a, 2_301, 3_301)
+        .unwrap()
+        .unwrap();
+    assert_eq!(ready.comment_id, id(602));
+    let mut comment = remote("same", 2_302);
+    comment.id = ready.comment_id;
+    db.confirm_write(
+        a,
+        &ready.operation_id,
+        ready.attempt,
+        ConfirmationProof::AcceptedCommentRead,
+        &ConfirmedWrite {
+            actor: ready.route.actor,
+            repository: ready.route.repository_id,
+            issue: ready.route.issue_id,
+            number: ready.route.number,
+            object: ConfirmedObject::Comment(comment),
+        },
+        2_303,
+    )
+    .unwrap();
+    assert!(!db.defer_write_reconciliation(&ready, 70_000).unwrap());
+    assert!(
+        db.claim_write_reconciliation(a, 50_000, 51_000)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(db.next_write_due(a, 50_000).unwrap(), Some(62_300));
+    assert!(db.claim_write(a, 62_300, 63_300).unwrap().is_none());
+    db.set_repository_paused(a, r, true).unwrap();
+    assert!(db.next_write_due(a, 70_000).unwrap().is_none());
+    db.set_repository_paused(a, r, false).unwrap();
+    assert_eq!(
+        db.claim_write_reconciliation(a, 70_000, 71_000)
+            .unwrap()
+            .unwrap()
+            .comment_id,
+        id(601)
+    );
 }
