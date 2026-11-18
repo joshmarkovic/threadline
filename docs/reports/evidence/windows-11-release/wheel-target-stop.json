@@ -1,0 +1,64 @@
+{
+  "status": "Fail",
+  "detail": "Exception calling \"Run\" with \"0\" argument(s): \"Stroke 3: the physical pointer is outside the child or unavailable.\"",
+  "build_manifest": "../windows-hosted/build.json",
+  "source_revision": "acd7ce73e51f3d0ba1e4ada4243779d211d21904",
+  "binary_sha256": "2d6c06948bf3273973ec448c3f78176f87ce9a1dd7c02c20b9d326ee415a7aa4",
+  "seed": 12345,
+  "fixture_revision": "s01-feasibility-v1",
+  "window_dpi": 144,
+  "gpui_scale_factor": 1.5,
+  "display": {
+    "width": 3840,
+    "height": 2160
+  },
+  "driver_sha256": {
+    "ThreadlineWinInput.cs": "3a1c2396a0da5d02fec2f0e44488d01bbca3a183b7009d76549baabc076728bc",
+    "windows-smoke.ps1": "1a7b3ede9dba93c64bbdb56f9675780d74684fc2ee95b9caa33790a12c2d9a79"
+  },
+  "source_files_sha256": {
+    "measurements.json": "3fc860dc8ae83e952f18da980b9f3ab461cfbc204208080febd136d56ebe6bfd",
+    "ui-observation.json": "bc41b0df8e5957952917dd67fda2c596b17522f4bd244bb4109b1b48ba0ed44b"
+  },
+  "wheel_input": {
+    "verified_down_strokes": 2,
+    "verified_up_strokes": 0,
+    "within_window_corrections": 0,
+    "longest_injection_gap_ms": 24.77,
+    "wheel_scroll_lines": 3,
+    "per_monitor_v2_coordinates": true,
+    "first_position": {
+      "Stroke": 1,
+      "ForegroundIsChild": true,
+      "PlannedPointIsChild": true,
+      "ActualPointIsChild": true,
+      "PlannedPointInsideClip": true,
+      "PhysicalDeltaX": -1538,
+      "PhysicalDeltaY": -705,
+      "LogicalMinusPhysicalX": 0,
+      "LogicalMinusPhysicalY": 0
+    },
+    "first_dispatch": {
+      "Stroke": 1,
+      "ForegroundIsChild": true,
+      "PlannedPointIsChild": true,
+      "ActualPointIsChild": true,
+      "PlannedPointInsideClip": true,
+      "PhysicalDeltaX": 0,
+      "PhysicalDeltaY": 0,
+      "LogicalMinusPhysicalX": 0,
+      "LogicalMinusPhysicalY": 0
+    },
+    "failure_position": {
+      "Stroke": 3,
+      "ForegroundIsChild": true,
+      "PlannedPointIsChild": true,
+      "ActualPointIsChild": false,
+      "PlannedPointInsideClip": true,
+      "PhysicalDeltaX": -2880,
+      "PhysicalDeltaY": -528,
+      "LogicalMinusPhysicalX": 0,
+      "LogicalMinusPhysicalY": 0
+    }
+  }
+}

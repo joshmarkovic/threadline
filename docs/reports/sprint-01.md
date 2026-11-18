@@ -12,7 +12,7 @@ Threadline has a runnable Rust and GPUI workspace. Native desktop smoke passed o
 | S01-T02 | The portable core verifies typed repository and item identities, revisions, structured errors, cancellation and stale responses. A seeded fake, bounded Tokio scheduler and loopback HTTP simulator exercise background work. |
 | S01-T03 | The workspace has virtualized selectable Markdown, a virtualized annotated diff, two resizable panes with independently focused tabs and drafts, a branching history fixture, and a 33/67 PR context and code split. Both splitters and OS clipboard behavior passed on Windows 11 at 96 and 144 DPI and on hosted Windows Server at 144 DPI. Simulated 2× geometry passed in the GPUI harness. [Windows 11 release-build smoke](evidence/windows-11-release/native.json) · [Hosted 144-DPI smoke](#hosted-144-dpi-smoke) |
 | S01-T04 | Windows opted in to tray residence, minimized on Close, and restored the original process through the actual tray icon. A second launch forwarded to the active review in the original process. The shell emitted its banner-shown callback. The Windows automation could not locate the banner's native click target. |
-| S01-T05 | The native benchmark and numeric ceilings are in place. Startup and working set passed on the reference VM. Both surfaces exceeded 20 ms at 96 DPI. At 144 DPI the release build exceeded 20 ms on the discussion and returned too few diff samples for p95. |
+| S01-T05 | The native benchmark and numeric ceilings are in place. Startup and working set passed on the reference VM. Both surfaces exceeded 20 ms at 96 DPI. At 144 DPI, a driver that targeted each wheel input measured both surfaces above 20 ms on the release build. |
 | S01-T06 | Portable service contracts, platform ownership, a support matrix, artifact metadata and short, verified installation templates are documented. |
 | S01-T07 | Cargo commands validate selection and seed, report JSON and JUnit, and run isolated tests. The Windows and X11 input drivers exercised real windows, including Windows 11 and hosted Windows Server at 150% display scaling. Windows, Apple Silicon macOS, and Ubuntu x64 hosted build and core-test jobs passed. The macOS launch and AppKit Quit probe passed. Full macOS desktop input verification remains open. |
 
@@ -103,6 +103,27 @@ The standard benchmark in the same desktop configuration recorded 1,693.06 ms to
 
 All three runs used the same executable, seed and wheel workload. The last run set GPUI’s process-local `GPUI_DISABLE_DIRECT_COMPOSITION=1` switch. All three diff results fell below the ten-frame minimum for reporting p95. Individual frame times include the wait before drawing, the draw itself, and submission through the platform. [Per-run results](evidence/windows-11-release/measurements.json) · [Paired frame samples and phases](evidence/windows-11-release/frame-samples.json)
 
+#### Per-stroke wheel verification
+
+The driver used for the three runs above positioned the pointer once for each 25-stroke burst. A diagnostic checked its physical position before each wheel input. It verified two downward strokes, then stopped before sending the third. Threadline was still the foreground window, and its intended diff point was visible and inside the system cursor clip. The physical pointer was outside the app. The physical and logical readings agreed. This identifies a targeting assumption in the earlier runs. [Guard results](evidence/windows-11-release/wheel-target-stop.json)
+
+A second diagnostic checked the intended point against the app window and submitted each absolute move and wheel event together. It sent 25 downward and 25 upward inputs on each surface. All 50 physical readbacks per surface matched their target point. The longest gaps between submissions were 168.22 ms on the diff and 185.30 ms on the discussion, despite a requested 24 ms delay. The different input pacing limits comparisons with the original driver. The midpoint pixel sample was unavailable, and the before-and-after pixel strip matched after reversal. Visual displacement at the midpoint remains unverified. [Input and pixel observations](evidence/windows-11-release/targeted-wheel.json)
+
+With the same app executable, seed and 20 ms ceiling, the diagnostic measured **214.7557 ms p95 over 20 diff frames** and **157.4276 ms p95 over 23 discussion frames**. These are GPUI dirty-to-present-submission intervals during input. Both exceeded the budget. [Budgets and measurements](evidence/windows-11-release/targeted-wheel.json) · [Paired frame timings](evidence/windows-11-release/targeted-frames.json)
+
+A separate desktop measurement timed 91 successive successful `DwmFlush` calls in the same session with no Threadline workload. After discarding the first call, the 90 remaining waits measured 31.1257 ms at p50, 33.9798 ms at p95 and 42.8163 ms maximum. Windows reported font smoothing enabled with ClearType. GPUI 0.3.12 uses this API to pace Windows frame requests. These desktop timings describe the reference session independently of the app’s frame samples. [Desktop measurement and samples](evidence/windows-11-release/desktop-compositor.json) · [GPUI Windows frame pacing](https://docs.rs/crate/gpui-pre-windows/0.3.12/source/src/vsync.rs)
+
+#### Text rendering comparison
+
+A separate Windows cross-build exposed GPUI’s grayscale option only during measurement. Each run used one executable and the same synthetic workload at 144 DPI on the software renderer. The application recorded the selected mode. Its cached Windows GPUI dependency compiled shaders at runtime with debug assertions. The CI-native release executable used optimized embedded shaders. [Experimental build and input records](evidence/windows-11-release/text-rendering.json)
+
+| Run | GPUI text mode | Diff p95 (frames) | Discussion p95 (frames) | Mean wheel gaps, diff / discussion |
+| ---: | --- | ---: | ---: | ---: |
+| 1 | Platform default | 252.9366 ms (22) | 158.5636 ms (28) | 57.04 / 68.85 ms |
+| 2 | Grayscale | 151.5891 ms (43) | 132.6192 ms (41) | 119.50 / 105.06 ms |
+
+Each surface received 25 downward and 25 upward wheel inputs, with 50 matching physical readbacks. The observed injection gaps varied across runs. When repeated in reverse order, both trials stopped at foreground-focus checks before sending wheel input. Both completed modes exceeded 20 ms. The single completed pair cannot isolate the effect of text rendering from input cadence and run order. Threadline continues to use the platform default. [Frame samples and phases](evidence/windows-11-release/text-rendering-frames.json) · [Trial and focus results](evidence/windows-11-release/text-rendering.json)
+
 ### Hosted Windows Server replay
 
 The replay used `build_run_id=44235734818` and seed 12345 on hosted Windows Server 2025 Datacenter x64, build 26100, at 1024 × 768 and 96 DPI. It reused the verified native release test executable with `/O3` shaders and SHA-256 `2d6c06948bf3273973ec448c3f78176f87ce9a1dd7c02c20b9d326ee415a7aa4`. GPUI named Microsoft Basic Render Driver and returned `is_software_emulated: false`. The Windows 11 cross-build and Windows Server replay ran on different machines. The Windows 11 tests of the two builds also used different display scales, so their timings do not isolate shader compilation. [Verified build manifest](evidence/windows-hosted/build.json) · [Replay workflow](../../.github/workflows/windows-hosted-replay.yml) · [Hosted replay and raw artifacts](https://github.com/joshmarkovic/threadline/actions/runs/44240601495)
@@ -120,6 +141,12 @@ The replay used `build_run_id=44235734818` and seed 12345 on hosted Windows Serv
 The diff p95 frame spent 146.6351 ms in GPUI paint. The discussion p95 frame spent 137.2148 ms in platform submission. The replay preserves the per-frame timings in its workflow artifact. [Measurement results](evidence/windows-hosted-replay/measurements.json) · [Raw replay artifact](https://github.com/joshmarkovic/threadline/actions/runs/44240601495)
 
 ## Additional Windows desktop evidence
+
+### Windows 11 notification focus
+
+Windows reported `AcceptsNotifications` on the 144-DPI reference desktop. After the shell acknowledged the new fixture banner, the diagnostic used Win+Shift+V three times and polled focused notifications and classic balloons 20 times over 2,697 ms. It found zero exact title-and-body matches and issued zero banner clicks. It restored the earlier focus. The original process remained on PR 68. [Shell observations and driver digests](evidence/windows-11-release/focused-notification.json)
+
+A separate Windows Runtime helper registered an indexed Start shortcut and submitted its own fixture toast. Its notification setting query returned `0x80070490`. Windows accepted the submission, exposed the fixture twice in its app-scoped history, and emitted the dismissal reason `TimedOut`. The helper cleaned up the notification and shortcut and returned exit 78. Activation into the running Threadline process remains open. [Standalone submission and cleanup](evidence/windows-11-release/standalone-winrt.json)
 
 ### Hosted notification and display diagnostics
 

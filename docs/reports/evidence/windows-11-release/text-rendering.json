@@ -1,0 +1,234 @@
+{
+  "build": {
+    "purpose": "Same-executable Windows rendering policy comparison with the Sprint 01 measurement fixture",
+    "source_revision": "fa972abb86fbe726dc602b3c356b53e2afdad00e",
+    "source_patch_sha256": "b651f744710cbd3b1a3f65b7d410eae8cc467b8ed135836d3129bcddfb9b4c95",
+    "cargo_lock_sha256": "00d232dc36582a00dddaddfaf4f4225b9be0af05c50dd26803bd7054e8f30f86",
+    "target": "x86_64-pc-windows-msvc",
+    "compiler": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "windows_sdk": "10.0.26100",
+    "features": [
+      "e2e"
+    ],
+    "application_opt_level": 3,
+    "pe_subsystem": "Windows GUI",
+    "gpui_windows_sha256": "cc384d54aa744d69329400b471a1a2528cccd65194973db89b760286e37ecb60",
+    "threadline_app_rlib_sha256": "526baca7f2f2b16f854fa0cea660360e849daab7ace57a757248ffd922cd9c69",
+    "gpui_windows_build": "Cached cross-build with debug assertions and D3DCompileFromFile using D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION",
+    "binary_sha256": "ef0c7b624a085a1747f78777a0cc6bb877806ef4f35b99f44e978c6055a91652",
+    "binary_size_bytes": 26838016,
+    "baseline": {
+      "THREADLINE_TEST_GRAYSCALE": null,
+      "observed_field": "text_rendering_mode",
+      "expected_value": "platform_default"
+    },
+    "experiment": {
+      "THREADLINE_TEST_GRAYSCALE": "1",
+      "observed_field": "text_rendering_mode",
+      "expected_value": "grayscale"
+    }
+  },
+  "fixture_revision": "s01-feasibility-v1",
+  "seed": 12345,
+  "window_dpi": 144,
+  "display": {
+    "width": 3840,
+    "height": 2160
+  },
+  "gpui_scale_factor": 1.5,
+  "renderer_adapter": {
+    "is_software_emulated": true,
+    "device_name": "Microsoft Basic Render Driver",
+    "driver_name": "Unknown Vendor (ID: 0x1414)",
+    "driver_info": "10.0.22621.7649"
+  },
+  "driver_revision": "803aefcccc6c8f785a6fbab970cfeaffdf5ae8cc",
+  "driver_sha256": {
+    "ThreadlineWinInput.cs": "99681ad035da538f3985f49029a53661493b256e86fef754fc28610241bfa11c",
+    "windows-smoke.ps1": "077d10207bdb3583bcb4ea96d3dea936ac0690718ce129d4b6691b73d1faacdc"
+  },
+  "trials": [
+    {
+      "trial": 1,
+      "mode_observed": "platform_default",
+      "status": "Fail",
+      "wheel_input": {
+        "diff": {
+          "calibrated": true,
+          "accepted_down": 25,
+          "accepted_up": 25,
+          "physical_target_readbacks": 50,
+          "repositioned_strokes": 0,
+          "interrupted_stroke": null,
+          "first_missed_readback": null,
+          "mean_gap_ms": 57.04,
+          "longest_gap_ms": 155.96
+        },
+        "markdown_copy": {
+          "calibrated": true,
+          "accepted_down": 25,
+          "accepted_up": 25,
+          "physical_target_readbacks": 50,
+          "repositioned_strokes": 0,
+          "interrupted_stroke": null,
+          "first_missed_readback": null,
+          "mean_gap_ms": 68.85,
+          "longest_gap_ms": 152.61
+        }
+      },
+      "scroll_budget": {
+        "value": 252.9366,
+        "limit": 20,
+        "status": "Fail",
+        "surfaces": {
+          "large_diff": {
+            "value": 252.9366,
+            "sample_count": 22,
+            "limit": 20,
+            "status": "Fail"
+          },
+          "markdown_discussion": {
+            "value": 158.5636,
+            "sample_count": 28,
+            "limit": 20,
+            "status": "Fail"
+          }
+        }
+      },
+      "source_files_sha256": {
+        "measurements.json": "0b3534e00475cd526657f3cab5c4732f4ed2f80b0f96e82391c075e310741745",
+        "ui-observation.json": "224d492ea978162b9edf0ed1b31acbe0ed041f1d680eb830a89b9b05991f68d0"
+      }
+    },
+    {
+      "trial": 2,
+      "mode_observed": "grayscale",
+      "status": "Fail",
+      "wheel_input": {
+        "diff": {
+          "calibrated": true,
+          "accepted_down": 25,
+          "accepted_up": 25,
+          "physical_target_readbacks": 50,
+          "repositioned_strokes": 0,
+          "interrupted_stroke": null,
+          "first_missed_readback": null,
+          "mean_gap_ms": 119.5,
+          "longest_gap_ms": 288.5
+        },
+        "markdown_copy": {
+          "calibrated": true,
+          "accepted_down": 25,
+          "accepted_up": 25,
+          "physical_target_readbacks": 50,
+          "repositioned_strokes": 0,
+          "interrupted_stroke": null,
+          "first_missed_readback": null,
+          "mean_gap_ms": 105.06,
+          "longest_gap_ms": 220.61
+        }
+      },
+      "scroll_budget": {
+        "value": 151.5891,
+        "limit": 20,
+        "status": "Fail",
+        "surfaces": {
+          "large_diff": {
+            "value": 151.5891,
+            "sample_count": 43,
+            "limit": 20,
+            "status": "Fail"
+          },
+          "markdown_discussion": {
+            "value": 132.6192,
+            "sample_count": 41,
+            "limit": 20,
+            "status": "Fail"
+          }
+        }
+      },
+      "source_files_sha256": {
+        "measurements.json": "889b8b93efe78e67bf01a4541ed79f233ae06186a183b17d374e537245e49b43",
+        "ui-observation.json": "a45199e55f756849b9138ddcb94da812f50aef1af67fc82d2349521737787c26"
+      }
+    }
+  ],
+  "preliminary_driver_sha256": {
+    "ThreadlineWinInput.cs": "923dc83af3cec700ef6cfc5f581e3df2f512537f9021ce46bb10390f16adf7d6",
+    "windows-smoke.ps1": "dee9777155e2e5ad42c80f991fe1e27152d0bd32860fdd285a853fb1e5852d0e"
+  },
+  "preliminary_attempts": [
+    {
+      "mode_observed": "platform_default",
+      "status": "Fail",
+      "detail": "Exception calling \"Run\" with \"0\" argument(s): \"Wheel input requires a stable, visible child with matching native DPI and client bounds.\"",
+      "scroll_budget": null,
+      "source_files_sha256": {
+        "measurements.json": "5243b7223a840d79d83c260699c779d74e9df2e6d2b839530bd4e946bead49bf",
+        "ui-observation.json": "ee3bb864787f313e2622ada05ab0ce1c92c26aaa0d8d0c8cf744d9006b19de9b"
+      }
+    },
+    {
+      "mode_observed": "grayscale",
+      "status": "Fail",
+      "detail": "One or more Windows performance budgets were exceeded.",
+      "scroll_budget": {
+        "value": 144.1869,
+        "limit": 20,
+        "status": "Fail",
+        "surfaces": {
+          "large_diff": {
+            "value": 133.7347,
+            "sample_count": 40,
+            "limit": 20,
+            "status": "Fail"
+          },
+          "markdown_discussion": {
+            "value": 144.1869,
+            "sample_count": 43,
+            "limit": 20,
+            "status": "Fail"
+          }
+        }
+      },
+      "source_files_sha256": {
+        "measurements.json": "00797712956833bb8edc8a3d3f4be818bc0b5d2c3c3013ee10f1824c48906b80",
+        "ui-observation.json": "280f1b093068a30d22781012bdd055996f416c4ea61591e6511308e2891198ed"
+      }
+    }
+  ],
+  "reverse_order_attempts": [
+    {
+      "mode_observed": "grayscale",
+      "status": "Blocked",
+      "detail": "The Threadline test window lost foreground focus.",
+      "wheel_input": {
+        "diff": {
+          "calibrated": false,
+          "accepted_down": 0,
+          "accepted_up": 0,
+          "physical_target_readbacks": 0,
+          "repositioned_strokes": 0,
+          "interrupted_stroke": null,
+          "first_missed_readback": null,
+          "mean_gap_ms": 0,
+          "longest_gap_ms": 0
+        }
+      },
+      "source_files_sha256": {
+        "measurements.json": "4ac3c46d35e3cb26ac2b29f626e902536ce6f2d707100d064aed77b797fd508d",
+        "ui-observation.json": "fb3e21fa7f227e1100088cf7daf7848486855a97fcf60ccccab1323185c9350a"
+      }
+    },
+    {
+      "mode_observed": "platform_default",
+      "status": "Blocked",
+      "detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible.",
+      "wheel_input": {},
+      "source_files_sha256": {
+        "measurements.json": "072c0455c43685611ab926a9f2be62fe88d2912529a3f8ddff5752c1539a799c",
+        "ui-observation.json": "b6b6e65286db12365b184ca1c6f780ec083b8924eb10ca6c142922432ac03554"
+      }
+    }
+  ]
+}

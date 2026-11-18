@@ -1,0 +1,152 @@
+{
+  "status": "Fail",
+  "detail": "One or more Windows performance budgets were exceeded.",
+  "build_manifest": "../windows-hosted/build.json",
+  "source_revision": "acd7ce73e51f3d0ba1e4ada4243779d211d21904",
+  "binary_sha256": "2d6c06948bf3273973ec448c3f78176f87ce9a1dd7c02c20b9d326ee415a7aa4",
+  "seed": 12345,
+  "fixture_revision": "s01-feasibility-v1",
+  "window_dpi": 144,
+  "gpui_scale_factor": 1.5,
+  "display": {
+    "width": 3840,
+    "height": 2160
+  },
+  "driver_sha256": {
+    "ThreadlineWinInput.cs": "923dc83af3cec700ef6cfc5f581e3df2f512537f9021ce46bb10390f16adf7d6",
+    "windows-smoke.ps1": "dee9777155e2e5ad42c80f991fe1e27152d0bd32860fdd285a853fb1e5852d0e"
+  },
+  "source_files_sha256": {
+    "measurements.json": "4637b6e650c5afeabe4436aeb270886a44ca93092832b7e252d2174144ea659f",
+    "ui-observation.json": "6699574e2fddf35d59b4343da2c751a0122d3781d7000054f6fff4d92d48c627"
+  },
+  "renderer_adapter": {
+    "is_software_emulated": true,
+    "device_name": "Microsoft Basic Render Driver",
+    "driver_name": "Unknown Vendor (ID: 0x1414)",
+    "driver_info": "10.0.22621.7649"
+  },
+  "wheel_input": {
+    "diff": {
+      "verified_down_strokes": 25,
+      "verified_up_strokes": 25,
+      "within_window_corrections": 0,
+      "longest_injection_gap_ms": 168.22,
+      "wheel_scroll_lines": 3,
+      "per_monitor_v2_coordinates": true,
+      "absolute_move_before_wheel": true,
+      "accepted_absolute_move_wheel_batches": 50,
+      "pointer_corrections_from_outside": 1,
+      "physical_target_readbacks": 50,
+      "first_position": {
+        "Stroke": 1,
+        "ForegroundIsChild": true,
+        "PlannedPointIsChild": true,
+        "ActualPointIsChild": false,
+        "PlannedPointInsideClip": true,
+        "PhysicalDeltaX": 796,
+        "PhysicalDeltaY": -67,
+        "LogicalMinusPhysicalX": 0,
+        "LogicalMinusPhysicalY": 0
+      },
+      "first_dispatch": {
+        "Stroke": 1,
+        "ForegroundIsChild": true,
+        "PlannedPointIsChild": true,
+        "ActualPointIsChild": true,
+        "PlannedPointInsideClip": true,
+        "PhysicalDeltaX": 0,
+        "PhysicalDeltaY": 0,
+        "LogicalMinusPhysicalX": 0,
+        "LogicalMinusPhysicalY": 0
+      },
+      "failure_position": null
+    },
+    "markdown_copy": {
+      "verified_down_strokes": 25,
+      "verified_up_strokes": 25,
+      "within_window_corrections": 0,
+      "longest_injection_gap_ms": 185.3,
+      "wheel_scroll_lines": 3,
+      "per_monitor_v2_coordinates": true,
+      "absolute_move_before_wheel": true,
+      "accepted_absolute_move_wheel_batches": 50,
+      "pointer_corrections_from_outside": 0,
+      "physical_target_readbacks": 50,
+      "first_position": {
+        "Stroke": 1,
+        "ForegroundIsChild": true,
+        "PlannedPointIsChild": true,
+        "ActualPointIsChild": true,
+        "PlannedPointInsideClip": true,
+        "PhysicalDeltaX": 1177,
+        "PhysicalDeltaY": 290,
+        "LogicalMinusPhysicalX": 0,
+        "LogicalMinusPhysicalY": 0
+      },
+      "first_dispatch": {
+        "Stroke": 1,
+        "ForegroundIsChild": true,
+        "PlannedPointIsChild": true,
+        "ActualPointIsChild": true,
+        "PlannedPointInsideClip": true,
+        "PhysicalDeltaX": 0,
+        "PhysicalDeltaY": 0,
+        "LogicalMinusPhysicalX": 0,
+        "LogicalMinusPhysicalY": 0
+      },
+      "failure_position": null
+    }
+  },
+  "diff_scroll_probe": {
+    "changed_during_down": null,
+    "changed_since_down": null,
+    "changed_after_round_trip": false
+  },
+  "budgets": {
+    "idle_working_set_bytes": {
+      "value": 104947712,
+      "limit": 209715200,
+      "status": "Pass"
+    },
+    "peak_working_set_bytes": {
+      "value": 106741760,
+      "limit": 471859200,
+      "status": "Pass"
+    },
+    "gpu_memory_bytes": {
+      "value": 0,
+      "limit": 268435456,
+      "status": "Pass"
+    },
+    "package_bytes": {
+      "value": null,
+      "limit": 52428800,
+      "status": "Blocked"
+    },
+    "cold_start_ms": {
+      "value": 2519.52,
+      "limit": 3000,
+      "status": "Pass"
+    },
+    "scroll_frame_p95_ms": {
+      "value": 214.7557,
+      "limit": 20,
+      "status": "Fail",
+      "surfaces": {
+        "large_diff": {
+          "value": 214.7557,
+          "sample_count": 20,
+          "limit": 20,
+          "status": "Fail"
+        },
+        "markdown_discussion": {
+          "value": 157.4276,
+          "sample_count": 23,
+          "limit": 20,
+          "status": "Fail"
+        }
+      }
+    }
+  }
+}

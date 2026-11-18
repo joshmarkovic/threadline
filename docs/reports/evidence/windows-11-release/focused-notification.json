@@ -1,0 +1,53 @@
+{
+  "status": "Blocked",
+  "detail": "The Windows shell reported display, but the bounded focused and classic search found no safely clickable exact fixture.",
+  "build_manifest": "../windows-hosted/build.json",
+  "source_revision": "acd7ce73e51f3d0ba1e4ada4243779d211d21904",
+  "binary_sha256": "2d6c06948bf3273973ec448c3f78176f87ce9a1dd7c02c20b9d326ee415a7aa4",
+  "seed": 12345,
+  "fixture_revision": "s01-feasibility-v1",
+  "window_dpi": 144,
+  "gpui_scale_factor": 1.5,
+  "display": {
+    "width": 3840,
+    "height": 2160
+  },
+  "driver_sha256": {
+    "ThreadlineWinInput.cs": "ac7e96154609d939428ac5078c3734b1188b9ba0d0a0a9c41204013ed0d85041",
+    "windows-smoke.ps1": "13d4c958068b24f6776676ce8d11b541ba228b4a945d5b6f92e2a7817be78ae5",
+    "windows-notification-focus.ps1": "2bf19af5cbc94069081298f1b5a1dace24de1ce9fe9aa7ddd1a99366d6feb8bb"
+  },
+  "source_files_sha256": {
+    "platform-native.json": "fa7009458eb0fa4194830b0b64f1790f1d0429e5c0b536ba6ec7d8ad563599ad",
+    "ui-observation.json": "bfbf1d30e5746856be8894ca0db538dfdf1be04f8a2dc1b41a715851eb9bbe23"
+  },
+  "diagnostic": "Focused shell notification and classic balloon",
+  "user_notification_state": {
+    "hresult": 0,
+    "state": 5,
+    "state_name": "AcceptsNotifications"
+  },
+  "preexisting_fixture_matches": 0,
+  "notifications_shown": 1,
+  "search": {
+    "polls": 20,
+    "cycles": 3,
+    "shell_windows": 0,
+    "focus_derived_windows": 0,
+    "classic_windows": 0,
+    "title_nodes": 0,
+    "body_nodes": 0,
+    "combined_nodes": 0,
+    "classic_pairs": 0,
+    "uia_pairs": 0,
+    "ambiguous_pairs": 0,
+    "focused_pairs": 0,
+    "stale_elements": 0,
+    "unavailable_elements": 0,
+    "expired_checks": 0,
+    "click_attempts": 0,
+    "elapsed_ms": 2697
+  },
+  "final_pr": 68,
+  "prior_focus_restored": true
+}

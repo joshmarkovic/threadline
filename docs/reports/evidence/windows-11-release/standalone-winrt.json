@@ -1,0 +1,17 @@
+{
+  "helper_sha256": "d637f1cf4d8abd5db39d81ac9a1b438119c3238413c6093d486042a3ee0eaf79",
+  "shortcut_verified": true,
+  "start_indexed": true,
+  "events": [
+    "VERIFIED_IDENTITY x64",
+    "SETTING_ERROR 80070490",
+    "READY unknown",
+    "HISTORY true",
+    "DISMISSED 2",
+    "HISTORY true",
+    "CLEANUP true true true"
+  ],
+  "exit_code": 78,
+  "shortcut_removed": true,
+  "source_sha256": "9f69b57c86ba8528f7408d30c3093737088882a89c4e333b561a8d54ebc91646"
+}
