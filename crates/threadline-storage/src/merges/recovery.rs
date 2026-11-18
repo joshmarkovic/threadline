@@ -53,7 +53,7 @@ fn sent(db: &Connection, a: AccountId, id: &str, n: i64) -> Result<(MergeRoute, 
            AND s.sending_at IS NOT NULL AND s.step='direct_merge' AND q.state IN ('sending','unknown','waiting')",
         params![a,id,n],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?))).optional()?
         .ok_or(Error::Conflict("No sent merge attempt is awaiting evidence"))?;
-    Ok((decode(&raw.0)?, decode(&raw.1)?))
+    Ok((decode(&raw.0)?, decode::<StoredIntent>(&raw.1)?.parts().0))
 }
 
 fn readback(db: &Connection, a: AccountId, until: i64) -> Result<Option<(MergeReadback, i64)>> {

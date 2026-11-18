@@ -113,9 +113,28 @@ pub struct MergeObservation {
     pub number: NonZeroU64,
     pub credential_generation: i64,
     pub base: String,
+    #[serde(default)]
+    pub base_ref: Option<String>,
     pub head: String,
     pub observed_at_ms: i64,
     pub policy: MergePolicy,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+enum StoredIntent {
+    Bound {
+        method: MergeMethod,
+        base_ref: Option<String>,
+    },
+    Legacy(MergeMethod),
+}
+impl StoredIntent {
+    fn parts(self) -> (MergeMethod, Option<String>) {
+        match self {
+            Self::Bound { method, base_ref } => (method, base_ref),
+            Self::Legacy(method) => (method, None),
+        }
+    }
 }
 pub struct MergeSubmission<'a> {
     pub id: &'a str,
@@ -128,6 +147,7 @@ pub struct MergeClaim {
     claim: Claim,
     pub route: MergeRoute,
     pub method: MergeMethod,
+    pub expected_base_ref: Option<String>,
 }
 impl MergeClaim {
     pub fn operation_id(&self) -> &str {
@@ -195,11 +215,34 @@ fn hold(
     if observed.observed_at_ms > now || now.saturating_sub(observed.observed_at_ms) > 60_000 {
         return Some("merge_preflight_stale");
     }
-    if observed.head != r.head || observed.base != r.base {
+    if observed.head != r.head {
         return Some("expected_merge_revision_changed");
     }
     observed.policy.direct_hold(method)
 }
+fn target_branch_matches(
+    original_oid: &str,
+    original_ref: Option<&str>,
+    actual_oid: &str,
+    actual_ref: Option<&str>,
+) -> bool {
+    match (original_ref, actual_ref) {
+        (Some(expected), Some(actual)) => !expected.is_empty() && expected == actual,
+        _ => original_oid == actual_oid,
+    }
+}
+fn admission_hold(c: &MergeClaim, o: &MergeObservation, now: i64) -> Option<&'static str> {
+    hold(&c.route, c.method, o, now).or_else(|| {
+        (!target_branch_matches(
+            &c.route.base,
+            c.expected_base_ref.as_deref(),
+            &o.base,
+            o.base_ref.as_deref(),
+        ))
+        .then_some("merge_target_branch_changed")
+    })
+}
+
 fn eligible(db: &Connection, c: &MergeClaim, now: i64) -> Result<bool> {
     let op = &c.claim.operation;
     Ok(db.query_row(
@@ -271,6 +314,13 @@ impl Store {
                 None
             };
             let id = duplicate.as_deref().unwrap_or(s.id);
+            let payload=match queue::read_operation(tx,rev.account,id)? {
+                Some(op) if op.kind==ActionKind::Merge && decode::<StoredIntent>(&op.snapshot.payload)?.parts().0==s.method=>op.snapshot.payload,
+                _=>{
+                    let (_,header)=pr::revision_in(tx,rev.account,rev.pr,rev.id)?.ok_or(Error::NotFound)?;
+                    encode(&StoredIntent::Bound{method:s.method,base_ref:header.base_ref})?
+                }
+            };
             let pr_id:String=tx.query_row("SELECT d.pull_request_api_id FROM pull_request_details d JOIN items i ON i.id=d.item_id
                         JOIN repositories r ON r.id=i.repository_id JOIN github_access_profiles p ON p.account_id=i.account_id AND p.owner_scope=r.owner
                         WHERE i.id=? AND i.account_id=? AND i.repository_id=?",params![rev.pr,rev.account,rev.repository],|r|r.get(0))?;
@@ -281,7 +331,7 @@ impl Store {
                     id,
                     item: rev.pr,
                     kind: ActionKind::Merge,
-                    payload: &encode(&s.method)?,
+                    payload: &payload,
                     base: rev.head.as_str(),
                     anchor: &format!("pr-merge-v1/{}", rev.id),
                     projection: &format!("{} at {}", s.method.github_name(), rev.head.as_str()),
@@ -318,11 +368,13 @@ impl Store {
                 }
                 Err(error) => return Err(error),
             };
-            let method = decode(&claim.operation.snapshot.payload)?;
+            let (method, expected_base_ref) =
+                decode::<StoredIntent>(&claim.operation.snapshot.payload)?.parts();
             Ok(Some(MergeClaim {
                 claim,
                 route,
                 method,
+                expected_base_ref,
             }))
         })
     }
@@ -350,13 +402,14 @@ impl Store {
             let route = mutations::pr_route(tx, op.account, &op.id)?;
             if !eligible(tx, c, now)?
                 || route != c.route
-                || decode::<MergeMethod>(&op.snapshot.payload)? != c.method
+                || decode::<StoredIntent>(&op.snapshot.payload)?.parts()
+                    != (c.method, c.expected_base_ref.clone())
             {
                 return Err(Error::Conflict(
                     "The immutable merge target or attempt changed",
                 ));
             }
-            let reason = hold(&c.route, c.method, o, now);
+            let reason = admission_hold(c, o, now);
             tx.execute(
                 "INSERT INTO merge_attempts VALUES(?,?,?,?,?,?,?)",
                 params![
@@ -413,7 +466,8 @@ impl Store {
                         params![op.account,op.id,c.attempt()],|r|r.get(0))?;
             let observed: MergeObservation = decode(&raw)?;
             let current = pr::current_in(tx, op.account, op.item)?;
-            let Some((rev, _, _)) = current.filter(|(rev, _, _)| rev.id == c.route.revision_id) else {
+            let Some((rev, _, _))=current.filter(|(rev,header,_)| rev.head.as_str()==c.route.head
+                && target_branch_matches(&c.route.base,c.expected_base_ref.as_deref(),rev.base.as_str(),header.base_ref.as_deref())) else {
                 finish(
                     tx,
                     &c.claim,
@@ -423,7 +477,11 @@ impl Store {
                 )?;
                 return Ok(false);
             };
-            let veto = hold(&c.route, c.method, &observed, now)
+            if rev.id!=c.route.revision_id && rev.base.as_str()!=observed.base {
+                finish(tx,&c.claim,"queued","refresh_current_branch_policy",now)?;
+                return Ok(false)
+            }
+            let veto = admission_hold(c,&observed,now)
                 .or(cached(tx, &rev)?.and_then(|latest| latest.policy.direct_hold(c.method)));
             if let Some(reason) = veto {
                 finish(tx, &c.claim, "attention", reason, 0)?;
@@ -480,6 +538,7 @@ mod tests {
             pr_id: n(6),
             number: n(7),
             base: route.base.clone(),
+            base_ref: None,
             head: route.head.clone(),
             credential_generation: 2,
             observed_at_ms: 100,

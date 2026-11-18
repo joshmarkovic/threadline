@@ -73,7 +73,10 @@ fn revision(
             &oid('a'),
             &oid(head),
             Some(&oid('c')),
-            &PrHeader::default(),
+            &PrHeader {
+                base_ref: Some("main".into()),
+                ..Default::default()
+            },
             at,
         )
         .unwrap();
@@ -102,6 +105,7 @@ fn obs(c: &MergeClaim, at: i64) -> MergeObservation {
         number: r.number,
         credential_generation: r.credential_generation,
         base: r.base.clone(),
+        base_ref: c.expected_base_ref.clone(),
         head: r.head.clone(),
         observed_at_ms: at,
         policy: policy(),
@@ -360,4 +364,136 @@ fn it_015_renewed_original_credential_can_resume_confirmed_own_merge_without_cha
     );
     r.unwrap();
     assert!(s.confirmed_merge(a, &op).unwrap().unwrap().own_action);
+}
+
+#[test]
+fn it_014_base_branch_advance_uses_fresh_checks_but_an_explicit_retarget_requires_new_consent() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = Store::open_profile(dir.path()).unwrap();
+    let (a, r, _) = setup(&s);
+    let pr = revision(&s, a, r, 72, 'b', 20);
+    let op = submit(&s, &pr, MergeMethod::Squash);
+    let c = s.claim_merge(a, 30, 100).unwrap().unwrap();
+    assert_eq!(c.expected_base_ref.as_deref(), Some("main"));
+    let mut o = obs(&c, 32);
+    o.base = oid('e').as_str().into();
+    let next = s
+        .record_pr_revision(
+            a,
+            pr.pr,
+            &oid('e'),
+            &pr.head,
+            Some(&oid('c')),
+            &PrHeader {
+                base_ref: Some("main".into()),
+                ..Default::default()
+            },
+            31,
+        )
+        .unwrap();
+    assert_ne!(next.id, pr.id);
+    let MergeAdmission::Send(ticket) = s.authorize_merge(&c, &o, 32).unwrap() else {
+        panic!("freshly checked same branch")
+    };
+    assert!(s.start_merge_transport(&ticket, 33).unwrap());
+    let actual = merged(&c, 81);
+    s.confirm_merge(
+        a,
+        &op,
+        c.attempt(),
+        MergeProof::MutationResponse {
+            request_id: "direct-merge",
+        },
+        &actual,
+        35,
+    )
+    .unwrap();
+    assert!(s.confirmed_merge(a, &op).unwrap().unwrap().own_action);
+
+    let another = revision(&s, a, r, 73, 'd', 1100);
+    let _second = submit(&s, &another, MergeMethod::Squash);
+    let c = s.claim_merge(a, 1110, 1250).unwrap().unwrap();
+    let mut observed = obs(&c, 1111);
+    observed.base_ref = Some("release".into());
+    assert!(matches!(
+        s.authorize_merge(&c, &observed, 1111).unwrap(),
+        MergeAdmission::Held("merge_target_branch_changed")
+    ));
+}
+
+#[test]
+fn it_015_two_wal_connections_cannot_send_review_and_merge_concurrently() {
+    use std::sync::{Arc, Barrier};
+    use threadline_storage::reviews::*;
+    let dir = tempfile::tempdir().unwrap();
+    let s = Store::open_profile(dir.path()).unwrap();
+    let (a, r, _) = setup(&s);
+    let first = revision(&s, a, r, 72, 'b', 20);
+    let second = revision(&s, a, r, 73, 'e', 21);
+    let merge = submit(&s, &first, MergeMethod::Merge);
+    let review = s
+        .submit_review(
+            &second,
+            ReviewSubmission {
+                id: &s.new_operation_id().unwrap(),
+                intent: &ReviewIntent::Review(ReviewDraft {
+                    event: ReviewEvent::Comment,
+                    summary: "review".into(),
+                    comments: vec![],
+                }),
+                draft: None,
+                dependencies: &[],
+                submitted_at_ms: 25,
+            },
+        )
+        .unwrap();
+    let mc = s.claim_merge(a, 30, 300).unwrap().unwrap();
+    let mt = ticket(&s, &mc, 31);
+    let rc = s.claim_review(a, 30, 300).unwrap().unwrap();
+    let rr = &rc.route;
+    let o = ReviewObservation {
+        actor: rr.actor,
+        repository_id: rr.repository_id,
+        pr_id: rr.pr_id,
+        number: rr.number,
+        credential_generation: rr.credential_generation,
+        observed_at_ms: 31,
+        base: rr.base.clone(),
+        head: rr.head.clone(),
+        permission: Permission::Allowed,
+        pr_open: Some(true),
+        pr_author: Some(id(99)),
+        pending: RemotePending::Absent,
+        thread: None,
+    };
+    let ReviewAdmission::Send(rt) = s.authorize_review(&rc, &o, 31).unwrap() else {
+        panic!("expected review admission")
+    };
+    let other = Store::open_profile(dir.path()).unwrap();
+    let barrier = Arc::new(Barrier::new(2));
+    let b = barrier.clone();
+    let (m, v) = std::thread::scope(|scope| {
+        let worker = scope.spawn(move || {
+            b.wait();
+            other.start_review_transport(&rt, 32).unwrap()
+        });
+        barrier.wait();
+        (
+            s.start_merge_transport(&mt, 32).unwrap(),
+            worker.join().unwrap(),
+        )
+    });
+    assert_ne!(m, v);
+    let expected = if m {
+        [State::Sending, State::Queued]
+    } else {
+        [State::Queued, State::Sending]
+    };
+    assert_eq!(
+        [
+            s.operation(a, &merge).unwrap().unwrap().state,
+            s.operation(a, &review).unwrap().unwrap().state
+        ],
+        expected
+    );
 }
