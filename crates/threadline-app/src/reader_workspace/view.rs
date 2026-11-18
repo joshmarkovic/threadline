@@ -186,7 +186,8 @@ impl ReaderWorkspace {
         let mut layout = self.layout.clone();
         layout.focused_pane = pane;
         layout.panes[pane].active = Some(tab);
-        self.save_layout(layout, window, cx);
+        let target = layout.panes[pane].tabs[tab].clone();
+        self.save_layout_with_tab(layout, Some(target), true, None, window, cx);
         self.focus[pane].focus(window, cx);
     }
 

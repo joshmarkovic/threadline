@@ -215,6 +215,76 @@ struct ItemData {
     download: Option<IssueDownload>,
 }
 
+impl ItemData {
+    fn read(
+        store: &Store,
+        account: AccountId,
+        actor: Option<std::num::NonZeroU64>,
+        tab: &Tab,
+    ) -> Outcome<Self> {
+        let item = tab.item;
+        let (discussion, anchor_missing) = match tab
+            .view
+            .scroll_anchor
+            .as_deref()
+            .filter(|key| !key.starts_with("thread:"))
+        {
+            Some(anchor) => match store.discussion_page_at(account, item, anchor, PAGE) {
+                Ok(page) => (page, false),
+                Err(threadline_storage::Error::NotFound) => {
+                    (store.discussion_page(account, item, None, PAGE)?, true)
+                }
+                Err(error) => return Err(error),
+            },
+            None => (store.discussion_page(account, item, None, PAGE)?, false),
+        };
+        let timeline = store.timeline_page(account, item, None, PAGE)?;
+        let mut linked_items = HashMap::new();
+        for entry in &timeline.entries {
+            if let Some(link) = &entry.linked_item
+                && let Some(target) = store.resolve_linked_item(account, link)?
+            {
+                linked_items.insert(entry.remote_key.clone(), target);
+            }
+        }
+        let cached = store.item(account, item)?;
+        let pr = if cached
+            .as_ref()
+            .is_some_and(|item| item.kind == threadline_storage::ItemKind::PullRequest)
+        {
+            pr::PullRequestData::read(store, account, tab)?
+        } else {
+            None
+        };
+        let write_choices = if cached
+            .as_ref()
+            .is_some_and(|item| item.kind == threadline_storage::ItemKind::Issue)
+        {
+            Some(store.write_choices(
+                account,
+                cached.as_ref().expect("cached issue").locator.repository,
+            )?)
+        } else {
+            None
+        };
+        let editable_comments =
+            outbox::editable_comments(store, account, item, actor, &discussion)?;
+        Ok(ItemData {
+            item: cached,
+            pr,
+            metadata: store.reader_item_metadata(account, item)?,
+            anchor_missing,
+            discussion,
+            timeline,
+            linked_items,
+            projections: store.projections(account, item)?,
+            write_choices,
+            editable_comments,
+            download: store.issue_download(account, item)?,
+        })
+    }
+}
+
 struct ItemView {
     data: ItemData,
     pr: Option<Box<pr::PullRequestView>>,
@@ -1015,149 +1085,103 @@ impl ReaderWorkspace {
         }
     }
 
+    fn prepare_tab_read(&mut self, tab: &Tab) -> u64 {
+        self.tab_generation += 1;
+        self.pending_tabs
+            .insert(tab.id.clone(), self.tab_generation);
+        self.tab_generation
+    }
+
     fn load_tab(&mut self, tab: Tab, window: &mut Window, cx: &mut Context<Self>) {
         let Some(account) = self.account else { return };
-        let item = tab.item;
-        let id = tab.id.clone();
         let actor = self.actor;
-        self.tab_generation += 1;
-        let request = self.tab_generation;
-        self.pending_tabs.insert(id.clone(), request);
+        let request = self.prepare_tab_read(&tab);
+        let source = tab.clone();
         self.launch(
             window,
             cx,
-            move |store| {
-                let (discussion, anchor_missing) = match tab
-                    .view
-                    .scroll_anchor
-                    .as_deref()
-                    .filter(|key| !key.starts_with("thread:"))
-                {
-                    Some(anchor) => match store.discussion_page_at(account, item, anchor, PAGE) {
-                        Ok(page) => (page, false),
-                        Err(threadline_storage::Error::NotFound) => {
-                            (store.discussion_page(account, item, None, PAGE)?, true)
-                        }
-                        Err(error) => return Err(error),
-                    },
-                    None => (store.discussion_page(account, item, None, PAGE)?, false),
-                };
-                let timeline = store.timeline_page(account, item, None, PAGE)?;
-                let mut linked_items = HashMap::new();
-                for entry in &timeline.entries {
-                    if let Some(link) = &entry.linked_item
-                        && let Some(target) = store.resolve_linked_item(account, link)?
-                    {
-                        linked_items.insert(entry.remote_key.clone(), target);
-                    }
-                }
-                let cached = store.item(account, item)?;
-                let pr = if cached
-                    .as_ref()
-                    .is_some_and(|item| item.kind == threadline_storage::ItemKind::PullRequest)
-                {
-                    pr::PullRequestData::read(store, account, &tab)?
-                } else {
-                    None
-                };
-                let write_choices = if cached
-                    .as_ref()
-                    .is_some_and(|item| item.kind == threadline_storage::ItemKind::Issue)
-                {
-                    Some(store.write_choices(
-                        account,
-                        cached.as_ref().expect("cached issue").locator.repository,
-                    )?)
-                } else {
-                    None
-                };
-                let editable_comments =
-                    outbox::editable_comments(store, account, item, actor, &discussion)?;
-                Ok(ItemData {
-                    item: cached,
-                    pr,
-                    metadata: store.reader_item_metadata(account, item)?,
-                    anchor_missing,
-                    discussion,
-                    timeline,
-                    linked_items,
-                    projections: store.projections(account, item)?,
-                    write_choices,
-                    editable_comments,
-                    download: store.issue_download(account, item)?,
-                })
-            },
-            move |this, result, window, cx| {
-                if this.pending_tabs.get(&id) != Some(&request) {
-                    return;
-                }
-                this.pending_tabs.remove(&id);
-                let Some(tab) = this
-                    .layout
-                    .panes
-                    .iter()
-                    .flat_map(|pane| &pane.tabs)
-                    .find(|tab| tab.id == id && tab.item == item)
-                    .cloned()
-                else {
-                    return;
-                };
-                match result {
-                    Ok(mut data) => {
-                        let mut old = this.tab_views.remove(&id);
-                        let scroll = old
-                            .as_ref()
-                            .map_or_else(ScrollHandle::new, |view| view.scroll.clone());
-                        if old.is_none() && tab.view.scroll_anchor.is_some() && !data.anchor_missing
-                        {
-                            let discussion = 5
-                                + usize::from(data.metadata.is_some())
-                                + usize::from(data.discussion.state.error.is_some());
-                            scroll.scroll_to_item(discussion);
-                        } else if old.is_none() && tab.view.scroll_offset > 0 {
-                            let handle = scroll.clone();
-                            window.on_next_frame(move |_, _| {
-                                handle
-                                    .set_offset(point(px(0.), px(-(tab.view.scroll_offset as f32))))
-                            });
-                        }
-                        if let Some(set) = data.pr.as_ref().and_then(|pr| pr.references.as_ref()) {
-                            for current in this
-                                .layout
-                                .panes
-                                .iter_mut()
-                                .flat_map(|pane| &mut pane.tabs)
-                                .filter(|tab| tab.item == item)
-                            {
-                                if let Some(context) = current.view.context.as_mut() {
-                                    pr::refresh_context(set, context);
-                                }
-                            }
-                        }
-                        let prior = old.as_mut().and_then(|view| view.pr.take().map(|pr| *pr));
-                        let pr = data.pr.take().map(|data| {
-                            Box::new(pr::PullRequestView::new(data, &tab, prior, window, cx))
-                        });
-                        let (body, notes) = ItemView::use_cached_text(&mut data, old, cx);
-                        this.tab_views.insert(
-                            id,
-                            ItemView {
-                                data,
-                                pr,
-                                body,
-                                notes,
-                                scroll,
-                            },
-                        );
-                        this.trim_inactive_views();
-                        this.restore_review(tab, window, cx);
-                        this.resume_visible_pr_downloads(window, cx);
-                    }
-                    Err(_) => this.status = Some("The cached item could not be loaded."),
-                }
-                this.maybe_start_sync();
-            },
+            move |store| ItemData::read(store, account, actor, &source),
+            move |this, result, window, cx| this.apply_tab_read(&tab, request, result, window, cx),
         );
+    }
+
+    fn apply_tab_read(
+        &mut self,
+        requested: &Tab,
+        request: u64,
+        result: Outcome<ItemData>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let id = requested.id.clone();
+        let item = requested.item;
+        if self.pending_tabs.get(&id) != Some(&request) {
+            return;
+        }
+        self.pending_tabs.remove(&id);
+        let Some(tab) = self
+            .layout
+            .panes
+            .iter()
+            .flat_map(|pane| &pane.tabs)
+            .find(|tab| tab.id == id && tab.item == item)
+            .cloned()
+        else {
+            return;
+        };
+        match result {
+            Ok(mut data) => {
+                let mut old = self.tab_views.remove(&id);
+                let scroll = old
+                    .as_ref()
+                    .map_or_else(ScrollHandle::new, |view| view.scroll.clone());
+                if old.is_none() && tab.view.scroll_anchor.is_some() && !data.anchor_missing {
+                    let discussion = 5
+                        + usize::from(data.metadata.is_some())
+                        + usize::from(data.discussion.state.error.is_some());
+                    scroll.scroll_to_item(discussion);
+                } else if old.is_none() && tab.view.scroll_offset > 0 {
+                    let handle = scroll.clone();
+                    window.on_next_frame(move |_, _| {
+                        handle.set_offset(point(px(0.), px(-(tab.view.scroll_offset as f32))))
+                    });
+                }
+                if let Some(set) = data.pr.as_ref().and_then(|pr| pr.references.as_ref()) {
+                    for current in self
+                        .layout
+                        .panes
+                        .iter_mut()
+                        .flat_map(|pane| &mut pane.tabs)
+                        .filter(|tab| tab.item == item)
+                    {
+                        if let Some(context) = current.view.context.as_mut() {
+                            pr::refresh_context(set, context);
+                        }
+                    }
+                }
+                let prior = old.as_mut().and_then(|view| view.pr.take().map(|pr| *pr));
+                let pr = data
+                    .pr
+                    .take()
+                    .map(|data| Box::new(pr::PullRequestView::new(data, &tab, prior, window, cx)));
+                let (body, notes) = ItemView::use_cached_text(&mut data, old, cx);
+                self.tab_views.insert(
+                    id,
+                    ItemView {
+                        data,
+                        pr,
+                        body,
+                        notes,
+                        scroll,
+                    },
+                );
+                self.trim_inactive_views();
+                self.restore_review(tab, window, cx);
+                self.resume_visible_pr_downloads(window, cx);
+            }
+            Err(_) => self.status = Some("The cached item could not be loaded."),
+        }
+        self.maybe_start_sync();
     }
 
     fn capture_scroll(&mut self) {
@@ -1180,6 +1204,18 @@ impl ReaderWorkspace {
     }
 
     fn save_layout(&mut self, layout: Workspace, window: &mut Window, cx: &mut Context<Self>) {
+        self.save_layout_with_tab(layout, None, false, None, window, cx);
+    }
+
+    fn save_layout_with_tab(
+        &mut self,
+        layout: Workspace,
+        target: Option<Tab>,
+        show_cached: bool,
+        recent: Option<ItemId>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(account) = self.account else { return };
         if self.layout_busy {
             return;
@@ -1187,22 +1223,50 @@ impl ReaderWorkspace {
         self.layout_busy = true;
         let state = layout.clone();
         let maximized = self.maximized.then_some(layout.focused_pane);
+        let optimistic = show_cached
+            && target.as_ref().is_some_and(|tab| {
+                !self.pending_tabs.contains_key(&tab.id)
+                    && self
+                        .tab_views
+                        .get(&tab.id)
+                        .is_some_and(|view| view.data.item.is_some())
+            });
+        let previous = optimistic.then(|| std::mem::replace(&mut self.layout, layout.clone()));
+        let preload = target
+            .filter(|tab| {
+                !self.tab_views.contains_key(&tab.id) && !self.pending_tabs.contains_key(&tab.id)
+            })
+            .map(|tab| {
+                let request = self.prepare_tab_read(&tab);
+                (tab, request)
+            });
+        let pending = preload
+            .as_ref()
+            .map(|(tab, request)| (tab.id.clone(), *request));
+        let actor = self.actor;
         self.launch(
             window,
             cx,
-            move |store| store.save_reader_layout(account, &state, maximized),
+            move |store| {
+                store.save_reader_layout(account, &state, maximized)?;
+                Ok(preload.map(|(tab, request)| {
+                    let result = ItemData::read(store, account, actor, &tab);
+                    (tab, request, result)
+                }))
+            },
             move |this, result, window, cx| {
                 this.layout_busy = false;
                 let editor_to_focus = this.editor_to_focus.take();
                 match result {
-                    Ok(()) => {
+                    Ok(preloaded) => {
                         let reloading = layout
                             .panes
                             .iter()
                             .filter_map(|pane| pane.active.and_then(|index| pane.tabs.get(index)))
                             .filter(|tab| {
-                                let previous = this
-                                    .layout
+                                let previous = previous
+                                    .as_ref()
+                                    .unwrap_or(&this.layout)
                                     .panes
                                     .iter()
                                     .flat_map(|pane| &pane.tabs)
@@ -1246,6 +1310,15 @@ impl ReaderWorkspace {
                             this.load_tab(tab, window, cx);
                         }
                         this.load_visible(window, cx);
+                        if let Some((tab, request, result)) = preloaded {
+                            this.apply_tab_read(&tab, request, result, window, cx);
+                        }
+                        if let Some(item) = recent {
+                            let store = Arc::clone(&this.store);
+                            this.runtime.spawn_blocking(move || {
+                                store.record_recent_item(account, item, now_ms())
+                            });
+                        }
                         this.restore_active_draft(window, cx);
                         this.finish_notification_item(window, cx);
                         if let Some(editor) = editor_to_focus.and_then(|id| this.drafts.get(&id)) {
@@ -1254,6 +1327,15 @@ impl ReaderWorkspace {
                         }
                     }
                     Err(_) => {
+                        if let Some(previous) = previous {
+                            this.layout = previous;
+                            this.focus_active(window);
+                        }
+                        if let Some((tab, request)) = pending
+                            && this.pending_tabs.get(&tab) == Some(&request)
+                        {
+                            this.pending_tabs.remove(&tab);
+                        }
                         this.status =
                             Some("Workspace changes could not be saved. Your tabs are still open.")
                     }
@@ -1312,22 +1394,26 @@ impl ReaderWorkspace {
             pane.active = Some(pane.tabs.len() - 1);
             pane.tabs.last_mut().expect("just added a tab")
         };
+        let preserve_view = anchor.is_none();
         if let Some(anchor) = anchor {
             tab.view.scroll_anchor = Some(anchor);
             self.tab_views.remove(&tab.id);
         }
+        let target = tab.clone();
         layout.focused_pane = index;
         self.surface = Surface::Browse;
         if let Some(previous) = current.filter(|previous| *previous != item) {
             push_history(&mut self.back, previous);
             self.forward.clear();
         }
-        if let Some(account) = self.account {
-            let store = Arc::clone(&self.store);
-            self.runtime
-                .spawn_blocking(move || store.record_recent_item(account, item, now_ms()));
-        }
-        self.save_layout(layout, window, cx);
+        self.save_layout_with_tab(
+            layout,
+            Some(target),
+            existing.is_some() && preserve_view,
+            Some(item),
+            window,
+            cx,
+        );
     }
 
     fn active_tab(&self) -> Option<&Tab> {

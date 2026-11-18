@@ -10,6 +10,95 @@ use threadline_storage::{
 };
 
 #[gpui_kit::test]
+fn cached_navigation_shows_an_existing_tab_immediately_and_saves_both_open_and_switch(
+    cx: &mut TestAppContext,
+) {
+    let setup = ReaderHarness::seeded();
+    let first = Tab {
+        id: "cached-navigation-original".into(),
+        item: setup.fixture.long_discussion,
+        view: TabView::default(),
+    };
+    let next = setup.fixture.reviewed_pr;
+    setup.one_pane(&first);
+    let (window, reader) = setup.open(cx);
+    let before = first.item;
+    cx.update_window(window, |_, window, cx| {
+        reader.update(cx, |reader, cx| {
+            assert!(
+                !reader.tab_views.values().any(|view| view
+                    .data
+                    .item
+                    .as_ref()
+                    .is_some_and(|item| item.id == next))
+            );
+            reader.open(next, None, false, false, window, cx);
+            assert!(reader.layout_busy);
+        });
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let reader = reader.read(cx);
+            reader.active_tab().is_some_and(|tab| {
+                tab.item == next
+                    && reader.tab_views.get(&tab.id).is_some_and(|view| {
+                        view.data.item.as_ref().is_some_and(|item| item.id == next)
+                    })
+            }) && !reader.layout_busy
+        })
+    });
+    let account = setup.fixture.account;
+    let reopened = setup.store.reader_layout(account).unwrap().unwrap().0;
+    assert_eq!(
+        reopened.panes[0].tabs[reopened.panes[0].active.unwrap()].item,
+        next
+    );
+    cx.update_window(window, |_, window, cx| {
+        window.simulate_next_frame(cx);
+        window.render_frame(cx);
+        window.click("reader-tab-0-0", cx);
+        let visible = reader.read(cx);
+        assert!(visible.layout_busy);
+        assert_eq!(visible.active_tab().unwrap().item, before);
+    })
+    .unwrap();
+    until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+    let reopened = setup.store.reader_layout(account).unwrap().unwrap().0;
+    assert_eq!(
+        reopened.panes[0].tabs[reopened.panes[0].active.unwrap()].item,
+        before
+    );
+
+    cx.update_window(window, |_, window, cx| {
+        reader.update(cx, |reader, cx| {
+            let mut invalid = reader.layout.clone();
+            invalid.panes[0].active = Some(1);
+            invalid.panes[0].tabs.push(Tab {
+                id: "missing-cache".into(),
+                item: ItemId(i64::MAX),
+                view: TabView::default(),
+            });
+            let target = invalid.panes[0].tabs[1].clone();
+            reader.save_layout_with_tab(invalid, Some(target), true, None, window, cx);
+            assert_eq!(reader.active_tab().unwrap().item, next);
+        });
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let reader = reader.read(cx);
+            !reader.layout_busy && reader.active_tab().is_some_and(|tab| tab.item == before)
+        })
+    });
+    let reopened = setup.store.reader_layout(account).unwrap().unwrap().0;
+    assert_eq!(
+        reopened.panes[0].tabs[reopened.panes[0].active.unwrap()].item,
+        before
+    );
+}
+
+#[gpui_kit::test]
 fn cached_offline_account_adopts_worker_snapshot_published_before_hydration(
     cx: &mut TestAppContext,
 ) {
