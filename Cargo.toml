@@ -3,6 +3,7 @@ members = [
     "crates/threadline-app",
     "crates/threadline-core",
     "crates/threadline-platform",
+    "crates/threadline-storage",
     "xtask",
 ]
 resolver = "3"

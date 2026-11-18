@@ -22,3 +22,13 @@ cargo xtask test e2e --suite smoke
 ```
 
 The native smoke command needs an interactive desktop with the driver prerequisites for the host. Use `--report-dir` to choose where the runner writes its machine-readable results. See the [testing contract](docs/spec/TESTING_PLAN.md) for the full runner, artifact, and live commands.
+
+## Generate a storage fixture
+
+Use an unused database path in an existing directory. The generator fills a temporary database and publishes it at that path when it finishes.
+
+```sh
+cargo run --locked -p threadline-storage --example generate_fixture -- section16.sqlite section16 12345
+```
+
+Use `small` for a fast fixture. The `section16` fixture includes 50,000 issue and PR summaries, 250,000 comments, a multi-file diff with a review draft, branching history, two panes with twenty tabs, and 1,000 mixed Outbox entries. Runner results for these storage cases include their fixture revision.

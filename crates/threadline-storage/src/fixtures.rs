@@ -1,0 +1,317 @@
+use rusqlite::params;
+
+use crate::{
+    AccountId, Error, ItemId, RepositoryId, Result, Store,
+    queue::{
+        DraftContent, DraftKind, Pane, PrContext, ReferenceCandidate, Tab, TabView, Workspace,
+        load_benchmark_outbox,
+    },
+    resources::{
+        CommitOid, ComparisonFile, ComparisonKey, ComparisonMode, GraphCommit, GraphRef,
+        ResourceFamily, ResourceKey, ResourceTarget, ensure_resource,
+    },
+};
+
+const FIXTURE_TIME_MS: i64 = 1_700_000_000_000;
+const BATCH: usize = 250;
+pub const REVISION: &str = include_str!("../../../fixtures/storage-revision.txt").trim_ascii();
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Scale {
+    Small,
+    Section16,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Fixture {
+    pub revision: &'static str,
+    pub account: AccountId,
+    pub repository: RepositoryId,
+    pub long_discussion: ItemId,
+    pub reviewed_pr: ItemId,
+    pub comparison: ComparisonKey,
+    pub head: CommitOid,
+    pub item_count: usize,
+    pub comment_count: usize,
+    pub open_tabs: usize,
+    pub outbox_count: usize,
+}
+
+impl Scale {
+    fn workload(self) -> (usize, usize, usize, usize) {
+        match self {
+            Self::Small => (30, 3, 6, 12),
+            Self::Section16 => (50_000, 5, 40, 400),
+        }
+    }
+}
+
+/// Populate a fresh synthetic database. Fixture writes use bounded transactions.
+/// Callers own the temporary database and can remove it if generation fails.
+pub fn populate(store: &Store, seed: u64, scale: Scale) -> Result<Fixture> {
+    let empty: bool = store.read(|db| {
+        Ok(
+            db.query_row("SELECT NOT EXISTS(SELECT 1 FROM accounts)", [], |r| {
+                r.get(0)
+            })?,
+        )
+    })?;
+    if !empty {
+        return Err(Error::Conflict(
+            "fixture generation needs a new empty profile",
+        ));
+    }
+
+    let account = store.ensure_account("fixtures.invalid", seed.max(1))?;
+    let repository = store.ensure_repository(account, 1, "fixture", "relay")?;
+    let (item_count, comments_per_item, files, history_count) = scale.workload();
+    let long_extra = if scale == Scale::Section16 { 5_000 } else { 10 };
+    let root_oid = fixture_oid(seed, 0)?;
+    let head = fixture_oid(seed, history_count - 1)?;
+    let mut tabs = Vec::with_capacity(20);
+    let mut issue_targets = Vec::with_capacity(30);
+    let mut reviewed_pr = None;
+    let mut alternate_pr = None;
+    let mut long_discussion = None;
+
+    for first in (0..item_count).step_by(BATCH) {
+        let batch = store.write(|tx| {
+            let mut items = tx.prepare_cached(
+                "INSERT INTO items(account_id,repository_id,number,kind,issue_api_id,title,title_at,body,body_at,closed,closed_at)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?7,?9,?7) RETURNING id",
+            )?;
+            let mut prs = tx.prepare_cached(
+                "INSERT INTO pull_request_details(item_id,account_id,pull_request_api_id,merged,merged_at,base_oid,base_oid_at,head_oid,head_oid_at)
+                 VALUES (?1,?2,?3,?4,?5,?6,?5,?7,?5)",
+            )?;
+            let mut put_comment = tx.prepare_cached(
+                "INSERT INTO cached_resource_records(resource_id,record_key,body) VALUES (?1,?2,?3)",
+            )?;
+            let mut initial_items = Vec::new();
+            for index in first..(first + BATCH).min(item_count) {
+                let number = index + 1;
+                let is_pr = number % 3 == 0;
+                let (kind, title, body) = if is_pr {
+                    ("pull_request",format!("Improve relay workflow {number}"),"Resolves #1 and relates to #2 and #4. **Fixture review**.")
+                } else {
+                    ("issue",format!("Investigate relay behavior {number}"),"A cached fixture for offline **discussion** and search.")
+                };
+                let item = items.query_row(
+                    params![account.0,repository.0,i64::try_from(number).map_err(|_| Error::InvalidInput("fixture item limit exceeded"))?,
+                        kind,number.to_string(),title,FIXTURE_TIME_MS,body,number % 4 == 0],
+                    |row| row.get::<_,i64>(0).map(ItemId),
+                )?;
+                if is_pr {
+                    prs.execute(params![item.0,account.0,(60_000 + number).to_string(),number % 12 == 0,FIXTURE_TIME_MS,root_oid.as_str(),head.as_str()])?;
+                }
+
+                let key = ResourceKey { account, target: ResourceTarget::Item(item), family: ResourceFamily::Comments };
+                let resource = ensure_resource(tx,key)?;
+                tx.execute(
+                    "UPDATE cached_resources SET coverage=2,last_page_at_ms=?2,last_fetch_at_ms=?2,last_validation_at_ms=?2,etag=?3 WHERE id=?1",
+                    params![resource,FIXTURE_TIME_MS,format!("\"fixture-{seed}-{number}\"")],
+                )?;
+                let count = match index {
+                    0 => comments_per_item + long_extra,
+                    1.. if index <= long_extra => comments_per_item - 1,
+                    _ => comments_per_item,
+                };
+                for comment in 0..count {
+                    put_comment.execute(params![resource,format!("comment-{comment:06}"),
+                        format!("Synthetic comment {comment} on item {number}. Seed {seed}. **Offline review**.")])?;
+                }
+                if number <= 30 {
+                    initial_items.push((item,is_pr));
+                }
+            }
+            Ok(initial_items)
+        })?;
+        for (item, is_pr) in batch {
+            if is_pr {
+                if reviewed_pr.is_none() {
+                    reviewed_pr = Some(item);
+                } else {
+                    alternate_pr.get_or_insert(item);
+                }
+            } else {
+                long_discussion.get_or_insert(item);
+                issue_targets.push(item.0);
+            }
+            if tabs.len() < 20 {
+                tabs.push(Tab {
+                    id: format!("fixture-tab-{}", tabs.len()),
+                    item,
+                    view: TabView::default(),
+                });
+            }
+        }
+    }
+
+    let comparison = ComparisonKey {
+        repository,
+        base: root_oid,
+        head: head.clone(),
+        mode: ComparisonMode::MergeBase,
+        ignore_whitespace: false,
+        context_lines: 3,
+    };
+    let diffs: Vec<_> = (0..files)
+        .map(|file| {
+            let lines = if scale == Scale::Section16 { 200 } else { 10 };
+            let mut patch = format!("@@ -1,{lines} +1,{lines} @@\n-previous\n+changed\n");
+            for line in 2..=lines {
+                use std::fmt::Write as _;
+                writeln!(patch, " shared relay line {line}").expect("write to String");
+            }
+            ComparisonFile {
+                path: format!("src/relay_{file:02}.rs"),
+                previous_path: None,
+                patch: Some(patch),
+            }
+        })
+        .collect();
+    store.save_comparison(account, &comparison, &diffs)?;
+    for first in (0..history_count).step_by(BATCH) {
+        let commits = (first..(first + BATCH).min(history_count))
+            .map(|index| {
+                let parent_indices = match index {
+                    0 => Vec::new(),
+                    1 => vec![0],
+                    n if n % 7 == 0 => vec![n - 1, n - 2],
+                    n if n % 7 == 6 => vec![n - 2],
+                    n => vec![n - 1],
+                };
+                Ok(GraphCommit {
+                    oid: fixture_oid(seed, index)?,
+                    title: format!("Relay commit {index}"),
+                    committed_at_ms: FIXTURE_TIME_MS + i64::try_from(index).unwrap_or_default(),
+                    parents: parent_indices
+                        .into_iter()
+                        .map(|parent| fixture_oid(seed, parent))
+                        .collect::<Result<_>>()?,
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        store.save_commits(account, repository, &commits)?;
+    }
+    for (name, index) in [
+        ("refs/heads/main", history_count - 1),
+        ("refs/heads/review", history_count - 2),
+    ] {
+        store.save_graph_ref(
+            account,
+            repository,
+            &GraphRef {
+                name: name.into(),
+                target: Some(fixture_oid(seed, index)?),
+                observed_at_ms: FIXTURE_TIME_MS,
+            },
+        )?;
+    }
+
+    let reviewed_pr = reviewed_pr.ok_or(Error::Conflict("fixture has no review target"))?;
+    store.create_draft(
+        account,
+        "fixture-review-draft",
+        reviewed_pr,
+        DraftKind::Review,
+        &DraftContent {
+            body: "Keep the previous revision visible.".into(),
+            base: head.as_str().into(),
+            anchor: "src/relay_00.rs:new:19".into(),
+        },
+    )?;
+    let discussion = long_discussion.ok_or(Error::Conflict("fixture has no discussion"))?;
+    let revision = "fixture-review-body-1";
+    let provenance = "fixture-pr-body";
+    let candidates: Vec<_> = [1, 2, 4]
+        .into_iter()
+        .zip([9, 23, 30])
+        .zip(&issue_targets)
+        .map(|((number, position), item)| ReferenceCandidate {
+            position,
+            raw: format!("#{number}"),
+            provenance: provenance.into(),
+            verified: Some((ItemId(*item), FIXTURE_TIME_MS)),
+        })
+        .collect();
+    store.replace_pr_references(account, reviewed_pr, None, revision, &candidates)?;
+    let open_tabs = tabs.len();
+    let pr_tab = tabs
+        .iter()
+        .position(|tab| tab.item == reviewed_pr)
+        .ok_or(Error::Conflict("fixture has no review tab"))?;
+    tabs[pr_tab].view = TabView {
+        draft: Some("fixture-review-draft".into()),
+        navigation: Some("changes".into()),
+        context: Some(PrContext {
+            selected_issue: Some(discussion),
+            body_revision: revision.into(),
+            provenance: provenance.into(),
+            ratio: 0.33,
+        }),
+        ..TabView::default()
+    };
+    tabs.swap(pr_tab, open_tabs / 2);
+    let alternate = alternate_pr.ok_or(Error::Conflict("fixture has no alternate PR"))?;
+    let alternate_revision = "fixture-alternate-body-1";
+    store.replace_pr_references(account, alternate, None, alternate_revision, &candidates)?;
+    let alternate_tab = tabs
+        .iter()
+        .position(|tab| tab.item == alternate)
+        .ok_or(Error::Conflict("fixture has no alternate PR tab"))?;
+    tabs[alternate_tab].view = TabView {
+        navigation: Some("discussion".into()),
+        context: Some(PrContext {
+            selected_issue: Some(ItemId(issue_targets[1])),
+            body_revision: alternate_revision.into(),
+            provenance: provenance.into(),
+            ratio: 0.23,
+        }),
+        ..TabView::default()
+    };
+    tabs.swap(alternate_tab, open_tabs / 2 + 1);
+    let right = tabs.split_off(open_tabs / 2);
+    store.save_workspace(
+        account,
+        &Workspace {
+            focused_pane: 1,
+            proportions: vec![0.5, 0.5],
+            panes: vec![
+                Pane {
+                    active: Some(0),
+                    tabs,
+                },
+                Pane {
+                    active: Some(0),
+                    tabs: right,
+                },
+            ],
+        },
+    )?;
+
+    let outbox_count = if scale == Scale::Section16 {
+        store.write(|tx| load_benchmark_outbox(tx, account.0, &issue_targets, seed))?;
+        1_000
+    } else {
+        0
+    };
+
+    Ok(Fixture {
+        revision: REVISION,
+        account,
+        repository,
+        long_discussion: discussion,
+        reviewed_pr,
+        comparison,
+        head,
+        item_count,
+        comment_count: item_count * comments_per_item,
+        open_tabs,
+        outbox_count,
+    })
+}
+
+fn fixture_oid(seed: u64, index: usize) -> Result<CommitOid> {
+    CommitOid::parse(&format!("{seed:016x}{index:024x}"))
+}
