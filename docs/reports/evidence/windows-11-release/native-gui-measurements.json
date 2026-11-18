@@ -1,0 +1,151 @@
+{
+  "status": "Fail",
+  "detail": "One or more Windows performance budgets were exceeded.",
+  "artifact_manifest": {
+    "purpose": "Development executable for Windows reference desktop tests",
+    "build": "release with e2e feature",
+    "source_revision": "fa972abb86fbe726dc602b3c356b53e2afdad00e",
+    "cargo_lock_sha256": "756bd3b3f162735b175102c7f1bb8ac1262e56a7c6f869855b6be4f44b905a06",
+    "workflow_run": "44324237981",
+    "target": "x86_64-pc-windows-msvc",
+    "executable_sha256": "6f53f75802e544b4946fa0299da7810419925803b96c5b02e77e7c1907dfe3ef",
+    "executable_bytes": 26798592
+  },
+  "driver_revision": "803aefcccc6c8f785a6fbab970cfeaffdf5ae8cc",
+  "driver_sha256": {
+    "windows-smoke.ps1": "077d10207bdb3583bcb4ea96d3dea936ac0690718ce129d4b6691b73d1faacdc",
+    "ThreadlineWinInput.cs": "99681ad035da538f3985f49029a53661493b256e86fef754fc28610241bfa11c"
+  },
+  "source_files_sha256": {
+    "measurements.json": "c4b134a6a1f7c2048f6e6655fcbebbd4de68b65c0266c8f0e27d743d3be171af",
+    "ui-observation.json": "a1b07aedbfed1d8b4685ad1691d76b092bbb15adb8846074e70f91d38ecb5f23"
+  },
+  "source_manifest_sha256": "71c371ef79a8f90942862c8855030f34056b2963876cd19d1659cfb7493ea093",
+  "fixture_revision": "s01-feasibility-v1",
+  "seed": 12345,
+  "windows_product": "Microsoft Windows 11 Enterprise",
+  "architecture": "AMD64",
+  "os_version": "10.0.22631",
+  "machine": {
+    "manufacturer": "Microsoft Corporation",
+    "model": "Virtual Machine",
+    "ram_bytes": 34358562816,
+    "processors": [
+      {
+        "Name": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+        "NumberOfCores": 4,
+        "NumberOfLogicalProcessors": 8
+      }
+    ],
+    "graphics": [
+      {
+        "Name": "Microsoft Hyper-V Video",
+        "DriverVersion": "10.0.22621.1"
+      },
+      {
+        "Name": "Microsoft Remote Display Adapter",
+        "DriverVersion": "10.0.22621.7649"
+      }
+    ],
+    "storage": [
+      {
+        "Model": "Microsoft Virtual Disk",
+        "InterfaceType": "SCSI",
+        "MediaType": "Fixed hard disk media"
+      }
+    ],
+    "display": {
+      "width": 3840,
+      "height": 2160
+    }
+  },
+  "window_dpi": 144,
+  "gpui_scale_factor": 1.5,
+  "renderer_adapter": {
+    "is_software_emulated": true,
+    "device_name": "Microsoft Basic Render Driver",
+    "driver_name": "Unknown Vendor (ID: 0x1414)",
+    "driver_info": "10.0.22621.7649"
+  },
+  "wheel_input": {
+    "diff": {
+      "calibrated": true,
+      "accepted_down": 25,
+      "accepted_up": 25,
+      "physical_target_readbacks": 50,
+      "repositioned_strokes": 1,
+      "interrupted_stroke": null,
+      "first_missed_readback": null,
+      "mean_gap_ms": 101.76,
+      "longest_gap_ms": 347.32
+    },
+    "markdown_copy": {
+      "calibrated": true,
+      "accepted_down": 25,
+      "accepted_up": 25,
+      "physical_target_readbacks": 50,
+      "repositioned_strokes": 0,
+      "interrupted_stroke": null,
+      "first_missed_readback": null,
+      "mean_gap_ms": 114.81,
+      "longest_gap_ms": 250
+    }
+  },
+  "budgets": {
+    "idle_working_set_bytes": {
+      "value": 103739392,
+      "limit": 209715200,
+      "status": "Pass"
+    },
+    "peak_working_set_bytes": {
+      "value": 105865216,
+      "limit": 471859200,
+      "status": "Pass"
+    },
+    "gpu_memory_bytes": {
+      "value": 0,
+      "sample_count": 2,
+      "limit": 268435456,
+      "status": "Pass"
+    },
+    "package_bytes": {
+      "value": null,
+      "limit": 52428800,
+      "status": "Blocked"
+    },
+    "cold_start_ms": {
+      "value": 2020.9,
+      "limit": 3000,
+      "status": "Pass"
+    },
+    "scroll_frame_p95_ms": {
+      "value": 138.6821,
+      "limit": 20,
+      "status": "Fail",
+      "surfaces": {
+        "large_diff": {
+          "value": 138.6821,
+          "sample_count": 39,
+          "limit": 20,
+          "status": "Fail"
+        },
+        "markdown_discussion": {
+          "value": 131.2661,
+          "sample_count": 44,
+          "limit": 20,
+          "status": "Fail"
+        }
+      }
+    }
+  },
+  "gpu_breakdown": {
+    "idle": {
+      "dedicated_bytes": 0,
+      "shared_bytes": 0
+    },
+    "after_scroll": {
+      "dedicated_bytes": 0,
+      "shared_bytes": 0
+    }
+  }
+}

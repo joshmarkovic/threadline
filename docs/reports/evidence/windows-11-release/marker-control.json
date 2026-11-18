@@ -1,0 +1,191 @@
+{
+  "build": {
+    "source_revision": "803aefcccc6c8f785a6fbab970cfeaffdf5ae8cc",
+    "diagnostic_patch_sha256": "ff2f29b5f2b8e53a3b2717511571d10d50849aa98489dd786fe69938525a51d6",
+    "binary_sha256": "5f53e73788c87404c8856a8344609e34775d03d92f7fa07ef7b21ec6f28ad6a2",
+    "size_bytes": 26845696,
+    "target": "x86_64-pc-windows-msvc",
+    "compiler": "rustc 1.98.1",
+    "windows_sdk": "10.0.26100",
+    "application_opt_level": 3,
+    "cargo_feature": "e2e",
+    "gpui_windows_build": "Cached cross-build with debug assertions and runtime shader compilation",
+    "gpui_windows_sha256": "cc384d54aa744d69329400b471a1a2528cccd65194973db89b760286e37ecb60"
+  },
+  "driver_revision": "803aefcccc6c8f785a6fbab970cfeaffdf5ae8cc",
+  "driver_sha256": {
+    "windows-smoke.ps1": "077d10207bdb3583bcb4ea96d3dea936ac0690718ce129d4b6691b73d1faacdc",
+    "ThreadlineWinInput.cs": "99681ad035da538f3985f49029a53661493b256e86fef754fc28610241bfa11c"
+  },
+  "seed": 12345,
+  "window_dpi": 144,
+  "gpui_scale_factor": 1.5,
+  "display": {
+    "width": 3840,
+    "height": 2160
+  },
+  "renderer_adapter": {
+    "is_software_emulated": true,
+    "device_name": "Microsoft Basic Render Driver",
+    "driver_name": "Unknown Vendor (ID: 0x1414)",
+    "driver_info": "10.0.22621.7649"
+  },
+  "scenes": {
+    "markers": {
+      "fixture_revision": "s01-diagnostic-wheel-markers-v1",
+      "THREADLINE_TEST_WHEEL_MARKERS": "1",
+      "wheel_input": {
+        "diff": {
+          "calibrated": true,
+          "accepted_down": 25,
+          "accepted_up": 25,
+          "physical_target_readbacks": 50,
+          "repositioned_strokes": 1,
+          "interrupted_stroke": null,
+          "first_missed_readback": null,
+          "mean_gap_ms": 55.17,
+          "longest_gap_ms": 122.33
+        },
+        "markdown_copy": {
+          "calibrated": true,
+          "accepted_down": 25,
+          "accepted_up": 25,
+          "physical_target_readbacks": 50,
+          "repositioned_strokes": 0,
+          "interrupted_stroke": null,
+          "first_missed_readback": null,
+          "mean_gap_ms": 64.22,
+          "longest_gap_ms": 209.04
+        }
+      },
+      "source_files_sha256": {
+        "measurements.json": "e137c2de85d6830fd5e56a14f0cb46590cd122a018225d0579de9d5d23b2992b",
+        "ui-observation.json": "b9767e3f77bb5d0b60dd1f83b89373fdf8b07aa92aa59237bb4b1a7f1204c417"
+      },
+      "surfaces": {
+        "large_diff": {
+          "interpreted_as": "right marker",
+          "p95_ms": 109.994,
+          "samples": 29,
+          "p95_frame": {
+            "dirty_to_present_ms": 109.994,
+            "before_draw_ms": 95.9863,
+            "draw_ms": 0.439,
+            "request_layout_ms": 0.172,
+            "prepaint_ms": 0.115,
+            "paint_ms": 0.1176,
+            "before_present_ms": 0.0048,
+            "platform_present_ms": 13.5639
+          }
+        },
+        "markdown_discussion": {
+          "interpreted_as": "left marker",
+          "p95_ms": 137.9944,
+          "samples": 32,
+          "p95_frame": {
+            "dirty_to_present_ms": 137.9944,
+            "before_draw_ms": 0.0356,
+            "draw_ms": 0.4584,
+            "request_layout_ms": 0.1587,
+            "prepaint_ms": 0.1092,
+            "paint_ms": 0.1549,
+            "before_present_ms": 0.0045,
+            "platform_present_ms": 137.4959
+          }
+        }
+      },
+      "wheel_markers_left_right": {
+        "offset_px": [
+          -12,
+          -60
+        ],
+        "delivered_events": [
+          48,
+          40
+        ],
+        "max_rendered_displacement_px": [
+          144,
+          144
+        ]
+      },
+      "final_marker_bounds": {
+        "left": [
+          36.0,
+          208.0,
+          160.0,
+          12.0
+        ],
+        "right": [
+          696.0,
+          160.0,
+          160.0,
+          12.0
+        ]
+      }
+    },
+    "workspace": {
+      "fixture_revision": "s01-feasibility-v1",
+      "THREADLINE_TEST_WHEEL_MARKERS": null,
+      "wheel_input": {
+        "diff": {
+          "calibrated": true,
+          "accepted_down": 25,
+          "accepted_up": 25,
+          "physical_target_readbacks": 50,
+          "repositioned_strokes": 1,
+          "interrupted_stroke": null,
+          "first_missed_readback": null,
+          "mean_gap_ms": 109.44,
+          "longest_gap_ms": 242.06
+        },
+        "markdown_copy": {
+          "calibrated": true,
+          "accepted_down": 25,
+          "accepted_up": 25,
+          "physical_target_readbacks": 50,
+          "repositioned_strokes": 0,
+          "interrupted_stroke": null,
+          "first_missed_readback": null,
+          "mean_gap_ms": 114.97,
+          "longest_gap_ms": 244.83
+        }
+      },
+      "source_files_sha256": {
+        "measurements.json": "6653e1739ac370ecfe77f5ef9dd304d3da8688597ade4ef85af4c57e0b59bad1",
+        "ui-observation.json": "58c4402098050fb176056e85386806588a3f64586744f5230ed45d4a0a4f0a81"
+      },
+      "surfaces": {
+        "large_diff": {
+          "interpreted_as": "large_diff",
+          "p95_ms": 135.6546,
+          "samples": 41,
+          "p95_frame": {
+            "dirty_to_present_ms": 135.6546,
+            "before_draw_ms": 125.3821,
+            "draw_ms": 9.8246,
+            "request_layout_ms": 0.9307,
+            "prepaint_ms": 5.9135,
+            "paint_ms": 2.3274,
+            "before_present_ms": 0.0069,
+            "platform_present_ms": 0.441
+          }
+        },
+        "markdown_discussion": {
+          "interpreted_as": "markdown_discussion",
+          "p95_ms": 123.5316,
+          "samples": 44,
+          "p95_frame": {
+            "dirty_to_present_ms": 123.5316,
+            "before_draw_ms": 117.9929,
+            "draw_ms": 5.0806,
+            "request_layout_ms": 1.6167,
+            "prepaint_ms": 1.5936,
+            "paint_ms": 1.4867,
+            "before_present_ms": 0.0052,
+            "platform_present_ms": 0.4529
+          }
+        }
+      }
+    }
+  }
+}

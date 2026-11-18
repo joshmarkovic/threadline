@@ -2,7 +2,7 @@
 
 November 18, 2026 · Threadline 0.1.0
 
-Threadline has a runnable Rust and GPUI workspace. Native desktop smoke passed on Windows 11 at 96 and 144 DPI, hosted Windows Server 2025 at 144 DPI, and isolated X11. Hosted builds and portable tests passed on all three OS families, and the hosted macOS window and AppKit Quit probe passed. Windows notification click, hardware-rendered performance and the 20 ms scrolling budget remain open.
+Threadline has a runnable Rust and GPUI workspace. Native desktop smoke passed on Windows 11 at 96 and 144 DPI, hosted Windows Server 2025 at 144 DPI, and isolated X11. Hosted builds and portable tests passed on all three OS families, and the hosted macOS window and AppKit Quit probe passed. On the Windows 11 reference VM, the native release build measured 138.68 ms p95 for diff scrolling and 131.27 ms for discussion scrolling against the 20 ms budget. Notification click and hardware-rendered verification also remain open. [Reference measurements](evidence/windows-11-release/native-gui-measurements.json)
 
 ## Delivered behavior
 
@@ -12,7 +12,7 @@ Threadline has a runnable Rust and GPUI workspace. Native desktop smoke passed o
 | S01-T02 | The portable core verifies typed repository and item identities, revisions, structured errors, cancellation and stale responses. A seeded fake, bounded Tokio scheduler and loopback HTTP simulator exercise background work. |
 | S01-T03 | The workspace has virtualized selectable Markdown, a virtualized annotated diff, two resizable panes with independently focused tabs and drafts, a branching history fixture, and a 33/67 PR context and code split. Both splitters and OS clipboard behavior passed on Windows 11 at 96 and 144 DPI and on hosted Windows Server at 144 DPI. Simulated 2× geometry passed in the GPUI harness. [Windows 11 release-build smoke](evidence/windows-11-release/native.json) · [Hosted 144-DPI smoke](#hosted-144-dpi-smoke) |
 | S01-T04 | Windows opted in to tray residence, minimized on Close, and restored the original process through the actual tray icon. A second launch forwarded to the active review in the original process. The shell emitted its banner-shown callback. The Windows automation could not locate the banner's native click target. |
-| S01-T05 | The native benchmark and numeric ceilings are in place. Startup and working set passed on the reference VM. Both surfaces exceeded 20 ms at 96 DPI. At 144 DPI, a driver that targeted each wheel input measured both surfaces above 20 ms on the release build. |
+| S01-T05 | The native benchmark and numeric ceilings are in place. Startup and working set passed on the reference VM. Both surfaces exceeded 20 ms at 96 DPI. The 144-DPI native release-build benchmark verified every wheel input on both surfaces. [Canonical release-build measurements](evidence/windows-11-release/native-gui-measurements.json) |
 | S01-T06 | Portable service contracts, platform ownership, a support matrix, artifact metadata and short, verified installation templates are documented. |
 | S01-T07 | Cargo commands validate selection and seed, report JSON and JUnit, and run isolated tests. The Windows and X11 input drivers exercised real windows, including Windows 11 and hosted Windows Server at 150% display scaling. Windows, Apple Silicon macOS, and Ubuntu x64 hosted build and core-test jobs passed. The macOS launch and AppKit Quit probe passed. Full macOS desktop input verification remains open. |
 
@@ -89,7 +89,22 @@ The earlier runs retain their original results. The debug run measured a worst p
 
 The first Windows 11 benchmark attempt with the exact hosted test executable returned exit 78 during input desktop readiness. All 50 samples showed the Remote Desktop session disconnected and locked. The guard stopped before sending input. [Attempt summary](evidence/windows-hosted/reference-readiness/summary.json) · [Desktop samples](evidence/windows-hosted/reference-readiness/measure-desktop.json)
 
-### Windows 11 release build at 144 DPI
+### Native Windows release build and canonical wheel driver
+
+The Windows GUI build from `fa972ab` ran on the 3840 × 2160 Windows 11 reference desktop at 144 DPI with seed 12345. The executable matched the build manifest from CI run `44324237981`. The canonical driver from `803aefc` delivered 25 downward and 25 upward wheel inputs on each surface. All 50 physical pointer readbacks per surface matched their target. GPUI reported Microsoft Basic Render Driver with software emulation. [CI build](https://github.com/joshmarkovic/threadline/actions/runs/44324237981) · [Build identity and native measurements](evidence/windows-11-release/native-gui-measurements.json)
+
+| Metric | Windows 11 native release build | Result |
+| --- | ---: | --- |
+| Large diff scroll p95 | 138.6821 ms over 39 frames | Fail against 20 ms |
+| Long discussion scroll p95 | 131.2661 ms over 44 frames | Fail against 20 ms |
+| Fresh process startup | 2,020.9 ms | Pass |
+| Idle / peak working set | 103,739,392 / 105,865,216 bytes | Pass |
+| GPU process-memory counters | 0 bytes at idle and after scrolling | Pass for the observed software renderer |
+| Candidate package | Pending | Blocked |
+
+Average gaps between submitted wheel inputs were 101.76 ms for the diff and 114.81 ms for the discussion. Frame samples measure GPUI’s dirty-to-present submission for each surface. [Frame samples and phases](evidence/windows-11-release/native-gui-frames.json)
+
+### Earlier Windows 11 release build at 144 DPI
 
 After the reference desktop reconnected, Windows reported 144 DPI on Threadline’s window and GPUI reported 1.5 at 3840 × 2160. The executable matched the SHA-256 and length in the Windows CI build manifest. The same E2E-001 driver and seed 12345 passed all ten native actions with the test runner’s console hidden. It restored the clipboard, opened PR 72 in the original process on the second launch, and quit and relaunched successfully. Two earlier attempts stopped when the app lost foreground focus at the context-divider drag. [Build manifest](evidence/windows-hosted/build.json) · [Native actions and earlier attempts](evidence/windows-11-release/native.json)
 
@@ -123,6 +138,17 @@ A separate Windows cross-build exposed GPUI’s grayscale option only during mea
 | 2 | Grayscale | 151.5891 ms (43) | 132.6192 ms (41) | 119.50 / 105.06 ms |
 
 Each surface received 25 downward and 25 upward wheel inputs, with 50 matching physical readbacks. The observed injection gaps varied across runs. When repeated in reverse order, both trials stopped at foreground-focus checks before sending wheel input. Both completed modes exceeded 20 ms. The single completed pair cannot isolate the effect of text rendering from input cadence and run order. Threadline continues to use the platform default. [Frame samples and phases](evidence/windows-11-release/text-rendering-frames.json) · [Trial and focus results](evidence/windows-11-release/text-rendering.json)
+
+#### Two-marker frame-pacing control
+
+A separate cross-built executable measured the minimal scene and the full workspace in separate native windows on the same 144-DPI desktop. The minimal scene drew a colored marker in each pane and moved it on real wheel input. The left and right panes received 48 and 40 app scroll events, respectively. Both markers reached 144 logical pixels of displacement. On both scenes every surface returned 50 matching physical readbacks. [Build identity, movement and input observations](evidence/windows-11-release/marker-control.json)
+
+| Scene | Right surface p95 (frames) | Left surface p95 (frames) |
+| --- | ---: | ---: |
+| Two markers | 109.9940 ms (29) | 137.9944 ms (32) |
+| Full workspace | Diff 135.6546 ms (41) | Discussion 123.5316 ms (44) |
+
+Both markers exceeded 20 ms on this software-rendered Remote Desktop session. On their p95 frames, GPUI drew each marker scene in under 0.5 ms. The right marker waited 95.99 ms before drawing and the left marker spent 137.50 ms in platform submission. The single pair recorded different input timing between scenes. The delay persisted with the comments and diff removed. The native release-build figures above remain the product benchmark. [Paired frame timings by scene](evidence/windows-11-release/marker-control-frames.json)
 
 ### Hosted Windows Server replay
 
