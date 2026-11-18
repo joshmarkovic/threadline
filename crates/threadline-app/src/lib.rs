@@ -1,5 +1,6 @@
 mod account_panel;
 mod accounts;
+mod activity_delivery;
 mod fixtures;
 #[cfg(windows)]
 mod notification_commands;
@@ -32,6 +33,7 @@ use threadline_storage::Store;
 pub struct Options {
     pub seed: u64,
     pub open_review: bool,
+    pub notification_com_server: bool,
     pub e2e_report: Option<PathBuf>,
     pub profile: Option<PathBuf>,
     pub measure: bool,
@@ -124,7 +126,7 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
         Activation::Focus
     };
     let launch = start_platform(activation, options.profile.as_deref())?;
-    let (controls, events) = match launch {
+    let (controls, mut events) = match launch {
         Launch::Forwarded => return Ok(()),
         Launch::Primary { controls, events } => (controls, events),
     };
@@ -138,6 +140,28 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
     let storage = runtime
         .block_on(runtime.spawn_blocking(move || open_profile(profile)))
         .unwrap_or_else(|_| Err("The profile database worker stopped unexpectedly".to_owned()));
+    if options.notification_com_server {
+        let event = runtime.block_on(async {
+            tokio::time::timeout(std::time::Duration::from_secs(30), async {
+                while let Some(event) = events.recv().await {
+                    if let threadline_platform::PlatformEvent::ActivityActivated(activity) = event {
+                        return Some(activity);
+                    }
+                }
+                None
+            })
+            .await
+            .ok()
+            .flatten()
+        });
+        let Some(event) = event else {
+            return Err("Windows did not supply a notification action".into());
+        };
+        let profile = storage.as_ref().map_err(|e| e.to_owned())?;
+        if !activity_delivery::activate(profile, event)? {
+            return Ok(());
+        }
+    }
     let startup_error = storage.as_ref().err().cloned();
     let seed = options.seed;
     let large = options.measure;
@@ -156,6 +180,7 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
     gpui_kit::application()
         .with_assets(gpui_kit::assets::Assets)
         .run(move |cx| {
+            cx.set_global(activity_delivery::ActivityInbox);
             cx.set_quit_mode(QuitMode::LastWindowClosed);
             gpui_kit::init(cx);
             bind_shortcuts(cx);

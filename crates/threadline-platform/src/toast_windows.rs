@@ -25,7 +25,7 @@ use windows::core::{
 use windows_sys::Win32::System::Registry::{HKEY_CLASSES_ROOT, HKEY_CURRENT_USER};
 
 use super::toast_registration::{installed_link_matches, registry_matches};
-use super::{Activation, PlatformError, PlatformEvent};
+use super::{Activation, ActivityActivation, ActivityNotification, PlatformError, PlatformEvent};
 
 const BODY: &str = "Open the sample pull request in Threadline.";
 const GROUP: &str = "ThreadlineReview";
@@ -43,21 +43,34 @@ impl Identity {
     pub(super) fn installed() -> Option<Self> {
         let executable = std::env::current_exe().ok()?;
         let command = format!("\"{}\" --notification-com-server", executable.display());
-        if !registry_matches(
-            HKEY_CLASSES_ROOT,
-            r"CLSID\{5a20cea8-a5d8-4b5e-9be3-4121ba0aa753}\LocalServer32",
-            None,
-            &command,
-        ) || !installed_link_matches(&executable, INSTALLED_APP_ID, INSTALLED_CLASS)
-        {
-            return None;
+        let local_class = GUID::from_u128(0xdf3bb9a2_0794_44a6_b130_a35197093afe);
+        let identities = [
+            (
+                INSTALLED_APP_ID,
+                INSTALLED_CLASS,
+                "Threadline.lnk",
+                r"CLSID\{5a20cea8-a5d8-4b5e-9be3-4121ba0aa753}\LocalServer32",
+            ),
+            (
+                "Threadline.InstallTest",
+                local_class,
+                "Threadline Installer Test.lnk",
+                r"CLSID\{df3bb9a2-0794-44a6-b130-a35197093afe}\LocalServer32",
+            ),
+        ];
+        for (app_id, class, shortcut, server) in identities {
+            if registry_matches(HKEY_CLASSES_ROOT, server, None, &command)
+                && installed_link_matches(&executable, app_id, class, shortcut)
+            {
+                return Some(Self {
+                    app_id: app_id.into(),
+                    class,
+                    title: "Threadline review".into(),
+                    action: "Open review".into(),
+                });
+            }
         }
-        Some(Self {
-            app_id: INSTALLED_APP_ID.into(),
-            class: INSTALLED_CLASS,
-            title: "Threadline review".into(),
-            action: "Open review".into(),
-        })
+        None
     }
 
     fn fixture(token: &str) -> Result<Self, PlatformError> {
@@ -175,6 +188,16 @@ enum Source {
 
 impl Route {
     fn activate(&self, app_id: &str, payload: &str, source: Source) -> bool {
+        if app_id != self.app_id {
+            return false;
+        }
+        if let Ok(activation) = ActivityActivation::parse(payload) {
+            // The account's persistent journal verifies this opaque ID again before routing.
+            return self
+                .events
+                .send(PlatformEvent::ActivityActivated(activation))
+                .is_ok();
+        }
         let Ok(mut current) = self.current.lock() else {
             return false;
         };
@@ -291,6 +314,51 @@ impl Toasts {
             pending: None,
             _apartment: apartment,
         })
+    }
+
+    fn activity_notifier(&self) -> Result<ToastNotifier, PlatformError> {
+        ToastNotificationManager::CreateToastNotifierWithId(&HSTRING::from(
+            self.identity.app_id.as_str(),
+        ))
+        .map_err(|error| native_error("Find the Threadline activity sender", error))
+    }
+    pub(super) fn activity_enabled(&self) -> Result<bool, PlatformError> {
+        Ok(self
+            .activity_notifier()?
+            .Setting()
+            .map_err(|error| native_error("Read Windows notification preferences", error))?
+            == NotificationSetting::Enabled)
+    }
+    pub(super) fn submit_activity(
+        &self,
+        notice: ActivityNotification,
+    ) -> Result<(), PlatformError> {
+        let notifier = self.activity_notifier()?;
+        if notifier
+            .Setting()
+            .map_err(|e| native_error("Read Windows notification preferences", e))?
+            != NotificationSetting::Enabled
+        {
+            return Err(PlatformError::Denied);
+        }
+        let document =
+            XmlDocument::new().map_err(|e| native_error("Create the activity card", e))?;
+        document
+            .LoadXml(&HSTRING::from(notice.xml()))
+            .map_err(|e| native_error("Load the activity card", e))?;
+        let toast = ToastNotification::CreateToastNotification(&document)
+            .map_err(|e| native_error("Create the activity notification", e))?;
+        let key = notice.id.key();
+        toast
+            .SetTag(&HSTRING::from(&key[..16]))
+            .map_err(|e| native_error("Name the activity notification", e))?;
+        toast
+            .SetGroup(&HSTRING::from(&key[16..]))
+            .map_err(|e| native_error("Group the activity notification", e))?;
+        // Windows retains the card across orderly application exit. The registered COM class handles all three actions.
+        notifier
+            .Show(&toast)
+            .map_err(|e| native_error("Submit activity to Windows", e))
     }
 
     pub(super) fn show_review(&mut self) -> Result<(), PlatformError> {

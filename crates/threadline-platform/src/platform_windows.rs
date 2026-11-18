@@ -1,3 +1,4 @@
+use super::ActivityNotification;
 use std::cell::{Cell, RefCell};
 use std::ffi::c_void;
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -52,6 +53,8 @@ struct DesktopInner {
 enum Command {
     EnableTray(bool),
     NotifyReview,
+    SubmitActivity(ActivityNotification, SyncSender<Result<(), PlatformError>>),
+    ActivitySetting(SyncSender<Result<bool, PlatformError>>),
     Shutdown,
 }
 
@@ -62,6 +65,17 @@ impl Desktop {
 
     pub fn show_notification(&self) -> Result<(), PlatformError> {
         self.post(Command::NotifyReview)
+    }
+
+    pub fn submit_activity(&self, notice: ActivityNotification) -> Result<(), PlatformError> {
+        let (reply, response) = mpsc::sync_channel(1);
+        self.post(Command::SubmitActivity(notice, reply))?;
+        response.recv().map_err(|_| PlatformError::Unavailable)?
+    }
+    pub fn activity_notifications_enabled(&self) -> Result<bool, PlatformError> {
+        let (reply, response) = mpsc::sync_channel(1);
+        self.post(Command::ActivitySetting(reply))?;
+        response.recv().map_err(|_| PlatformError::Unavailable)?
     }
 
     fn post(&self, command: Command) -> Result<(), PlatformError> {
@@ -373,6 +387,24 @@ impl WindowState {
                     Some(Err(error)) => Err(*error),
                     None => self.show_balloon(hwnd),
                 },
+                Command::SubmitActivity(notice, reply) => {
+                    let result = match self.toasts.borrow().as_ref() {
+                        Some(Ok(toasts)) => toasts.submit_activity(notice),
+                        Some(Err(error)) => Err(*error),
+                        None => Err(PlatformError::Unsupported),
+                    };
+                    let _ = reply.send(result);
+                    Ok(())
+                }
+                Command::ActivitySetting(reply) => {
+                    let result = match self.toasts.borrow().as_ref() {
+                        Some(Ok(toasts)) => toasts.activity_enabled(),
+                        Some(Err(error)) => Err(*error),
+                        None => Err(PlatformError::Unsupported),
+                    };
+                    let _ = reply.send(result);
+                    Ok(())
+                }
                 Command::Shutdown => {
                     // The worker owns this window and WM_DESTROY performs icon cleanup.
                     unsafe { DestroyWindow(hwnd) };

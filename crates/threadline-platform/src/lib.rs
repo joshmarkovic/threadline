@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 
 use tokio::sync::mpsc::{self, UnboundedReceiver};
 
+mod activity;
+pub use activity::{ActivityAction, ActivityActivation, ActivityId, ActivityNotification};
 mod credentials;
 mod paths;
 #[cfg(windows)]
@@ -31,6 +33,7 @@ pub enum PlatformEvent {
     NotificationShown,
     NotificationSubmitted,
     NotificationComActivated,
+    ActivityActivated(ActivityActivation),
     Quit,
     Wake,
     NetworkChanged,
@@ -113,6 +116,25 @@ impl PlatformControls {
         }
     }
 
+    /// Submit a durable activity group on a worker. Windows may accept a card without showing a banner.
+    pub fn submit_activity(&self, notice: ActivityNotification) -> Result<(), PlatformError> {
+        #[cfg(windows)]
+        return self.desktop.submit_activity(notice);
+        #[cfg(not(windows))]
+        {
+            let _ = notice;
+            Err(PlatformError::Unsupported)
+        }
+    }
+
+    /// Read the sender's current setting before taking a native delivery reservation.
+    pub fn activity_notifications_enabled(&self) -> Result<bool, PlatformError> {
+        #[cfg(windows)]
+        return self.desktop.activity_notifications_enabled();
+        #[cfg(not(windows))]
+        Err(PlatformError::Unsupported)
+    }
+
     /// Queue a native feasibility notification. WinRT reports submission before any activation.
     pub fn notify_open_review(&self) -> Result<(), PlatformError> {
         #[cfg(windows)]
@@ -148,6 +170,11 @@ pub fn start_isolated_with_test_toast(
     let profile = canonical_profile(profile)?;
     let identity = toast_windows::Identity::registered_fixture(token)?;
     start_windows(activation, Some(&profile), Some(identity))
+}
+
+#[cfg(windows)]
+pub fn installed_activity_identity() -> bool {
+    toast_windows::Identity::installed().is_some()
 }
 
 #[cfg(windows)]

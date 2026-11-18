@@ -15,7 +15,7 @@ use tempfile::{Builder, NamedTempFile};
 use crate::{Error, Result, queue::hold_restored_dispatch};
 
 pub const DATABASE_FILENAME: &str = "threadline.sqlite3";
-pub const SCHEMA_VERSION: u32 = 14;
+pub const SCHEMA_VERSION: u32 = 15;
 const APPLICATION_ID: u32 = 0x5448_5244;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(3);
 const BACKUP_TIMEOUT: Duration = Duration::from_secs(30);
@@ -42,6 +42,7 @@ pub struct Store {
     reader: Mutex<Connection>,
     writer: Mutex<Connection>,
     migration_backup: Option<PathBuf>,
+    commit_listeners: Mutex<Vec<std::sync::mpsc::SyncSender<()>>>,
 }
 
 impl Store {
@@ -75,6 +76,7 @@ impl Store {
             reader: Mutex::new(reader),
             writer: Mutex::new(writer),
             migration_backup,
+            commit_listeners: Mutex::default(),
         })
     }
 
@@ -121,9 +123,30 @@ impl Store {
         run(&reader)
     }
 
+    /// Register a coalescing, nonblocking wake-up for an in-process observer. Receivers recheck durable state.
+    pub fn watch_commits(&self, listener: std::sync::mpsc::SyncSender<()>) -> Result<()> {
+        self.commit_listeners
+            .lock()
+            .map_err(|_| Error::Unavailable)?
+            .push(listener);
+        Ok(())
+    }
+
     pub(crate) fn write<T>(&self, run: impl FnOnce(&Transaction<'_>) -> Result<T>) -> Result<T> {
         let mut writer = lock(&self.writer)?;
-        with_write(&mut writer, run)
+        let before = writer.total_changes();
+        let result = with_write(&mut writer, run)?;
+        let changed = writer.total_changes() != before;
+        drop(writer);
+        if changed && let Ok(mut listeners) = self.commit_listeners.lock() {
+            listeners.retain(|l| {
+                !matches!(
+                    l.try_send(()),
+                    Err(std::sync::mpsc::TrySendError::Disconnected(()))
+                )
+            });
+        }
+        Ok(result)
     }
 }
 
@@ -266,6 +289,13 @@ fn migrate(connection: &mut Connection, path: &Path) -> Result<Option<PathBuf>> 
         if version < 14 {
             tx.execute_batch(include_str!("notifications.sql"))?;
             tx.pragma_update(None, "user_version", 14)?;
+        }
+        if version < 15 {
+            tx.execute_batch("ALTER TABLE native_notification_groups ADD COLUMN activated_at INTEGER;
+                    CREATE TABLE pending_notification_opens(
+                        group_id INTEGER PRIMARY KEY REFERENCES native_notification_groups(id) ON DELETE CASCADE
+                    ) STRICT;")?;
+            tx.pragma_update(None, "user_version", 15)?;
         }
         check_foreign_keys(tx)?;
         Ok(backup)

@@ -73,7 +73,12 @@ impl Drop for Variant {
     }
 }
 
-pub(super) fn installed_link_matches(executable: &Path, app_id: &str, class: GUID) -> bool {
+pub(super) fn installed_link_matches(
+    executable: &Path,
+    app_id: &str,
+    class: GUID,
+    filename: &str,
+) -> bool {
     // Use the shell's per-user and all-users Programs directories, including redirected folders.
     if unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) }.is_err() {
         return false;
@@ -90,8 +95,8 @@ pub(super) fn installed_link_matches(executable: &Path, app_id: &str, class: GUI
             if folder.0.is_null() {
                 return false;
             }
-            let path = PathBuf::from(OsString::from_wide(unsafe { folder.0.as_wide() }))
-                .join("Threadline.lnk");
+            let path =
+                PathBuf::from(OsString::from_wide(unsafe { folder.0.as_wide() })).join(filename);
             path.is_file() && load_link(&path, executable, app_id, class).unwrap_or(false)
         })
 }

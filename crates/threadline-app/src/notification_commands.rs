@@ -6,8 +6,12 @@ pub fn handle_notification_command() -> bool {
     let command = arguments.next();
     match command.as_deref().and_then(std::ffi::OsStr::to_str) {
         Some("--notification-com-server") => {
-            // The running desktop worker already owns warm activation. A cold COM launch has no live review token.
-            std::process::exit(78);
+            // COM starts the same single-instance app as a normal launch. Its class factory receives
+            // the opaque payload after startup; the active account's SQLite journal owns the target.
+            if !threadline_platform::installed_activity_identity() {
+                std::process::exit(78)
+            }
+            false
         }
         #[cfg(feature = "e2e")]
         Some("--cleanup-test-toast") => {

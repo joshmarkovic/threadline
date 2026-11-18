@@ -42,6 +42,16 @@ fn parse_args() -> Result<Options, String> {
     let mut arguments = std::env::args_os().skip(1);
     while let Some(argument) = arguments.next() {
         match argument.to_str() {
+            #[cfg(windows)]
+            Some("--notification-com-server") => options.notification_com_server = true,
+            #[cfg(windows)]
+            Some(arg)
+                if options.notification_com_server
+                    && (arg.eq_ignore_ascii_case("-embedding")
+                        || arg.eq_ignore_ascii_case("/embedding")) =>
+            {
+                ()
+            }
             Some("--open-review") => options.open_review = true,
             Some("--e2e-report") if cfg!(feature = "e2e") && options.e2e_report.is_none() => {
                 let path = PathBuf::from(

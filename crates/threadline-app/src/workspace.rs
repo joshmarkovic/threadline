@@ -179,6 +179,7 @@ pub struct Workspace {
     accounts_open: bool,
     feasibility_fixture: bool,
     platform: Option<PlatformControls>,
+    activity_delivery: Option<crate::activity_delivery::ActivityDelivery>,
     tray_enabled: bool,
     platform_status: Option<String>,
     notifications_shown: u32,
@@ -346,6 +347,7 @@ impl Workspace {
             accounts_open: false,
             feasibility_fixture,
             platform: None,
+            activity_delivery: None,
             tray_enabled: false,
             platform_status: None,
             notifications_shown: 0,
@@ -458,6 +460,12 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if !self.feasibility_fixture
+            && let Some(store) = crate::profile_store(cx)
+        {
+            self.activity_delivery =
+                crate::activity_delivery::ActivityDelivery::start(&store, controls.clone());
+        }
         self.platform = Some(controls);
         let view = cx.weak_entity();
         window.on_window_should_close(cx, move |window, cx| {
@@ -506,6 +514,22 @@ impl Workspace {
                     self.select_tab(Pane::Right, 0, window, cx);
                 }
                 self.platform_status = Some("Opened from a native activation".into());
+            }
+            PlatformEvent::ActivityActivated(event) => {
+                if let Some(store) = crate::profile_store(cx) {
+                    let work = self
+                        .runtime
+                        .spawn_blocking(move || crate::activity_delivery::activate(&store, event));
+                    cx.spawn_in(window, async move |_, cx| {
+                        if matches!(work.await, Ok(Ok(true))) {
+                            let _ = cx.update(|window, cx| {
+                                window.activate_window();
+                                cx.set_global(crate::activity_delivery::ActivityInbox);
+                            });
+                        }
+                    })
+                    .detach();
+                }
             }
             PlatformEvent::TrayChanged(enabled) => {
                 self.tray_enabled = enabled;

@@ -128,6 +128,24 @@ fn it_018_baselines_many_paths_group_by_exact_target_and_unknown_after_crash_is_
         NotificationTarget::Item { item, thread: None }
     );
     assert!(
+        db.activate_notification(a, &group.native_id, NotificationAction::MarkRead, 140)
+            .unwrap()
+            .is_none()
+    );
+    drop(db);
+    let db = Store::open_profile(dir.path()).unwrap();
+    assert_eq!(
+        db.pending_notification_open(a).unwrap(),
+        Some((group.native_id.clone(), activated))
+    );
+    assert!(db.pending_notification_open(outsider).unwrap().is_none());
+    assert!(
+        !db.complete_notification_open(outsider, &group.native_id)
+            .unwrap()
+    );
+    assert!(db.complete_notification_open(a, &group.native_id).unwrap());
+    assert!(db.pending_notification_open(a).unwrap().is_none());
+    assert!(
         db.notification_feed(a, None, 100)
             .unwrap()
             .iter()

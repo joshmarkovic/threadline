@@ -196,6 +196,11 @@ fn decide(
     } else {
         false
     };
+    let quiet_override: bool = db.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sync_settings WHERE account_id=? AND notification_quiet=1)",
+        [a],
+        |r| r.get(0),
+    )?;
     let quiet = settings
         .quiet_hours
         .as_ref()
@@ -211,7 +216,7 @@ fn decide(
             own: actor_own || receipt_proves_own(db, a, e)?,
             followed,
             snoozed: until.is_some_and(|t| t > now),
-            quiet,
+            quiet: quiet || quiet_override,
             os_allows_popup: os,
         },
     ))
@@ -340,6 +345,14 @@ fn journal(
     Ok(())
 }
 impl Store {
+    pub fn notification_work_pending(&self, account: AccountId) -> Result<bool> {
+        self.read(|db| {
+            if !dispatch_allowed(db,account)? {return Ok(false)}
+            Ok(db.query_row("SELECT EXISTS(SELECT 1 FROM notification_events WHERE account_id=?1 AND decision IS NULL)
+                  OR EXISTS(SELECT 1 FROM native_notification_groups WHERE account_id=?1 AND state='pending')",
+                [account],|r|r.get(0))?)
+        })
+    }
     pub fn process_notification_events(
         &self,
         a: AccountId,
@@ -544,6 +557,37 @@ impl Store {
     pub fn mark_notification_read(&self, a: AccountId, event_id: i64, now: i64) -> Result<bool> {
         self.write(|tx|Ok(tx.execute("UPDATE notification_events SET read_at=? WHERE account_id=? AND id=? AND published=1 AND read_at IS NULL",params![now,a,event_id])?==1))
     }
+    pub fn pending_notification_open(
+        &self,
+        account: AccountId,
+    ) -> Result<Option<(String, Destination)>> {
+        self.read(|db| {
+            let next = db
+                .query_row(
+                    "SELECT g.native_id, g.destination FROM pending_notification_opens p
+                 JOIN native_notification_groups g ON g.id = p.group_id
+                 JOIN active_profile a ON a.account_id = g.account_id
+                 WHERE g.account_id = ? ORDER BY g.activated_at, g.id LIMIT 1",
+                    [account],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+                )
+                .optional()?;
+            next.map(|(key, route)| Ok((key, decode(&route)?)))
+                .transpose()
+        })
+    }
+    pub fn complete_notification_open(&self, account: AccountId, native_id: &str) -> Result<bool> {
+        self.write(|tx| {
+            Ok(tx.execute(
+                "DELETE FROM pending_notification_opens WHERE group_id IN
+                 (SELECT g.id FROM native_notification_groups g
+                  JOIN active_profile a ON a.account_id = g.account_id
+                  WHERE g.account_id = ? AND g.native_id = ?)",
+                params![account, native_id],
+            )? == 1)
+        })
+    }
+
     pub fn activate_notification(
         &self,
         a: AccountId,
@@ -552,16 +596,37 @@ impl Store {
         now: i64,
     ) -> Result<Option<Destination>> {
         self.write(|tx| {
-            let group=tx.query_row("SELECT id,destination FROM native_notification_groups WHERE account_id=? AND native_id=?
-                        AND state IN ('unknown','delivered') AND account_id=(SELECT account_id FROM active_profile)",
-                        params![a,native_id],|r|Ok((r.get::<_,i64>(0)?,r.get::<_,String>(1)?))).optional()?;
+            let group = tx
+                .query_row(
+                    "SELECT g.id, g.destination FROM native_notification_groups g
+                 JOIN active_profile a ON a.account_id = g.account_id
+                 WHERE g.account_id = ? AND g.native_id = ? AND g.activated_at IS NULL
+                   AND g.state IN ('unknown', 'delivered')",
+                    params![a, native_id],
+                    |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+                )
+                .optional()?;
             let Some((id, raw)) = group else {
                 return Ok(None);
             };
             let route: Destination = decode(&raw)?;
+            tx.execute(
+                "UPDATE native_notification_groups SET activated_at = ? WHERE id = ?",
+                params![now, id],
+            )?;
+            if action == NotificationAction::Open {
+                tx.execute(
+                    "INSERT INTO pending_notification_opens (group_id) VALUES (?)",
+                    [id],
+                )?;
+            }
             match action {
                 NotificationAction::Open | NotificationAction::MarkRead => {
-                    tx.execute("UPDATE notification_events SET read_at=COALESCE(read_at,?) WHERE group_id=? AND published=1",params![now,id])?;
+                    tx.execute(
+                        "UPDATE notification_events SET read_at = COALESCE(read_at, ?)
+                         WHERE group_id = ? AND published = 1",
+                        params![now, id],
+                    )?;
                 }
                 NotificationAction::SnoozeUntil(until) => {
                     if until <= now {
