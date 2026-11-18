@@ -5,7 +5,7 @@ function Wait-Account([string]$Description, [scriptblock]$AccountCheck) {
     }
 }
 
-function Click-AccountControl([IntPtr]$Window, [string]$Id) {
+function Click-AccountControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwatch]$InputClock) {
     $state = Wait-State ('account control ' + $Id) {
         param($snapshot)
         $property = $snapshot.bounds.PSObject.Properties[$Id]
@@ -15,11 +15,12 @@ function Click-AccountControl([IntPtr]$Window, [string]$Id) {
     }
     $bounds = $state.bounds.PSObject.Properties[$Id].Value
     $center = To-ClientPoint ($bounds[0] + $bounds[2] / 2) ($bounds[1] + $bounds[3] / 2) $state.scale_factor
+    if ($null -ne $InputClock) { $InputClock.Restart() }
     [ThreadlineWinInput]::ClickClient($Window, $center, [uint32]$script:app.Id, [uint32][Math]::Round(96 * $state.scale_factor))
 }
 
 function Set-AccessPhase([string]$Phase) {
-    if ($Phase -cnotin @('ready', 'partial', 'sso', 'denied', 'revoked')) {
+    if ($Phase -cnotin @('ready', 'partial', 'sso', 'denied', 'revoked', 'reader-failure', 'reader-resume')) {
         throw 'Unknown access fixture phase.'
     }
     try {
@@ -34,9 +35,10 @@ function Open-AccountFixture {
     return Wait-Account 'open the native account panel' { param($account) $account.panel_open }
 }
 
-function Invoke-GitHubAccessProof([IntPtr]$Window, [string]$Profile) {
+function Connect-FixtureAccount([IntPtr]$Window) {
     $null = Open-AccountFixture
     Click-AccountControl $Window 'account-repository'
+    [ThreadlineWinInput]::Chord(@(0x11, 0x41))
     [ThreadlineWinInput]::TypeText('fixture-org/private')
     Click-AccountControl $Window 'account-token'
     $syntheticPat = 'threadline-test-fixture'
@@ -61,7 +63,10 @@ function Invoke-GitHubAccessProof([IntPtr]$Window, [string]$Profile) {
         param($account) $account.selected_count -eq 1 -and $account.profile_access -ceq 'Readable'
     }
     Add-Evidence 'Select the verified repository' 1
+}
 
+function Invoke-GitHubAccessProof([IntPtr]$Window, [string]$Profile) {
+    Connect-FixtureAccount $Window
     Set-AccessPhase 'partial'
     Click-AccountControl $Window 'account-refresh'
     $null = Wait-Account 'partial SSO repository discovery with retained direct access' {

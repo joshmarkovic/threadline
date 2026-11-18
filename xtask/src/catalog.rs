@@ -19,6 +19,17 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == "LIVE-001" {
         return Some("s03-live-read-allowlist-v1");
     }
+    if matches!(
+        case,
+        "E2E-003"
+            | "E2E-004"
+            | "S04-READER-PERF"
+            | "S04-READ-TRANSPORT"
+            | "S04-CACHED-STORE"
+            | "S04-READ-SERVICE"
+    ) {
+        return Some("s04-reader-v1");
+    }
     if case.starts_with("S01-") || matches!(case, "UT-021" | "E2E-001") {
         return Some(include_str!("../../fixtures/revision.txt").trim_ascii());
     }
@@ -77,6 +88,15 @@ pub fn associations(case: &str) -> Associations {
             "AC-01;AC-02;AC-03;AC-90",
         ),
         "S03-ACCESS-STORAGE" => ("AUTH-06;AUTH-11;CACHE-08;OUTBOX-09;TEST-03", "AC-67;AC-90"),
+        "S04-READER-PERF" => ("CACHE-01;SEARCH-01;WORKSPACE-08;TEST-08", "AC-35"),
+        "S04-READ-TRANSPORT" => (
+            "CACHE-05;ISSUE-01;SEARCH-02;SEARCH-03;TEST-03",
+            "AC-07;AC-08;AC-09",
+        ),
+        "S04-CACHED-STORE" | "S04-READ-SERVICE" => (
+            "CACHE-03;CACHE-05;OFFLINE-03;SEARCH-01;TEST-03",
+            "AC-06;AC-07;AC-08;AC-09",
+        ),
         _ => catalog_associations(case).unwrap_or_default(),
     };
     Associations {

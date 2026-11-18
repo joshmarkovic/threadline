@@ -129,6 +129,12 @@ jobs:
       - name: Drive the isolated GitHub access journey
         if: ${{ !cancelled() }}
         run: cargo xtask test e2e --suite full --case E2E-002 --binary target/release/threadline.exe --report-dir artifacts/github-access
+      - name: Restore a cached workspace and draft offline
+        if: ${{ !cancelled() }}
+        run: cargo xtask test e2e --suite full --case E2E-003 --binary target/release/threadline.exe --report-dir artifacts/cached-reader
+      - name: Resume a partial discussion after restart
+        if: ${{ !cancelled() }}
+        run: cargo xtask test e2e --suite full --case E2E-004 --binary target/release/threadline.exe --report-dir artifacts/cached-reader
       - name: Exercise the real Windows protected store
         if: ${{ !cancelled() }}
         run: cargo xtask test integration --case IT-020 --report-dir artifacts/github-access
@@ -149,6 +155,7 @@ jobs:
             'tools/native/ThreadlineWinInput.cs'
             'tools/native/windows-app-toast.ps1'
             'tools/native/windows-github-access.ps1'
+            'tools/native/windows-cached-reader.ps1'
             'tools/native/windows-notification-focus.ps1'
             'tools/native/ThreadlineToastShortcut.cs'
             'docs/architecture/windows-budgets.json'

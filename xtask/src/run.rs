@@ -8,7 +8,7 @@ use std::{
 use serde_json::{Value, json};
 
 use crate::{
-    access_fixture::AccessFixture,
+    access_fixture::{AccessFixture, TraceCheck},
     cli::{Lane, Options, catalog_cases, public_path},
     report::{CaseResult, Status, sha256},
 };
@@ -125,6 +125,23 @@ const INTEGRATION: &[CargoTest] = &[
         id: "S03-ACCESS-STORAGE",
         arguments: &["-p", "threadline-storage", "--test", "access"],
     },
+    CargoTest {
+        id: "S04-READ-TRANSPORT",
+        arguments: &["-p", "threadline-core", "--test", "github_reader"],
+    },
+    CargoTest {
+        id: "S04-CACHED-STORE",
+        arguments: &["-p", "threadline-storage", "--test", "reader"],
+    },
+    CargoTest {
+        id: "S04-READ-SERVICE",
+        arguments: &[
+            "-p",
+            "threadline-app",
+            "--lib",
+            "accounts::tests::cache_reader_",
+        ],
+    },
 ];
 const UI: &[CargoTest] = &[CargoTest {
     id: "S01-GPUI",
@@ -189,12 +206,30 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
             NativeMode::WindowsGitHubAccess,
             "windows-github-access",
         ),
+        (
+            "E2E-003",
+            NativeMode::WindowsReaderOffline,
+            "windows-reader-offline",
+        ),
+        (
+            "E2E-004",
+            NativeMode::WindowsReaderResume,
+            "windows-reader-resume",
+        ),
     ];
     let full = options.suite.as_deref() == Some("full");
     match options.case.as_deref() {
         Some("E2E-001") => {}
         Some(id) => {
-            let Some(&(_, mode, _)) = WINDOWS_CASES.iter().find(|case| id == case.0) else {
+            let mode = if id == "S04-READER-PERF" {
+                Some(NativeMode::WindowsReaderPerformance)
+            } else {
+                WINDOWS_CASES
+                    .iter()
+                    .find(|case| id == case.0)
+                    .map(|case| case.1)
+            };
+            let Some(mode) = mode else {
                 return vec![unimplemented(id)];
             };
             if !full {
@@ -339,6 +374,9 @@ enum NativeMode {
     WindowsShell,
     WindowsToast,
     WindowsGitHubAccess,
+    WindowsReaderOffline,
+    WindowsReaderResume,
+    WindowsReaderPerformance,
 }
 
 fn run_native(
@@ -393,7 +431,13 @@ fn native_driver(
         .prefix("threadline-e2e-")
         .tempdir()
         .map_err(|error| NativeError::Blocked(error.to_string()))?;
-    let access_fixture = if mode == NativeMode::WindowsGitHubAccess {
+    let reader_proof = match mode {
+        NativeMode::WindowsReaderOffline => Some("Offline"),
+        NativeMode::WindowsReaderResume => Some("Resume"),
+        NativeMode::WindowsReaderPerformance => Some("Performance"),
+        _ => None,
+    };
+    let access_fixture = if mode == NativeMode::WindowsGitHubAccess || reader_proof.is_some() {
         Some(AccessFixture::start(isolated.path()).map_err(|_| {
             NativeError::Blocked("The isolated loopback server could not bind.".into())
         })?)
@@ -440,8 +484,12 @@ fn native_driver(
             cmd.arg("-ToastProof");
         }
         if let Some(fixture) = &access_fixture {
-            cmd.arg("-AccessProof")
-                .arg("-AccessAddress")
+            if let Some(proof) = reader_proof {
+                cmd.arg("-ReaderProof").arg(proof);
+            } else {
+                cmd.arg("-AccessProof");
+            }
+            cmd.arg("-AccessAddress")
                 .arg(fixture.address().to_string())
                 .arg("-AccessPhaseFile")
                 .arg(fixture.phase_file());
@@ -460,8 +508,7 @@ fn native_driver(
     let output = driver.output().map_err(|error| {
         NativeError::Blocked(format!("Cannot start {os} native driver: {error}"))
     })?;
-    if mode == NativeMode::WindowsGitHubAccess && access_output_disclosed_credential(dir, &output)?
-    {
+    if access_fixture.is_some() && access_output_disclosed_credential(dir, &output)? {
         return Err(NativeError::Failed(
             "The access fixture credential entered routine diagnostics.".into(),
         ));
@@ -474,6 +521,8 @@ fn native_driver(
         NativeMode::WindowsShell => "platform-native.json",
         NativeMode::WindowsToast => "toast-native.json",
         NativeMode::WindowsGitHubAccess => "github-access-native.json",
+        NativeMode::WindowsReaderOffline | NativeMode::WindowsReaderResume => "reader-native.json",
+        NativeMode::WindowsReaderPerformance => "reader-performance.json",
     };
     let details = fs::read(dir.join(driver_report))
         .ok()
@@ -502,11 +551,20 @@ fn native_driver(
     } else {
         log
     });
-    if let Some(fixture) = access_fixture
-        && fixture.finish(dir, status == Status::Pass).is_err()
-    {
-        result.status = Status::Fail;
-        result.detail = "Could not verify the isolated GitHub access trace.".into();
+    if let Some(fixture) = access_fixture {
+        let check = match (status, mode) {
+            (Status::Pass, NativeMode::WindowsGitHubAccess) => TraceCheck::AccountJourney,
+            (
+                Status::Pass,
+                NativeMode::WindowsReaderOffline | NativeMode::WindowsReaderPerformance,
+            ) => TraceCheck::OfflineReader,
+            (Status::Pass, NativeMode::WindowsReaderResume) => TraceCheck::ReaderResume,
+            _ => TraceCheck::Observe,
+        };
+        if fixture.finish(dir, check).is_err() {
+            result.status = Status::Fail;
+            result.detail = "Could not verify the isolated GitHub trace.".into();
+        }
     }
     Ok(result)
 }
@@ -518,6 +576,9 @@ fn access_output_disclosed_credential(dir: &Path, output: &Output) -> Result<boo
         "github-access-native.json",
         "ui-observation.json",
         "github-access-restart-observation.json",
+        "reader-native.json",
+        "reader-performance.json",
+        "reader-restart-observation.json",
     ] {
         let path = dir.join(name);
         if let Ok(bytes) = fs::read(&path)

@@ -30,6 +30,12 @@ pub fn contains_fixture_credential(bytes: &[u8]) -> bool {
 const USER: &str = "/user";
 const DISCOVERY: &str = "/user/repos?per_page=100&page=1";
 const REPOSITORY: &str = "/repos/fixture-org/private";
+const ITEMS: &str =
+    "/repos/fixture-org/private/issues?state=all&sort=created&direction=desc&per_page=20&page=1";
+const ITEM: &str = "/repos/fixture-org/private/issues/41";
+const COMMENTS_FIRST: &str = "/repos/fixture-org/private/issues/41/comments?per_page=20&page=1";
+const COMMENTS_NEXT: &str = "/repos/fixture-org/private/issues/41/comments?per_page=20&page=2";
+const TIMELINE: &str = "/repos/fixture-org/private/issues/41/timeline?per_page=20&page=1";
 const AUTHORIZATION_URL: &str =
     "https://github.com/orgs/fixture-org/sso?authorization_request=fixture123";
 
@@ -41,6 +47,8 @@ enum Phase {
     Sso,
     Denied,
     Revoked,
+    ReaderFailure,
+    ReaderResume,
 }
 
 impl Phase {
@@ -51,6 +59,8 @@ impl Phase {
             "sso" => Ok(Self::Sso),
             "denied" => Ok(Self::Denied),
             "revoked" => Ok(Self::Revoked),
+            "reader-failure" => Ok(Self::ReaderFailure),
+            "reader-resume" => Ok(Self::ReaderResume),
             _ => Err(io::Error::other("invalid access fixture phase")),
         }
     }
@@ -63,6 +73,11 @@ enum Route {
     Discovery,
     Repository,
     Graphql,
+    Items,
+    Item,
+    CommentsFirst,
+    CommentsNext,
+    Timeline,
     Unexpected,
 }
 
@@ -79,6 +94,13 @@ pub struct AccessFixture {
     phase_file: PathBuf,
     stopping: Arc<AtomicBool>,
     worker: Option<JoinHandle<io::Result<Vec<RequestEvidence>>>>,
+}
+
+pub enum TraceCheck {
+    Observe,
+    AccountJourney,
+    OfflineReader,
+    ReaderResume,
 }
 
 impl AccessFixture {
@@ -112,13 +134,19 @@ impl AccessFixture {
         &self.phase_file
     }
 
-    pub fn finish(mut self, report_dir: &Path, require_journey: bool) -> io::Result<()> {
+    pub fn finish(mut self, report_dir: &Path, check: TraceCheck) -> io::Result<()> {
         let records = self.stop()?;
         let trace = serde_json::to_vec_pretty(&records)?;
         fs::write(report_dir.join("github-access-trace.json"), trace)?;
-        if require_journey && !complete_journey(&records) {
+        let valid = match check {
+            TraceCheck::Observe => true,
+            TraceCheck::AccountJourney => complete_journey(&records),
+            TraceCheck::OfflineReader => records.is_empty(),
+            TraceCheck::ReaderResume => complete_reader_resume(&records),
+        };
+        if !valid {
             return Err(io::Error::other(
-                "the synthetic GitHub trace did not cover the access journey",
+                "the synthetic GitHub trace did not match the expected journey",
             ));
         }
         Ok(())
@@ -133,6 +161,26 @@ impl AccessFixture {
             None => Ok(Vec::new()),
         }
     }
+}
+
+fn complete_reader_resume(records: &[RequestEvidence]) -> bool {
+    let discussion: Vec<_> = records
+        .iter()
+        .filter(|entry| matches!(entry.route, Route::CommentsFirst | Route::CommentsNext))
+        .map(|entry| (entry.phase, entry.route, entry.status))
+        .collect();
+    records
+        .iter()
+        .all(|entry| entry.route != Route::Unexpected && entry.fixture_authorization)
+        && records
+            .iter()
+            .any(|entry| entry.route == Route::Items && entry.status == 200)
+        && discussion
+            == [
+                (Phase::ReaderFailure, Route::CommentsFirst, 200),
+                (Phase::ReaderFailure, Route::CommentsNext, 502),
+                (Phase::ReaderResume, Route::CommentsNext, 200),
+            ]
 }
 
 impl Drop for AccessFixture {
@@ -203,6 +251,13 @@ fn answer(socket: &mut TcpStream, phase: Phase) -> io::Result<RequestEvidence> {
     if let Some(sso) = reply.sso {
         write!(socket, "X-GitHub-SSO: {sso}\r\n")?;
     }
+    if route == Route::CommentsFirst && reply.status == 200 {
+        let local = socket.local_addr()?;
+        write!(
+            socket,
+            "Link: <http://{local}{COMMENTS_NEXT}>; rel=\"next\"\r\n"
+        )?;
+    }
     socket.write_all(b"\r\n")?;
     socket.write_all(&body)?;
     Ok(RequestEvidence {
@@ -222,6 +277,11 @@ fn read_request(socket: &TcpStream) -> io::Result<(Route, bool)> {
         (Some("GET"), Some(USER), Some("HTTP/1.1")) => Route::User,
         (Some("GET"), Some(DISCOVERY), Some("HTTP/1.1")) => Route::Discovery,
         (Some("GET"), Some(REPOSITORY), Some("HTTP/1.1")) => Route::Repository,
+        (Some("GET"), Some(ITEMS), Some("HTTP/1.1")) => Route::Items,
+        (Some("GET"), Some(ITEM), Some("HTTP/1.1")) => Route::Item,
+        (Some("GET"), Some(COMMENTS_FIRST), Some("HTTP/1.1")) => Route::CommentsFirst,
+        (Some("GET"), Some(COMMENTS_NEXT), Some("HTTP/1.1")) => Route::CommentsNext,
+        (Some("GET"), Some(TIMELINE), Some("HTTP/1.1")) => Route::Timeline,
         (Some("POST"), Some("/graphql"), Some("HTTP/1.1")) => Route::Graphql,
         _ => Route::Unexpected,
     };
@@ -288,6 +348,20 @@ fn response(phase: Phase, route: Route, authorized: bool) -> Response {
         "id":71, "node_id":"R_71", "name":"private", "owner":{"login":"fixture-org"},
         "private":true, "permissions":{"pull":true,"push":false,"admin":false}
     });
+    let item = || {
+        json!({
+            "id":410, "node_id":"I_410", "number":41, "title":"Reader pagination fixture",
+            "state":"closed", "body":"A downloaded fixture issue.", "user":{"login":"fixture-user"},
+            "created_at":"2018-01-01T00:00:00Z", "updated_at":"2018-01-01T00:00:00Z"
+        })
+    };
+    let comment = |id, day, body| {
+        json!({
+            "id":id, "node_id":format!("IC_{id}"), "body":body, "user":{"login":"fixture-user"},
+            "created_at":format!("2018-01-{day:02}T00:00:00Z"),
+            "updated_at":format!("2018-01-{day:02}T00:00:00Z")
+        })
+    };
     match (phase, route) {
         (_, Route::Unexpected) => {
             result(404, "Not Found", json!({"message":"Unknown fixture route"}))
@@ -322,6 +396,33 @@ fn response(phase: Phase, route: Route, authorized: bool) -> Response {
                 "id":"R_71","name":"private","owner":{"login":"fixture-org"},"isPrivate":true,"viewerPermission":"READ"
             }}}),
         ),
+        (Phase::ReaderFailure | Phase::ReaderResume, Route::Items) => {
+            result(200, "OK", json!([item()]))
+        }
+        (Phase::ReaderFailure | Phase::ReaderResume, Route::Item) => result(200, "OK", item()),
+        (Phase::ReaderFailure, Route::CommentsFirst) => result(
+            200,
+            "OK",
+            json!([comment(5101, 2, "Downloaded first page.")]),
+        ),
+        (Phase::ReaderFailure, Route::CommentsNext) => result(
+            502,
+            "Bad Gateway",
+            json!({"message":"Fixture page two failed"}),
+        ),
+        (Phase::ReaderResume, Route::CommentsNext) => result(
+            200,
+            "OK",
+            json!([comment(5102, 3, "Recovered second page.")]),
+        ),
+        (Phase::ReaderFailure | Phase::ReaderResume, Route::Timeline) => {
+            result(200, "OK", json!([]))
+        }
+        _ => result(
+            404,
+            "Not Found",
+            json!({"message":"Unexpected fixture phase"}),
+        ),
     }
 }
 
@@ -344,7 +445,7 @@ mod tests {
         let mut reply = String::new();
         socket.read_to_string(&mut reply).unwrap();
         assert!(reply.contains("X-GitHub-SSO: partial-results; organizations=123"));
-        fixture.finish(temp.path(), false).unwrap();
+        fixture.finish(temp.path(), TraceCheck::Observe).unwrap();
         let trace = fs::read_to_string(temp.path().join("github-access-trace.json")).unwrap();
         let records: Value = serde_json::from_str(&trace).unwrap();
         assert_eq!(
@@ -352,5 +453,56 @@ mod tests {
             json!({"phase":"partial","route":"discovery","fixture_authorization":true,"status":200})
         );
         assert!(!trace.contains("threadline-test-fixture"));
+    }
+
+    #[test]
+    fn reader_fixture_rejects_repeating_the_first_comment_page_on_resume() {
+        let temp = tempfile::tempdir().unwrap();
+        let fixture = AccessFixture::start(temp.path()).unwrap();
+        let fetch = |path: &str| {
+            let mut socket = TcpStream::connect(fixture.address()).unwrap();
+            write!(
+                socket,
+                "GET {path} HTTP/1.1\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\n\r\n"
+            )
+            .unwrap();
+            let mut reply = String::new();
+            socket.read_to_string(&mut reply).unwrap();
+            reply
+        };
+        fs::write(fixture.phase_file(), "reader-failure").unwrap();
+        assert!(fetch(ITEMS).contains("Reader pagination fixture"));
+        assert!(
+            fetch(COMMENTS_FIRST).contains(&format!("http://{}{COMMENTS_NEXT}", fixture.address()))
+        );
+        assert!(fetch(COMMENTS_NEXT).starts_with("HTTP/1.1 502"));
+        fs::write(fixture.phase_file(), "reader-resume").unwrap();
+        assert!(fetch(COMMENTS_NEXT).contains("Recovered second page"));
+        fixture
+            .finish(temp.path(), TraceCheck::ReaderResume)
+            .unwrap();
+
+        let mut records: Vec<RequestEvidence> = [
+            (Phase::ReaderFailure, Route::Items, 200),
+            (Phase::ReaderFailure, Route::CommentsFirst, 200),
+            (Phase::ReaderFailure, Route::CommentsNext, 502),
+            (Phase::ReaderResume, Route::CommentsNext, 200),
+        ]
+        .into_iter()
+        .map(|(phase, route, status)| RequestEvidence {
+            phase,
+            route,
+            status,
+            fixture_authorization: true,
+        })
+        .collect();
+        assert!(complete_reader_resume(&records));
+        records.push(RequestEvidence {
+            phase: Phase::ReaderResume,
+            route: Route::CommentsFirst,
+            status: 404,
+            fixture_authorization: true,
+        });
+        assert!(!complete_reader_resume(&records));
     }
 }

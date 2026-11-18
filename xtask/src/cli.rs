@@ -307,8 +307,13 @@ fn known_case(lane: Lane, case: &str) -> bool {
             | (Lane::Integration, "S02-FIXTURES")
             | (Lane::Integration, "S03-ACCOUNT-PROFILES")
             | (Lane::Integration, "S03-ACCESS-STORAGE")
+            | (
+                Lane::Integration,
+                "S04-READ-TRANSPORT" | "S04-CACHED-STORE" | "S04-READ-SERVICE"
+            )
             | (Lane::Ui, "S01-GPUI")
             | (Lane::E2e, "S01-WINDOWS-SHELL")
+            | (Lane::E2e, "S04-READER-PERF")
             | (Lane::E2e, "S01-WINDOWS-TOAST")
     ) || catalog_cases(lane).any(|id| id == case)
 }

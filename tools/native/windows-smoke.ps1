@@ -8,6 +8,7 @@ param(
     [switch]$PlatformProof,
     [switch]$ToastProof,
     [switch]$AccessProof,
+    [ValidateSet('Offline', 'Resume', 'Performance')][string]$ReaderProof,
     [string]$AccessAddress,
     [string]$AccessPhaseFile,
     [switch]$ManualTrayClick,
@@ -27,6 +28,10 @@ $reportName = if ($Measure) {
     'toast-native.json'
 } elseif ($AccessProof) {
     'github-access-native.json'
+} elseif ($ReaderProof -eq 'Performance') {
+    'reader-performance.json'
+} elseif ($ReaderProof) {
+    'reader-native.json'
 } else {
     'native.json'
 }
@@ -107,11 +112,11 @@ function Stop-Blocked([string]$Message) {
     throw $Message
 }
 
-function Wait-For([string]$Description, [scriptblock]$Probe, [int]$Timeout = 8000) {
+function Wait-For([string]$Description, [scriptblock]$Probe, [int]$Timeout = 8000, [int]$Interval = 45) {
     $wait = [Diagnostics.Stopwatch]::StartNew()
     while ($wait.ElapsedMilliseconds -lt $Timeout) {
         if (& $Probe) { return }
-        Start-Sleep -Milliseconds 45
+        Start-Sleep -Milliseconds $Interval
     }
     throw "Timed out waiting for $Description."
 }
@@ -135,11 +140,11 @@ function Read-Observation {
     }
 }
 
-function Wait-State([string]$Description, [scriptblock]$Check) {
+function Wait-State([string]$Description, [scriptblock]$Check, [int]$Interval = 45) {
     Wait-For $Description {
         $state = Read-Observation
         $null -ne $state -and (& $Check $state)
-    }
+    } 8000 $Interval
     return Read-Observation
 }
 
@@ -165,13 +170,15 @@ function Wait-SettledLayout([string]$Description, [scriptblock]$Check) {
     return $stable.state
 }
 
-function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenReview) {
+function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenReview, [string]$SeedReader) {
     $info = New-Object System.Diagnostics.ProcessStartInfo
     $info.FileName = $script:Binary
     $info.UseShellExecute = $false
     $info.CreateNoWindow = $true
     $info.WorkingDirectory = $Profile
     $info.Arguments = '--e2e-report "' + $Observation + '"'
+    if (!$AccessProof -and !$ReaderProof) { $info.Arguments += ' --fixture-s01' }
+    if ($SeedReader) { $info.Arguments += ' --e2e-seed-reader ' + $SeedReader }
     if ($Measure) { $info.Arguments += ' --measure' }
     if ($OpenReview) { $info.Arguments += ' --open-review' }
     $info.EnvironmentVariables['THREADLINE_PROFILE_DIR'] = $Profile
@@ -181,7 +188,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     if ($ToastProof -and $null -ne $script:toastFixture) {
         $info.EnvironmentVariables['THREADLINE_TEST_TOAST_TOKEN'] = $script:toastFixture.Token
     }
-    if ($AccessProof) {
+    if ($AccessProof -or $ReaderProof) {
         $info.EnvironmentVariables['THREADLINE_E2E_GITHUB_ADDR'] = $script:AccessAddress
     }
     return [Diagnostics.Process]::Start($info)
@@ -833,9 +840,9 @@ try {
     if (!$ProfileDir) {
         $ProfileDir = Join-Path ([IO.Path]::GetTempPath()) ('threadline-e2e-' + [guid]::NewGuid().ToString('N'))
     }
-    if ($AccessProof) {
+    if ($AccessProof -or $ReaderProof) {
         $fixtureAddress = [regex]::Match($AccessAddress, '^127\.0\.0\.1:([1-9][0-9]{0,4})$')
-        if ($Measure -or $PlatformProof -or $ToastProof -or
+        if ($Measure -or $PlatformProof -or $ToastProof -or ($AccessProof -and $ReaderProof) -or
             !$fixtureAddress.Success -or [int]$fixtureAddress.Groups[1].Value -gt 65535 -or !$AccessPhaseFile -or
             [IO.Path]::GetFullPath($AccessPhaseFile) -ine [IO.Path]::GetFullPath((Join-Path $ProfileDir 'access-fixture-phase.txt')) -or
             !(Test-Path -LiteralPath $AccessPhaseFile -PathType Leaf)) {
@@ -843,8 +850,11 @@ try {
         }
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
+    if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
     $firstProfile = Join-Path $ProfileDir ('initial-' + [guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $firstProfile -Force
+    if ($ReaderProof -eq 'Offline') { Initialize-ReaderProfile $firstProfile 'small' }
+    if ($ReaderProof -eq 'Performance') { Initialize-ReaderProfile $firstProfile 'section-16' }
     if ($ToastProof) {
         if (!(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'windows-notification-focus.ps1') -PathType Leaf)) {
             throw 'The registered toast action helper is missing from this test build.'
@@ -878,6 +888,12 @@ try {
     } elseif ($AccessProof) {
         Invoke-GitHubAccessProof $window $firstProfile
         $report.detail = 'Native account controls verified the synthetic GitHub access and SSO journey and restored repository selection after restart.'
+    } elseif ($ReaderProof) {
+        switch ($ReaderProof) {
+            Offline { Invoke-OfflineReaderProof $window $firstProfile }
+            Resume { Invoke-ReaderResumeProof $window $firstProfile }
+            Performance { Invoke-ReaderPerformance $window }
+        }
     } else {
         try {
             $clipboardBackup = [Windows.Forms.Clipboard]::GetDataObject()
@@ -909,14 +925,14 @@ try {
     }
     $report.status = 'Pass'
 } catch {
-    if ($AccessProof -and $app -and !$app.HasExited -and
+    if (($AccessProof -or $ReaderProof) -and $app -and !$app.HasExited -and
         $_.Exception.InnerException -is [ThreadlineWinInput+TargetUnavailableException]) {
         $blocked = $true
     }
     $report.status = if ($blocked) { 'Blocked' } else { 'Fail' }
     $report.detail = $_.Exception.Message
-    $report.driver_location = if ($AccessProof) { $_.InvocationInfo.ScriptLineNumber } else { $_.InvocationInfo.PositionMessage }
-    if (!$ToastProof -and !$AccessProof -and $app -and !$app.HasExited -and $app.MainWindowHandle -ne [IntPtr]::Zero) {
+    $report.driver_location = if ($AccessProof -or $ReaderProof) { $_.InvocationInfo.ScriptLineNumber } else { $_.InvocationInfo.PositionMessage }
+    if (!$ToastProof -and !$AccessProof -and !$ReaderProof -and $app -and !$app.HasExited -and $app.MainWindowHandle -ne [IntPtr]::Zero) {
         try {
             if ([ThreadlineWinInput]::GetForegroundWindow() -eq $app.MainWindowHandle) {
                 Crop-Screenshot $app.MainWindowHandle 'failure.png'
