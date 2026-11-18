@@ -265,20 +265,6 @@ public static class ThreadlineWinInput
         Send(events);
     }
 
-    private static void RequirePointerTarget(Point point)
-    {
-        RequireTargetFocus();
-        if (WindowFromPoint(point) != TargetWindow)
-            throw new InvalidOperationException("A different native window covers the requested Threadline control.");
-    }
-
-    private static void Move(Point point)
-    {
-        RequirePointerTarget(point);
-        if (!SetCursorPos(point.X, point.Y)) throw new Win32Exception(Marshal.GetLastWin32Error());
-        RequirePointerTarget(point);
-    }
-
     private static Input MouseEvent(uint flags, int data = 0)
     {
         return new Input
@@ -292,26 +278,107 @@ public static class ThreadlineWinInput
         Send(new[] { MouseEvent(LeftDown), MouseEvent(LeftUp) }, requireFocus);
     }
 
-    public static void Drag(Point from, Point to)
+    public static void DragClient(IntPtr window, Point from, Point to, uint child, uint dpi)
     {
-        Move(from);
-        Send(new[] { MouseEvent(LeftDown) });
-        try
-        {
-            for (int step = 1; step <= 12; step++)
-            {
-                Move(new Point { X = from.X + (to.X - from.X) * step / 12, Y = from.Y + (to.Y - from.Y) * step / 12 });
-                Thread.Sleep(16);
-            }
-            RequireTargetFocus();
-        }
-        finally { Release(MouseEvent(LeftUp)); }
+        RunAppPointerGesture(window, from, to, child, dpi);
     }
 
-    public static void Click(Point point)
+    public static void ClickClient(IntPtr window, Point point, uint child, uint dpi)
     {
-        Move(point);
-        ClickPointer(requireFocus: true);
+        RunAppPointerGesture(window, point, null, child, dpi);
+    }
+
+    private struct AppPointerTarget
+    {
+        public IntPtr Window;
+        public uint Child, Dpi;
+        public Rect Client, Desktop;
+    }
+
+    private static Point AppPointerPoint(Point client, AppPointerTarget target)
+    {
+        RequireTargetFocus();
+        Rect view, clip;
+        var screen = client;
+        IntPtr window = target.Window;
+        if (window != TargetWindow || target.Child == 0 || WindowProcessId(window) != target.Child || !IsWindowVisible(window) ||
+            IsIconic(window) || target.Dpi == 0 || GetDpiForWindow(window) != target.Dpi || !GetClientRect(window, out view) ||
+            !SameRect(target.Client, view) || !Contains(view, client) || !ClientToScreen(window, ref screen) ||
+            !SameRect(target.Desktop, VirtualDesktop()))
+            throw new TargetUnavailableException("The Threadline window or display geometry changed during pointer input.");
+        if (!GetClipCursor(out clip) || !Contains(clip, screen) || WindowFromPoint(screen) != window)
+            throw new TargetUnavailableException("The Threadline pointer target is clipped or covered by another window.");
+        return screen;
+    }
+
+    private static void WaitForAppPointer(Point client, Point screen, AppPointerTarget target, string phase)
+    {
+        var timeout = Stopwatch.StartNew();
+        bool corrected = false, readback = false, ownsCursor = false;
+        Point observed = default(Point);
+        do
+        {
+            if (!SamePoint(AppPointerPoint(client, target), screen))
+                throw new TargetUnavailableException("The Threadline pointer target moved during input.");
+            readback = GetPhysicalCursorPos(out observed);
+            ownsCursor = readback && WindowFromPoint(observed) == target.Window;
+            if (ownsCursor && SamePoint(observed, screen)) return;
+            if (!corrected && ownsCursor && timeout.ElapsedMilliseconds >= 8)
+            {
+                Send(new[] { AbsoluteMove(screen, target.Desktop) });
+                corrected = true;
+            }
+            Thread.Sleep(2);
+        } while (timeout.ElapsedMilliseconds < 80);
+        string detail = readback ? "delta X=" + (observed.X - screen.X) + ", Y=" + (observed.Y - screen.Y) +
+            ", cursor belongs to Threadline=" + ownsCursor : "physical position unavailable";
+        throw new TargetUnavailableException("Windows did not confirm the physical cursor " + phase + " (" + detail + ").");
+    }
+
+    private static void RunAppPointerGesture(IntPtr window, Point from, Point? to, uint child, uint dpi)
+    {
+        IntPtr previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        if (previous == IntPtr.Zero)
+            throw new TargetUnavailableException("Could not select per-monitor physical coordinates for pointer input.");
+        try
+        {
+            RequireTargetFocus();
+            Rect clientBounds;
+            if (!GetClientRect(window, out clientBounds))
+                throw new TargetUnavailableException("Threadline did not provide the native client bounds for pointer input.");
+            var target = new AppPointerTarget { Window = window, Child = child, Dpi = dpi, Client = clientBounds, Desktop = VerifiedVirtualDesktop() };
+            Point start = AppPointerPoint(from, target);
+            Point end = to.HasValue ? AppPointerPoint(to.Value, target) : start;
+            Input startMove = AbsoluteMove(start, target.Desktop);
+            Send(new[] { startMove });
+            WaitForAppPointer(from, start, target, "before mouse-down");
+            // Keep the exact absolute move and button events together if the cursor drifts after the readback.
+            if (!to.HasValue)
+            {
+                Send(new[] { startMove, MouseEvent(LeftDown), MouseEvent(LeftUp) });
+                return;
+            }
+
+            Send(new[] { startMove, MouseEvent(LeftDown) });
+            try
+            {
+                for (int step = 1; step <= 12; step++)
+                {
+                    var client = new Point {
+                        X = from.X + (to.Value.X - from.X) * step / 12,
+                        Y = from.Y + (to.Value.Y - from.Y) * step / 12
+                    };
+                    var screen = AppPointerPoint(client, target);
+                    if (screen.X - start.X != client.X - from.X || screen.Y - start.Y != client.Y - from.Y)
+                        throw new TargetUnavailableException("The Threadline client moved during the pointer drag.");
+                    Send(new[] { AbsoluteMove(screen, target.Desktop) });
+                    if (step < 12) Thread.Sleep(16);
+                }
+                WaitForAppPointer(to.Value, end, target, "at the drag endpoint");
+            }
+            finally { Release(MouseEvent(LeftUp)); }
+        }
+        finally { SetThreadDpiAwarenessContext(previous); }
     }
 
     public static void ClickShellControl(Point point, uint shellProcess)
@@ -544,6 +611,14 @@ public static class ThreadlineWinInput
         return (int)((first + last) / 2);
     }
 
+    private static Input AbsoluteMove(Point point, Rect desktop)
+    {
+        var move = MouseEvent(AbsoluteVirtualDesktopMove);
+        move.Data.Mouse.X = NormalizePixel(point.X, desktop.Left, desktop.Right - desktop.Left);
+        move.Data.Mouse.Y = NormalizePixel(point.Y, desktop.Top, desktop.Bottom - desktop.Top);
+        return move;
+    }
+
     internal static void RequireWheelOwner(IntPtr window, IntPtr foreground, IntPtr hit, uint owner, uint child, bool visible)
     {
         if (window == IntPtr.Zero || owner != child || child == 0 || !visible)
@@ -580,9 +655,7 @@ public static class ThreadlineWinInput
             RequireWheelTarget(window, child, target);
             Rect desktop = VerifiedVirtualDesktop();
 
-            var move = MouseEvent(AbsoluteVirtualDesktopMove);
-            move.Data.Mouse.X = NormalizePixel(target.X, desktop.Left, desktop.Right - desktop.Left);
-            move.Data.Mouse.Y = NormalizePixel(target.Y, desktop.Top, desktop.Bottom - desktop.Top);
+            var move = AbsoluteMove(target, desktop);
             RequireWheelTarget(window, child, target);
             Send(new[] { move });
             Point cursor;

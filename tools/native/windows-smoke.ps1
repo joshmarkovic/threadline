@@ -227,8 +227,8 @@ function Invoke-ToolbarClick([IntPtr]$Window, [string]$Control) {
     $property = $state.bounds.PSObject.Properties[$Control]
     if ($null -eq $property -or $property.Value.Count -ne 4) { throw "Missing current bounds for $Control." }
     $bounds = $property.Value
-    $point = To-ScreenPoint $Window ($bounds[0] + $bounds[2] / 2) ($bounds[1] + $bounds[3] / 2) $state.scale_factor
-    [ThreadlineWinInput]::Click($point)
+    $point = To-ClientPoint ($bounds[0] + $bounds[2] / 2) ($bounds[1] + $bounds[3] / 2) $state.scale_factor
+    [ThreadlineWinInput]::ClickClient($Window, $point, $script:app.Id, [uint32][Math]::Round($state.scale_factor * 96))
 }
 
 function Find-ShellControl([string]$Name, [switch]$TrayArea) {
@@ -356,9 +356,9 @@ function Invoke-Smoke([IntPtr]$Window) {
     if ($null -eq $markdown -or $markdown.Count -ne 4 -or $markdown[2] -le 0 -or $markdown[3] -le 0) {
         throw 'Missing current selectable Markdown bounds.'
     }
-    $origin = To-ScreenPoint $Window ($markdown[0] + 1) ($markdown[1] + $markdown[3] * 0.5) $left.scale_factor
-    $end = To-ScreenPoint $Window ($markdown[0] + $markdown[2] - 1) ($markdown[1] + $markdown[3] * 0.5) $left.scale_factor
-    [ThreadlineWinInput]::Drag($origin, $end)
+    $origin = To-ClientPoint ($markdown[0] + 1) ($markdown[1] + $markdown[3] * 0.5) $left.scale_factor
+    $end = To-ClientPoint ($markdown[0] + $markdown[2] - 1) ($markdown[1] + $markdown[3] * 0.5) $left.scale_factor
+    [ThreadlineWinInput]::DragClient($Window, $origin, $end, $script:app.Id, [uint32][Math]::Round($left.scale_factor * 96))
     $markdownAttempts = Assert-ClipboardContains 'Offline review'
     Add-Evidence 'Pointer select formatted Markdown and copy' ([ordered]@{ verified = $true; copy_attempts = $markdownAttempts })
 
@@ -385,16 +385,16 @@ function Invoke-Smoke([IntPtr]$Window) {
     Add-Evidence 'Switch context to linked issue' $context.context_mode
 
     $outer = $context.bounds.outer_divider
-    $start = To-ScreenPoint $Window ($outer[0] + $outer[2] / 2) ($outer[1] + $outer[3] / 2) $context.scale_factor
-    $end = To-ScreenPoint $Window ($outer[0] - 62) ($outer[1] + $outer[3] / 2) $context.scale_factor
-    [ThreadlineWinInput]::Drag($start, $end)
+    $start = To-ClientPoint ($outer[0] + $outer[2] / 2) ($outer[1] + $outer[3] / 2) $context.scale_factor
+    $end = To-ClientPoint ($outer[0] - 62) ($outer[1] + $outer[3] / 2) $context.scale_factor
+    [ThreadlineWinInput]::DragClient($Window, $start, $end, $script:app.Id, [uint32][Math]::Round($context.scale_factor * 96))
     $outerState = Wait-SettledLayout 'settled outer divider resize' { param($state) [Math]::Abs($state.outer_ratio - $context.outer_ratio) -gt 0.025 }
     Add-Evidence 'Resize workspace panes with the pointer' $outerState.outer_ratio
 
     $inner = $outerState.bounds.context_divider
-    $start = To-ScreenPoint $Window ($inner[0] + $inner[2] / 2) ($inner[1] + $inner[3] / 2) $outerState.scale_factor
-    $end = To-ScreenPoint $Window ($inner[0] + 48) ($inner[1] + $inner[3] / 2) $outerState.scale_factor
-    [ThreadlineWinInput]::Drag($start, $end)
+    $start = To-ClientPoint ($inner[0] + $inner[2] / 2) ($inner[1] + $inner[3] / 2) $outerState.scale_factor
+    $end = To-ClientPoint ($inner[0] + 48) ($inner[1] + $inner[3] / 2) $outerState.scale_factor
+    [ThreadlineWinInput]::DragClient($Window, $start, $end, $script:app.Id, [uint32][Math]::Round($outerState.scale_factor * 96))
     $innerState = Wait-SettledLayout 'settled PR context divider resize' { param($state) [Math]::Abs($state.context_ratio - $outerState.context_ratio) -gt 0.025 }
     Add-Evidence 'Resize PR context and code with the pointer' $innerState.context_ratio
 
