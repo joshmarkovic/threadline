@@ -69,6 +69,7 @@ pub(crate) struct ReaderObservation {
     pub active_item: Option<i64>,
     pub active_number: Option<u64>,
     pub cached_content_ready: bool,
+    pub cached_visible_panes: usize,
     pub search_results: Option<usize>,
     pub search_generation: Option<u64>,
     pub first_search_item: Option<i64>,
@@ -372,6 +373,17 @@ impl ReaderWorkspace {
             cached_content_ready: active
                 .and_then(|tab| self.tab_views.get(&tab.id))
                 .is_some_and(|view| view.data.item.is_some()),
+            cached_visible_panes: self
+                .layout
+                .panes
+                .iter()
+                .filter(|pane| {
+                    pane.active
+                        .and_then(|index| pane.tabs.get(index))
+                        .and_then(|tab| self.tab_views.get(&tab.id))
+                        .is_some_and(|view| view.data.item.is_some())
+                })
+                .count(),
             search_results: self.search_hits.as_ref().map(Vec::len),
             search_generation: self.search_reply,
             performance_timing: self.performance.ready(

@@ -205,7 +205,7 @@ function Get-ThreadlineArguments([string]$Observation, [switch]$OpenReview, [str
     return $arguments
 }
 
-function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenReview, [string]$SeedReader) {
+function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenReview, [string]$SeedReader, [switch]$ReaderIdle) {
     $info = New-Object System.Diagnostics.ProcessStartInfo
     $info.FileName = $script:Binary
     $info.UseShellExecute = $false
@@ -219,7 +219,9 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_SYNC')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_FIXTURE_AUTH')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_READER_TIMING')
-    if ($ReaderProof -eq 'Performance') { $info.EnvironmentVariables['THREADLINE_E2E_READER_TIMING'] = '1' }
+    $info.EnvironmentVariables.Remove('THREADLINE_E2E_READER_IDLE')
+    if ($ReaderProof -in @('Performance', 'LargeWorkspace')) { $info.EnvironmentVariables['THREADLINE_E2E_READER_TIMING'] = '1' }
+    if ($ReaderIdle) { $info.EnvironmentVariables['THREADLINE_E2E_READER_IDLE'] = '1' }
     if ($ToastProof -and $null -ne $script:toastFixture) {
         $info.EnvironmentVariables['THREADLINE_TEST_TOAST_TOKEN'] = $script:toastFixture.Token
     }
@@ -951,6 +953,7 @@ try {
     $app = Start-Threadline $firstProfile $reportFile
     $report.app_pid = $app.Id
     $window = Get-ReadyWindow
+    if ($ReaderProof -eq 'LargeWorkspace') { Wait-LargeWorkspaceReady $window }
     $coldMs = $clock.Elapsed.TotalMilliseconds
     $report.native_window = $window.ToInt64()
     $report.dpi = [ThreadlineWinInput]::GetDpiForWindow($window)
@@ -981,7 +984,7 @@ try {
             Offline { Invoke-OfflineReaderProof $window $firstProfile }
             Resume { Invoke-ReaderResumeProof $window $firstProfile }
             Performance { Invoke-ReaderPerformance $window }
-            LargeWorkspace { Invoke-LargeWorkspaceProof $window }
+            LargeWorkspace { Invoke-LargeWorkspaceProof $window $firstProfile $coldMs }
             Sync { Invoke-SyncProof $window $firstProfile }
             NotificationSchedule { Invoke-NotificationScheduleProof $window $firstProfile }
             PullRequest { Invoke-PrReaderProof $window }

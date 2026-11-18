@@ -18,6 +18,8 @@ use tokio::task::JoinHandle;
 
 use crate::{pane_content::DiscussionPane, reader_workspace::performance};
 
+mod reader_idle;
+
 #[derive(Clone)]
 pub(crate) struct Observer(Rc<RefCell<Recorder>>);
 
@@ -27,6 +29,7 @@ struct Recorder {
     bounds: BTreeMap<Cow<'static, str>, [f32; 4]>,
     measurement: Option<Measurement>,
     reader_timing: Option<performance::PaintTiming>,
+    reader_idle: Option<tokio::sync::oneshot::Sender<gpui_kit::WindowId>>,
     reports: watch::Sender<PendingReport>,
 }
 
@@ -119,6 +122,7 @@ impl Observer {
                 gpu: None,
             }
         });
+        let reader_idle = reader_idle::start(&path, runtime);
         let writer = ReportWriter::new(path, runtime);
         let observer = Self(Rc::new(RefCell::new(Recorder {
             started,
@@ -126,6 +130,7 @@ impl Observer {
             bounds: BTreeMap::new(),
             measurement,
             reader_timing: None,
+            reader_idle,
             reports: writer.reports.clone(),
         })));
         (observer, writer)
@@ -236,6 +241,15 @@ impl Observer {
                 timing.painted_qpc = performance::counter();
                 recorder.reader_timing = Some(*timing);
             }
+        }
+        if snapshot.cached_reader.as_ref().is_some_and(|reader| {
+            reader.signed_out
+                && reader.offline
+                && reader.cached_visible_panes == 2
+                && reader.tab_counts == [10, 10]
+        }) && let Some(trigger) = recorder.reader_idle.take()
+        {
+            let _ = trigger.send(window.window_handle().window_id());
         }
         let elapsed_ms = recorder.started.elapsed().as_secs_f64() * 1_000.;
         let startup_ms = if snapshot.ready {

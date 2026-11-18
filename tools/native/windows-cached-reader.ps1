@@ -31,15 +31,20 @@ function Initialize-ReaderProfile([string]$Profile, [string]$Scale) {
     Add-Evidence 'Seed the isolated profile with the application and bundled SQLite' $receipt
 }
 
-function Restart-Reader([string]$Profile) {
+function Restart-Reader([string]$Profile, [hashtable]$Startup) {
     Stop-ThroughUi
     $script:app.Dispose()
     $script:app = $null
     $before = Get-IsolatedSqlite $Profile
     $script:reportFile = Join-Path $script:ReportDir 'reader-restart-observation.json'
-    $script:app = Start-Threadline $Profile $script:reportFile
+    if ($Startup) { $startupClock = [Diagnostics.Stopwatch]::StartNew() }
+    $script:app = Start-Threadline $Profile $script:reportFile -ReaderIdle:([bool]$Startup)
     $script:report.restarted_pid = $script:app.Id
     $window = Get-ReadyWindow
+    if ($Startup) {
+        Wait-LargeWorkspaceReady $window
+        $Startup.warm_start_ms = $startupClock.Elapsed.TotalMilliseconds
+    }
     if (!$script:UseOwnedUiAutomation) { Set-WindowFocus $window }
     $after = Get-IsolatedSqlite $Profile -Live
     if ($before.creation_time_ticks -ne $after.creation_time_ticks) {
@@ -284,13 +289,71 @@ function Invoke-ReaderPerformance([IntPtr]$Window, [switch]$KeepOpen) {
         cached_tab_switch = Get-ReaderBudget ($switch.ToArray()) 100
     }
     if (!$KeepOpen) { Stop-ThroughUi }
-    if ($script:report.budgets.Values.status -contains 'Fail') {
-        throw 'One or more Section 16 cached-reader p95 budgets failed.'
+    if (!$KeepOpen) {
+        if ($script:report.budgets.Values.status -contains 'Fail') {
+            throw 'One or more Section 16 cached-reader p95 budgets failed.'
+        }
+        $script:report.detail = 'Cached opening, local search and tab switching passed their Section 16 p95 budgets.'
     }
-    $script:report.detail = 'Cached opening, local search and tab switching passed their Section 16 p95 budgets.'
 }
 
-function Invoke-LargeWorkspaceProof([IntPtr]$Window) {
+function Wait-LargeWorkspaceReady([IntPtr]$Window) {
+    $state = Wait-Reader 'both visible cached panes and all twenty offline tabs' {
+        param($reader)
+        $panes = $reader.PSObject.Properties['cached_visible_panes']
+        $null -ne $panes -and $panes.Value -eq 2 -and $reader.offline -and $reader.signed_out -and
+            ($reader.tab_counts -join ',') -ceq '10,10'
+    } 5
+    if (![ThreadlineWinInput]::IsWindowVisible($Window) -or $state.pid -ne $script:app.Id -or
+        $null -eq $state.bounds.PSObject.Properties['reader-tab-0-0'] -or
+        $null -eq $state.bounds.PSObject.Properties['reader-tab-1-0']) {
+        Stop-Blocked 'Both cached panes need to be visible in the owned Threadline window.'
+    }
+}
+
+function Get-LargeIdleStatus($Idle, [int]$ProcessId) {
+    if ($null -eq $Idle) { return 'Blocked' }
+    if ($Idle.pid -ne $ProcessId -or $Idle.settle_ms -ne 2000 -or $Idle.sample_ms -ne 3000 -or
+        @($Idle.draws_per_second).Count -ne 3 -or @($Idle.presents_per_second).Count -ne 3) {
+        throw 'The passive idle capture does not identify the owned window and bounded interval.'
+    }
+    if (@($Idle.draws_per_second | Where-Object { $_ -gt 0 }).Count -eq 3 -or
+        @($Idle.presents_per_second | Where-Object { $_ -gt 0 }).Count -eq 3) { return 'Fail' }
+    if (@($Idle.draws_per_second + $Idle.presents_per_second | Where-Object { $_ -ne 0 }).Count -ne 0) { return 'Blocked' }
+    return 'Pass'
+}
+
+function Read-LargeIdleSample {
+    $path = [IO.Path]::ChangeExtension($script:reportFile, 'idle.json')
+    try {
+        Wait-For 'the app-owned passive renderer sample' { [IO.File]::Exists($path) } 8500
+    } catch {
+        if ($script:app.HasExited) { throw 'Threadline exited before the idle sample completed.' }
+        return $null
+    }
+    return [IO.File]::ReadAllText($path) | ConvertFrom-Json
+}
+
+function Invoke-LargeWorkspaceProof([IntPtr]$Window, [string]$Profile, [double]$InitialStartupMs) {
+    $script:app.Refresh()
+    $startup = @{ warm_start_ms = $null }
+    $runtime = [ordered]@{
+        initial_offline_start_ms = $InitialStartupMs
+        initial_offline_peak_working_set_bytes = $script:app.PeakWorkingSet64
+        warm_start_ms = $null
+        idle_frames = $null
+        idle_working_set_bytes = $null
+        peak_working_set_bytes = $null
+        gpu_memory = [ordered]@{ idle = $null; after_actions = $null }
+    }
+    $script:report.runtime = $runtime
+    $Window = Restart-Reader $Profile $startup
+    $runtime.warm_start_ms = $startup.warm_start_ms
+    $runtime.idle_frames = Read-LargeIdleSample
+    $idleStatus = Get-LargeIdleStatus $runtime.idle_frames $script:app.Id
+    $script:app.Refresh()
+    $runtime.idle_working_set_bytes = $script:app.WorkingSet64
+    $runtime.gpu_memory.idle = Get-GpuProcessMemory $script:app.Id
     Invoke-ReaderPerformance $Window -KeepOpen
     Click-AccountControl $Window 'reader-outbox'
     $null = Wait-Reader 'the signed-out native queue shows 900 unresolved fixture operations' {
@@ -309,7 +372,40 @@ function Invoke-LargeWorkspaceProof([IntPtr]$Window) {
     Add-Evidence 'Inspect and cancel the first queued action in the full offline Outbox' ([ordered]@{
         unresolved_before = 900; unresolved_after = 899; cancellation_ms = $cancel.Elapsed.TotalMilliseconds
     })
+    $script:app.Refresh()
+    $runtime.peak_working_set_bytes = [Math]::Max($runtime.initial_offline_peak_working_set_bytes, $script:app.PeakWorkingSet64)
+    $runtime.gpu_memory.after_actions = Get-GpuProcessMemory $script:app.Id
+    $gpuTotals = @($runtime.gpu_memory.Values | Where-Object { $null -ne $_ } | ForEach-Object {
+        $_.dedicated_bytes + $_.shared_bytes
+    })
+    $gpuMaximum = if ($gpuTotals.Count) { ($gpuTotals | Measure-Object -Maximum).Maximum } else { $null }
+    $budgets = $script:report.budgets
+    $budgets.warm_start_ms = [ordered]@{
+        value = $runtime.warm_start_ms
+        limit = 2000
+        status = if ($null -eq $runtime.warm_start_ms) { 'Blocked' }
+            elseif ($runtime.warm_start_ms -gt 0 -and $runtime.warm_start_ms -lt 2000) { 'Pass' }
+            else { 'Fail' }
+    }
+    $budgets.idle_redraw = [ordered]@{ status = $idleStatus }
+    $limits = Get-Content -LiteralPath $BudgetFile -Raw | ConvertFrom-Json
+    foreach ($metric in @('idle_working_set_bytes', 'peak_working_set_bytes')) {
+        $budgets[$metric] = [ordered]@{
+            value = $runtime[$metric]; limit = $limits.$metric
+            status = Compare-Measurement $runtime[$metric] $limits.$metric
+        }
+    }
+    $budgets.gpu_memory_bytes = Get-GpuBudget $gpuMaximum $gpuTotals.Count $limits.gpu_memory_bytes
+    if ($Artifact) {
+        $packageBytes = (Get-Item -LiteralPath $Artifact).Length
+        $runtime.package = [ordered]@{ bytes = $packageBytes; sha256 = Get-FileSha256 $Artifact }
+        $budgets.package_bytes = [ordered]@{
+            value = $packageBytes; limit = $limits.package_bytes
+            status = Compare-Measurement $packageBytes $limits.package_bytes
+        }
+    }
     Stop-ThroughUi
     $script:report.offline_checks_passed = $true
-    Stop-Blocked 'Offline reader budgets, large Outbox inspection and durable cancellation passed. Concurrent eligible online backlog drain still requires a verified workload.'
+    if ($budgets.Values.status -contains 'Fail') { throw 'At least one Section 16 large-workspace budget failed.' }
+    Stop-Blocked 'Offline workspace, warm startup and runtime measurements are recorded. The online drain still requires a verified workload.'
 }

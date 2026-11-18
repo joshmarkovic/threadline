@@ -884,6 +884,11 @@ fn native_driver(
             .arg(options.seed.to_string());
         if mode == NativeMode::Measure {
             cmd.arg("-Measure");
+        }
+        if matches!(
+            mode,
+            NativeMode::Measure | NativeMode::WindowsLargeWorkspace
+        ) {
             if let Some(artifact) = &options.artifact {
                 let artifact = std::path::absolute(artifact).map_err(|error| {
                     NativeError::Blocked(format!("Candidate artifact: {error}"))
