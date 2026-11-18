@@ -52,4 +52,12 @@ The Linux driver needs a real X11 session, xdotool, xclip, ImageMagick with PNG 
 
 The development matrix builds the app and runs available portable tests on native Windows, macOS, and Linux runners. Hosted Windows runs and Windows 11 reference desktop evidence have separate jobs. The supported reference desktop must register the `threadline-interactive` self-hosted runner label to run its optional dispatch job.
 
-The macOS early feasibility command reports the absence of an external input driver. On an Apple Silicon macOS 15 desktop, build `cargo build --locked -p threadline-app`, launch `target/debug/threadline`, and capture process and window evidence while exercising both panes, Markdown selection and copy, the two splitters, PR context, review typing, and Quit. Keep this manual feasibility evidence separate from the future automated macOS native suite.
+The hosted macOS 15 arm64 build job probes its existing debug executable and uploads `macos-window-probe.json`. The probe records Quartz session, display and Metal availability. It looks for an on-screen window owned by the launched process and requests AppKit Quit after verifying the executable. A blocked probe is reported separately from the build and core tests. This check covers launch, window discovery and Quit. Keyboard, clipboard, splitters, and other E2E-001 interactions still need a native input driver or separately recorded desktop evidence.
+
+Run the same probe from an Apple Silicon macOS 15 desktop after building the app.
+
+```bash
+mkdir -p artifacts
+THREADLINE_PROBE_COMMIT=$(git rev-parse HEAD) xcrun swift tools/native/macos-window-probe.swift \
+  target/debug/threadline artifacts/macos-window-probe.json
+```
