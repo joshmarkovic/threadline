@@ -1,0 +1,218 @@
+{
+  "source_revision": "eb77755c93dd58baf0eaefb8d50c84ba2556d7b2",
+  "source_dirty": false,
+  "seed": 12345,
+  "fixture_revision": "s04-reader-v1",
+  "status": "Pass",
+  "exit_code": 0,
+  "case": "E2E-004",
+  "windows": "Microsoft Windows 11 Enterprise",
+  "os_version": "10.0.22631",
+  "architecture": "AMD64",
+  "dpi": 144,
+  "executable_sha256": "ea9d7d974decb6269ddd63f18103ce283f69a76b83ea7b7186c77ceb6707a739",
+  "bytes": 75254272,
+  "identity_setup": "Fixed isolated loopback identity, verified by the application",
+  "distinct_processes": true,
+  "actions": [
+    {
+      "action": "Load the isolated verified account and scope",
+      "observed": {
+        "user": 41,
+        "repository_count": 1
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "reader-repository-1",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "reader-fetch-repository",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "reader-result-0",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "reader-fetch-comments-0",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "reader-download-0",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Keep Partial discussion and an offline request after a failed page two",
+      "observed": {
+        "item": 1,
+        "discussion": "Partial",
+        "downloaded_comments": 1
+      }
+    },
+    {
+      "action": "Relaunch the same SQLite profile in a separate process",
+      "observed": {
+        "sqlite_retained": true
+      }
+    },
+    {
+      "action": "Load the isolated verified account and scope",
+      "observed": {
+        "user": 41,
+        "repository_count": 1
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "reader-resume-download-0",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Resume the original download after reconnecting the isolated account",
+      "observed": {
+        "item": 1,
+        "discussion": "Complete",
+        "downloaded_comments": 2
+      }
+    }
+  ],
+  "requests": [
+    {
+      "phase": "reader_failure",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "reader_failure",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "reader_failure",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "reader_failure",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "reader_failure",
+      "route": "items",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "reader_failure",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "reader_failure",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "reader_failure",
+      "route": "comments_first",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "reader_failure",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "reader_failure",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "reader_failure",
+      "route": "item",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "reader_failure",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "reader_failure",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "reader_failure",
+      "route": "comments_next",
+      "fixture_authorization": true,
+      "status": 502
+    },
+    {
+      "phase": "reader_resume",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "reader_resume",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "reader_resume",
+      "route": "comments_next",
+      "fixture_authorization": true,
+      "status": 200
+    }
+  ],
+  "final_reader": {
+    "comments_coverage": "Complete",
+    "comment_fetch_state": "Idle",
+    "download_state": "Complete",
+    "active_number": 41,
+    "comment_count": 2,
+    "offline": false,
+    "signed_out": false
+  },
+  "source_sha256": {
+    "result.json": "922ccd1ecd9deb7b1f7b619668f078212d2096879d9ebaeac35bec7fb1d3c0d0",
+    "junit.xml": "da3ece01e5f86448806b9a08b9515c3909b040f105f77283053f27c1bdbaeda1",
+    "binary.json": "0b57b20dbb021da128bbb710f8799d56ff494e5580b706ec710734ebcc23fe40",
+    "reader-native.json": "071176c15ba776944e45b70aec06e9f99da4a1cf24f8395775f9f171ec72d0ce",
+    "reader-restart-observation.json": "c404efceddacf27679c57bcfe44d5a36203e7abbb3e4c001dd8bdec791684605",
+    "github-access-trace.json": "573b6751a07d75c07dcc4e4493ceada719cf747d557d61c298eb8e6813f57c6c"
+  }
+}
