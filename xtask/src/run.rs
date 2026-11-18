@@ -30,6 +30,22 @@ const UNIT: &[CargoTest] = &[
         id: "S01-DIFF-FIXTURE",
         arguments: &["-p", "threadline-app", "--lib"],
     },
+    CargoTest {
+        id: "UT-001",
+        arguments: &["-p", "threadline-storage", "--lib", "ut_001"],
+    },
+    CargoTest {
+        id: "UT-003",
+        arguments: &["-p", "threadline-storage", "--lib", "ut_003"],
+    },
+    CargoTest {
+        id: "UT-004",
+        arguments: &["-p", "threadline-storage", "--lib", "ut_004"],
+    },
+    CargoTest {
+        id: "UT-009",
+        arguments: &["-p", "threadline-storage", "--lib", "ut_009"],
+    },
 ];
 const INTEGRATION: &[CargoTest] = &[
     CargoTest {
@@ -39,6 +55,32 @@ const INTEGRATION: &[CargoTest] = &[
     CargoTest {
         id: "S01-PLATFORM",
         arguments: &["-p", "threadline-platform", "--lib"],
+    },
+    CargoTest {
+        id: "IT-001",
+        arguments: &["-p", "threadline-storage", "--test", "identity"],
+    },
+    CargoTest {
+        id: "IT-002",
+        arguments: &["-p", "threadline-storage", "--test", "resources", "it_002"],
+    },
+    CargoTest {
+        id: "S02-RESOURCE-CONTRACTS",
+        arguments: &[
+            "-p",
+            "threadline-storage",
+            "--test",
+            "resources",
+            "resource_",
+        ],
+    },
+    CargoTest {
+        id: "S02-DURABILITY",
+        arguments: &["-p", "threadline-storage", "--test", "durability"],
+    },
+    CargoTest {
+        id: "S02-FIXTURES",
+        arguments: &["-p", "threadline-storage", "--test", "fixtures"],
     },
 ];
 const UI: &[CargoTest] = &[CargoTest {
@@ -112,11 +154,12 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
 }
 
 fn unimplemented(id: &str) -> CaseResult {
-    CaseResult::new(
-        id,
-        Status::Blocked,
-        "No Sprint 01 implementation for this case",
-    )
+    let detail = if id == "IT-019" {
+        "Full IT-019 remains a Sprint 12 gate. Use S02-DURABILITY for the Sprint 02 storage subset."
+    } else {
+        "This scheduled case has no implementation yet."
+    };
+    CaseResult::new(id, Status::Blocked, detail)
 }
 
 fn run_cargo_tests(
@@ -589,13 +632,13 @@ mod tests {
             "test".into(),
             "unit".into(),
             "--case".into(),
-            "UT-001".into(),
+            "UT-002".into(),
         ])
         .unwrap();
         let dir = tempfile::tempdir().unwrap();
         let outcomes = execute(&options, dir.path(), dir.path());
         assert_eq!(outcomes.len(), 1);
-        assert_eq!(outcomes[0].case, "UT-001");
+        assert_eq!(outcomes[0].case, "UT-002");
         assert_eq!(outcomes[0].status, Status::Blocked);
         assert!(outcomes[0].evidence.is_none());
     }

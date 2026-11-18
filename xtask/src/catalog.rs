@@ -15,6 +15,22 @@ pub fn scenario_ids() -> impl Iterator<Item = &'static str> {
         .filter_map(|row| row.split_once(',').map(|(id, _)| id))
 }
 
+pub fn fixture_revision(case: &str) -> Option<&'static str> {
+    matches!(
+        case,
+        "UT-001"
+            | "UT-003"
+            | "UT-004"
+            | "UT-009"
+            | "IT-001"
+            | "IT-002"
+            | "S02-RESOURCE-CONTRACTS"
+            | "S02-DURABILITY"
+            | "S02-FIXTURES"
+    )
+    .then(|| include_str!("../../fixtures/storage-revision.txt").trim_ascii())
+}
+
 pub fn associations(case: &str) -> Associations {
     // These cases are implementation checks that do not have their own catalog row.
     let (requirements, acceptance) = match case {
@@ -26,6 +42,15 @@ pub fn associations(case: &str) -> Associations {
         "S01-WINDOWS-SHELL" => ("PORT-05;NOTIFY-01;TEST-04", "AC-86"),
         "S01-WINDOWS-TOAST" => ("FND-02;PORT-05;NOTIFY-01;TEST-04", "AC-33;AC-86"),
         "S01-WINDOWS-BASELINE" => ("FND-01;TEST-04;TEST-08", "AC-35;AC-84"),
+        "S02-RESOURCE-CONTRACTS" => (
+            "CACHE-03;CACHE-05;CACHE-09;CACHE-10;SYNC-11;NOTIFY-15",
+            "AC-07;AC-08;AC-90",
+        ),
+        "S02-DURABILITY" => (
+            "CACHE-07;CACHE-13;OUTBOX-10;DATA-01;TEST-03;TEST-05",
+            "AC-10;AC-68;AC-73;AC-74;AC-92",
+        ),
+        "S02-FIXTURES" => ("TEST-02;TEST-03;TEST-05", "AC-35;AC-90"),
         _ => catalog_associations(case).unwrap_or_default(),
     };
     Associations {

@@ -39,6 +39,8 @@ pub struct CaseResult {
     #[serde(flatten)]
     associations: Associations,
     pub child_exit_code: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fixture_revision: Option<&'static str>,
 }
 
 impl CaseResult {
@@ -51,6 +53,7 @@ impl CaseResult {
             evidence: None,
             associations: associations(case),
             child_exit_code: None,
+            fixture_revision: crate::catalog::fixture_revision(case),
         }
     }
 }

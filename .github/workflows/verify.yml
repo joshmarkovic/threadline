@@ -48,7 +48,7 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all --check
       - name: Build the native application
-        run: cargo build --locked -p threadline-app
+        run: cargo build --locked -p threadline-app -p threadline-storage
       - name: Verify the Windows desktop executable
         if: runner.os == 'Windows'
         shell: pwsh
