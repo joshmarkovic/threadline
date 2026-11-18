@@ -12,6 +12,7 @@ ShowUninstDetails show
 
 !ifdef LOCAL_FIXTURE
   !define Product "Threadline Installer Test"
+  !define NotificationChannel Local
   !define Registration "Software\Microsoft\Windows\CurrentVersion\Uninstall\Threadline.InstallTest"
   !define History "Software\Threadline.InstallTest"
   !define MutexName "Global\Threadline.InstallTest.367F090C-C2DE-4998-8429-BBA2FDF0BD0C"
@@ -25,12 +26,29 @@ ShowUninstDetails show
     !error "Staging fault injection is available only for the local fixture."
   !endif
   !define Product "Threadline"
+  !define NotificationChannel Release
   !define Registration "Software\Microsoft\Windows\CurrentVersion\Uninstall\Threadline"
   !define History "Software\Threadline"
   !define MutexName "Global\Threadline.EF9956B0-0CA4-4139-B957-CA6F907027B6"
   !define StageId "EF9956B0-0CA4-4139-B957-CA6F907027B6"
 !endif
 !define Stage ".threadline-stage"
+
+!ifdef REGISTER_ACTIVITY
+  !macro StageNotificationHelper
+    InitPluginsDir
+    SetOutPath "$PLUGINSDIR"
+    File /oname=notification-registration.ps1 "${ACTIVITY_SCRIPT}"
+    File /oname=ThreadlineToastShortcut.cs "${SHELL_LINK_HELPER}"
+  !macroend
+  !macro NotificationRegistration Mode Failure
+    nsExec::ExecToStack /TIMEOUT=45000 '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -File "$PLUGINSDIR\notification-registration.ps1" -Mode ${Mode} -Channel ${NotificationChannel} -App "$INSTDIR\threadline.exe" -Link "$SMPROGRAMS\${Product}.lnk" -Scratch "$PLUGINSDIR"'
+    Pop $0
+    Pop $1
+    StrCmp $0 0 +2
+      Goto ${Failure}
+  !macroend
+!endif
 
 Name "${Product} ${PACKAGE_VERSION}"
 OutFile "${INSTALLER_OUTPUT}"
@@ -272,13 +290,21 @@ Section "Install Threadline" SEC_INSTALL
   StrCpy $PriorUninstaller 1
 
   record_pending:
+  !ifdef REGISTER_ACTIVITY
+    !insertmacro StageNotificationHelper
+    !insertmacro NotificationRegistration Prepare stage_failure
+  !endif
   ClearErrors
   WriteRegStr HKCU "${Registration}" "InstallLocation" "$INSTDIR"
   WriteRegDWORD HKCU "${Registration}" "PendingBuild" ${PACKAGE_BUILD}
   IfErrors commit_failure
   SetOutPath "$INSTDIR"
-  CreateShortCut "$SMPROGRAMS\${Product}.lnk" "$INSTDIR\threadline.exe"
-  IfErrors commit_failure
+  !ifdef REGISTER_ACTIVITY
+    !insertmacro NotificationRegistration Apply commit_failure
+  !else
+    CreateShortCut "$SMPROGRAMS\${Product}.lnk" "$INSTDIR\threadline.exe"
+    IfErrors commit_failure
+  !endif
   System::Call 'kernel32::MoveFileExW(w "$INSTDIR\${Stage}\uninstaller.exe", w "$INSTDIR\Uninstall.exe", i 9) i.r0'
   StrCmp $0 0 commit_failure
   StrCpy $UninstallerReplaced 1
@@ -324,6 +350,13 @@ Section "Install Threadline" SEC_INSTALL
 SectionEnd
 
 Function Rollback
+  !ifdef REGISTER_ACTIVITY
+    !insertmacro NotificationRegistration Restore notification_rollback_failed
+    Goto notification_rollback_done
+    notification_rollback_failed:
+      !insertmacro MessageAndStop 19 "Notification registration recovery requires rerunning this installer."
+    notification_rollback_done:
+  !endif
   StrCpy $RollbackFailed 0
   ${If} $AppReplaced == 1
     ${If} $PriorApp == 1
@@ -394,6 +427,10 @@ Function un.onInit
 FunctionEnd
 
 Section "Uninstall"
+  !ifdef REGISTER_ACTIVITY
+    !insertmacro StageNotificationHelper
+    !insertmacro NotificationRegistration Prepare uninstall_failure
+  !endif
   ClearErrors
   SetOutPath "$INSTDIR\${Stage}"
   WriteINIStr "$INSTDIR\${Stage}\owner.ini" "Stage" "Identity" "${StageId}"
@@ -403,6 +440,9 @@ Section "Uninstall"
   StrCmp $0 0 uninstall_busy
 
   remove_shortcut:
+  !ifdef REGISTER_ACTIVITY
+    !insertmacro NotificationRegistration Remove uninstall_restore
+  !endif
   ClearErrors
   Delete "$SMPROGRAMS\${Product}.lnk"
   IfErrors uninstall_restore
@@ -427,7 +467,11 @@ Section "Uninstall"
   IfFileExists "$INSTDIR\${Stage}\removing.exe" 0 uninstall_failure
   System::Call 'kernel32::MoveFileExW(w "$INSTDIR\${Stage}\removing.exe", w "$INSTDIR\threadline.exe", i 9) i.r0'
   StrCmp $0 0 uninstall_restoration_failure
-  CreateShortCut "$SMPROGRAMS\${Product}.lnk" "$INSTDIR\threadline.exe"
+  !ifdef REGISTER_ACTIVITY
+    !insertmacro NotificationRegistration Restore uninstall_restoration_failure
+  !else
+    CreateShortCut "$SMPROGRAMS\${Product}.lnk" "$INSTDIR\threadline.exe"
+  !endif
   uninstall_failure:
   !insertmacro MessageAndStop 16 "The application files or Start menu entry could not be updated. Check the per-user installation permissions and retry uninstalling."
 

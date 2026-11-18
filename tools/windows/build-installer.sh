@@ -114,6 +114,10 @@ if [[ $channel != local-fixture ]]; then
         "-DPUBLISHER_VERIFIER=$staging/verify-publisher.exe")
 fi
 
+if [[ $schema != null && $schema -ge 14 ]]; then
+    compile_defines+=(-DREGISTER_ACTIVITY=1 "-DACTIVITY_SCRIPT=$recipe_dir/notification-registration.ps1"
+        "-DSHELL_LINK_HELPER=$recipe_dir/../native/ThreadlineToastShortcut.cs")
+fi
 "$makensis_path" -V3 -WX -INPUTCHARSET UTF8 \
     "${compile_defines[@]}" "-DPACKAGE_VERSION=$version" "-DPACKAGE_BUILD=$build" \
     "-DPAYLOAD_FILE=$staging/threadline.exe" "-DPAYLOAD_SHA256=$app_hash" \

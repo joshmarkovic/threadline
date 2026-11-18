@@ -77,7 +77,7 @@ public static class ThreadlineToastShortcut
             var shellLink = (IShellLinkW)link;
             shellLink.SetPath(binary);
             shellLink.SetWorkingDirectory(Path.GetDirectoryName(binary));
-            shellLink.SetDescription("Temporary Threadline notification feasibility fixture");
+            shellLink.SetDescription("Open Threadline");
             var store = (IPropertyStore)link;
             var key = new PropertyKey { Format = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"), Id = 5 };
             store.SetValue(ref key, ref value);
