@@ -901,7 +901,7 @@ async fn sync_worker_waits_for_hydration_and_restored_offline_then_observes_both
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn inspected_watched_branch_requires_authoritative_absence_before_deletion() {
+async fn monitored_history_inspected_branch_requires_authoritative_absence_before_deletion() {
     use crate::reader::{ReaderError, ReaderService};
     use threadline_storage::{
         history::{HistoryMonitoring, HistoryRef},
