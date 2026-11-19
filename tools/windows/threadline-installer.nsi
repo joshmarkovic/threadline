@@ -183,12 +183,20 @@ Var RollbackFailed
   ${If} $0 == 0
     !insertmacro MessageAndStop 18 "Could not prepare the application check. Rerun setup and check permission to install applications."
   ${EndIf}
-  nsExec::ExecToStack /TIMEOUT=15000 '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -Command "if (Get-Process -Name threadline -ErrorAction SilentlyContinue | Where-Object { $$_.Path -eq $$env:THREADLINE_SETUP_INSTANCE }) { exit 42 }"'
+  nsExec::ExecToStack /TIMEOUT=15000 '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -Command "\
+    $$ErrorActionPreference = $\'Stop$\'; $$env:PSModulePath = $$PSHOME + $\'\Modules$\'; \
+    try { \
+      foreach ($$process in (Microsoft.PowerShell.Management\Get-Process)) { \
+        if ($$process.ProcessName -ieq $\'threadline$\' -and $$process.Path -ieq $$env:THREADLINE_SETUP_INSTANCE) { exit 42 } \
+      } \
+    } catch { exit 44 }; \
+    exit 0"'
   Pop $ResultCode
   Pop $0
   ${If} $ResultCode == 42
     !insertmacro MessageAndStop 14 "${Product} is running. Quit it from the application and rerun."
   ${ElseIf} $ResultCode != 0
+    DetailPrint "Running application check subprocess status: $ResultCode."
     !insertmacro MessageAndStop 18 "Could not check whether Threadline is running. Ensure Windows PowerShell is available, then rerun setup."
   ${EndIf}
 !macroend
@@ -280,7 +288,13 @@ Function VerifyCandidate
   ${If} $0 == 0
     !insertmacro MessageAndStop 18 "Could not prepare installation verification. Rerun setup."
   ${EndIf}
-  nsExec::ExecToStack /TIMEOUT=60000 '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -Command "$$ErrorActionPreference = $\'Stop$\'; if ((Get-FileHash -LiteralPath $$env:THREADLINE_SETUP_PAYLOAD -Algorithm SHA256).Hash -ine $\'${PAYLOAD_SHA256}$\') { exit 43 }"'
+  nsExec::ExecToStack /TIMEOUT=60000 '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -Command "\
+    $$ErrorActionPreference = $\'Stop$\'; $$env:PSModulePath = $$PSHOME + $\'\Modules$\'; \
+    try { \
+      $$actual = (Microsoft.PowerShell.Utility\Get-FileHash -LiteralPath $$env:THREADLINE_SETUP_PAYLOAD -Algorithm SHA256).Hash; \
+      if ($$actual -ine $\'${PAYLOAD_SHA256}$\') { exit 43 } \
+    } catch { exit 44 }; \
+    exit 0"'
   Pop $ResultCode
   Pop $0
   ${If} $ResultCode == 43
@@ -288,6 +302,7 @@ Function VerifyCandidate
     !insertmacro MessageAndStop 15 "The staged executable did not match the expected SHA-256 digest. Use an intact copy of this installer."
   ${ElseIf} $ResultCode != 0
     Delete "$INSTDIR\${Stage}\candidate.exe"
+    DetailPrint "Staged executable verification subprocess status: $ResultCode."
     !insertmacro MessageAndStop 18 "Could not verify the staged executable. Check Windows PowerShell and local installation permissions."
   ${EndIf}
   !ifndef LOCAL_FIXTURE
