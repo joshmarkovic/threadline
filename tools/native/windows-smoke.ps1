@@ -227,7 +227,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     $info.WorkingDirectory = $Profile
     $info.Arguments = Get-ThreadlineArguments $Observation -OpenReview:$OpenReview -SeedReader $SeedReader -SeedQuietEvent:$SeedQuietEvent
     $info.EnvironmentVariables['THREADLINE_PROFILE_DIR'] = $Profile
-    $info.EnvironmentVariables['THREADLINE_TEST_SEED'] = $Seed.ToString([Globalization.CultureInfo]::InvariantCulture)
+    $info.EnvironmentVariables['THREADLINE_TEST_SEED'] = $script:Seed.ToString([Globalization.CultureInfo]::InvariantCulture)
     $info.EnvironmentVariables.Remove('THREADLINE_TEST_TOAST_TOKEN')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_GITHUB_ADDR')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_SYNC')

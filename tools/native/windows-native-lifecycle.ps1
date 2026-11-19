@@ -240,8 +240,8 @@ function Assert-OfflineOutboxCacheResult($Before, $After) {
 
 function Invoke-OfflineMixedOutboxProof([IntPtr]$Window, [string]$Profile) {
     $initial = Wait-LifecycleWorkspace $true $false
-    $seed = $script:lifecycleSeed
-    $before = $seed.offline_outbox
+    $fixture = $script:lifecycleSeed
+    $before = $fixture.offline_outbox
     if ($before.drafts.Count -ne 4 -or $before.pending_dependents -ne 3 -or
         ($before.actions.kind -join ',') -cne 'Comment,EditIssue,Review,Merge') {
         throw 'This isolated fixture did not seed the mixed drafts and Outbox dependency chain.'
@@ -294,8 +294,8 @@ function Invoke-OfflineMixedOutboxProof([IntPtr]$Window, [string]$Profile) {
     Click-AccountControl $Window 'reader-outbox-filter-all'
     $children = @(
         @{ label = 'Issue edit'; fields = @('Lifecycle fixture title edit') }
-        @{ label = 'Review'; fields = @('Request changes', 'Threadline lifecycle held review.', 'src/relay_00.rs', 'Right line 1', $seed.content.pr_head, 'Threadline lifecycle held inline note.') }
-        @{ label = 'Merge pull request'; fields = @('Squash and merge', 'Target branch main', $seed.content.pr_head) }
+        @{ label = 'Review'; fields = @('Request changes', 'Threadline lifecycle held review.', 'src/relay_00.rs', 'Right line 1', $fixture.content.pr_head, 'Threadline lifecycle held inline note.') }
+        @{ label = 'Merge pull request'; fields = @('Squash and merge', 'Target branch main', $fixture.content.pr_head) }
     )
     for ($index = 1; $index -lt 4; $index++) {
         $child = $children[$index - 1]
