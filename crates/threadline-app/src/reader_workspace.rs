@@ -1485,30 +1485,19 @@ impl ReaderWorkspace {
             return;
         }
         self.layout_busy = true;
-        let count_tabs = |workspace: &Workspace| {
-            workspace
-                .panes
-                .iter()
-                .map(|pane| pane.tabs.len())
-                .sum::<usize>()
-        };
-        let closing_positions: Vec<_> = if count_tabs(&layout) < count_tabs(&self.layout) {
-            self.layout
-                .panes
-                .iter()
-                .flat_map(|pane| &pane.tabs)
-                .filter(|tab| {
-                    !layout
-                        .panes
-                        .iter()
-                        .flat_map(|pane| &pane.tabs)
-                        .any(|open| open.id == tab.id)
-                })
-                .cloned()
-                .collect()
-        } else {
-            Vec::new()
-        };
+        let remaining: HashSet<_> = layout
+            .panes
+            .iter()
+            .flat_map(|pane| pane.tabs.iter().map(|tab| tab.id.as_str()))
+            .collect();
+        let closing_positions: Vec<_> = self
+            .layout
+            .panes
+            .iter()
+            .flat_map(|pane| &pane.tabs)
+            .filter(|tab| !remaining.contains(tab.id.as_str()))
+            .cloned()
+            .collect();
         let state = layout.clone();
         let maximized = self.maximized.then_some(layout.focused_pane);
         let optimistic = show_cached
