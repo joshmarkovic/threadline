@@ -1,0 +1,533 @@
+{
+  "windows_native_merge_and_credentials": [
+    {
+      "run": "e2e-1795045446714-44360",
+      "case": "E2E-009",
+      "status": "Blocked",
+      "exit_code": 78,
+      "child_exit_code": 78,
+      "test_checkout_source": "1bf7e77e8aa6cff3eb675790010602fcd2778c8e",
+      "source_dirty": false,
+      "app_source_revision": "1bf7e77e8aa6cff3eb675790010602fcd2778c8e",
+      "runner_binary_source": "1bf7e77e8aa6cff3eb675790010602fcd2778c8e",
+      "binary": {
+        "sha256": "dbd4d9e77a593a3a07d592f092aa995da85233428b2b8e57b48b534bb44b7fd4",
+        "size_bytes": 80149504,
+        "build": "external override",
+        "evidence_class": "test-build native process"
+      },
+      "app_version": "0.1.0",
+      "fixture_revision": "s09-direct-merge-v1",
+      "lock_sha256": "5b92e1a83782908953a4405e9c1ed8ce80e2dffaa10238f3e14ac04c0a524056",
+      "seed": 12345,
+      "started_at_unix_ms": 1795045446713,
+      "finished_at_unix_ms": 1795045517040,
+      "dpi": 96,
+      "driver_detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible.",
+      "action_count": 27,
+      "action_observations": [
+        {
+          "action": "Queue a native squash merge for the exact original head while offline",
+          "observed": {
+            "expected_head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "merged_before_send": false,
+            "outbox": "Queued"
+          }
+        }
+      ],
+      "offline_profile_reopened": false,
+      "requests": 27,
+      "http": [
+        {
+          "phase": "merge_send",
+          "route": "merge_put",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "merge_send",
+          "route": "merge_readback",
+          "status": 200,
+          "count": 1
+        }
+      ],
+      "sha256": {
+        "result.json": "98977d7f8f9710279d315d4075fb161023378658ce870e6c1b3756e69250e507",
+        "binary.json": "f99ee501e5d8802094d51e4ee2e19f4ee53c45d02c133a9b6ccfb3625655983c",
+        "direct-merge-native.json": "579d8c24a08178944ee39fbdf88f74d10e86d0cd9263e8341ba65ee1cd1f91e7",
+        "github-access-trace.json": "b9372f5bb6485725c3a8aa9157d1f32b24452dd6219bab80ac768b52089bab64"
+      }
+    },
+    {
+      "run": "e2e-1795045876644-19652",
+      "case": "E2E-009",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "test_checkout_source": "3d4fc49da5f13fdb4747e331f90e60832edaab00",
+      "source_dirty": false,
+      "app_source_revision": "c93a8cfd1240b0cd258577f0bce697dd26aad9ac",
+      "runner_binary_source": "c93a8cfd1240b0cd258577f0bce697dd26aad9ac",
+      "binary": {
+        "sha256": "304597568c644891fc92bf77449b6053d690d08a366d053d1ca2c321579398db",
+        "size_bytes": 80279040,
+        "build": "external override",
+        "evidence_class": "test-build native process"
+      },
+      "app_version": "0.1.0",
+      "fixture_revision": "s09-direct-merge-v1",
+      "lock_sha256": "5b92e1a83782908953a4405e9c1ed8ce80e2dffaa10238f3e14ac04c0a524056",
+      "seed": 12345,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-009",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_unix_ms": 1795045876643,
+      "finished_at_unix_ms": 1795046007536,
+      "host": {
+        "os": "windows",
+        "architecture": "x86_64",
+        "version": "Microsoft Windows [Version 10.0.22631.7652]",
+        "display_session": "Windows desktop availability is checked by native driver"
+      },
+      "dpi": 96,
+      "driver_detail": "An offline native squash intent confirmed only after exact-head submission and readback. A second offline intent was held without sending when the provider returned a changed head.",
+      "action_count": 53,
+      "action_observations": [
+        {
+          "action": "Queue a native squash merge for the exact original head while offline",
+          "observed": {
+            "expected_head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "merged_before_send": false,
+            "outbox": "Queued"
+          }
+        },
+        {
+          "action": "Confirm merge after authoritative provider readback",
+          "observed": {
+            "expected_head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "merged": true,
+            "outbox": "Confirmed"
+          }
+        },
+        {
+          "action": "Fresh provider head change holds the queued merge before any send",
+          "observed": {
+            "expected_head": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "fresh_head": "9999999999999999999999999999999999999999",
+            "merged": false,
+            "outbox": "NeedsAttention"
+          }
+        }
+      ],
+      "offline_profile_reopened": false,
+      "requests": 39,
+      "http": [
+        {
+          "phase": "merge_prepare",
+          "route": "compare_a",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "merge_prepare",
+          "route": "compare_b",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "merge_prepare",
+          "route": "items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "merge_prepare",
+          "route": "merge_policy_a",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "merge_prepare",
+          "route": "merge_policy_b",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "merge_prepare",
+          "route": "pull_a",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "merge_prepare",
+          "route": "pull_b",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "merge_prepare",
+          "route": "repository",
+          "status": 200,
+          "count": 7
+        },
+        {
+          "phase": "merge_prepare",
+          "route": "updated_comments",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "merge_prepare",
+          "route": "updated_items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "merge_prepare",
+          "route": "user",
+          "status": 200,
+          "count": 7
+        },
+        {
+          "phase": "merge_send",
+          "route": "merge_policy_a",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "merge_send",
+          "route": "merge_put",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "merge_send",
+          "route": "merge_readback",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "merge_send",
+          "route": "pull_a",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "merge_send",
+          "route": "repository",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "merge_send",
+          "route": "user",
+          "status": 200,
+          "count": 3
+        },
+        {
+          "phase": "merge_wrong_head",
+          "route": "pull_b",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "merge_wrong_head",
+          "route": "repository",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "merge_wrong_head",
+          "route": "user",
+          "status": 200,
+          "count": 2
+        }
+      ],
+      "sha256": {
+        "result.json": "ccf804d8df27178a58ee812a09382b53173e69fbaacfe3f595b49f3eead48a8c",
+        "binary.json": "a87a7cdb97db7bc49de113b9e3b7327ca421fd4d62424005b57c6dd52faa8520",
+        "direct-merge-native.json": "413e18928671e855fcb01b91ec183bb314a9bbd50f152b4116832c729e727dd0",
+        "github-access-trace.json": "c696e176665af9c8f80395a09712c1db1d1d07bcfedf8a99c9bd370e9cbd5fa2"
+      }
+    },
+    {
+      "run": "e2e-1795046007634-40356",
+      "case": "E2E-010",
+      "status": "Blocked",
+      "exit_code": 78,
+      "child_exit_code": 78,
+      "test_checkout_source": "3d4fc49da5f13fdb4747e331f90e60832edaab00",
+      "source_dirty": false,
+      "app_source_revision": "c93a8cfd1240b0cd258577f0bce697dd26aad9ac",
+      "runner_binary_source": "c93a8cfd1240b0cd258577f0bce697dd26aad9ac",
+      "binary": {
+        "sha256": "304597568c644891fc92bf77449b6053d690d08a366d053d1ca2c321579398db",
+        "size_bytes": 80279040,
+        "build": "external override",
+        "evidence_class": "test-build native process"
+      },
+      "app_version": "0.1.0",
+      "fixture_revision": "s09-credential-boundary-v1",
+      "lock_sha256": "5b92e1a83782908953a4405e9c1ed8ce80e2dffaa10238f3e14ac04c0a524056",
+      "seed": 12345,
+      "started_at_unix_ms": 1795046007633,
+      "finished_at_unix_ms": 1795046024030,
+      "dpi": 96,
+      "driver_detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible.",
+      "action_count": 3,
+      "action_observations": [],
+      "offline_profile_reopened": false,
+      "requests": 0,
+      "http": [],
+      "sha256": {
+        "result.json": "06e96cd6abaf1f98e51fdb360c261b843a21eca64ac0233b35e96dce319b0b85",
+        "binary.json": "a87a7cdb97db7bc49de113b9e3b7327ca421fd4d62424005b57c6dd52faa8520",
+        "credential-boundary-native.json": "ef7964564f2609a41a7d789741e01e3cb8ecb828a538ef16c95c39fb99e39012",
+        "github-access-trace.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "run": "e2e-1795047264519-16124",
+      "case": "E2E-010",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "test_checkout_source": "1aa645740159965a0a6bad0f4a6764fe4050ab88",
+      "source_dirty": false,
+      "app_source_revision": "1aa645740159965a0a6bad0f4a6764fe4050ab88",
+      "runner_binary_source": "1aa645740159965a0a6bad0f4a6764fe4050ab88",
+      "binary": {
+        "sha256": "16eee322c34379eb81db4ada0b9db7b249f0ba0e5c8ba4efd3d33732841ec3c3",
+        "size_bytes": 80363008,
+        "build": "external override",
+        "evidence_class": "test-build native process"
+      },
+      "app_version": "0.1.0",
+      "fixture_revision": "s09-credential-boundary-v1",
+      "lock_sha256": "5b92e1a83782908953a4405e9c1ed8ce80e2dffaa10238f3e14ac04c0a524056",
+      "seed": 12345,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-010",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_unix_ms": 1795047264515,
+      "finished_at_unix_ms": 1795047374717,
+      "host": {
+        "os": "windows",
+        "architecture": "x86_64",
+        "version": "Microsoft Windows [Version 10.0.22631.7652]",
+        "display_session": "Windows desktop availability is checked by native driver"
+      },
+      "dpi": 96,
+      "driver_detail": "Sign-out and offline restart retained the original scoped action. Wrong-user renewal was rejected, another account could not see or send it, and the original verified account renewed and confirmed it once.",
+      "action_count": 51,
+      "action_observations": [
+        {
+          "action": "Verify the synthetic settings reached the native authorization form",
+          "observed": {
+            "repository_value_confirmed": true,
+            "synthetic_credential_confirmed": true,
+            "input": "Fixture-only owned setup action"
+          }
+        },
+        {
+          "action": "Keep the original item and one queued action after sign-out and offline restart",
+          "observed": {
+            "original_user": 41,
+            "selected_repository_retained": true,
+            "outbox": 1,
+            "offline": true
+          }
+        },
+        {
+          "action": "Verify the synthetic settings reached the native authorization form",
+          "observed": {
+            "repository_value_confirmed": true,
+            "synthetic_credential_confirmed": true,
+            "input": "Fixture-only owned setup action"
+          }
+        },
+        {
+          "action": "Reject a replacement credential that authenticates the wrong GitHub user",
+          "observed": {
+            "original_user": 41,
+            "replacement_rejected": true
+          }
+        },
+        {
+          "action": "Verify the synthetic settings reached the native authorization form",
+          "observed": {
+            "repository_value_confirmed": true,
+            "synthetic_credential_confirmed": true,
+            "input": "Fixture-only owned setup action"
+          }
+        },
+        {
+          "action": "Connect the same repository under a distinct account without carrying the queued action",
+          "observed": {
+            "alternate_user": 42,
+            "outbox": 0
+          }
+        },
+        {
+          "action": "Verify the synthetic settings reached the native authorization form",
+          "observed": {
+            "repository_value_confirmed": true,
+            "synthetic_credential_confirmed": true,
+            "input": "Fixture-only owned setup action"
+          }
+        },
+        {
+          "action": "Renew the original credential and confirm the same scoped queued action",
+          "observed": {
+            "original_user": 41,
+            "outbox": "Confirmed",
+            "alternate_account_sent": false
+          }
+        }
+      ],
+      "offline_profile_reopened": true,
+      "requests": 34,
+      "http": [
+        {
+          "phase": "credential_other",
+          "route": "discovery",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "credential_other",
+          "route": "repository",
+          "status": 200,
+          "count": 3
+        },
+        {
+          "phase": "credential_other",
+          "route": "updated_comments",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "credential_other",
+          "route": "updated_items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "credential_other",
+          "route": "user",
+          "status": 200,
+          "count": 4
+        },
+        {
+          "phase": "credential_ready",
+          "route": "discovery",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "credential_ready",
+          "route": "items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "credential_ready",
+          "route": "repository",
+          "status": 200,
+          "count": 4
+        },
+        {
+          "phase": "credential_ready",
+          "route": "scheduled_issue",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "credential_ready",
+          "route": "updated_comments",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "credential_ready",
+          "route": "updated_items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "credential_ready",
+          "route": "user",
+          "status": 200,
+          "count": 4
+        },
+        {
+          "phase": "credential_return",
+          "route": "comment_created",
+          "status": 201,
+          "count": 1
+        },
+        {
+          "phase": "credential_return",
+          "route": "discovery",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "credential_return",
+          "route": "item",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "credential_return",
+          "route": "repository",
+          "status": 200,
+          "count": 3
+        },
+        {
+          "phase": "credential_return",
+          "route": "user",
+          "status": 200,
+          "count": 3
+        }
+      ],
+      "sha256": {
+        "result.json": "78495c6be22fc9d3d9fe2df38b6d08a421937d96a26167bb8eb4d46118a2e773",
+        "binary.json": "61ff1efabb5a22f7549b38483f59092474a775b4283dcad67d359a1d02a98ad0",
+        "credential-boundary-native.json": "9ba27638caaaace6c64566c726a7e0e83ffcda4a770ac3db71279792e0cff91c",
+        "github-access-trace.json": "9f9d27c8b89656253556ed0dac2dbe912efa546538c3b166b5395d08eaaec790",
+        "reader-restart-observation.json": "c229ac0c2d5bde950e10bb5cd3ad2cd73a28f02907a723da2dc672823cf481be"
+      }
+    }
+  ]
+}

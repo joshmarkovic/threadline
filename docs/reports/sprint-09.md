@@ -4,4 +4,15 @@ On Windows 11 x64 at `f17e39c`, the direct-merge provider test and six SQLite me
 
 LIVE-004 passed for the designated disposable pull request 3. The authorized client at `8649422` checked ten optional contexts and sent one expected-head merge request. GitHub returned HTTP 200 and commit `a69379f832db973789668ea97d0d3122e46e900b`. That run and an initial read-only check failed their final confirmation. The corrected read-only check at `7e7f602` confirmed that GitHub user 52184130 merged the PR and that the commit's second parent was the expected head `501a4528e98d07e413c6f56bac76a50a9f5d61b5`. No merge request was repeated. The shared provider ran on WSL Linux using the existing CLI OAuth credential. [Three live receipts](evidence/sprint-09/live-merge.json)
 
-Windows native merge scenarios E2E-009 and E2E-010 retain their own workspace and fault checks. [Sprint requirements](../spec/sprints/sprint_09_merge_workflows.md)
+## Native Windows merge and account boundaries
+
+| Scenario and target | Result |
+| --- | --- |
+| E2E-009 first attempt at 96 DPI, app and runner `1bf7e77` | Blocked. The fixture accepted the merge and its readback. The driver tried an Outbox row before its confirmed state was available through accessibility. Windows denied fallback focus. |
+| E2E-009 on Windows 11 x64 at 96 DPI, app and runner `c93a8cf`, driver `3d4fc49` | Pass. The app queued the original squash merge offline and showed the pull request as unmerged. After reconnect it sent one merge request for the exact head, then confirmed the merged state from the provider readback. A second queued merge reached Needs attention when the provider returned a changed head. It sent no second merge request. |
+| E2E-010 first attempt at 96 DPI, app and runner `c93a8cf`, driver `3d4fc49` | Blocked. The correct owned repository field accepted the fixture route. Windows denied foreground access before masked keyboard entry, so the provider received no requests. |
+| E2E-010 on Windows 11 x64 at 96 DPI, clean `1aa6457` app, runner and driver | Pass. Sign-out and offline restart retained the original item, repository selection and queued action. A different GitHub user could not replace the original credential. Connecting that user separately showed an empty Outbox and sent no mutation. Renewal for the original user confirmed the retained action with one HTTP 201. |
+
+For the passing E2E-010 run, a fixture-only accessibility action filled the masked field with the fixed synthetic credential. The normal account form performed access checks, replacement, sign-out and account switching. The normal Outbox worker performed the final send. The 34 local provider requests included no offline traffic. The guarded physical typing attempt is recorded separately. [Native account and request observations](evidence/sprint-09/native-verification.json)
+
+The native commands used `cargo xtask test e2e --suite full --case <case> --binary <binary-path> --seed 12345 --report-dir <report-dir>`. These runs used the local synthetic GitHub provider. [Native Windows receipts](evidence/sprint-09/native-verification.json) · [Sprint requirements](../spec/sprints/sprint_09_merge_workflows.md)
