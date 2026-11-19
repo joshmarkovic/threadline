@@ -38,9 +38,9 @@ pub(super) fn applies(phase: Phase) -> bool {
             | Phase::PrRelease
             | Phase::ReviewSend
             | Phase::ReviewChanged
-            | Phase::ReviewDecisions
     ) || merge::applies(phase)
         || review_threads::active(phase)
+        || review_decisions::active(phase)
 }
 
 pub(super) fn activity_query(phase: Phase, request: &Value) -> Option<Route> {
@@ -121,7 +121,7 @@ fn data(phase: Phase, route: Route) -> Option<Value> {
         )),
         Route::CompareA => {
             let mut comparison = compare(A_BASE, A_HEAD, A_MERGE, "src/first.rs");
-            if phase == Phase::ReviewDecisions {
+            if review_decisions::active(phase) {
                 comparison["files"][0]["additions"] = json!(2);
                 comparison["files"][0]["deletions"] = json!(2);
                 comparison["files"][0]["patch"] = json!(

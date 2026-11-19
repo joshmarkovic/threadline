@@ -245,7 +245,7 @@ function Wait-FixtureReviewDecision($Fixture, [string]$Draft, [bool]$Queued) {
     }
 }
 
-function Invoke-ReviewDecisionsProof([IntPtr]$Window, [string]$Profile) {
+function Invoke-ReviewDecisionsProof([IntPtr]$Window, [string]$Profile, [switch]$Predecessor) {
     Wait-SeededFixtureAccount
     Open-SyncSettings $Window
     Click-AccountControl $Window 'sync-pause-background'
@@ -260,6 +260,7 @@ function Invoke-ReviewDecisionsProof([IntPtr]$Window, [string]$Profile) {
         @{ index = 1; number = 43; title = 'Second fixture pull request'; head = 'e' * 40; path = 'src/second.rs';
            event = 'RequestChanges'; action = 'pr-0-review-request-changes'; lines = @(1); changed = 2 }
     )
+    if ($Predecessor) { $fixtures = @($fixtures[0]) }
     foreach ($fixture in $fixtures) {
         $null = Open-FixturePr $Window 0 $fixture.number $fixture.title $fixture.head $fixture.path $fixture.changed
         $draft = Enter-FixtureAnchoredReview $Window $fixture.head $fixture.path
@@ -286,6 +287,25 @@ function Invoke-ReviewDecisionsProof([IntPtr]$Window, [string]$Profile) {
             throw 'The isolated review did not survive a separate offline process.'
         }
         Set-WriteFixtureOffline $Window $false
+        if ($Predecessor) {
+            $marker = Join-Path ([IO.Path]::GetDirectoryName($script:AccessPhaseFile)) 'review-predecessor-durable.txt'
+            Wait-For 'the worker reads the durable pending review ID before submitting' {
+                if ($script:app.HasExited) { throw 'Threadline exited before reading the pending review.' }
+                [IO.File]::Exists($marker) -and [IO.File]::ReadAllText($marker).Trim() -ceq '92'
+            } 30000 25
+            Set-WriteFixtureOffline $Window $true
+            Set-AccessPhase 'review-resume'
+            $interrupted = $script:app.Id
+            $Window = Restart-Reader $Profile
+            $restored = Wait-FixtureReviewDecision $fixture $draft $false
+            if (!$restored.cached_reader.offline -or $restored.cached_reader.outbox -ne 1 -or $script:app.Id -eq $interrupted) {
+                throw 'The accepted pending review did not survive its interrupted preflight and restart.'
+            }
+            Add-Evidence 'Restore the incomplete submit after the exact pending-review ID was accepted' ([ordered]@{
+                pending_review_id = 92; head = $fixture.head; distinct_process = $true; unfinished = $true
+            })
+            Set-WriteFixtureOffline $Window $false
+        }
         Click-AccountControl $Window 'reader-outbox'
         Click-AccountControl $Window 'reader-outbox-filter-history'
         Wait-For 'the submitted review and predecessor are durably confirmed' {
@@ -300,14 +320,18 @@ function Invoke-ReviewDecisionsProof([IntPtr]$Window, [string]$Profile) {
             number = $fixture.number; head = $fixture.head; event = $fixture.event; source_lines = $fixture.lines
             distinct_process = $true; confirmed = $true
         })
-        if ($fixture.index -eq 0) {
+        if ($fixture.index -eq 0 -and !$Predecessor) {
             Click-AccountControl $Window 'reader-outbox-open'
             Click-AccountControl $Window 'reader-maximize-pane'
             Click-AccountControl $Window 'reader-repository-1'
         }
     }
     Stop-ThroughUi
-    $script:report.detail = 'Windows restored a two-note approval and an anchored request for changes in separate offline processes. Both original reviews confirmed through the exact reviewer and revision checks.'
+    $script:report.detail = if ($Predecessor) {
+        'Windows resumed the exact pending review after an interrupted predecessor read and restart, then confirmed one approval without repeating its creation.'
+    } else {
+        'Windows restored a two-note approval and an anchored request for changes in separate offline processes. Both original reviews confirmed through the exact reviewer and revision checks.'
+    }
 }
 
 function Invoke-ThreadQueueProof([IntPtr]$Window, [string]$Profile) {

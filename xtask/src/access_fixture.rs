@@ -76,6 +76,8 @@ enum Phase {
     ReviewSend,
     ReviewChanged,
     ReviewDecisions,
+    ReviewPredecessor,
+    ReviewResume,
     ThreadQueue,
     ThreadOutdated,
     MergePrepare,
@@ -129,6 +131,8 @@ impl Phase {
             "review-send" => Ok(Self::ReviewSend),
             "review-changed" => Ok(Self::ReviewChanged),
             "review-decisions" => Ok(Self::ReviewDecisions),
+            "review-predecessor" => Ok(Self::ReviewPredecessor),
+            "review-resume" => Ok(Self::ReviewResume),
             "thread-queue" => Ok(Self::ThreadQueue),
             "thread-outdated" => Ok(Self::ThreadOutdated),
             "merge-prepare" => Ok(Self::MergePrepare),
@@ -263,6 +267,7 @@ pub enum TraceCheck {
     ReviewContextJourney,
     ReviewDraftJourney,
     ReviewDecisionsJourney,
+    ReviewPredecessorJourney,
     ReviewThreadsJourney,
     MergeJourney,
     MergeQueueJourney,
@@ -322,6 +327,7 @@ impl AccessFixture {
             TraceCheck::ReviewContextJourney => pr::trace_review_context(&records),
             TraceCheck::ReviewDraftJourney => pr::trace_review_draft(&records),
             TraceCheck::ReviewDecisionsJourney => review_decisions::trace(&records),
+            TraceCheck::ReviewPredecessorJourney => review_decisions::predecessor_trace(&records),
             TraceCheck::ReviewThreadsJourney => review_threads::trace(&records),
             TraceCheck::MergeJourney => merge::trace(&records),
             TraceCheck::MergeQueueJourney => merge::trace_queue(&records),
@@ -514,6 +520,17 @@ fn answer(
     socket.set_read_timeout(timeout)?;
     socket.set_write_timeout(timeout)?;
     let (route, authorized, binding) = read_request(socket, phase)?;
+    if authorized
+        && route == Route::ReviewDecision(review_decisions::DecisionStep::ApprovalReadInterrupted)
+    {
+        review_decisions::interrupt_read(phase_file, stopping)?;
+        return Ok(RequestEvidence {
+            phase,
+            route,
+            fixture_authorization: true,
+            status: 0,
+        });
+    }
     if authorized && let Some(status) = lifecycle::hold(phase, route, phase_file, stopping)? {
         return Ok(RequestEvidence {
             phase,
@@ -850,7 +867,7 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
     let repository = json!({
         "id":71, "node_id":"R_71", "name":"private", "owner":{"login":"fixture-org"},
         "default_branch":"main","private":true,
-        "permissions":{"pull":true,"push":matches!(phase, Phase::ReviewSend | Phase::ReviewChanged | Phase::ReviewDecisions) || merge::applies(phase),"admin":false}
+        "permissions":{"pull":true,"push":matches!(phase, Phase::ReviewSend | Phase::ReviewChanged) || review_decisions::active(phase) || merge::applies(phase),"admin":false}
     });
     let item = || {
         json!({

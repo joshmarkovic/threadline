@@ -619,7 +619,10 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
                 Some(NativeMode::WindowsReaderPerformance)
             } else if id == "S09-MERGE-QUEUE" {
                 Some(NativeMode::WindowsDirectMerge)
-            } else if matches!(id, "S08-REVIEW-DECISIONS" | "S08-THREAD-QUEUE") {
+            } else if matches!(
+                id,
+                "S08-REVIEW-DECISIONS" | "S08-REVIEW-PREDECESSOR" | "S08-THREAD-QUEUE"
+            ) {
                 Some(NativeMode::WindowsReviewDraft)
             } else {
                 WINDOWS_CASES
@@ -871,6 +874,9 @@ fn native_driver(
         NativeMode::WindowsPullRequest => Some("PullRequest"),
         NativeMode::WindowsHistory => Some("History"),
         NativeMode::WindowsReviewDraft if id == "S08-REVIEW-DECISIONS" => Some("ReviewDecisions"),
+        NativeMode::WindowsReviewDraft if id == "S08-REVIEW-PREDECESSOR" => {
+            Some("ReviewPredecessor")
+        }
         NativeMode::WindowsReviewDraft if id == "S08-THREAD-QUEUE" => Some("ThreadQueue"),
         NativeMode::WindowsReviewDraft => Some("ReviewDraft"),
         NativeMode::WindowsReviewContext => Some("ReviewContext"),
@@ -1051,6 +1057,9 @@ fn native_driver(
             (Status::Pass, NativeMode::WindowsHistory) => TraceCheck::HistoryJourney,
             (Status::Pass, NativeMode::WindowsReviewDraft) if id == "S08-REVIEW-DECISIONS" => {
                 TraceCheck::ReviewDecisionsJourney
+            }
+            (Status::Pass, NativeMode::WindowsReviewDraft) if id == "S08-REVIEW-PREDECESSOR" => {
+                TraceCheck::ReviewPredecessorJourney
             }
             (Status::Pass, NativeMode::WindowsReviewDraft) if id == "S08-THREAD-QUEUE" => {
                 TraceCheck::ReviewThreadsJourney

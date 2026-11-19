@@ -398,6 +398,7 @@ fn known_case(lane: Lane, case: &str) -> bool {
             | (Lane::E2e, "S09-MERGE-QUEUE")
             | (Lane::E2e, "S08-REVIEW-DECISIONS")
             | (Lane::E2e, "S08-THREAD-QUEUE")
+            | (Lane::E2e, "S08-REVIEW-PREDECESSOR")
             | (Lane::E2e, "S11-NATIVE-ACTIVITY")
             | (Lane::E2e, "S01-WINDOWS-TOAST")
             | (Lane::Install, crate::install::LOCAL_CASE)

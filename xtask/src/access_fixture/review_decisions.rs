@@ -10,6 +10,7 @@ pub(super) enum DecisionStep {
     ApprovalList,
     ApprovalCreate,
     ApprovalRead,
+    ApprovalReadInterrupted,
     ApprovalSubmit,
     ChangesList,
     ChangesCreate,
@@ -23,7 +24,7 @@ impl DecisionStep {
     fn approval(self) -> bool {
         matches!(
             self,
-            ApprovalList | ApprovalCreate | ApprovalRead | ApprovalSubmit
+            ApprovalList | ApprovalCreate | ApprovalRead | ApprovalReadInterrupted | ApprovalSubmit
         )
     }
     fn identity(self) -> (u32, u32, String) {
@@ -35,29 +36,37 @@ impl DecisionStep {
     }
 }
 
+pub(super) fn active(phase: Phase) -> bool {
+    matches!(
+        phase,
+        Phase::ReviewDecisions | Phase::ReviewPredecessor | Phase::ReviewResume
+    )
+}
+
 pub(super) fn get(phase: Phase, target: &str) -> Option<Route> {
-    if phase != Phase::ReviewDecisions {
+    if !active(phase) {
         return None;
     }
     let step = match target.strip_prefix("/repos/fixture-org/private/pulls/")? {
-        "42/reviews?per_page=100&page=1" => ApprovalList,
+        "42/reviews?per_page=100&page=1" if phase != Phase::ReviewResume => ApprovalList,
+        "42/reviews/92" if phase == Phase::ReviewPredecessor => ApprovalReadInterrupted,
         "42/reviews/92" => ApprovalRead,
-        "43/reviews?per_page=100&page=1" => ChangesList,
-        "43/reviews/93" => ChangesRead,
+        "43/reviews?per_page=100&page=1" if phase == Phase::ReviewDecisions => ChangesList,
+        "43/reviews/93" if phase == Phase::ReviewDecisions => ChangesRead,
         _ => return None,
     };
     Some(Route::ReviewDecision(step))
 }
 
 pub(super) fn post(phase: Phase, path: &str, body: &Value) -> Option<Route> {
-    if phase != Phase::ReviewDecisions {
+    if !active(phase) {
         return None;
     }
     let step = match path.strip_prefix("/repos/fixture-org/private/pulls/")? {
-        "42/reviews" => ApprovalCreate,
-        "42/reviews/92/events" => ApprovalSubmit,
-        "43/reviews" => ChangesCreate,
-        "43/reviews/93/events" => ChangesSubmit,
+        "42/reviews" if phase != Phase::ReviewResume => ApprovalCreate,
+        "42/reviews/92/events" if phase != Phase::ReviewPredecessor => ApprovalSubmit,
+        "43/reviews" if phase == Phase::ReviewDecisions => ChangesCreate,
+        "43/reviews/93/events" if phase == Phase::ReviewDecisions => ChangesSubmit,
         _ => return None,
     };
     let (_, _, head) = step.identity();
@@ -74,6 +83,43 @@ pub(super) fn post(phase: Phase, path: &str, body: &Value) -> Option<Route> {
         _ => return None,
     };
     (*body == expected).then_some(Route::ReviewDecision(step))
+}
+
+pub(super) fn interrupt_read(phase_file: &Path, stopping: &AtomicBool) -> io::Result<()> {
+    use std::time::Instant;
+    let marker = phase_file.with_file_name("review-predecessor-durable.txt");
+    fs::write(&marker, b"92\n")?;
+    let started = Instant::now();
+    while !stopping.load(Ordering::Acquire) && started.elapsed() < Duration::from_secs(12) {
+        if Phase::read(phase_file).ok() != Some(Phase::ReviewPredecessor) {
+            break;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+    fs::remove_file(marker)
+}
+
+pub(super) fn predecessor_trace(records: &[RequestEvidence]) -> bool {
+    use Phase::{ReviewPredecessor, ReviewResume};
+    records.iter().all(|row| {
+        row.fixture_authorization
+            && matches!(row.phase, ReviewPredecessor | ReviewResume)
+            && row.route != Route::Unexpected
+            && (row.status == 200
+                || row.route == Route::ReviewDecision(ApprovalReadInterrupted) && row.status == 0)
+    }) && records
+        .iter()
+        .filter_map(|row| match row.route {
+            Route::ReviewDecision(step) => Some((row.phase, step, row.status)),
+            _ => None,
+        })
+        .eq([
+            (ReviewPredecessor, ApprovalList, 200),
+            (ReviewPredecessor, ApprovalCreate, 200),
+            (ReviewPredecessor, ApprovalReadInterrupted, 0),
+            (ReviewResume, ApprovalRead, 200),
+            (ReviewResume, ApprovalSubmit, 200),
+        ])
 }
 
 pub(super) fn response(route: Route) -> Option<Response> {
@@ -180,5 +226,36 @@ mod tests {
         let result = response(Route::ReviewDecision(ChangesSubmit)).unwrap();
         assert_eq!(result.body["user"]["id"], 41);
         assert_eq!(result.body["state"], "CHANGES_REQUESTED");
+    }
+
+    #[test]
+    fn predecessor_fixture_allows_only_the_unfinished_submit_after_restart() {
+        let phase = Phase::ReviewPredecessor;
+        let resumed = Phase::ReviewResume;
+        let read = "/repos/fixture-org/private/pulls/42/reviews/92";
+        assert_eq!(
+            get(phase, read),
+            Some(Route::ReviewDecision(ApprovalReadInterrupted))
+        );
+        assert_eq!(
+            get(resumed, read),
+            Some(Route::ReviewDecision(ApprovalRead))
+        );
+        let take = |phase, step, status| RequestEvidence {
+            phase,
+            route: Route::ReviewDecision(step),
+            status,
+            fixture_authorization: true,
+        };
+        let mut records = vec![
+            take(phase, ApprovalList, 200),
+            take(phase, ApprovalCreate, 200),
+            take(phase, ApprovalReadInterrupted, 0),
+            take(resumed, ApprovalRead, 200),
+            take(resumed, ApprovalSubmit, 200),
+        ];
+        assert!(predecessor_trace(&records));
+        records.insert(3, take(resumed, ApprovalCreate, 200));
+        assert!(!predecessor_trace(&records));
     }
 }
