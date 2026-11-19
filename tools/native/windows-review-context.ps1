@@ -130,12 +130,12 @@ function Invoke-ReviewContextProof([IntPtr]$Window, [string]$Profile) {
     $script:report.detail = 'The real Windows review draft retained its source line, code comparison and original head through verified issue switches, app layout changes and a separate offline restart.'
 }
 
-function Enter-FixtureAnchoredReview([IntPtr]$Window, [string]$Head, [string]$FixturePath) {
+function Enter-FixtureAnchoredReview([IntPtr]$Window, [string]$Head, [string]$FixturePath, [switch]$AlreadyMaximized) {
     Click-AccountControl $Window 'pr-0-diff-split'
     $null = Wait-PrReader 'the exact fixture split diff' {
         param($pr) $pr.head -ceq $Head -and $pr.selected_file -ceq $FixturePath -and $pr.diff_mode -ceq 'Split'
     }
-    Click-AccountControl $Window 'reader-maximize-pane'
+    if (!$AlreadyMaximized) { Click-AccountControl $Window 'reader-maximize-pane' }
     Select-FixtureRightReviewLine $Window $Head $FixturePath
     Click-AccountControl $Window 'pr-0-review-add-inline'
     $receipt = Wait-PrReader 'the anchored review opened in the chosen pane' {

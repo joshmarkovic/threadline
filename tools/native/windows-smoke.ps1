@@ -937,9 +937,9 @@ try {
     }
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
     if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'DirectMerge', 'MergeQueue', 'NativeLifecycle', 'NativeActivity', 'PerformanceConcurrent')) { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
-    if ($ReaderProof -in @('PullRequest', 'SharedPullRequest', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'NativeLifecycle', 'NativeActivity')) { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
+    if ($ReaderProof -in @('PullRequest', 'SharedPullRequest', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'NativeLifecycle', 'NativeActivity', 'History')) { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
     if ($ReaderProof -in @('NotificationSchedule', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'CredentialBoundary', 'History', 'CommentDependency', 'IssueConflict', 'Writes', 'WriteSurface')) { . (Join-Path $PSScriptRoot 'windows-issue-writes.ps1') }
-    if ($ReaderProof -in @('SharedPullRequest', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'NativeLifecycle')) { . (Join-Path $PSScriptRoot 'windows-review-context.ps1') }
+    if ($ReaderProof -in @('SharedPullRequest', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'NativeLifecycle', 'History')) { . (Join-Path $PSScriptRoot 'windows-review-context.ps1') }
     if ($ReaderProof -in @('DirectMerge', 'MergeQueue')) { . (Join-Path $PSScriptRoot 'windows-merge.ps1') }
     if ($ReaderProof -in @('CredentialBoundary', 'NativeLifecycle')) { . (Join-Path $PSScriptRoot 'windows-credential-boundary.ps1') }
     if ($ReaderProof -eq 'NativeLifecycle') { . (Join-Path $PSScriptRoot 'windows-native-lifecycle.ps1') }
@@ -967,7 +967,7 @@ try {
             ReviewContext { 'pr-load' }
             DirectMerge { 'merge-prepare' }
             MergeQueue { 'merge-prepare' }
-            History { 'history' }
+            History { 'pr-load' }
             PerformanceConcurrent { 'backlog-auth' }
             default { 'write-online' }
         }

@@ -509,3 +509,34 @@ if (!$script:report.concurrent_checks_passed -or $script:report.budgets.Count -n
 }
 $missingTiming = Get-ReaderTimingAttribution @{method = 'UIA InvokePattern'; begin = 10; returned = 20} ([pscustomobject]@{ready = $true}) 'search' 1 30
 if ($missingTiming.status -cne 'Unavailable') { throw 'A missing reader observation appeared correlated.' }
+
+. (Join-Path $PSScriptRoot 'windows-history.ps1')
+$script:historyReads = 0
+function Wait-Reader([string]$Description, [scriptblock]$Check) {
+    foreach ($reader in @([pscustomobject]@{}, [pscustomobject]@{ history = $null },
+        [pscustomobject]@{ history = [pscustomobject]@{ comparison_coverage = 'Missing'; files = 0 } })) {
+        $script:historyReads++
+        if (& $Check $reader) { return $reader }
+    }
+    throw $Description
+}
+$result = Wait-History 'read the completed history observation' {
+    param($history) $history.comparison_coverage -ceq 'Missing' -and $history.files -eq 0
+}
+if ($script:historyReads -ne 3 -or $result.history.files -ne 0) {
+    throw 'The history driver accepted an interim observation with no initialized history view.'
+}
+$script:fixtureQueued = $false
+function Wait-ExactFixtureReview([string]$Draft, [string]$Head) {
+    if ($Draft -cne 'fixture-draft' -or $Head -cne ('b' * 40)) { throw 'Wrong review scope.' }
+    [pscustomobject]@{ cached_reader = [pscustomobject]@{ active_item = 3; outbox = 0
+        pull_request = [pscustomobject]@{ review_draft = [pscustomobject]@{
+            queued = $script:fixtureQueued; summary_nonempty = $true
+        } }
+    } }
+}
+Wait-HistoryUnsubmittedDraft 'fixture-draft' ('b' * 40) 3
+$script:fixtureQueued = $true
+$refused = $false
+try { Wait-HistoryUnsubmittedDraft 'fixture-draft' ('b' * 40) 3 } catch { $refused = $_.Exception.Message -like '*unsubmitted draft*' }
+if (!$refused) { throw 'The history driver accepted a submitted review as an unsent draft.' }

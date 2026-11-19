@@ -74,6 +74,13 @@ fn comparison(base: &str) -> String {
 }
 
 pub(super) fn route(phase: Phase, target: &str) -> Option<Route> {
+    if matches!(phase, Phase::HistoryMoved | Phase::HistoryDeleted) {
+        return match target {
+            "/repositories/71/branches?per_page=20&page=1" => Some(Route::HistoryBranches),
+            "/repositories/71/tags?per_page=20&page=1" => Some(Route::HistoryTags),
+            _ => None,
+        };
+    }
     if phase != Phase::History {
         return None;
     }
@@ -101,7 +108,10 @@ pub(super) fn route(phase: Phase, target: &str) -> Option<Route> {
 }
 
 pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
-    if phase != Phase::History {
+    if !matches!(
+        phase,
+        Phase::History | Phase::HistoryMoved | Phase::HistoryDeleted
+    ) {
         return None;
     }
     let commit = |oid, title, parents| {
@@ -120,7 +130,11 @@ pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
         })
     };
     let body = match route {
-        Route::HistoryBranches => json!([{"name":"main","commit":{"sha":HEAD}}]),
+        Route::HistoryBranches => match phase {
+            Phase::HistoryMoved => json!([{"name":"main","commit":{"sha":OTHER}}]),
+            Phase::HistoryDeleted => json!([]),
+            _ => json!([{"name":"main","commit":{"sha":HEAD}}]),
+        },
         Route::HistoryTags => json!([{"name":"fixture-v1","commit":{"sha":BASE}}]),
         Route::HistoryBranch => json!({"name":"main","commit":{"sha":HEAD}}),
         Route::HistoryFirst => {
@@ -156,9 +170,34 @@ pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
 }
 
 pub(super) fn trace(records: &[RequestEvidence]) -> bool {
+    let occurred = |phase, route| {
+        records
+            .iter()
+            .any(|row| row.phase == phase && row.route == route && row.status == 200)
+    };
     records.iter().all(|row| {
         row.fixture_authorization
-            && row.route != Route::Unexpected
+            && matches!(
+                (row.phase, row.route),
+                (
+                    Phase::PrLoad | Phase::History | Phase::HistoryMoved | Phase::HistoryDeleted,
+                    Route::User | Route::Repository,
+                ) | (Phase::PrLoad, Route::Items | Route::PullA | Route::CompareA)
+                    | (
+                        Phase::History | Phase::HistoryMoved | Phase::HistoryDeleted,
+                        Route::HistoryBranches | Route::HistoryTags,
+                    )
+                    | (
+                        Phase::History,
+                        Route::HistoryBranch
+                            | Route::HistoryFirst
+                            | Route::HistoryOlder
+                            | Route::HistoryParentDiff
+                            | Route::HistoryPairDiff
+                            | Route::HistoryDivergentPair
+                            | Route::HistoryExactObject(_),
+                    )
+            )
             && row.status
                 == if row.route == Route::HistoryDivergentPair {
                     404
@@ -187,9 +226,15 @@ pub(super) fn trace(records: &[RequestEvidence]) -> bool {
             Route::HistoryPairDiff,
         ]
         .into_iter()
-        .all(|route| {
-            records.iter().any(|entry| {
-                entry.phase == Phase::History && entry.route == route && entry.status == 200
+        .all(|route| occurred(Phase::History, route))
+        && [Route::Items, Route::PullA, Route::CompareA]
+            .into_iter()
+            .all(|route| occurred(Phase::PrLoad, route))
+        && [Phase::HistoryMoved, Phase::HistoryDeleted]
+            .into_iter()
+            .all(|phase| {
+                [Route::HistoryBranches, Route::HistoryTags]
+                    .into_iter()
+                    .all(|route| occurred(phase, route))
             })
-        })
 }

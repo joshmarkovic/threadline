@@ -77,7 +77,7 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
         return Some("s10-history-monitor-v1");
     }
     if case == "E2E-011" {
-        return Some("s10-history-endpoints-v2");
+        return Some("s10-history-endpoints-v3");
     }
     if matches!(case, "UT-016" | "S10-HISTORY-HTTP") {
         return Some("s10-history-dag-v1");

@@ -93,6 +93,8 @@ enum Phase {
     CredentialOther,
     CredentialReturn,
     History,
+    HistoryMoved,
+    HistoryDeleted,
     WriteOnline,
     WriteDrop,
     IssueEditBaseline,
@@ -157,6 +159,8 @@ impl Phase {
             "credential-other" => Ok(Self::CredentialOther),
             "credential-return" => Ok(Self::CredentialReturn),
             "history" => Ok(Self::History),
+            "history-moved" => Ok(Self::HistoryMoved),
+            "history-deleted" => Ok(Self::HistoryDeleted),
             "write-online" => Ok(Self::WriteOnline),
             "write-drop" => Ok(Self::WriteDrop),
             "issue-edit-baseline" => Ok(Self::IssueEditBaseline),
@@ -1107,12 +1111,12 @@ mod tests {
         let fixture = AccessFixture::start(temp.path()).unwrap();
         let base = "a".repeat(40);
         let head = "b".repeat(40);
-        let fetch = |phase| {
+        let fetch = |phase, target| {
             fs::write(fixture.phase_file(), phase).unwrap();
             let mut socket = TcpStream::connect(fixture.address()).unwrap();
             write!(
                 socket,
-                "GET /repositories/71/compare/{base}...{head}?per_page=20&page=1 HTTP/1.1\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\n\r\n"
+                "GET {target} HTTP/1.1\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\n\r\n"
             )
             .unwrap();
             let mut reply = String::new();
@@ -1120,8 +1124,17 @@ mod tests {
             assert!(reply.starts_with("HTTP/1.1 200"));
             reply
         };
-        assert!(fetch("history").contains("pair.txt"));
-        assert!(fetch("pr-load").contains("src/first.rs"));
+        let pair = format!("/repositories/71/compare/{base}...{head}?per_page=20&page=1");
+        assert!(fetch("history", pair.as_str()).contains("pair.txt"));
+        assert!(fetch("pr-load", pair.as_str()).contains("src/first.rs"));
+        let branches = "/repositories/71/branches?per_page=20&page=1";
+        assert!(fetch("history", branches).contains(&head));
+        let moved = fetch("history-moved", branches);
+        assert!(moved.contains(&"c".repeat(40)));
+        assert!(!moved.contains(&head));
+        assert!(fetch("history-deleted", branches).ends_with("\r\n[]"));
+        let tags = "/repositories/71/tags?per_page=20&page=1";
+        assert!(fetch("history-deleted", tags).contains("fixture-v1"));
         fixture.finish(temp.path(), TraceCheck::Observe).unwrap();
     }
 
