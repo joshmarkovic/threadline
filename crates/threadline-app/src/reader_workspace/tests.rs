@@ -10,6 +10,8 @@ use threadline_storage::{
     queue::DraftKind,
 };
 
+pub(crate) mod diff_preparation;
+
 #[gpui_kit::test]
 fn ui_008_inactive_tab_labels_restore_and_follow_cached_title_updates(cx: &mut TestAppContext) {
     let setup = ReaderHarness::seeded();

@@ -335,6 +335,8 @@ pub(super) fn parse_patch(
         "--- {left}\n+++ {right}\n{}\n",
         fragment.trim_end_matches('\n')
     );
+    #[cfg(all(test, feature = "e2e"))]
+    super::tests::diff_preparation::hold_fixture_parse(&summary.path, fragment);
     let parsed = DiffFile::parse_with(&patch, DiffParseOptions::new().truncated_hunks(truncated));
     let result = parsed
         .ok()

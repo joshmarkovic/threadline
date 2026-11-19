@@ -1372,6 +1372,8 @@ impl ReaderWorkspace {
         let id = requested.id.clone();
         let item = requested.item;
         if self.pending_tabs.get(&id) != Some(&request) {
+            #[cfg(all(test, feature = "e2e"))]
+            tests::diff_preparation::record_discarded_read(&id);
             return;
         }
         self.pending_tabs.remove(&id);
