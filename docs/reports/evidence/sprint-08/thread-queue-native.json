@@ -1,0 +1,276 @@
+{
+  "runs": [
+    {
+      "run": "e2e-1795052608787-44932",
+      "runner": {
+        "schema": 1,
+        "source_revision": "1f9ce0596cdf205c5d74a597cf0d88830785bea4",
+        "source_dirty": false,
+        "cargo_lock_sha256": "83587d235ce28277e15e3c6e2a0c2ad93f9826339812983027253991e5ebe8ab",
+        "package_version": "0.1.0",
+        "fixture_revision": "s08-native-thread-queue-v1",
+        "seed": 12345,
+        "host": {
+          "os": "windows",
+          "architecture": "x86_64",
+          "version": "Microsoft Windows [Version 10.0.22631.7652]",
+          "display_session": "Windows desktop availability is checked by native driver"
+        },
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "e2e",
+            "--suite",
+            "full",
+            "--case",
+            "S08-THREAD-QUEUE",
+            "--binary",
+            "<binary-path>",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "lane": "e2e",
+        "suite": "full",
+        "started_at_unix_ms": 1795052608786,
+        "finished_at_unix_ms": 1795052662584,
+        "status": "Fail",
+        "exit_code": 1,
+        "case": {
+          "case": "S08-THREAD-QUEUE",
+          "status": "Fail",
+          "detail": "The exact visible review thread control remained unavailable after bounded Conversation scrolling (pr-0-thread-0-reply). See native-driver.log.",
+          "tests_passed": null,
+          "evidence": "review-draft-native.json",
+          "requirement_ids": [
+            "REVIEW-01",
+            "REVIEW-04",
+            "OUTBOX-03",
+            "TEST-04"
+          ],
+          "acceptance_ids": [
+            "AC-63",
+            "AC-65"
+          ],
+          "child_exit_code": 1,
+          "fixture_revision": "s08-native-thread-queue-v1"
+        },
+        "binary_source_revision": "1f9ce0596cdf205c5d74a597cf0d88830785bea4"
+      },
+      "application": {
+        "sha256": "17bfbc210da777a149730c44fa11780e18e48f1362df6c93fcd6b8086b4c3cf1",
+        "size_bytes": 45295104,
+        "evidence_class": "test-build native process",
+        "source_revision": "1f9ce0596cdf205c5d74a597cf0d88830785bea4"
+      },
+      "native": {
+        "driver": "Windows PowerShell / owned UI Automation and guarded Win32 SendInput",
+        "authentication_setup": "Fixed isolated loopback identity, verified by the application",
+        "dpi": 96,
+        "windows_product": "Microsoft Windows 11 Enterprise",
+        "architecture": "AMD64",
+        "os_version": "10.0.22631",
+        "status": "Fail",
+        "action_count": 17,
+        "observations": []
+      },
+      "provider": {
+        "count": 18,
+        "all_fixture_authorized": true,
+        "status_counts": [
+          {
+            "status": 200,
+            "count": 16
+          },
+          {
+            "status": 404,
+            "count": 2
+          }
+        ],
+        "review_steps": [],
+        "thread_steps": [
+          {
+            "phase": "thread_queue",
+            "route": "queued_thread_list",
+            "status": 200
+          }
+        ]
+      },
+      "receipt_sha256": {
+        "result.json": "b731662be1e95669487a00780ef9b0875f00fe88770bc4b0e75aaeeef97a07f6",
+        "binary.json": "ec6c938c61d87f2f67c04518bab7a9ba1265267e09c8dbb9d35f7a649266cceb",
+        "review-draft-native.json": "4d6fe4efe3a93cde6e9fc2b8a353238e518d055dd0b530e7c1d6e48dd0f9b854",
+        "github-access-trace.json": "5136c378ba67a76d60712ca5ce53ea716450e993a705c840a650ddba543b091b",
+        "ui-observation.json": "e24818fdbb2a16b83bd4f754c384cb345801d419ad0add35096885532790f145"
+      },
+      "last_conversation": {
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "threads_coverage": "Complete",
+        "threads_on_page": 1,
+        "account_panel_open": false,
+        "offline": true,
+        "reply_visible": false
+      },
+      "driver_source_revision": "1f9ce0596cdf205c5d74a597cf0d88830785bea4"
+    },
+    {
+      "run": "e2e-1795053412618-34700",
+      "runner": {
+        "schema": 1,
+        "source_revision": "902cba05c2ae99fad7eda6eefdac5bd85d2eb30a",
+        "source_dirty": false,
+        "cargo_lock_sha256": "83587d235ce28277e15e3c6e2a0c2ad93f9826339812983027253991e5ebe8ab",
+        "package_version": "0.1.0",
+        "fixture_revision": "s08-native-thread-queue-v1",
+        "seed": 12345,
+        "host": {
+          "os": "windows",
+          "architecture": "x86_64",
+          "version": "Microsoft Windows [Version 10.0.22631.7652]",
+          "display_session": "Windows desktop availability is checked by native driver"
+        },
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "e2e",
+            "--suite",
+            "full",
+            "--case",
+            "S08-THREAD-QUEUE",
+            "--binary",
+            "<binary-path>",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "lane": "e2e",
+        "suite": "full",
+        "started_at_unix_ms": 1795053412617,
+        "finished_at_unix_ms": 1795053536681,
+        "status": "Pass",
+        "exit_code": 0,
+        "case": {
+          "case": "S08-THREAD-QUEUE",
+          "status": "Pass",
+          "detail": "Windows restored two queued operations on the original review thread, confirmed the exact reply before resolution, and held reopening when the thread became outdated. See native-driver.log.",
+          "tests_passed": null,
+          "evidence": "review-draft-native.json",
+          "requirement_ids": [
+            "REVIEW-01",
+            "REVIEW-04",
+            "OUTBOX-03",
+            "TEST-04"
+          ],
+          "acceptance_ids": [
+            "AC-63",
+            "AC-65"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s08-native-thread-queue-v1"
+        },
+        "binary_source_revision": "43bd2fc625043687f9d5fec86637f1243e754739"
+      },
+      "application": {
+        "sha256": "c98a01e1fa629040243835b6dc27b555816b9a6b7add69e67ab91b3aa6c5bb86",
+        "size_bytes": 45313536,
+        "evidence_class": "test-build native process",
+        "source_revision": "43bd2fc625043687f9d5fec86637f1243e754739"
+      },
+      "native": {
+        "driver": "Windows PowerShell / owned UI Automation and guarded Win32 SendInput",
+        "authentication_setup": "Fixed isolated loopback identity, verified by the application",
+        "dpi": 96,
+        "windows_product": "Microsoft Windows 11 Enterprise",
+        "architecture": "AMD64",
+        "os_version": "10.0.22631",
+        "status": "Pass",
+        "action_count": 51,
+        "observations": [
+          {
+            "action": "Restore and confirm the queued reply followed by resolution on the original thread",
+            "observed": {
+              "number": 42,
+              "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "thread": "PRRT_42",
+              "root": 771,
+              "reply": 772,
+              "confirmed": 2,
+              "distinct_process": true
+            }
+          },
+          {
+            "action": "Hold reopening when provider preflight finds the original thread outdated",
+            "observed": {
+              "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "thread": "PRRT_42",
+              "needs_attention": true
+            }
+          }
+        ]
+      },
+      "provider": {
+        "count": 34,
+        "all_fixture_authorized": true,
+        "status_counts": [
+          {
+            "status": 200,
+            "count": 33
+          },
+          {
+            "status": 201,
+            "count": 1
+          }
+        ],
+        "review_steps": [],
+        "thread_steps": [
+          {
+            "phase": "thread_queue",
+            "route": "queued_thread_list",
+            "status": 200
+          },
+          {
+            "phase": "thread_queue",
+            "route": "queued_thread_target",
+            "status": 200
+          },
+          {
+            "phase": "thread_queue",
+            "route": "queued_thread_reply",
+            "status": 201
+          },
+          {
+            "phase": "thread_queue",
+            "route": "queued_thread_target",
+            "status": 200
+          },
+          {
+            "phase": "thread_queue",
+            "route": "queued_thread_resolve",
+            "status": 200
+          },
+          {
+            "phase": "thread_outdated",
+            "route": "queued_thread_target",
+            "status": 200
+          }
+        ]
+      },
+      "receipt_sha256": {
+        "result.json": "676e308341b2abc29e804cf3cecf3145465246cf65d8dda9330421b1acf968e4",
+        "binary.json": "94c26fad52abb31ea06b104be2cd7fb26cc22357c3a3acd872a64b9e59a8475e",
+        "review-draft-native.json": "98e09811c0f1f098a172d62342d94ac8f69a6b532ca433ac4832981ac5f525c5",
+        "github-access-trace.json": "b937c5cd7734cdf60d2317dd0a77580b3d8ba90f423cc2bfeafe9b27e8d363b3",
+        "ui-observation.json": "4022bb866264b381f2a2d4c3f7aef789460829415a8e428ba02306d434060ef9"
+      },
+      "driver_source_revision": "902cba05c2ae99fad7eda6eefdac5bd85d2eb30a"
+    }
+  ]
+}
