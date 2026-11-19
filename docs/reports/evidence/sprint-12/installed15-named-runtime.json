@@ -1,0 +1,262 @@
+{
+  "source_revision": "c8f241294e2420a827cd09e006ba1b0e8ab05dd1",
+  "installed_build": 15,
+  "installed_setup_sha256": "6c910ef001bed32af9be2aad40d9298d925ffc4094bde18ac86d69ef3c47485b",
+  "runtime_inventory_sha256": "93dfaa82006bc0137e14e50b0d4c16f6d6c9ce6da12a429129cf75d251af8203",
+  "scope": "Three separate named reruns using the runtime inventory. The original full-suite outcomes are preserved.",
+  "cases": [
+    {
+      "case": "E2E-012",
+      "run": "e2e-1795070493668-13496",
+      "status": "Blocked",
+      "exit_code": 78,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-012",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>",
+          "--local-fixture",
+          "<local-fixture-path>"
+        ],
+        "redacted": true
+      },
+      "native": {
+        "status": "Blocked",
+        "detail": "Windows did not grant focus to the fixture window.",
+        "app_sha256": "ff261612e927611805a7afd0a3f0123e6faa93e3d4bcbc443c165a04c173b37c",
+        "fixture_sha256": "8454585fc594444e6739a99855a3f035b180ffc115e0be79cac9da694bd3145c",
+        "synthetic_profile_archived": true,
+        "actions": [
+          {
+            "action": "Create an isolated synthetic account with both network queues paused, a local draft on issue 41 and unseen activity on issue 42",
+            "observed": {
+              "fixture": "threadline-s11-installed-fixture-v1",
+              "event_count": 37,
+              "feed_count": 0,
+              "latest_feed_id": null,
+              "os_feed_only": 0,
+              "registration_feed_only": 0,
+              "adapter_feed_only": 0,
+              "snoozed_targets": 0,
+              "read_count": 0,
+              "group_count": 0,
+              "outcome": null,
+              "activated": false,
+              "pending_opens": 0,
+              "selected_issue": 41,
+              "draft_preserved": true,
+              "draft_tab_preserved": true,
+              "source_events": 37
+            }
+          },
+          {
+            "action": "Verify Windows history, opaque Open/Snooze/Mark read payloads and the delivered journal",
+            "observed": {
+              "fixture": "threadline-s11-installed-fixture-v1",
+              "event_count": 37,
+              "feed_count": 37,
+              "latest_feed_id": 37,
+              "os_feed_only": 0,
+              "registration_feed_only": 0,
+              "adapter_feed_only": 0,
+              "snoozed_targets": 0,
+              "read_count": 0,
+              "group_count": 1,
+              "outcome": "delivered",
+              "activated": false,
+              "pending_opens": 0,
+              "selected_issue": 41,
+              "draft_preserved": true,
+              "draft_tab_preserved": true,
+              "source_events": 37
+            }
+          }
+        ]
+      },
+      "raw_sha256": {
+        "result.json": "86dd1a64cf3f893c33761c707ac06938fd2e68148d096769570357251b9e464d",
+        "junit.xml": "d20034ccea34921e72172ab2d156495368792a90ea6db18dc480ff0e1fe726df",
+        "installed-activity.json": "f203d6696845e24b1b36ec312891cbf4383e6df4207ac46d9c9212a84e6311e9"
+      }
+    },
+    {
+      "case": "E2E-018",
+      "run": "e2e-1795070540366-36392",
+      "status": "Pass",
+      "exit_code": 0,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-018",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>",
+          "--local-fixture",
+          "<local-fixture-path>"
+        ],
+        "redacted": true
+      },
+      "native": {
+        "status": "Pass",
+        "app_sha256": "ff261612e927611805a7afd0a3f0123e6faa93e3d4bcbc443c165a04c173b37c",
+        "fixture_sha256": "8454585fc594444e6739a99855a3f035b180ffc115e0be79cac9da694bd3145c",
+        "synthetic_profile_archived": true,
+        "actions": [
+          {
+            "action": "Create an isolated synthetic account with both network queues paused, a local draft on issue 41 and unseen activity on issue 42",
+            "observed": {
+              "fixture": "threadline-s11-installed-fixture-v1",
+              "event_count": 37,
+              "feed_count": 0,
+              "latest_feed_id": null,
+              "os_feed_only": 0,
+              "registration_feed_only": 0,
+              "adapter_feed_only": 0,
+              "snoozed_targets": 0,
+              "read_count": 0,
+              "group_count": 0,
+              "outcome": null,
+              "activated": false,
+              "pending_opens": 0,
+              "selected_issue": 41,
+              "draft_preserved": true,
+              "draft_tab_preserved": true,
+              "source_events": 37
+            }
+          },
+          {
+            "action": "Start the same executable outside its registered path; all 37 events reach the feed without a native group",
+            "observed": {
+              "fixture": "threadline-s11-installed-fixture-v1",
+              "event_count": 37,
+              "feed_count": 37,
+              "latest_feed_id": 37,
+              "os_feed_only": 0,
+              "registration_feed_only": 37,
+              "adapter_feed_only": 0,
+              "snoozed_targets": 0,
+              "read_count": 0,
+              "group_count": 0,
+              "outcome": null,
+              "activated": false,
+              "pending_opens": 0,
+              "selected_issue": 41,
+              "draft_preserved": true,
+              "draft_tab_preserved": true,
+              "source_events": 37
+            }
+          },
+          {
+            "action": "Snooze and mark read through owned feed controls; retain the original unrelated draft",
+            "observed": {
+              "fixture": "threadline-s11-installed-fixture-v1",
+              "event_count": 37,
+              "feed_count": 37,
+              "latest_feed_id": 37,
+              "os_feed_only": 0,
+              "registration_feed_only": 37,
+              "adapter_feed_only": 0,
+              "snoozed_targets": 1,
+              "read_count": 1,
+              "group_count": 0,
+              "outcome": null,
+              "activated": false,
+              "pending_opens": 0,
+              "selected_issue": 41,
+              "draft_preserved": true,
+              "draft_tab_preserved": true,
+              "source_events": 37
+            }
+          }
+        ]
+      },
+      "raw_sha256": {
+        "result.json": "193022fe018915a5bdb237ea28e28dad9577e9178121bf5d7708d4b89e088603",
+        "junit.xml": "8f6da9493ecf168f0d7b567838b6b63fc3c2d7dc44264cede5843585c81cc365",
+        "installed-activity.json": "9787923e63056d0195a2706f5275c6f711a567e05224411d73f9fc8e0ad4b34a"
+      }
+    },
+    {
+      "case": "E2E-020",
+      "run": "e2e-1795070569226-25532",
+      "status": "Pass",
+      "exit_code": 0,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-020",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>",
+          "--local-fixture",
+          "<local-fixture-path>"
+        ],
+        "redacted": true
+      },
+      "native": {
+        "status": "Pass",
+        "app_sha256": "ff261612e927611805a7afd0a3f0123e6faa93e3d4bcbc443c165a04c173b37c",
+        "fixture_sha256": "8454585fc594444e6739a99855a3f035b180ffc115e0be79cac9da694bd3145c",
+        "synthetic_profile_archived": true,
+        "offline": true,
+        "orderly_quit": true,
+        "selected_file": "second.txt",
+        "diff_mode": "Split",
+        "modules": [
+          {
+            "phase": "Native Markdown with parsed image attachment",
+            "module_count": 72,
+            "descendants": 0,
+            "browser_matches": []
+          },
+          {
+            "phase": "Native selected comparison file and diff toolbar",
+            "module_count": 72,
+            "descendants": 0,
+            "browser_matches": []
+          },
+          {
+            "phase": "Native split diff after the persisted action",
+            "module_count": 72,
+            "descendants": 0,
+            "browser_matches": []
+          }
+        ]
+      },
+      "raw_sha256": {
+        "result.json": "f05ab37611c0c5226f2844ed0e4abe26cf971571a373931db633c254a1da76a0",
+        "junit.xml": "c9a8f64ef76d14cc91f41f02eb987b9bac276cb4f45e012a226346ae50bdc2bf",
+        "installed-runtime.json": "bddb7f06c42b3be75513fefe0f1673f526bcf0d41ba379e958920d07aad81cb7"
+      }
+    }
+  ],
+  "dependency_and_import_check": {
+    "source_commit": "c8f241294e2420a827cd09e006ba1b0e8ab05dd1",
+    "app_sha256": "ff261612e927611805a7afd0a3f0123e6faa93e3d4bcbc443c165a04c173b37c",
+    "normal_dependency_names": 393,
+    "imported_library_count": 39,
+    "browser_matches": [],
+    "dependency_tree_sha256": "67da5108ca1d6190c9a623c5acee2b6359b922c4f32d4af7be913b2ed574e759"
+  },
+  "raw_build_receipt_sha256": "b11d02cc96705de03696dee4021f22c48bb3bd846b23f64df001d1c8d9a2578b"
+}

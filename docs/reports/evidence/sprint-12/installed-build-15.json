@@ -146,7 +146,14 @@
     "canonical": "418284b23f921de418b1b4a8e7bd5999601f5c9730554b693a793ca13649868f",
     "junit": "b9d3d7dd00adc50c2329db959b11a2a176bf57b36e7414bec9a045f2c65d791b",
     "matrix": "134545febd85d4ef72838c679c743f98fc3fb6f6e18c1968a4cf671565f78a5b",
-    "retention": "0fa9c271c4ba0a0847a6747554b0f08880cf9705fe1a5e5082ba7dd17cba40ef"
+    "retention": "0fa9c271c4ba0a0847a6747554b0f08880cf9705fe1a5e5082ba7dd17cba40ef",
+    "post_suite_uninstall": "9f88b9abbff5b1c7be6422dd419ebf04acf0045b7700ed71416c50caa89bf4f3"
+  },
+  "post_suite_uninstall": {
+    "highest_build": 15,
+    "exact_install_present": false,
+    "default_data_absent": true,
+    "registered_uninstaller_sha256": "4afc75c721550476dcb4fe54beaf25f4fcef6f547cde45ce6026cd25e95b8bda"
   },
   "sealed_archives": {
     "earlier_files": 12,

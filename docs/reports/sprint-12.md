@@ -159,6 +159,16 @@ A separate Windows test delivered modeled suspend and resume messages to its own
 
 ## Full native Windows suite
 
+### Full suite with installed local build 15
+
+The clean `c8f2412` Windows 11 suite recorded **10 Pass, seven Blocked and four Fail**, exit 1. Seven cases stopped at the foreground check. E2E-014 exceeded four timing limits. The three installed cases rejected the supplied package lifecycle manifest before launch. [Original 21 outcomes and build identities](evidence/sprint-12/full-native-c8f2412-installed15.json)
+
+Three separate invocations used the runtime inventory. E2E-018 passed with all 37 events available in the feed. E2E-020 passed offline, opened the saved split diff and quit normally. Its three runtime observations each found 72 modules and zero browser matches. E2E-012 verified a delivered notification group for 37 events and retained the unrelated draft. Windows denied foreground focus before the shell click, so the case stayed Blocked. [Named cases and native receipts](evidence/sprint-12/installed15-named-runtime.json)
+
+E2E-014 measured warm startup at 13,430.19 ms against 2,000 ms. From app entry, SQLite opened at 16.07 ms and GPUI application construction finished at 158.94 ms. The application callback began at 11,064.98 ms, a 10,906.04 ms interval that includes toolkit display initialization. The trace records no individual Windows call within that interval. Components and shortcuts finished by 11,069.79 ms. The first useful cached paint was at 11,374.75 ms. External p95 was 2,153.77 ms for cached open, 2,191.84 ms for local search and 2,089.93 ms for tab switch. Idle redraw, working set, reported GPU memory and the 11,171,629-byte setup passed their checks. [All startup checkpoints, budgets and action timings](evidence/sprint-12/full-native-c8f2412-installed15.json)
+
+After the named runs, the ordinary registered uninstaller removed the selected program and registration. The default Data directory was absent, the high-water mark remained 15 and all 15 sealed archive files matched their pinned hashes. [Protected upgrade, migration and post-suite teardown](evidence/sprint-12/installed-build-15.json)
+
 ### Full suite with installed local build 14
 
 The clean `1668ccc` Windows 11 suite recorded **12 Pass, eight Blocked and one Fail** across 21 cases, exit 1. History, offline writes and installed notification fallback passed. The installed normal executable opened the offline fixture and quit normally. The cold notification case showed the delivered group of 37 events and stopped before a shell click. Seven other cases stopped at the foreground check. [All cases, applications and native receipt hashes](evidence/sprint-12/full-native-1668ccc-installed14.json)
