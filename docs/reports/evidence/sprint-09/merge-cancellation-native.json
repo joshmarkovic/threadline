@@ -1,0 +1,247 @@
+{
+  "case": "S09-MERGE-CANCEL",
+  "fixture_revision": "s09-accepted-merge-cancel-v1",
+  "seed": 12345,
+  "target": "Windows 11 x64, authenticated loopback fixture",
+  "runs": [
+    {
+      "run": "e2e-1795063565557-35416",
+      "driver_source": "a062a187a10b65e37481233fbe6b16e2dd632c9f",
+      "source_dirty": false,
+      "driver_sha256": {
+        "windows-merge.ps1": "332d0259459a65e97fd887d2c2c17d4670db9d4fd387cee0e1e7f6ebde2a070e",
+        "windows-github-access.ps1": "6ed128c787133761bbb2e2f47b567d991a67c15186856696cd4bbaafb0110747"
+      },
+      "application_source": "a062a187a10b65e37481233fbe6b16e2dd632c9f",
+      "application_sha256": "0262a2f571a36108599b577a8b43aa9b68c756cf4971c8729de59de6351b29b5",
+      "status": "Fail",
+      "exit_code": 1,
+      "detail": "Unknown access fixture phase.",
+      "window_dpi": 96,
+      "actions": 20,
+      "observed_transitions": [],
+      "total_authenticated_requests": 18,
+      "merge_requests": 0,
+      "authoritative_graphql_reads": 0,
+      "dispatch_and_readback": [],
+      "interrupted_final_state": null,
+      "raw_sha256": {
+        "result.json": "a8bc86fdbe5cc8aa7527432c662b4999af1a48b90e393f0f7b9b693b33257298",
+        "junit.xml": "a20d0a5e89ce6b4677efc3ec0c0c0759a1bb65c53a85771eec6fe3c5af96e8c7",
+        "binary.json": "d38329686b82b7bc5051eaae2616c66e7bc60cbc62263047c0096def3a71e4df",
+        "direct-merge-native.json": "dbb969b7a55cf1258db18554ac58e422a7b33e1cfb8f8ae25bddba109d9f6b59",
+        "github-access-trace.json": "e858ca66a7412141d7b4739262e144628066f507be0d0d74a34e637abdad58fd",
+        "ui-observation.json": "9e9f4dfd2afc894e121d314fbb6b9f33eddb79a8a4a6f31f8d388cfae8ac53d3"
+      }
+    },
+    {
+      "run": "e2e-1795063782591-35920",
+      "driver_source": "0ea88c55f1c9aba733b4d9389cf8446daa7c3c5e",
+      "source_dirty": false,
+      "driver_sha256": {
+        "windows-merge.ps1": "332d0259459a65e97fd887d2c2c17d4670db9d4fd387cee0e1e7f6ebde2a070e",
+        "windows-github-access.ps1": "957fa3f3a41ec9463a7857d4deface86a5aba4b5c44cc85803ad9894b81d984a"
+      },
+      "application_source": "b3ec4778d573d010ed9e48fc04c5443bcef7d625",
+      "application_sha256": "794e5e42ba7699330117311a42e4a0da58c7370ebb7178307ef19f2a83c1a799",
+      "status": "Fail",
+      "exit_code": 1,
+      "detail": "Timed out waiting for the lost response triggered authoritative merge readback.",
+      "window_dpi": 96,
+      "actions": 29,
+      "observed_transitions": [
+        {
+          "action": "Request cancellation from the native Outbox after the provider received the merge",
+          "observed": {
+            "state": "Sending",
+            "cancel_requested": true,
+            "expected_head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "method": "squash"
+          }
+        }
+      ],
+      "total_authenticated_requests": 28,
+      "merge_requests": 1,
+      "authoritative_graphql_reads": 0,
+      "dispatch_and_readback": [
+        {
+          "phase": "merge_cancel_hold",
+          "route": "user",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_hold",
+          "route": "user",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_hold",
+          "route": "repository",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_hold",
+          "route": "pull_a",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_hold",
+          "route": "merge_policy_a",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_hold",
+          "route": "merge_accepted_response_lost",
+          "status": 0
+        },
+        {
+          "phase": "merge_cancel_read",
+          "route": "user",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_read",
+          "route": "user",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_read",
+          "route": "repository",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_read",
+          "route": "pull_a",
+          "status": 200
+        }
+      ],
+      "interrupted_final_state": {
+        "state": "OutcomeUnknown",
+        "cancel_requested": true
+      },
+      "raw_sha256": {
+        "result.json": "da79a93bc92716c1204a8de55b06c20b235d32858c3dc3adb42cd424b7cbfbb1",
+        "junit.xml": "aa5b7cbb01e2f918733d7214f1fde50032969d5e7882e145ea70f1525ae3d2e0",
+        "binary.json": "e09fc2a19c57512534e3151272c900446cfadcf703e5ef143ec152c00f3316c9",
+        "direct-merge-native.json": "f0da14f78ba27549aa66c23972eb4ea7a6ee203b7af319824eadbc66ac81f219",
+        "github-access-trace.json": "7676fc407b34123f31e4d3690fd7655ef9583df62460189ac1dfa7716577c9f3",
+        "ui-observation.json": "6bcf19eec474e32619e09bdf3934d8da26897e8fb6ed56df1c4022f21d177d10"
+      }
+    },
+    {
+      "run": "e2e-1795064066430-45476",
+      "driver_source": "10f021a5692d523904f9ae592c184dd87db30b72",
+      "source_dirty": false,
+      "driver_sha256": {
+        "windows-merge.ps1": "7a99d4e8546fdb44bfb2f6d3c0537f5b809c57db1e3e194b800577824885c9b5",
+        "windows-github-access.ps1": "957fa3f3a41ec9463a7857d4deface86a5aba4b5c44cc85803ad9894b81d984a"
+      },
+      "application_source": "b3ec4778d573d010ed9e48fc04c5443bcef7d625",
+      "application_sha256": "794e5e42ba7699330117311a42e4a0da58c7370ebb7178307ef19f2a83c1a799",
+      "status": "Pass",
+      "exit_code": 0,
+      "detail": "The native Outbox requested cancellation during the original squash request. Response loss left the result uncertain until authoritative readback confirmed the merged PR. The fixture received one PUT.",
+      "window_dpi": 96,
+      "actions": 32,
+      "observed_transitions": [
+        {
+          "action": "Request cancellation from the native Outbox after the provider received the merge",
+          "observed": {
+            "state": "Sending",
+            "cancel_requested": true,
+            "expected_head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "method": "squash"
+          }
+        },
+        {
+          "action": "Observe the unresolved cancellation after the response was lost",
+          "observed": {
+            "state": "OutcomeUnknown",
+            "cancel_requested": true,
+            "unresolved": 1
+          }
+        },
+        {
+          "action": "Open the confirmed original PR and retain its independently observed merge",
+          "observed": {
+            "number": 42,
+            "state": "Confirmed",
+            "merged": true,
+            "expected_head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "merge_commit": "cccccccccccccccccccccccccccccccccccccccc",
+            "own_action_proved": false
+          }
+        }
+      ],
+      "total_authenticated_requests": 29,
+      "merge_requests": 1,
+      "authoritative_graphql_reads": 1,
+      "dispatch_and_readback": [
+        {
+          "phase": "merge_cancel_hold",
+          "route": "user",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_hold",
+          "route": "user",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_hold",
+          "route": "repository",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_hold",
+          "route": "pull_a",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_hold",
+          "route": "merge_policy_a",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_hold",
+          "route": "merge_accepted_response_lost",
+          "status": 0
+        },
+        {
+          "phase": "merge_cancel_read",
+          "route": "user",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_read",
+          "route": "user",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_read",
+          "route": "repository",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_read",
+          "route": "pull_a",
+          "status": 200
+        },
+        {
+          "phase": "merge_cancel_read",
+          "route": "merge_readback",
+          "status": 200
+        }
+      ],
+      "interrupted_final_state": null,
+      "raw_sha256": {
+        "result.json": "56a7693fe4025b3370406f338dc31817de675637b025d3077e8d01335ec6b378",
+        "junit.xml": "5fc0f93c1bb83a2f10300da79d02571f13d9194df1c91a14b07615b789205923",
+        "binary.json": "e09fc2a19c57512534e3151272c900446cfadcf703e5ef143ec152c00f3316c9",
+        "direct-merge-native.json": "a809b5b415f89c1d043057aba75b6483398fb7252166276ac797c3bbb346bbc1",
+        "github-access-trace.json": "c8c23161f39dcaf35ec1ee820f3aea3d3119d23b19d544b8f32ac6704eb7a1ad",
+        "ui-observation.json": "e964b94584cf62b1fa3cf0ca6adc173044025c90e71ee232114c57c5864077b9"
+      }
+    }
+  ]
+}
