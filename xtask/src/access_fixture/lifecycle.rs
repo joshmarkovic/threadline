@@ -18,6 +18,9 @@ fn active(phase: Phase) -> bool {
 }
 
 pub(super) fn read_route(phase: Phase, path: &str) -> Option<Route> {
+    if phase == Phase::ScopeHoldOnline && path == "/repos/fixture-org/archive" {
+        return Some(Route::ScopeArchive);
+    }
     if !active(phase) {
         return None;
     }
@@ -64,6 +67,13 @@ pub(super) fn hold(
 }
 
 pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
+    if phase == Phase::ScopeHoldOnline && matches!(route, Route::ScopeArchive | Route::Discovery) {
+        let mut response = concurrent::response(Phase::BacklogConcurrent, Route::BacklogArchive)?;
+        if route == Route::Discovery {
+            response.body = json!([response.body]);
+        }
+        return Some(response);
+    }
     if !active(phase) {
         return None;
     }
@@ -121,10 +131,15 @@ pub(super) fn trace(records: &[RequestEvidence]) -> bool {
 }
 
 pub(super) fn scope_hold_trace(records: &[RequestEvidence]) -> bool {
-    !records.is_empty()
+    let verified = |route| records.iter().any(|entry| entry.route == route);
+    verified(Route::User)
+        && verified(Route::ScopeArchive)
         && records.iter().all(|entry| {
-            entry.phase == Phase::LifecycleReady
-                && entry.route == Route::User
+            entry.phase == Phase::ScopeHoldOnline
+                && matches!(
+                    entry.route,
+                    Route::User | Route::ScopeArchive | Route::Discovery
+                )
                 && entry.fixture_authorization
                 && entry.status == 200
         })
@@ -135,25 +150,45 @@ mod tests {
     use super::*;
 
     #[test]
-    fn scoped_outbox_trace_requires_online_probe_and_refuses_all_other_traffic() {
+    fn scoped_outbox_trace_requires_the_authenticated_selected_archive_and_refuses_writes() {
+        let directory = tempfile::tempdir().unwrap();
+        let fixture = AccessFixture::start(directory.path()).unwrap();
+        fs::write(fixture.phase_file(), "scope-hold-online").unwrap();
+        let request = |route| {
+            let mut socket = TcpStream::connect(fixture.address()).unwrap();
+            write!(
+                socket,
+                "GET {route} HTTP/1.1\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\n\r\n"
+            )
+            .unwrap();
+            let mut reply = String::new();
+            socket.read_to_string(&mut reply).unwrap();
+            reply
+        };
+        assert!(request("/user").starts_with("HTTP/1.1 200"));
+        assert!(request("/repos/fixture-org/archive").contains("\"id\":72"));
+        assert!(request("/user/repos?per_page=100&page=1").contains("\"id\":72"));
+        fixture
+            .finish(directory.path(), TraceCheck::RepositoryHold)
+            .unwrap();
         let row = |phase, route| RequestEvidence {
             phase,
             route,
             fixture_authorization: true,
             status: 200,
         };
-        assert!(!scope_hold_trace(&[]));
-        let online = row(Phase::LifecycleReady, Route::User);
-        assert!(scope_hold_trace(std::slice::from_ref(&online)));
+        let online = row(Phase::ScopeHoldOnline, Route::User);
+        assert!(!scope_hold_trace(std::slice::from_ref(&online)));
         for (phase, route) in [
             (Phase::LifecycleOffline, Route::User),
-            (Phase::LifecycleReady, Route::Repository),
-            (Phase::LifecycleReady, Route::IssueEditCommitted),
-            (Phase::LifecycleReady, Route::ReviewCreated),
-            (Phase::LifecycleReady, Route::MergePut),
+            (Phase::ScopeHoldOnline, Route::Repository),
+            (Phase::ScopeHoldOnline, Route::IssueEditCommitted),
+            (Phase::ScopeHoldOnline, Route::ReviewCreated),
+            (Phase::ScopeHoldOnline, Route::MergePut),
         ] {
             assert!(!scope_hold_trace(&[
-                row(Phase::LifecycleReady, Route::User),
+                row(Phase::ScopeHoldOnline, Route::User),
+                row(Phase::ScopeHoldOnline, Route::ScopeArchive),
                 row(phase, route)
             ]));
         }

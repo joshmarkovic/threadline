@@ -382,11 +382,24 @@ function Invoke-RepositoryScopeHoldProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Sync 'release the Outbox pause while still offline' {
         param($sync) Test-LifecycleSync $sync $true $false
     }
-    Set-AccessPhase 'lifecycle-ready'
+    Set-AccessPhase 'scope-hold-online'
     Click-AccountControl $restarted 'sync-work-offline'
+    $null = Wait-Sync 'persist online dispatch settings after leaving Work Offline' {
+        param($sync) Test-LifecycleSync $sync $false $false
+    }
+    Click-AccountControl $restarted 'sync-check-now'
     $null = Wait-Sync 'verify authenticated connectivity with dispatch enabled and no eligible scope work' {
         param($sync) (Test-LifecycleSync $sync $false $false -Reachable) -and $sync.eligible_outbox -eq 0
     }
+    Click-AccountControl $restarted 'account-open'
+    Click-AccountControl $restarted 'account-refresh'
+    $null = Wait-Account 'verify the still-selected archive on the original account' {
+        param($account)
+        $account.active_user_id -eq 41 -and $account.selected_count -eq 1 -and !$account.busy -and
+            $account.profile_access -ceq 'Readable' -and $account.reachability -ceq 'ReceivedResponse'
+    }
+    Click-AccountControl $restarted 'account-close'
+    Add-Evidence 'Check the worker explicitly and refresh access to the only selected repository' 'archive'
     Click-AccountControl $restarted 'reader-outbox'
     Click-AccountControl $restarted 'reader-outbox-filter-all'
     $labels = @('Comment', 'Issue edit', 'Review', 'Merge pull request')
@@ -401,7 +414,7 @@ function Invoke-RepositoryScopeHoldProof([IntPtr]$Window, [string]$Profile) {
     $after = Read-NativeLifecycle $Profile 'scope-hold' 'scope-hold-after-reconnect.json'
     Assert-ScopedOutbox $before $after $false
     Add-Evidence 'Verify exact retained denied and pending actions after reconnect without another submission' $after
-    $script:report.detail = 'The original pending issue, review, merge and denied comment survived deselection and offline restart. Online dispatch stayed held with the other repository selected.'
+    $script:report.detail = 'The original pending issue, review, merge and denied comment survived deselection and offline restart. Explicit checks verified authenticated connectivity and the selected archive while dispatch stayed held.'
 }
 
 function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
