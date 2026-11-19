@@ -237,6 +237,227 @@
         "native": "19bb4a7dff7c0cd51da87c174ff46be17803a551d5e7cdfe4f3b422b2bd395fb",
         "redacted_http_trace": "dc4d82ed6dbe7c8320229f9024e3bdfe4ffac75e4420191db444fdf795e3551e"
       }
+    },
+    {
+      "run": "e2e-1795056751973-47556",
+      "case": "E2E-006",
+      "result": "Fail",
+      "exit_code": 1,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-006",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_unix_ms": 1795056751972,
+      "finished_at_unix_ms": 1795056800415,
+      "driver_revision": "6ebb514f758662815ea0951cc25afff343b35ff3",
+      "driver_sha256": "c080a85d7e23e4b38d73e9f26539dc59580e43a376895fdf4971f014f43eacda",
+      "driver_cargo_lock_sha256": "ba1fa2481ba47ebb082dae4aff8bf1a099cea5775b4196b096aeb3bb094d4efb",
+      "source_dirty": false,
+      "app_revision": "43bd2fc625043687f9d5fec86637f1243e754739",
+      "runner_revision": "43bd2fc625043687f9d5fec86637f1243e754739",
+      "runner_sha256": "7189cdaca98be1fd37dc471469a5e1ef96183416c969d085ee2d37bb45ec7ea9",
+      "executable_sha256": "c98a01e1fa629040243835b6dc27b555816b9a6b7add69e67ab91b3aa6c5bb86",
+      "bytes": 45313536,
+      "host": {
+        "os": "windows",
+        "architecture": "x86_64",
+        "version": "Microsoft Windows [Version 10.0.22631.7652]",
+        "display_session": "Windows desktop availability is checked by native driver"
+      },
+      "dpi": 96,
+      "fixture": "s07-write-engine-v1",
+      "seed": 12345,
+      "requirement_ids": [
+        "OFFLINE-02",
+        "ISSUE-03",
+        "ISSUE-04",
+        "OUTBOX-03",
+        "OUTBOX-07",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-13",
+        "AC-58",
+        "AC-59",
+        "AC-60",
+        "AC-61"
+      ],
+      "detail": "Exception calling \"SetValue\" with \"1\" argument(s): \"Unrecognized error.\"",
+      "driver_location": 132,
+      "native_actions": 13,
+      "new_process": false,
+      "checked_actions": [
+        {
+          "action": "Load the isolated verified account and scope",
+          "observed": {
+            "user": 41,
+            "repository_count": 1
+          }
+        },
+        {
+          "action": "Open existing GitHub issue 41 from the downloaded repository",
+          "observed": 41
+        }
+      ],
+      "requests": 12,
+      "authenticated": true,
+      "raw_sha256": {
+        "result": "dda530354d2c5528a2e2e8b81287b6b48169706d55d66c4cbb789ad2214c86ae",
+        "native": "f60582f01dedb67c847545bbde59943f603515fea6269b4789d8c0c4176f7e43",
+        "redacted_http_trace": "e64bee1b4afe831570e89ee26a4721b72cd262786389f8742575c309e3fccf74",
+        "binary": "94c26fad52abb31ea06b104be2cd7fb26cc22357c3a3acd872a64b9e59a8475e"
+      },
+      "reads": 12,
+      "writes": []
+    },
+    {
+      "run": "e2e-1795057238929-32548",
+      "case": "E2E-006",
+      "result": "Pass",
+      "exit_code": 0,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-006",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_unix_ms": 1795057238929,
+      "finished_at_unix_ms": 1795057343054,
+      "driver_revision": "a007590a069d4ec4061356a6f96a8c7ba5a5b91c",
+      "driver_sha256": "3c4e70b980127c1a6fd20d4e0c35b82073867f51dfdeba1cde7358e660362d4d",
+      "driver_cargo_lock_sha256": "ba1fa2481ba47ebb082dae4aff8bf1a099cea5775b4196b096aeb3bb094d4efb",
+      "source_dirty": false,
+      "app_revision": "43bd2fc625043687f9d5fec86637f1243e754739",
+      "runner_revision": "43bd2fc625043687f9d5fec86637f1243e754739",
+      "runner_sha256": "7189cdaca98be1fd37dc471469a5e1ef96183416c969d085ee2d37bb45ec7ea9",
+      "executable_sha256": "c98a01e1fa629040243835b6dc27b555816b9a6b7add69e67ab91b3aa6c5bb86",
+      "bytes": 45313536,
+      "host": {
+        "os": "windows",
+        "architecture": "x86_64",
+        "version": "Microsoft Windows [Version 10.0.22631.7652]",
+        "display_session": "Windows desktop availability is checked by native driver"
+      },
+      "dpi": 96,
+      "fixture": "s07-write-engine-v1",
+      "seed": 12345,
+      "requirement_ids": [
+        "OFFLINE-02",
+        "ISSUE-03",
+        "ISSUE-04",
+        "OUTBOX-03",
+        "OUTBOX-07",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-13",
+        "AC-58",
+        "AC-59",
+        "AC-60",
+        "AC-61"
+      ],
+      "detail": "The native editor restored two offline actions, cancelled the unsent issue edit and completed the retained ordinary comment after reconnect. A second ordinary comment lost its server response and retained an uncertain outcome after cancellation.",
+      "driver_location": null,
+      "native_actions": 39,
+      "new_process": true,
+      "checked_actions": [
+        {
+          "action": "Load the isolated verified account and scope",
+          "observed": {
+            "user": 41,
+            "repository_count": 1
+          }
+        },
+        {
+          "action": "Open existing GitHub issue 41 from the downloaded repository",
+          "observed": 41
+        },
+        {
+          "action": "Save two explicit actions and a separate unsent draft while offline",
+          "observed": {
+            "issue_number": 41,
+            "queued_actions": 2,
+            "later_draft_submitted": false
+          }
+        },
+        {
+          "action": "Relaunch the same SQLite profile in a separate process",
+          "observed": {
+            "sqlite_retained": true
+          }
+        },
+        {
+          "action": "Cancel the original issue edit while it is still offline",
+          "observed": "Cancelled"
+        },
+        {
+          "action": "Load the isolated verified account and scope",
+          "observed": {
+            "user": 41,
+            "repository_count": 1
+          }
+        },
+        {
+          "action": "Reconcile the original queued ordinary comment after reconnect",
+          "observed": "Confirmed"
+        },
+        {
+          "action": "Request cancellation after a mutation may have been sent",
+          "observed": {
+            "state": "OutcomeUnknown",
+            "cancellation_requested": true
+          }
+        }
+      ],
+      "requests": 23,
+      "authenticated": true,
+      "raw_sha256": {
+        "result": "a3a978cf34570034f8056a3f8b226f2b9b068b164eb6d7e3d506cf5e79b3aa64",
+        "native": "5c849b90e0e985d9920d92767ee003d0226007fbe1fb80faf48462151ed94a13",
+        "redacted_http_trace": "8105fa50da0bafb024c633f162d3fc0346fa9edb4e8ad91fa73b2a830752491c",
+        "binary": "94c26fad52abb31ea06b104be2cd7fb26cc22357c3a3acd872a64b9e59a8475e"
+      },
+      "reads": 21,
+      "writes": [
+        {
+          "phase": "write_drop",
+          "route": "comment_reply_lost",
+          "status": 0,
+          "count": 1
+        },
+        {
+          "phase": "write_online",
+          "route": "comment_created",
+          "status": 201,
+          "count": 1
+        }
+      ]
     }
   ]
 }
