@@ -43,6 +43,9 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == "S12-NATIVE-LIFECYCLE" {
         return Some("s12-native-lifecycle-v2");
     }
+    if case == "S12-PANE-POSITIONS" {
+        return Some("s12-pane-positions-v1");
+    }
     if matches!(case, "E2E-014" | "S12-READER-CONCURRENT") {
         return Some("s12-large-workspace-v2");
     }
@@ -252,6 +255,10 @@ pub fn associations(case: &str) -> Associations {
             "AC-11;AC-12;AC-57",
         ),
         "S05-WINDOWS-RATE-LIMIT" => ("SYNC-10;CONNECT-03;CACHE-03;TEST-04", "AC-12"),
+        "S12-PANE-POSITIONS" => (
+            "WORKSPACE-01;WORKSPACE-02;WORKSPACE-04;WORKSPACE-07;TEST-04",
+            "AC-42",
+        ),
         _ => catalog_associations(case).unwrap_or_default(),
     };
     Associations {

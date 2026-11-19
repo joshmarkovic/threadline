@@ -612,6 +612,8 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
                 Some(NativeMode::WindowsIssueWrites)
             } else if id == "S12-HISTORICAL-READER" {
                 Some(NativeMode::WindowsReaderResume)
+            } else if id == "S12-PANE-POSITIONS" {
+                Some(NativeMode::WindowsReaderOffline)
             } else if id == "S05-WINDOWS-RATE-LIMIT" {
                 Some(NativeMode::WindowsSync)
             } else if id == "S06-SHARED-PR-PANES" {
@@ -867,6 +869,7 @@ fn native_driver(
         .tempdir()
         .map_err(|error| NativeError::Blocked(error.to_string()))?;
     let reader_proof = match mode {
+        NativeMode::WindowsReaderOffline if id == "S12-PANE-POSITIONS" => Some("PanePositions"),
         NativeMode::WindowsReaderOffline => Some("Offline"),
         NativeMode::WindowsReaderResume if id == "S12-HISTORICAL-READER" => Some("Historical"),
         NativeMode::WindowsReaderResume => Some("Resume"),

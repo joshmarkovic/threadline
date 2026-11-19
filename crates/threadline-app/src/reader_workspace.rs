@@ -72,6 +72,8 @@ pub(crate) struct ReaderObservation {
     pub active_number: Option<u64>,
     pub cached_content_ready: bool,
     pub cached_visible_panes: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pane_positions: Option<PanePositionsObservation>,
     pub search_results: Option<usize>,
     pub search_generation: Option<u64>,
     pub first_search_item: Option<i64>,
@@ -102,6 +104,26 @@ pub(crate) struct ReaderObservation {
     pub outbox_action_cancel_requested: bool,
     pub outbox_paused: bool,
     pub active_draft_submitted: Option<bool>,
+}
+
+#[cfg(feature = "e2e")]
+#[derive(serde::Serialize)]
+pub(crate) struct PanePositionsObservation {
+    proportions: Vec<f64>,
+    panes: Vec<PanePositionObservation>,
+}
+
+#[cfg(feature = "e2e")]
+#[derive(serde::Serialize)]
+struct PanePositionObservation {
+    index: usize,
+    item: i64,
+    tab: String,
+    repository: i64,
+    pull_request: bool,
+    discussion_anchor: Option<String>,
+    discussion_offset: Option<u32>,
+    saved_draft_sha256: Option<String>,
 }
 
 #[cfg(feature = "e2e")]
@@ -352,6 +374,57 @@ impl ItemView {
 
 impl ReaderWorkspace {
     #[cfg(feature = "e2e")]
+    fn pane_positions(&self, cx: &gpui_kit::App) -> Option<PanePositionsObservation> {
+        use sha2::{Digest, Sha256};
+        static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        if !*ENABLED.get_or_init(|| {
+            std::env::var_os("THREADLINE_E2E_PANE_POSITIONS").is_some_and(|value| value == "1")
+        }) || self.surface != Surface::Browse
+            || self.maximized
+        {
+            return None;
+        }
+        let panes = self
+            .layout
+            .panes
+            .iter()
+            .enumerate()
+            .filter_map(|(index, pane)| {
+                let tab = pane.tabs.get(pane.active?)?;
+                let view = self.tab_views.get(&tab.id)?;
+                let item = view.data.item.as_ref()?;
+                let saved_draft_sha256 = tab
+                    .view
+                    .draft
+                    .as_ref()
+                    .and_then(|id| self.drafts.get(id))
+                    .filter(|editor| editor.saved())
+                    .map(|editor| {
+                        format!(
+                            "{:x}",
+                            Sha256::digest(editor.view.read(cx).value().as_bytes())
+                        )
+                    });
+                Some(PanePositionObservation {
+                    index,
+                    item: tab.item.0,
+                    tab: tab.id.clone(),
+                    repository: item.locator.repository.0,
+                    pull_request: item.kind == threadline_storage::ItemKind::PullRequest,
+                    discussion_anchor: tab.view.scroll_anchor.clone(),
+                    discussion_offset: (view.scroll.bounds().size.height > px(0.))
+                        .then(|| (-view.scroll.offset().y.as_f32()).max(0.) as u32),
+                    saved_draft_sha256,
+                })
+            })
+            .collect();
+        Some(PanePositionsObservation {
+            proportions: self.layout.proportions.clone(),
+            panes,
+        })
+    }
+
+    #[cfg(feature = "e2e")]
     fn cached_active_panes(&self) -> usize {
         self.layout
             .panes
@@ -394,6 +467,7 @@ impl ReaderWorkspace {
                 .and_then(|tab| self.tab_views.get(&tab.id))
                 .is_some_and(|view| view.data.item.is_some()),
             cached_visible_panes: self.cached_active_panes(),
+            pane_positions: self.pane_positions(cx),
             search_results: self.search_hits.as_ref().map(Vec::len),
             search_generation: self.search_reply,
             performance_timing: self.performance.ready(

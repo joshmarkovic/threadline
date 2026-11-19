@@ -20,7 +20,11 @@ function Initialize-ReaderProfile([string]$Profile, [string]$Scale) {
         $seeder.Dispose()
     }
     $receipt = [IO.File]::ReadAllText($path) | ConvertFrom-Json
-    $revision = if ($Scale -eq 'section-16-backlog') { 's12-large-workspace-v2' } else { 's04-reader-v1' }
+    $revision = switch ($Scale) {
+        'section-16-backlog' { 's12-large-workspace-v2' }
+        'small-pane-positions' { 's12-pane-positions-v1' }
+        default { 's04-reader-v1' }
+    }
     if ($receipt.fixture_revision -cne $revision -or $receipt.scale -cne $Scale -or
         $receipt.seed -ne $script:Seed -or !$receipt.offline) {
         throw 'The reader fixture does not match the requested isolated workload.'
@@ -34,6 +38,12 @@ function Initialize-ReaderProfile([string]$Profile, [string]$Scale) {
             throw 'The large workspace needs its exact typed actions and retained historical queue.'
         }
         $script:BacklogSeed = $receipt
+    }
+    if ($Scale -eq 'small-pane-positions') {
+        $script:PanePositionsSeed = $receipt
+        if ($receipt.pane_positions.archive -eq $receipt.repository_id -or $receipt.pane_positions.comments -ne 28 -or $receipt.open_tabs -ne 20) {
+            throw 'The isolated pane-position fixture must retain two repositories and both tab strips.'
+        }
     }
     Add-Evidence 'Seed the isolated profile with the application and bundled SQLite' $receipt
 }

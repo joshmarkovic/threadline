@@ -11,6 +11,16 @@ use threadline_storage::{
     writes::{WriteIntent, WriteSubmission},
 };
 
+mod panes;
+
+#[derive(Clone, Copy)]
+enum ReaderFixture {
+    Small,
+    Section16,
+    Backlog,
+    PanePositions,
+}
+
 pub fn run() -> Option<Result<(), String>> {
     let mut arguments = std::env::args_os().skip(1);
     let action = arguments.next()?;
@@ -28,11 +38,12 @@ pub fn run() -> Option<Result<(), String>> {
                     .as_deref()
                     .and_then(std::ffi::OsStr::to_str)
                 {
-                    Some("small") => (Scale::Small, false),
-                    Some("section-16") => (Scale::Section16, false),
-                    Some("section-16-backlog") => (Scale::Section16, true),
+                    Some("small") => ReaderFixture::Small,
+                    Some("section-16") => ReaderFixture::Section16,
+                    Some("section-16-backlog") => ReaderFixture::Backlog,
+                    Some("small-pane-positions") => ReaderFixture::PanePositions,
                     _ => {
-                        return Err("Select small, section-16, or section-16-backlog for the reader fixture.".to_owned());
+                        return Err("Select a known isolated reader fixture.".to_owned());
                     }
                 },
             )
@@ -52,7 +63,7 @@ pub fn run() -> Option<Result<(), String>> {
             .map(PathBuf::from)
             .filter(|path| path.is_absolute())
             .ok_or("An explicit isolated profile is required.")?;
-        let Some((scale, backlog)) = scale else {
+        let Some(fixture) = scale else {
             return seed_quiet_notification(profile, report);
         };
         let seed: u64 = match std::env::var("THREADLINE_TEST_SEED") {
@@ -60,7 +71,7 @@ pub fn run() -> Option<Result<(), String>> {
             Err(std::env::VarError::NotPresent) => 12345,
             Err(_) => return Err("Invalid reader fixture seed.".into()),
         };
-        seed_profile(profile, scale, backlog, seed, report)
+        seed_profile(profile, fixture, seed, report)
     })())
 }
 
@@ -209,8 +220,7 @@ fn seed_quiet_notification(profile: PathBuf, report: PathBuf) -> Result<(), Stri
 
 fn seed_profile(
     profile: PathBuf,
-    scale: Scale,
-    backlog: bool,
+    variant: ReaderFixture,
     seed: u64,
     report: PathBuf,
 ) -> Result<(), String> {
@@ -225,12 +235,22 @@ fn seed_profile(
         .open(report)
         .map_err(|_| "Could not create the reader fixture report.")?;
     let store = Store::open_profile(&profile).map_err(|error| error.to_string())?;
-    let fixture = if backlog {
-        populate_large_workspace(&store, seed)
-    } else {
-        populate_reader(&store, seed, scale)
+    let fixture = match variant {
+        ReaderFixture::Small | ReaderFixture::PanePositions => {
+            populate_reader(&store, seed, Scale::Small)
+        }
+        ReaderFixture::Section16 => populate_reader(&store, seed, Scale::Section16),
+        ReaderFixture::Backlog => populate_large_workspace(&store, seed),
     }
     .map_err(|error| error.to_string())?;
+    let pane_positions = if matches!(variant, ReaderFixture::PanePositions) {
+        Some(
+            panes::extend_archive_discussion(&store, &fixture)
+                .map_err(|error| error.to_string())?,
+        )
+    } else {
+        None
+    };
     let unresolved = store
         .sidebar_counts(
             fixture.account,
@@ -251,10 +271,15 @@ fn seed_profile(
         return Err("The reader fixture did not establish its isolated offline account.".into());
     }
     drop(store);
-    let receipt = serde_json::json!({
-        "fixture_revision": fixture.revision,
+    let mut receipt = serde_json::json!({
+        "fixture_revision": if pane_positions.is_some() { "s12-pane-positions-v1" } else { fixture.revision },
         "seed": seed,
-        "scale": if backlog { "section-16-backlog" } else if scale == Scale::Section16 { "section-16" } else { "small" },
+        "scale": match variant {
+            ReaderFixture::Small => "small",
+            ReaderFixture::Section16 => "section-16",
+            ReaderFixture::Backlog => "section-16-backlog",
+            ReaderFixture::PanePositions => "small-pane-positions",
+        },
         "account_id": fixture.account.0,
         "repository_id": fixture.repository.0,
         "discussion_item": fixture.long_discussion.0,
@@ -267,6 +292,13 @@ fn seed_profile(
         "unresolved_outbox": unresolved,
         "offline": offline
     });
+    if let Some(pane_positions) = pane_positions {
+        receipt["comments"] = (fixture.comment_count - pane_positions.replaced_comments
+            + pane_positions.comments)
+            .into();
+        receipt["pane_positions"] = serde_json::to_value(pane_positions)
+            .map_err(|_| "Could not encode pane-position fixture evidence.")?;
+    }
     let mut output = BufWriter::new(report);
     serde_json::to_writer_pretty(&mut output, &receipt)
         .map_err(|_| "Could not write reader fixture evidence.")?;
