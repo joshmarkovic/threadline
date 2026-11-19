@@ -1,0 +1,209 @@
+{
+  "case": "S06-READER-CURSOR-RECOVERY",
+  "fixture_revision": "s06-reader-cursor-recovery-v1",
+  "seed": 12345,
+  "host": "Windows 11 x64",
+  "cargo_lock_sha256": "ba1fa2481ba47ebb082dae4aff8bf1a099cea5775b4196b096aeb3bb094d4efb",
+  "application_and_runner_revision": "93f5e152f3e2c856df17a8a95dd33586745c0452",
+  "app_sha256": "6f18781ba4e4070eb3e4c51a66cc1052d38bd424362d2c6d548a86dd9718c0fb",
+  "runner_sha256": "6c89d749658d7d2ee58dd183ebb554ac0ed1f20363d90bc3a3222ec276f1e1a9",
+  "attempts": [
+    {
+      "run": "e2e-1795066821390-46268",
+      "status": "Fail",
+      "exit_code": 1,
+      "child_exit_code": 1,
+      "driver_revision": "93f5e152f3e2c856df17a8a95dd33586745c0452",
+      "source_dirty": false,
+      "started_at_unix_ms": 1795066821389,
+      "finished_at_unix_ms": 1795066881891,
+      "dpi": 96,
+      "action_count": 17,
+      "diagnosis": "The fixture loaded the issue list and Timeline, but never requested issue details. Independent Body coverage was not Complete and the isolated fault refused to arm.",
+      "sha256": {
+        "result.json": "5d72e077ef70904054dfadd4fc7fa436fa2fd6d775542f8198c3a3a053763003",
+        "reader-cursor-recovery-native.json": "303bf0753e183c0073005b94f0019498970cf14ac10b95567e006ef359e4dff8",
+        "github-access-trace.json": "8f41aeca1634c5fe30907b0da1c11157ce976830e6b9b3be84dbc8b155938a9c"
+      }
+    },
+    {
+      "run": "e2e-1795067102015-40004",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "driver_revision": "1c9d035568e033df77f460e447e917d55fd48d40",
+      "source_dirty": false,
+      "started_at_unix_ms": 1795067102014,
+      "finished_at_unix_ms": 1795067241990,
+      "dpi": 96,
+      "action_count": 38,
+      "sha256": {
+        "result.json": "f03826312a8a5e4fdb77ff10d09c92c9952f0002c712da7898b33f80ced96642",
+        "reader-cursor-recovery-native.json": "cdee5050e0a2ad0e775c1f1b44a02520874266845c3eab725c1a1963ea018118",
+        "github-access-trace.json": "6b11a80f4ea60e17a86f3ba2d95d0e0a85ea39495e71391aa3590f87aab7e972",
+        "reader-recovery-arm.json": "72f77b6d99b9188fb3902e4c5e54c7768c8aa952f87c925e978f1801407a4cb9",
+        "reader-recovery-expired.json": "527fb28a321acafb370f4316f86fd6fdd6bbee21c578622ce6279f469b20c52f",
+        "reader-recovery-repaired.json": "915949943d3dd91f4acfe750ff96548a8320d7662d61ac734ec32ec4374a2f4e",
+        "reader-recovery-rollback.json": "2c045723bcaa3ab5dec1e4fdd49acbcf588119a0303488089ff52e309d085398",
+        "reader-recovery-release.json": "2c045723bcaa3ab5dec1e4fdd49acbcf588119a0303488089ff52e309d085398",
+        "reader-recovery-completed.json": "d2557bec5543d68f30e7e5a4ed808c8ac9e0af896df1d15029794fb7c64d1f6e"
+      }
+    }
+  ],
+  "checkpoint_observations": [
+    {
+      "discussion": {
+        "coverage": 1,
+        "fetch": 1,
+        "error": null,
+        "cursor": "2",
+        "last_page": 1795067141693,
+        "last_success": null,
+        "last_validation": null
+      },
+      "comments": [
+        {
+          "id": "00000000000000005101",
+          "edited_original": false,
+          "metadata_retained": true
+        }
+      ],
+      "completed_other_resources": 2,
+      "stage": "offline_before_expiry"
+    },
+    {
+      "discussion": {
+        "coverage": 1,
+        "fetch": 3,
+        "error": 9,
+        "cursor": "2",
+        "last_page": 1795067141693,
+        "last_success": null,
+        "last_validation": null
+      },
+      "comments": [
+        {
+          "id": "00000000000000005101",
+          "edited_original": false,
+          "metadata_retained": true
+        }
+      ],
+      "completed_other_resources": 2,
+      "stage": "expired"
+    },
+    {
+      "discussion": {
+        "coverage": 1,
+        "fetch": 1,
+        "error": null,
+        "cursor": "2",
+        "last_page": 1795067192945,
+        "last_success": null,
+        "last_validation": null
+      },
+      "comments": [
+        {
+          "id": "00000000000000005101",
+          "edited_original": true,
+          "metadata_retained": true
+        },
+        {
+          "id": "00000000000000005102",
+          "edited_original": false,
+          "metadata_retained": true
+        }
+      ],
+      "completed_other_resources": 2,
+      "stage": "repaired_first_page"
+    },
+    {
+      "discussion": {
+        "coverage": 1,
+        "fetch": 3,
+        "error": 1,
+        "cursor": "2",
+        "last_page": 1795067192945,
+        "last_success": null,
+        "last_validation": null
+      },
+      "comments": [
+        {
+          "id": "00000000000000005101",
+          "edited_original": true,
+          "metadata_retained": true
+        },
+        {
+          "id": "00000000000000005102",
+          "edited_original": false,
+          "metadata_retained": true
+        }
+      ],
+      "completed_other_resources": 2,
+      "stage": "returned_page_rolled_back"
+    },
+    {
+      "discussion": {
+        "coverage": 2,
+        "fetch": 0,
+        "error": null,
+        "cursor": null,
+        "last_page": 1795067239578,
+        "last_success": 1795067239578,
+        "last_validation": 1795067239578
+      },
+      "comments": [
+        {
+          "id": "00000000000000005101",
+          "edited_original": true,
+          "metadata_retained": true
+        },
+        {
+          "id": "00000000000000005102",
+          "edited_original": false,
+          "metadata_retained": true
+        },
+        {
+          "id": "00000000000000005103",
+          "edited_original": false,
+          "metadata_retained": true
+        }
+      ],
+      "completed_other_resources": 2,
+      "stage": "resumed_page_committed"
+    }
+  ],
+  "unchanged": {
+    "rollback_equals_separate_process_checkpoint": true,
+    "draft_outbox_body_and_timeline": true
+  },
+  "discussion_requests": [
+    {
+      "phase": "recover_baseline",
+      "route": "comments_first",
+      "status": 200
+    },
+    {
+      "phase": "recover_expired",
+      "route": "comments_next",
+      "status": 410
+    },
+    {
+      "phase": "recover_rebuild",
+      "route": "comments_first",
+      "status": 200
+    },
+    {
+      "phase": "recover_rebuild",
+      "route": "comments_next",
+      "status": 200
+    },
+    {
+      "phase": "recover_resume",
+      "route": "comments_next",
+      "status": 200
+    }
+  ],
+  "total_fixture_requests": 33,
+  "offline_requests": 0,
+  "all_fixture_requests_authorized": true
+}
