@@ -1,0 +1,298 @@
+{
+  "runs": [
+    {
+      "run": "e2e-1795052085755-38860",
+      "runner": {
+        "schema": 1,
+        "source_revision": "ec28ba2720f352768bd42118c1b1d38b655e1e38",
+        "source_dirty": false,
+        "cargo_lock_sha256": "83587d235ce28277e15e3c6e2a0c2ad93f9826339812983027253991e5ebe8ab",
+        "package_version": "0.1.0",
+        "fixture_revision": "s08-native-review-decisions-v1",
+        "seed": 12345,
+        "host": {
+          "os": "windows",
+          "architecture": "x86_64",
+          "version": "Microsoft Windows [Version 10.0.22631.7652]",
+          "display_session": "Windows desktop availability is checked by native driver"
+        },
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "e2e",
+            "--suite",
+            "full",
+            "--case",
+            "S08-REVIEW-DECISIONS",
+            "--binary",
+            "<binary-path>",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "lane": "e2e",
+        "suite": "full",
+        "started_at_unix_ms": 1795052085754,
+        "finished_at_unix_ms": 1795052145886,
+        "status": "Fail",
+        "exit_code": 1,
+        "case": {
+          "case": "S08-REVIEW-DECISIONS",
+          "status": "Fail",
+          "detail": "Timed out waiting for the exact modified source line selected by the native action. See native-driver.log.",
+          "tests_passed": null,
+          "evidence": "review-draft-native.json",
+          "requirement_ids": [
+            "REVIEW-01",
+            "REVIEW-02",
+            "REVIEW-03",
+            "REVIEW-04",
+            "TEST-04"
+          ],
+          "acceptance_ids": [
+            "AC-16",
+            "AC-18",
+            "AC-65"
+          ],
+          "child_exit_code": 1,
+          "fixture_revision": "s08-native-review-decisions-v1"
+        }
+      },
+      "application": {
+        "sha256": "467f2fdd55260d89f9fed05ed71ad0ffe5f3ee8e07a77b03bd325d9b2d636c0a",
+        "size_bytes": 45204992,
+        "evidence_class": "test-build native process",
+        "source_revision": "ec28ba2720f352768bd42118c1b1d38b655e1e38"
+      },
+      "native": {
+        "driver": "Windows PowerShell / owned UI Automation and guarded Win32 SendInput",
+        "authentication_setup": "Fixed isolated loopback identity, verified by the application",
+        "dpi": 96,
+        "windows_product": "Microsoft Windows 11 Enterprise",
+        "architecture": "AMD64",
+        "os_version": "10.0.22631",
+        "status": "Fail",
+        "action_count": 17,
+        "observations": []
+      },
+      "provider": {
+        "count": 14,
+        "all_fixture_authorized": true,
+        "status_counts": [
+          {
+            "status": 200,
+            "count": 12
+          },
+          {
+            "status": 404,
+            "count": 2
+          }
+        ],
+        "review_steps": [],
+        "thread_steps": []
+      },
+      "last_review_observation": {
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "selected_file": "src/first.rs",
+        "patch_change_lines": 4,
+        "source_anchor": {
+          "side": "Right",
+          "line": 1,
+          "path": "src/first.rs"
+        },
+        "selected_source_line": 1,
+        "saved_anchors": [
+          {
+            "path": "src/first.rs",
+            "side": "Right",
+            "first_line": 1,
+            "last_line": 1,
+            "source_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "comment_nonempty": true
+          }
+        ],
+        "next_change_visible": false,
+        "review_editor_visible": true
+      },
+      "receipt_sha256": {
+        "result.json": "89556fbbc0749335a48a6fc813585bee05a4f797b320549605692766c247a403",
+        "binary.json": "d45eb720fb2ff805bda279ae070a714b9f346896722457b8788b65f331a9b8ba",
+        "review-draft-native.json": "fbc87e169d974c8b49eaa44e1ebdf497c7cb8dc17accfb7d689caab80c58a0a7",
+        "github-access-trace.json": "313ac6bd4add0ada4ad22c840d459045643d45fc7e0d3660978f9d7bb71e23e6",
+        "ui-observation.json": "1c8a395392f1811c3d03355e55fcdb782b5cc0368b77eae3f748c84e0a90e837"
+      }
+    },
+    {
+      "run": "e2e-1795052806820-13660",
+      "runner": {
+        "schema": 1,
+        "source_revision": "af4c5b9ff0d2e04006eedec121fb4ebec4fce51b",
+        "source_dirty": false,
+        "cargo_lock_sha256": "83587d235ce28277e15e3c6e2a0c2ad93f9826339812983027253991e5ebe8ab",
+        "package_version": "0.1.0",
+        "fixture_revision": "s08-native-review-decisions-v1",
+        "seed": 12345,
+        "host": {
+          "os": "windows",
+          "architecture": "x86_64",
+          "version": "Microsoft Windows [Version 10.0.22631.7652]",
+          "display_session": "Windows desktop availability is checked by native driver"
+        },
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "e2e",
+            "--suite",
+            "full",
+            "--case",
+            "S08-REVIEW-DECISIONS",
+            "--binary",
+            "<binary-path>",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "lane": "e2e",
+        "suite": "full",
+        "started_at_unix_ms": 1795052806818,
+        "finished_at_unix_ms": 1795052962148,
+        "status": "Pass",
+        "exit_code": 0,
+        "case": {
+          "case": "S08-REVIEW-DECISIONS",
+          "status": "Pass",
+          "detail": "Windows restored a two-note approval and an anchored request for changes in separate offline processes. Both original reviews confirmed through the exact reviewer and revision checks. See native-driver.log.",
+          "tests_passed": null,
+          "evidence": "review-draft-native.json",
+          "requirement_ids": [
+            "REVIEW-01",
+            "REVIEW-02",
+            "REVIEW-03",
+            "REVIEW-04",
+            "TEST-04"
+          ],
+          "acceptance_ids": [
+            "AC-16",
+            "AC-18",
+            "AC-65"
+          ],
+          "child_exit_code": 0,
+          "fixture_revision": "s08-native-review-decisions-v1"
+        }
+      },
+      "application": {
+        "sha256": "31252def843a728174512e22aa07d2f6b279c01b40f5d3d9436aceaa0fabd4ea",
+        "size_bytes": 45313536,
+        "evidence_class": "test-build native process",
+        "source_revision": "af4c5b9ff0d2e04006eedec121fb4ebec4fce51b"
+      },
+      "native": {
+        "driver": "Windows PowerShell / owned UI Automation and guarded Win32 SendInput",
+        "authentication_setup": "Fixed isolated loopback identity, verified by the application",
+        "dpi": 96,
+        "windows_product": "Microsoft Windows 11 Enterprise",
+        "architecture": "AMD64",
+        "os_version": "10.0.22631",
+        "status": "Pass",
+        "action_count": 60,
+        "observations": [
+          {
+            "action": "Restore and confirm the original queued native review decision",
+            "observed": {
+              "number": 42,
+              "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "event": "Approve",
+              "source_lines": [
+                1,
+                3
+              ],
+              "distinct_process": true,
+              "confirmed": true
+            }
+          },
+          {
+            "action": "Restore and confirm the original queued native review decision",
+            "observed": {
+              "number": 43,
+              "head": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "event": "RequestChanges",
+              "source_lines": [
+                1
+              ],
+              "distinct_process": true,
+              "confirmed": true
+            }
+          }
+        ]
+      },
+      "provider": {
+        "count": 40,
+        "all_fixture_authorized": true,
+        "status_counts": [
+          {
+            "status": 200,
+            "count": 40
+          }
+        ],
+        "review_steps": [
+          {
+            "phase": "review_decisions",
+            "step": "approval_list",
+            "status": 200
+          },
+          {
+            "phase": "review_decisions",
+            "step": "approval_create",
+            "status": 200
+          },
+          {
+            "phase": "review_decisions",
+            "step": "approval_read",
+            "status": 200
+          },
+          {
+            "phase": "review_decisions",
+            "step": "approval_submit",
+            "status": 200
+          },
+          {
+            "phase": "review_decisions",
+            "step": "changes_list",
+            "status": 200
+          },
+          {
+            "phase": "review_decisions",
+            "step": "changes_create",
+            "status": 200
+          },
+          {
+            "phase": "review_decisions",
+            "step": "changes_read",
+            "status": 200
+          },
+          {
+            "phase": "review_decisions",
+            "step": "changes_submit",
+            "status": 200
+          }
+        ],
+        "thread_steps": []
+      },
+      "receipt_sha256": {
+        "result.json": "dc18b257ab6df6e86602438803f64ab2cb8b34b2d5a15e341f449144be7332bf",
+        "binary.json": "5edabf4b449cc7f7c91e2ccc8a854169fb8e3fdd9ce107c3785f7b36862087d9",
+        "review-draft-native.json": "784fec43859eb001679a4fe0d801dc84cab13678d43c906b089e47595a24b520",
+        "github-access-trace.json": "47ed131b04e47cbcedd046af4e153d86d5983e0c70fff0ac5476c8baa09f6da1",
+        "ui-observation.json": "e74637c4cfe61a4d9b38bfdd7522568759897b49f59cb66429798a80f2d721f0"
+      }
+    }
+  ]
+}
