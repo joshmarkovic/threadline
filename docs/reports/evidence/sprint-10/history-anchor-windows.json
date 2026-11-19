@@ -1,0 +1,49 @@
+{
+  "criterion": "AC-24",
+  "source_revision": "8fe51db1f545ccd536d5d7a7bd7e51b13379238a",
+  "environment": "Windows 11 x64 native development test executables",
+  "history_ui": {
+    "layer": "GPUI integration",
+    "status": "Pass",
+    "exit_code": 0,
+    "passed": 2,
+    "failed": 0,
+    "ignored": 0,
+    "seconds": 13.08,
+    "executable_sha256": "61bdac69533d73d17fb83e5287d3c8566ab5354c4cb500d334810b2d63929938",
+    "log_sha256": "6efcdb8516325c6809e6e32bda7bea09c482bd69063ab21d5c1cf026e9f03b26",
+    "tests": [
+      "history_graph_keeps_its_top_commit_through_expansion_and_offline_reopen",
+      "history_view_selects_exact_parents_and_restores_an_offline_comparison"
+    ],
+    "assertions": {
+      "visible_rows": [48, 60, 105],
+      "first_visible_commit_and_position_preserved_on_expansion": true,
+      "wheel_input_during_pending_expansion_retained": true,
+      "final_saved_and_reopened_offset": 464,
+      "missing_parent_boundary_resolved_after_older_download": true,
+      "selected_merge_commit_and_exact_parent_retained": true,
+      "offline_reopen_pinned_to_old_tip_after_branch_moved": true,
+      "newest_action_restored_first_page_without_losing_selection": true,
+      "oldest_page_has_no_further_downloaded_page": true
+    }
+  },
+  "history_storage": {
+    "case": "IT-006",
+    "layer": "SQLite integration",
+    "status": "Pass",
+    "exit_code": 0,
+    "passed": 5,
+    "failed": 0,
+    "ignored": 0,
+    "seconds": 1.21,
+    "executable_sha256": "db655216b90c2c9233a13b09e6e0a59b1533f1430d76cedf23ba5871a0548e38",
+    "log_sha256": "6da2738360d116b215d2a1b13f698264d29bcd2f31f385b7b75454a16d2882dc",
+    "legacy_view_without_graph_window_restored": true
+  },
+  "separate_process_evidence": {
+    "case": "E2E-011",
+    "receipt": "history-context-c0e4957.json",
+    "scope": "Native controls downloaded older commits, resolved two continuation boundaries, and restored exact commit and file comparison offline"
+  }
+}
