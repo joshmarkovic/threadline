@@ -970,6 +970,7 @@ try {
             DirectMerge { 'merge-prepare' }
             MergeQueue { 'merge-prepare' }
             History { 'pr-load' }
+            IssueConflict { 'issue-edit-baseline' }
             PerformanceConcurrent { 'backlog-auth' }
             default { 'write-online' }
         }

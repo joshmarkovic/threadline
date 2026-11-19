@@ -67,6 +67,7 @@ function Set-AccessPhase([string]$Phase) {
         'pr-load', 'pr-delay', 'pr-release', 'pr-shared-hold', 'pr-shared-release', 'review-send', 'review-changed', 'review-decisions', 'review-predecessor', 'review-resume', 'thread-queue', 'thread-outdated',
         'merge-prepare', 'merge-send', 'merge-wrong-head', 'merge-queue-preflight', 'merge-queue-rejected',
         'history', 'history-moved', 'history-deleted', 'write-online', 'write-drop',
+         'issue-edit-baseline', 'issue-edit-remote-change',
         'credential-ready', 'credential-offline', 'credential-other', 'credential-return',
         'lifecycle-offline', 'lifecycle-ready', 'lifecycle-delay', 'lifecycle-crash',
         'lifecycle-recovery', 'lifecycle-signed-out', 'lifecycle-return', 'activity-baseline', 'activity-fresh',
