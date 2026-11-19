@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory)][ValidatePattern('^[a-fA-F0-9]{64}$')][string]$LifecycleSha256,
     [Parameter(Mandatory)][ValidatePattern('^[a-fA-F0-9]{64}$')][string]$InstalledSha256,
     [Parameter(Mandatory)][ValidateRange(1,65535)][int]$Schema,
-    [Parameter(Mandatory)][string]$ReportDirectory
+    [Parameter(Mandatory)][string]$ReportDirectory,
+    [switch]$DelayedOnline
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
@@ -90,8 +91,10 @@ $profileDirectory=Join-Path $root ('initial-'+$nonce)
 $seedArchive=Join-Path $root 'original-seed'
 $moved=$false
 $complete=$false
+$delayed=$null
 $stage='create isolated fixture'
 $loopback=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0)
+if ($DelayedOnline) { . (Join-Path $PSScriptRoot 'installed-drafts-delay.ps1') }
 try {
     $null=New-Item -ItemType Directory -Path $root -ErrorAction Stop
     $null=New-Item -ItemType Directory -Path $profileDirectory
@@ -119,11 +122,17 @@ try {
     [IO.Directory]::Move($staged,$data)
     $moved=$true
     $stage='installed launches'
-    $smoke=Join-Path $PSScriptRoot 'smoke-installed.ps1'
-    $opened=foreach ($tab in @('reader-tab-0-1','reader-tab-1-1')) {
-        $result=(& $smoke -ExpectedExecutableSha256 $InstalledSha256 -TabId $tab | Out-String) | ConvertFrom-Json
-        if (!$result.owned_window -or !$result.tab_activated -or !$result.orderly_exit) { throw 'The installed tab was not activated and closed normally.' }
-        $result
+    $opened=@()
+    if ($DelayedOnline) {
+        $stage='installed offline and delayed online launches'
+        $delayed=Invoke-InstalledDraftDelay
+    } else {
+        $smoke=Join-Path $PSScriptRoot 'smoke-installed.ps1'
+        $opened=foreach ($tab in @('reader-tab-0-1','reader-tab-1-1')) {
+            $result=(& $smoke -ExpectedExecutableSha256 $InstalledSha256 -TabId $tab | Out-String) | ConvertFrom-Json
+            if (!$result.owned_window -or !$result.tab_activated -or !$result.orderly_exit) { throw 'The installed tab was not activated and closed normally.' }
+            $result
+        }
     }
     Assert-ClosedFixture $data
     [IO.Directory]::Move($profileDirectory,$seedArchive)
@@ -131,9 +140,10 @@ try {
     $moved=$false
     $stage='retained mixed draft verification'
     $after=Invoke-Fixture 'inspect' 'after'
+    if ($after.work_offline -ne !$DelayedOnline) { throw 'The installed fixture did not retain the tested connectivity setting.' }
     foreach ($field in @('drafts','actions','action_ids','sync_checkpoint','content','schedule','tab_counts','pane_proportions',
-        'work_offline','pause_queued_actions','protected_reference_matches','protected_token_present','review_anchor_preserved',
-        'feed_event','feed_count','prior_delivery','delivery_groups','delivery_unchanged_at_ms','first_send_starts')) {
+        'pause_queued_actions','protected_reference_matches','protected_token_present','review_anchor_preserved',
+        'feed_event','feed_count','prior_delivery','delivery_groups','delivery_unchanged_at_ms','first_attempts','first_send_starts')) {
         $beforeValue=$seed.PSObject.Properties[$field].Value | ConvertTo-Json -Depth 8 -Compress
         $afterValue=$after.PSObject.Properties[$field].Value | ConvertTo-Json -Depth 8 -Compress
         if ($beforeValue -cne $afterValue) { throw "The installed reader changed this retained field: $field." }
@@ -159,9 +169,11 @@ try {
     }
 }
 if (!$complete -or (Test-Path -LiteralPath $data)) { throw "The mixed-draft check did not finish: $stage." }
-[ordered]@{status='Pass';installed_app_sha256=$InstalledSha256.ToLowerInvariant();fixture_sha256=$LifecycleSha256.ToLowerInvariant();
+$receipt=[ordered]@{status='Pass';installed_app_sha256=$InstalledSha256.ToLowerInvariant();fixture_sha256=$LifecycleSha256.ToLowerInvariant();
     schema=$Schema;before_database_sha256=$initialHash;seed_archive_unchanged=$true;native_launches=$opened;
     drafts=$after.drafts;work_offline=$after.work_offline;outbox_paused=$after.pause_queued_actions;queued_states=$after.actions;
     provider_page_cursor=$after.sync_checkpoint.cursor;prior_delivery=$after.prior_delivery;review_anchor_preserved=$after.review_anchor_preserved;
     protected_credential_retained=$after.protected_token_present;protected_fixture_key_removed=$key.protected_fixture_key_removed;
-    default_data_absent=$true} | ConvertTo-Json -Depth 8
+    default_data_absent=$true}
+if ($DelayedOnline) { $receipt['delayed_online']=$delayed }
+$receipt | ConvertTo-Json -Depth 8
