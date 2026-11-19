@@ -100,7 +100,6 @@ struct HistoryData {
 
 struct VisibleDiff {
     state: Entity<DiffState>,
-    path: String,
     binding: Arc<HistoryPatch>,
 }
 
@@ -115,7 +114,6 @@ enum PreparedHistoryDiff {
     Unchanged(Arc<HistoryPatch>),
     File {
         binding: Arc<HistoryPatch>,
-        path: String,
         diff: DiffFile,
     },
 }
@@ -176,7 +174,13 @@ impl HistoryState {
             comparison_coverage: comparison.map(|(_, page)| format!("{:?}", page.coverage)),
             parent,
             files: comparison.map_or(0, |(_, page)| page.files.len()),
-            displayed_file: self.diff.as_ref().map(|diff| diff.path.clone()),
+            displayed_file: self
+                .diff
+                .as_ref()
+                .and_then(|diff| match &diff.binding.record {
+                    PrRecord::File { path, .. } => Some(path.clone()),
+                    _ => None,
+                }),
         }
     }
 }
@@ -369,7 +373,6 @@ impl HistoryData {
             return PreparedHistoryDiff::Unavailable;
         };
         PreparedHistoryDiff::File {
-            path: path.clone(),
             diff,
             binding: Arc::new(HistoryPatch {
                 comparison: comparison.clone(),
@@ -707,13 +710,8 @@ impl ReaderWorkspace {
                 .diff
                 .take()
                 .filter(|current| Arc::ptr_eq(&current.binding, &binding)),
-            PreparedHistoryDiff::File {
-                binding,
-                path,
-                diff,
-            } => Some(VisibleDiff {
+            PreparedHistoryDiff::File { binding, diff } => Some(VisibleDiff {
                 state: cx.new(|cx| DiffState::new([diff], cx)),
-                path,
                 binding,
             }),
         };
