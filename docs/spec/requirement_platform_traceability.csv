@@ -290,7 +290,7 @@ DIFF-01,linux,Linux release,06,14,14,yes,Planned,Actual target evidence required
 DIFF-02,windows,Windows first release,08,08,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DIFF-02,macos,macOS release,08,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DIFF-02,linux,Linux release,08,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-DIFF-03,windows,Windows first release,10,10,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,Native second-parent and endpoint comparisons passed. PR merge-base behavior was verified separately. docs/reports/sprint-10.md
+DIFF-03,windows,Windows first release,10,10,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,Native second-parent and divergent two-tree endpoint comparisons passed. PR merge-base behavior was verified separately. docs/reports/sprint-10.md
 DIFF-03,macos,macOS release,10,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DIFF-03,linux,Linux release,10,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 DIFF-04,windows,Windows first release,06,08,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,

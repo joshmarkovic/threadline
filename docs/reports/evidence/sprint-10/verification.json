@@ -184,7 +184,94 @@
           "github-access-trace.json": "f943f3b2a2b322190efff56485652ab3f470184cc138f671d9bd78f578a47754"
         }
       }
-    ]
+    ],
+    "divergent_pair": {
+      "run": "e2e-1795047639750-6352",
+      "source_revision": "6ea3e4338d7263c7793f201836aeb5e768c1d172",
+      "source_dirty": false,
+      "app_revision": "6ea3e4338d7263c7793f201836aeb5e768c1d172",
+      "app_sha256": "b257fd77e2c89f4a8dda1eb46f2b4fde93cfb6744ca304b56671da2c4678c8e3",
+      "app_size_bytes": 80844288,
+      "app_version": "0.1.0",
+      "cargo_lock_sha256": "082539453360bf3f03c3bda8861f85e9ea384536457a9dfd27b5143e05890f9a",
+      "fixture_revision": "s10-history-endpoints-v2",
+      "seed": 12345,
+      "status": "Pass",
+      "exit_code": 0,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-011",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "host": {
+        "os": "windows",
+        "architecture": "x86_64",
+        "version": "Microsoft Windows [Version 10.0.22631.7652]",
+        "display_session": "Windows desktop availability is checked by native driver"
+      },
+      "started_at_unix_ms": 1795047639749,
+      "finished_at_unix_ms": 1795047709655,
+      "dpi": 96,
+      "display": {
+        "width": 2560,
+        "height": 1600
+      },
+      "receipt_sha256": {
+        "result.json": "5b534e49cd0d5fdc3efc3b529046ffa00cacec457b95acc6ac62abf513fdee3d",
+        "binary.json": "9ed278b2762406d962945dff24822ec343e0282a05793f9fc762d5966bf0e85c",
+        "history-native.json": "d787b8ac468387fdc60eac28fb194376a43b81df9392c0806172e60806d594da",
+        "github-access-trace.json": "d39116848b1d4dc5c6359242a0e26181484c56b91c78e16674100e27a1017a04",
+        "reader-restart-observation.json": "31a808cadae424257d287048225dfc352015a95ce6a3b07913ead7a19e998f96"
+      },
+      "action_count": 28,
+      "detail": "Native history followed the exact immutable continuation, opened a labeled merge parent and restored an exact divergent comparison after an offline restart.",
+      "http_count": 29,
+      "expected_compare_unavailable": [
+        {
+          "route": "history_divergent_pair",
+          "status": 404
+        }
+      ],
+      "exact_objects": [
+        "left_commit",
+        "right_commit",
+        "left_tree",
+        "right_tree",
+        "left_blob",
+        "right_blob"
+      ],
+      "graph": {
+        "initial_rows": 1,
+        "initial_boundaries": 2,
+        "expanded_rows": 3,
+        "expanded_boundaries": 0
+      },
+      "second_parent": {
+        "base": "cccccccccccccccccccccccccccccccccccccccc",
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "parent_order": 2,
+        "file": "parent-two.txt"
+      },
+      "reopened_comparison": {
+        "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head": "cccccccccccccccccccccccccccccccccccccccc",
+        "file": "divergent.txt",
+        "offline": true
+      }
+    }
   },
   "portable_monitor": {
     "S10-HISTORY-MONITOR": {

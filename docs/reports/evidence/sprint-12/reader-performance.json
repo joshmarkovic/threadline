@@ -1,0 +1,358 @@
+{
+  "offline_reader": [
+    {
+      "run": "e2e-1795041365988-48084",
+      "source_revision": "1df3c637a28a3648dbd0fc336896e404f3e18066",
+      "source_dirty": false,
+      "app_revision": "7f78edfe547b9c0eacd3fc40c405a7c97a302bdc",
+      "app_sha256": "f354102500d4b5f09063037587c87df55ff2da4ac2927fd95f73ca309e57653f",
+      "app_size_bytes": 41279488,
+      "app_version": "0.1.0",
+      "cargo_lock_sha256": "f1717e262ce2964d9b398759e2febce1fb143d9ff41043330c6556ef5e2883d8",
+      "fixture_revision": "s04-reader-v1",
+      "seed": 12345,
+      "status": "Fail",
+      "exit_code": 1,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "S04-READER-PERF",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "host": {
+        "os": "windows",
+        "architecture": "x86_64",
+        "version": "Microsoft Windows [Version 10.0.22631.7652]",
+        "display_session": "Windows desktop availability is checked by native driver"
+      },
+      "started_at_unix_ms": 1795041365987,
+      "finished_at_unix_ms": 1795041495559,
+      "dpi": 144,
+      "display": {
+        "width": 3840,
+        "height": 2160
+      },
+      "receipt_sha256": {
+        "result.json": "dbbc11463301c49aa8ae935b95839fa812367a0e9a2b8a8bfe3477cbc92a6ac8",
+        "binary.json": "63446af6554a7f0255e19f54349bfe24617a665322e63f672400a61fd4f3dec1",
+        "reader-performance.json": "6fa3a0a60644dfd55999ed34ecfe3e8ddaabfd7220e5c5ac3188510b4292f992"
+      },
+      "input": "UIA InvokePattern",
+      "budgets": {
+        "cached_open": {
+          "sample_count": 20,
+          "p95_ms": 507.1356,
+          "limit_ms": 100,
+          "status": "Fail"
+        },
+        "local_search": {
+          "sample_count": 20,
+          "p95_ms": 202.92020000000002,
+          "limit_ms": 200,
+          "status": "Fail"
+        },
+        "cached_tab_switch": {
+          "sample_count": 20,
+          "p95_ms": 312.88050000000004,
+          "limit_ms": 100,
+          "status": "Fail"
+        }
+      },
+      "attribution": null
+    },
+    {
+      "run": "e2e-1795043397302-23416",
+      "source_revision": "dd0f6a4a8bfc1093e233cfec2185fca83b13765d",
+      "source_dirty": false,
+      "app_revision": "40fe4d47cc1911e12b91b00b79e5d9d8bd651277",
+      "app_sha256": "5b7eacde933de08a187df6980249e8ce4933370f8d3f4c52be747a498b66c1c4",
+      "app_size_bytes": 44184064,
+      "app_version": "0.1.0",
+      "cargo_lock_sha256": "f1717e262ce2964d9b398759e2febce1fb143d9ff41043330c6556ef5e2883d8",
+      "fixture_revision": "s04-reader-v1",
+      "seed": 12345,
+      "status": "Fail",
+      "exit_code": 1,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "S04-READER-PERF",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "host": {
+        "os": "windows",
+        "architecture": "x86_64",
+        "version": "Microsoft Windows [Version 10.0.22631.7652]",
+        "display_session": "Windows desktop availability is checked by native driver"
+      },
+      "started_at_unix_ms": 1795043397301,
+      "finished_at_unix_ms": 1795043685760,
+      "dpi": 144,
+      "display": {
+        "width": 3840,
+        "height": 2160
+      },
+      "receipt_sha256": {
+        "result.json": "5312ddd7043ccd8f5428a173836938531546adf832ac6f0fa33197baa4f3c324",
+        "binary.json": "1ba60a2619b2707790ebe5be678e1eeca4b934690f5e7b5a167c82380f360ce2",
+        "reader-performance.json": "16210e20b54cb48d00a27a298653bd7f312e5e6587b3e14452e5c8ee3590cda2"
+      },
+      "input": "UIA InvokePattern",
+      "budgets": {
+        "cached_open": {
+          "sample_count": 20,
+          "p95_ms": 2291.1449000000002,
+          "limit_ms": 100,
+          "status": "Fail"
+        },
+        "local_search": {
+          "sample_count": 20,
+          "p95_ms": 2161.7159,
+          "limit_ms": 200,
+          "status": "Fail"
+        },
+        "cached_tab_switch": {
+          "sample_count": 20,
+          "p95_ms": 2121.2624,
+          "limit_ms": 100,
+          "status": "Fail"
+        }
+      },
+      "attribution": null
+    },
+    {
+      "run": "e2e-1795044559369-44444",
+      "source_revision": "f632434aa882a612f016a62a7a349efe3f381e79",
+      "source_dirty": false,
+      "app_revision": "3b1be96d141514a10b6a256cac158ae297aea47e",
+      "app_sha256": "18bac5177edfa992b8ebf6f81516c7f5786425b98011de582bda91727329ba62",
+      "app_size_bytes": 44217856,
+      "app_version": "0.1.0",
+      "cargo_lock_sha256": "5b92e1a83782908953a4405e9c1ed8ce80e2dffaa10238f3e14ac04c0a524056",
+      "fixture_revision": "s04-reader-v1",
+      "seed": 12345,
+      "status": "Fail",
+      "exit_code": 1,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "S04-READER-PERF",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "host": {
+        "os": "windows",
+        "architecture": "x86_64",
+        "version": "Microsoft Windows [Version 10.0.22631.7652]",
+        "display_session": "Windows desktop availability is checked by native driver"
+      },
+      "started_at_unix_ms": 1795044559366,
+      "finished_at_unix_ms": 1795044836600,
+      "dpi": 96,
+      "display": {
+        "width": 2560,
+        "height": 1600
+      },
+      "receipt_sha256": {
+        "result.json": "ed6833f3124d674a8f5f802822aba27a3ca2e2b81cce3f1b55f1376b89b85bce",
+        "binary.json": "1324e6ee59872feb8262e7c3e1ee28f4c1de71fcdfc981bab9f694518b0684a0",
+        "reader-performance.json": "715df2a275f6a72c7a283baae7b085f84a196b39518c8aaddd6fd60906221500"
+      },
+      "input": "UIA InvokePattern",
+      "budgets": {
+        "cached_open": {
+          "sample_count": 20,
+          "p95_ms": 2197.0584,
+          "limit_ms": 100,
+          "status": "Fail"
+        },
+        "local_search": {
+          "sample_count": 20,
+          "p95_ms": 2229.1591000000003,
+          "limit_ms": 200,
+          "status": "Fail"
+        },
+        "cached_tab_switch": {
+          "sample_count": 20,
+          "p95_ms": 2140.2784,
+          "limit_ms": 100,
+          "status": "Fail"
+        }
+      },
+      "attribution": {
+        "cached_open": {
+          "correlated_count": 20,
+          "input_call_p95_ms": 2015.0672,
+          "handler_to_useful_paint_p95_ms": 170.8219,
+          "input_to_useful_paint_p95_ms": 2174.2021,
+          "paint_to_observation_p95_ms": 72.0941
+        },
+        "local_search": {
+          "correlated_count": 20,
+          "input_call_p95_ms": 2014.4712,
+          "handler_to_useful_paint_p95_ms": 140.0387,
+          "input_to_useful_paint_p95_ms": 2174.1687,
+          "paint_to_observation_p95_ms": 54.8037
+        },
+        "cached_tab_switch": {
+          "correlated_count": 20,
+          "input_call_p95_ms": 2016.3499,
+          "handler_to_useful_paint_p95_ms": 38.2686,
+          "input_to_useful_paint_p95_ms": 2048.6301,
+          "paint_to_observation_p95_ms": 92.8994
+        }
+      }
+    }
+  ],
+  "large_workspace": {
+    "run": "e2e-1795046971513-3728",
+    "source_revision": "b88773b1eff6ce3f2e1da1b6c625612b9350ccd5",
+    "source_dirty": false,
+    "app_revision": "b88773b1eff6ce3f2e1da1b6c625612b9350ccd5",
+    "app_sha256": "1ab9dae71dba7869688424c71aa1c74ab84212d7b06044361b56e833193251f7",
+    "app_size_bytes": 44431360,
+    "app_version": "0.1.0",
+    "cargo_lock_sha256": "5b92e1a83782908953a4405e9c1ed8ce80e2dffaa10238f3e14ac04c0a524056",
+    "fixture_revision": "s12-large-workspace-v1",
+    "seed": 12345,
+    "status": "Fail",
+    "exit_code": 1,
+    "command": {
+      "program": "xtask",
+      "argv": [
+        "test",
+        "e2e",
+        "--suite",
+        "full",
+        "--case",
+        "E2E-014",
+        "--binary",
+        "<binary-path>",
+        "--artifact",
+        "<artifact-path>",
+        "--seed",
+        "12345",
+        "--report-dir",
+        "<report-dir>"
+      ],
+      "redacted": true
+    },
+    "host": {
+      "os": "windows",
+      "architecture": "x86_64",
+      "version": "Microsoft Windows [Version 10.0.22631.7652]",
+      "display_session": "Windows desktop availability is checked by native driver"
+    },
+    "started_at_unix_ms": 1795046971512,
+    "finished_at_unix_ms": 1795047233761,
+    "dpi": 96,
+    "display": {
+      "width": 2560,
+      "height": 1600
+    },
+    "receipt_sha256": {
+      "result.json": "31ffbc3e2cec24d45ab6c8bdd26d22bc58f86fceffe7090ecbacda2288b2191b",
+      "binary.json": "32aa6d3792e88090b919b747defe6cce5ee1f3282340886bc15af1b7ad8346da",
+      "large-workspace-native.json": "4c0e9e8113133f2c710241d0c906efb4a57f411cb0bac219fb7f53f1d6996759",
+      "github-access-trace.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "reader-restart-observation.json": "f3d42bcac816e7b1b5c872e4bcc5cff1237def812c136abaf8da011bd85e1df9",
+      "reader-fixture.json": "a7e7f948127275d6e57aaf80fea546e523e6d8e05be410e40df720c6084c8a1b",
+      "reader-restart-observation.idle.json": "b81825b3d3b93b2f1af75f2422a15d212e6491ef5e214ab7ed82383ec9974ced"
+    },
+    "fixture": {
+      "items": 50000,
+      "comments": 250000,
+      "open_tabs": 20,
+      "outbox_count": 1000,
+      "typed_outbox_count": 12,
+      "unresolved_outbox": 901
+    },
+    "detail": "Timed out waiting for account control reader-tab-0-1.",
+    "action_count": 85,
+    "completed_invocations": {
+      "reader-close-tab": 20,
+      "reader-result-0": 20,
+      "reader-search-submit": 20,
+      "reader-tab-0-0": 2,
+      "reader-tab-0-1": 1
+    },
+    "runtime": {
+      "initial_offline_start_ms": 13419.523000000001,
+      "initial_offline_peak_working_set_bytes": 96071680,
+      "warm_start_ms": 3919.6358,
+      "warm_process_id": 45776,
+      "idle_frames": {
+        "pid": 45776,
+        "settle_ms": 2000,
+        "sample_ms": 3000,
+        "draws_per_second": [
+          0,
+          0,
+          0
+        ],
+        "presents_per_second": [
+          0,
+          0,
+          0
+        ]
+      },
+      "idle_working_set_bytes": 92811264,
+      "peak_working_set_bytes": null,
+      "gpu_memory": {
+        "idle": {
+          "dedicated_bytes": 0,
+          "shared_bytes": 0
+        },
+        "after_actions": null,
+        "after_drain": null
+      }
+    },
+    "final_observation": {
+      "app_ready_ms": 1600.6469000000002,
+      "cached_visible_panes": 2,
+      "tab_counts": [
+        10,
+        10
+      ],
+      "active_item": 1
+    },
+    "http_count": 0,
+    "backlog": "Not run",
+    "persisted_timing_samples": null
+  }
+}

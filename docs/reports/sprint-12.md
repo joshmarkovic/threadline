@@ -45,6 +45,23 @@ E2E-020 passed on Windows 11 x64 build 22631.7652. Clean runner `1bf7e77` launch
 
 The matched build contained 393 unique Windows dependency names and imported 39 libraries from its PE executable. The three process observations each found 72 loaded modules, zero descendants and zero recognized browser components. These observations cover the installed local artifact and the sampled UI states. The exact published package remains pending. [Inventory inputs and counts](evidence/sprint-12/installed-runtime.json) · [Canonical runner and fixture](../../tools/native/README.md)
 
+## Cached reader performance
+
+The Windows 11 cached-reader runs each invoked 20 searches, 20 opens, and 20 tab changes through the app's native UI Automation controls. Every external p95 exceeded its budget. The runs used the synthetic Section 16 profile. [Builds, displays, invocation arguments and source receipt hashes](evidence/sprint-12/reader-performance.json)
+
+| Optimized app | DPI | Cached open p95 | Local search p95 | Cached tab p95 |
+| --- | ---: | ---: | ---: | ---: |
+| Budget | | <100 ms | <200 ms | <100 ms |
+| `7f78edf` | 144 | 507.14 ms | 202.92 ms | 312.88 ms |
+| `40fe4d4` | 144 | 2291.14 ms | 2161.72 ms | 2121.26 ms |
+| `3b1be96` | 96 | 2197.06 ms | 2229.16 ms | 2140.28 ms |
+
+The `3b1be96` run correlated all 60 actions to app handler and paint timestamps. The native invocation p95 was 2015.07 ms for open, 2014.47 ms for search, and 2016.35 ms for switching. The corresponding handler-to-first-useful-paint p95s were 170.82 ms, 140.04 ms, and 38.27 ms. The external p95s remain the budget results. [Timing attribution](evidence/sprint-12/reader-performance.json)
+
+E2E-014 failed on optimized app and driver `b88773b` at 96 DPI. The 50,000-item, 250,000-comment profile restored both panes and all 20 tabs offline. Warm launch to a verified useful workspace took 3919.64 ms against the 2000 ms budget. The app's earlier generic ready stamp was 1600.65 ms. The idle working set was 92,811,264 bytes. After settling, the app recorded zero draws and zero presents in each of three seconds. One app GPU counter sample was available. The run stopped after the second tab was widened by its downloaded title and fell outside the visible strip. The driver kept its action log. The timing arrays and subsequent backlog measurements were unavailable. [Large workspace result](evidence/sprint-12/reader-performance.json)
+
+The reader now constrains tab width independently of the downloaded title and keeps the full accessible name. The driver retains partial timing receipts and records the app's first paint of both populated panes alongside the external startup measurement. The concurrent Section 16 budget remains open. [Native driver](../../tools/native/windows-cached-reader.ps1)
+
 ## Local regression suites
 
 Formatting and strict Clippy passed on clean `f06de5e` in WSL Linux. Clippy checked all workspace targets with the app's E2E feature enabled and warnings treated as errors. The canonical runner used seed 12345 for the local test lanes. [Commands and test receipts](evidence/sprint-12/local-suite-validation.json)
