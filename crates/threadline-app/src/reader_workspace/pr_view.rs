@@ -355,7 +355,15 @@ impl ReaderWorkspace {
                 .min_h_0()
                 .min_w_0()
                 .child(self.pr_families(pane, tab, pr, palette, cx))
-                .child(self.item_view(pane, tab, palette, cx))
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .flex_1()
+                        .flex_grow(2.)
+                        .min_h_0()
+                        .child(self.item_view(pane, tab, palette, cx)),
+                )
                 .into_any_element(),
             PrSection::Commits | PrSection::Checks => self.pr_families(pane, tab, pr, palette, cx),
             PrSection::Files => self.pr_files(pane, tab, pr, pane_width < 725., palette, cx),
@@ -595,6 +603,7 @@ impl ReaderWorkspace {
         let mut viewport = div()
             .id(format!("pr-{pane}-records"))
             .overflow_y_scroll()
+            .flex_1()
             .min_h_0()
             .min_w_0()
             .p_2()
@@ -603,8 +612,6 @@ impl ReaderWorkspace {
             .gap_2();
         if settings.section == PrSection::Conversation {
             viewport = viewport.max_h(px(220.));
-        } else {
-            viewport = viewport.flex_1();
         }
         if settings.section == PrSection::Checks {
             viewport = viewport.child(div().text_xs().text_color(palette.muted).child(format!(
@@ -644,6 +651,10 @@ impl ReaderWorkspace {
         {
             return div()
                 .relative()
+                .flex()
+                .flex_col()
+                .flex_1()
+                .max_h(px(220.))
                 .min_h_0()
                 .child(viewport)
                 .child(observer.visible_control_bounds(format!("pr-{pane}-conversation-records")))

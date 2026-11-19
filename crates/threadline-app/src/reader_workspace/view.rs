@@ -1665,6 +1665,19 @@ impl ReaderWorkspace {
         palette: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let browsing_pr_conversation = self.surface == Surface::Browse
+            && self.layout.panes.iter().any(|pane| {
+                pane.active
+                    .and_then(|slot| pane.tabs.get(slot))
+                    .is_some_and(|tab| {
+                        tab.view.pr_reader.as_ref().is_none_or(|settings| {
+                            settings.section == threadline_storage::pr::PrSection::Conversation
+                        }) && self
+                            .tab_views
+                            .get(&tab.id)
+                            .is_some_and(|view| view.pr.is_some())
+                    })
+            });
         let mut upper = div()
             .flex_1()
             .min_h_0()
@@ -1672,8 +1685,19 @@ impl ReaderWorkspace {
             .flex()
             .flex_col()
             .children(
-                (self.surface != Surface::Browse || !self.maximized)
-                    .then(|| self.workspace_upper_surface(palette, cx)),
+                (self.surface != Surface::Browse || !self.maximized).then(|| {
+                    let surface = self.workspace_upper_surface(palette, cx);
+                    if browsing_pr_conversation {
+                        div()
+                            .id("reader-browse-scroll")
+                            .overflow_y_scroll()
+                            .max_h(gpui_kit::relative(0.3))
+                            .child(surface)
+                            .into_any_element()
+                    } else {
+                        surface
+                    }
+                }),
             );
         if self.surface == Surface::Browse {
             let panes = self

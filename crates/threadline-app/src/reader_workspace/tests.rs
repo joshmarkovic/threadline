@@ -1,6 +1,6 @@
 use super::*;
 use gpui_kit::{
-    AppContext, Bounds, Point, TestAppContext, WindowBounds, WindowOptions, size,
+    AppContext, Bounds, Pixels, Point, Size, TestAppContext, WindowBounds, WindowOptions, size,
     test::TestWindowExt,
 };
 use std::num::NonZeroU64;
@@ -590,6 +590,14 @@ impl ReaderHarness {
         &self,
         cx: &mut TestAppContext,
     ) -> (gpui_kit::AnyWindowHandle, Entity<ReaderWorkspace>) {
+        self.open_at(cx, size(px(1420.), px(1010.)))
+    }
+
+    fn open_at(
+        &self,
+        cx: &mut TestAppContext,
+        window_size: Size<Pixels>,
+    ) -> (gpui_kit::AnyWindowHandle, Entity<ReaderWorkspace>) {
         cx.executor().allow_parking();
         let account = self.fixture.account;
         let repositories = self.store.github_repository_views(account).unwrap();
@@ -602,7 +610,7 @@ impl ReaderHarness {
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds {
                     origin: Point::default(),
-                    size: size(px(1420.), px(1010.)),
+                    size: window_size,
                 })),
                 ..Default::default()
             };
@@ -1228,7 +1236,9 @@ fn mixed_lifecycle_cache_loads_every_seeded_editor_in_the_original_panes(cx: &mu
 
 #[cfg(feature = "e2e")]
 #[gpui_kit::test]
-fn scroll_within_pr_conversation_reveals_cached_thread_actions(cx: &mut TestAppContext) {
+fn default_shared_pr_panes_keep_conversation_and_cached_thread_actions_reachable(
+    cx: &mut TestAppContext,
+) {
     use gpui_kit::{Modifiers, PlatformInput, ScrollDelta, ScrollEvent, ScrollSource, TouchPhase};
     use threadline_storage::{
         pr::{InlineComment, PrFamily, PrHeader, PrInputPage, PrRecord, PrSection, PrTabView},
@@ -1289,7 +1299,7 @@ fn scroll_within_pr_conversation_reveals_cached_thread_actions(cx: &mut TestAppC
             },
         )
         .unwrap();
-    setup.one_pane(&Tab {
+    let left = Tab {
         id: "cached-thread-conversation".into(),
         item,
         view: TabView {
@@ -1299,8 +1309,37 @@ fn scroll_within_pr_conversation_reveals_cached_thread_actions(cx: &mut TestAppC
             }),
             ..Default::default()
         },
+    };
+    let right = Tab {
+        id: "other-pr-conversation".into(),
+        ..left.clone()
+    };
+    setup
+        .store
+        .save_workspace(
+            account,
+            &Workspace {
+                focused_pane: 0,
+                proportions: vec![0.5, 0.5],
+                panes: [left, right]
+                    .into_iter()
+                    .map(|tab| Pane {
+                        active: Some(0),
+                        tabs: vec![tab],
+                    })
+                    .collect(),
+            },
+        )
+        .unwrap();
+    let (window, reader) = setup.open_at(cx, size(px(1320.), px(820.)));
+    until(cx, |cx| {
+        cx.read(|cx| {
+            reader
+                .read(cx)
+                .tab_views
+                .contains_key("other-pr-conversation")
+        })
     });
-    let (window, reader) = setup.open(cx);
     let (observer, writer) = crate::observation::Observer::new(
         setup._directory.path().join("thread-bounds.json"),
         std::time::Instant::now(),
@@ -1313,6 +1352,38 @@ fn scroll_within_pr_conversation_reveals_cached_thread_actions(cx: &mut TestAppC
         });
         observer.begin_frame();
         window.render_frame(cx);
+        let [body_x, body_y, body_w, body_h] = observer
+            .test_control_bounds("reader-conversation-0")
+            .expect("The ordinary downloaded PR discussion must be visible");
+        for index in 0..2 {
+            let [_, _, _, discussion] = observer
+                .test_control_bounds(&format!("reader-conversation-{index}"))
+                .expect("The ordinary downloaded PR discussion must be visible");
+            assert!(discussion > 24., "pane {index} has no readable body");
+        }
+        let (left_scroll, right_scroll) = {
+            let workspace = reader.read(cx);
+            (
+                workspace.tab_views["cached-thread-conversation"]
+                    .scroll
+                    .clone(),
+                workspace.tab_views["other-pr-conversation"].scroll.clone(),
+            )
+        };
+        window.dispatch_event(
+            PlatformInput::Scroll(ScrollEvent {
+                position: Point::new(px(body_x + body_w / 2.), px(body_y + body_h / 2.)),
+                delta: ScrollDelta::Lines(Point::new(0., -3.)),
+                modifiers: Modifiers::default(),
+                touch_phase: TouchPhase::Moved,
+                source: ScrollSource::Pointer,
+            }),
+            cx,
+        );
+        observer.begin_frame();
+        window.render_frame(cx);
+        assert!(left_scroll.offset().y < px(0.));
+        assert_eq!(right_scroll.offset().y, px(0.));
         let [x, y, w, h] = observer
             .test_control_bounds("pr-0-conversation-records")
             .unwrap();
@@ -1322,24 +1393,29 @@ fn scroll_within_pr_conversation_reveals_cached_thread_actions(cx: &mut TestAppC
                 .test_control_bounds("pr-0-thread-0-reply")
                 .is_none()
         );
-        window.dispatch_event(
-            PlatformInput::Scroll(ScrollEvent {
-                position,
-                delta: ScrollDelta::Lines(Point::new(0., -30.)),
-                modifiers: Modifiers::default(),
-                touch_phase: TouchPhase::Moved,
-                source: ScrollSource::Pointer,
-            }),
-            cx,
-        );
-        observer.begin_frame();
-        window.render_frame(cx);
-        for id in ["pr-0-thread-0-reply", "pr-0-thread-0-resolution"] {
-            assert!(
-                observer.test_control_bounds(id).is_some(),
-                "{id} was clipped"
+        let controls = ["pr-0-thread-0-reply", "pr-0-thread-0-resolution"];
+        let mut seen = [false; 2];
+        for _ in 0..16 {
+            window.dispatch_event(
+                PlatformInput::Scroll(ScrollEvent {
+                    position,
+                    delta: ScrollDelta::Lines(Point::new(0., -3.)),
+                    modifiers: Modifiers::default(),
+                    touch_phase: TouchPhase::Moved,
+                    source: ScrollSource::Pointer,
+                }),
+                cx,
             );
+            observer.begin_frame();
+            window.render_frame(cx);
+            for (visible, id) in seen.iter_mut().zip(controls) {
+                *visible |= observer.test_control_bounds(id).is_some();
+            }
+            if seen.iter().all(|visible| *visible) {
+                break;
+            }
         }
+        assert_eq!(seen, [true, true], "A saved thread action remained clipped");
     })
     .unwrap();
     setup.runtime.block_on(writer.finish()).unwrap();

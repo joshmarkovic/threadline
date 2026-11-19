@@ -635,8 +635,8 @@ if ($script:positionReads -ne 3 -or $position.cached_reader.pane_positions.panes
 $script:viewportReads = 0
 function Read-Observation {
     $script:viewportReads++
-    $geometry = @{ 'reader-conversation-0' = @(0, 0, 100, 100); 'pr-1-context-content' = @(101, 0, 100, 100) }
-    if ($script:viewportReads -gt 1) { $geometry['pr-0-conversation-records'] = @(0, 0, 100, 100) }
+    $geometry = @{ 'pr-0-conversation-records' = @(0, 0, 100, 100); 'pr-1-context-content' = @(101, 0, 100, 100) }
+    if ($script:viewportReads -gt 1) { $geometry['reader-conversation-0'] = @(0, 0, 100, 100) }
     [pscustomobject]@{
         bounds = [pscustomobject]$geometry
         cached_reader = [pscustomobject]@{
@@ -648,8 +648,8 @@ function Read-Observation {
     }
 }
 $leftViewport = Wait-SharedPrViewport 1 $false
-if ($script:viewportReads -ne 3 -or $leftViewport.id -cne 'pr-0-conversation-records' -or $leftViewport.field -cne 'conversation_offset') {
-    throw 'The shared PR driver selected an issue viewport or acted before the exact PR Conversation appeared.'
+if ($script:viewportReads -ne 3 -or $leftViewport.id -cne 'reader-conversation-0' -or $leftViewport.field -cne 'conversation_offset') {
+    throw 'The shared PR driver selected formal review records or acted before the tracked PR discussion appeared.'
 }
 $rightViewport = Wait-SharedPrViewport 1 $true
 if ($rightViewport.id -cne 'pr-1-context-content' -or $rightViewport.field -cne 'files_context_offset') {

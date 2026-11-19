@@ -260,7 +260,7 @@ function Wait-SharedPrPanes([string]$Description, [long]$Item, [scriptblock]$Che
 
 function Wait-SharedPrViewport([long]$ExpectedItem, [bool]$FilesContext) {
     $pane = if ($FilesContext) { 1 } else { 0 }
-    $id = if ($FilesContext) { 'pr-1-context-content' } else { 'pr-0-conversation-records' }
+    $id = if ($FilesContext) { 'pr-1-context-content' } else { 'reader-conversation-0' }
     $section = if ($FilesContext) { 'Files' } else { 'Conversation' }
     $field = if ($FilesContext) { 'files_context_offset' } else { 'conversation_offset' }
     $observation = Wait-State ("the precise visible $id viewport for the existing PR pane") {
@@ -298,7 +298,7 @@ function Move-SharedPrReadingPosition([IntPtr]$Window, [long]$Item, [bool]$Files
     }
     $after = $receipt.cached_reader.shared_pr_panes[$pane].PSObject.Properties[$field].Value
     Add-Evidence 'Move the reading position of one exact owned PR viewport' ([ordered]@{
-        automation_id = $id; input = 'Owned HWND WM_MOUSEWHEEL'; before = $before; after = $after
+        automation_id = $id; input = 'Owned HWND WM_MOUSEWHEEL'; before = $before; after = $after; bounds = $rect
     })
     return $after
 }
@@ -407,7 +407,7 @@ function Invoke-SharedPrPanesProof([IntPtr]$Window) {
             $anchor[0].first_line -eq 1 -and $anchor[0].last_line -eq 1 -and $anchor[0].source_oid -ceq $head -and
             $reader.pending_pr_reads -eq 0 -and $reader.outbox -eq 0
     }
-    $null = Wait-AccountControl 'pr-0-conversation-records'
+    $null = Wait-AccountControl 'reader-conversation-0'
     $null = Wait-AccountControl 'pr-1-context-content'
     Add-Evidence 'Publish one shared refresh while the two visible reading positions and unsent review remain separate' $after.cached_reader.shared_pr_panes
     Stop-ThroughUi
