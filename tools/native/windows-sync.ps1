@@ -23,7 +23,7 @@ function Invoke-SyncProof([IntPtr]$Window, [string]$Profile) {
     Open-SyncSettings $Window
     $null = Wait-AccountControl 'sync-timezone'
     Wait-For 'the owned timezone field' {
-        Set-OwnedFixtureEditValue $Window 'sync-timezone' 'IANA time zone override' 'UTC'
+        Set-OwnedFixtureEditValue $Window 'sync-timezone' 'Work schedule time zone override' 'UTC'
     }
     Click-AccountControl $Window 'sync-save-schedule'
     $null = Wait-Sync 'the saved timezone override' { param($sync) $sync.schedule.timezone -ceq 'UTC' }
@@ -246,7 +246,7 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
         Set-OwnedFixtureEditValue $Window 'notifications-quiet-end' 'Quiet hours end, HH:MM' $end
     }
     Wait-For 'the quiet-hours time zone input' {
-        Set-OwnedFixtureEditValue $Window 'notifications-quiet-zone' 'IANA time zone, blank for local' 'UTC'
+        Set-OwnedFixtureEditValue $Window 'notifications-quiet-zone' 'Quiet hours time zone override, blank for user time zone' 'UTC'
     }
     Wait-For 'the native Save quiet hours control' {
         Invoke-OwnedFixtureControl $Window 'notifications-save-quiet' $null 'Save quiet hours'

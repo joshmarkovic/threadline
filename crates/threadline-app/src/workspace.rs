@@ -253,6 +253,19 @@ impl Workspace {
             })
         });
         let mut subscriptions = Vec::new();
+        subscriptions.push(cx.observe_window_activation(window, |_, window, cx| {
+            if window.is_window_active() {
+                crate::display_time::DisplayClock::refresh_device(cx);
+            }
+        }));
+        subscriptions.push(cx.observe_global::<crate::display_time::DisplayClock>(
+            |workspace, cx| {
+                if let Some(delivery) = &workspace.activity_delivery {
+                    delivery.wake();
+                }
+                cx.notify();
+            },
+        ));
         for pane in [Pane::Left, Pane::Right] {
             subscriptions.push(
                 cx.on_focus_in(&focus[pane.index()], window, move |this, _, cx| {
@@ -280,7 +293,10 @@ impl Workspace {
                 .filter(|_| !feasibility_fixture)
                 .map(|accounts| {
                     std::sync::Arc::new(crate::sync_worker::SyncWorker::start(
-                        accounts, &runtime, seed,
+                        accounts,
+                        &runtime,
+                        seed,
+                        crate::display_time::DisplayClock::subscribe(cx),
                     ))
                 });
             cx.new(|cx| {
@@ -463,8 +479,11 @@ impl Workspace {
         if !self.feasibility_fixture
             && let Some(store) = crate::profile_store(cx)
         {
-            self.activity_delivery =
-                crate::activity_delivery::ActivityDelivery::start(&store, controls.clone());
+            self.activity_delivery = crate::activity_delivery::ActivityDelivery::start(
+                &store,
+                controls.clone(),
+                crate::display_time::DisplayClock::subscribe(cx),
+            );
         }
         self.platform = Some(controls);
         let view = cx.weak_entity();
@@ -550,6 +569,7 @@ impl Workspace {
             PlatformEvent::NotificationComActivated => self.notification_com_activations += 1,
             PlatformEvent::Quit => self.request_quit(window, cx),
             PlatformEvent::Wake | PlatformEvent::NetworkChanged => {
+                crate::display_time::DisplayClock::refresh_device(cx);
                 if let Some(reader) = self.reader.as_ref() {
                     let trigger = if event == PlatformEvent::Wake {
                         threadline_core::connectivity::ProbeTrigger::Wake

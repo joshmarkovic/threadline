@@ -862,7 +862,7 @@ impl ReaderWorkspace {
                     div().w(px(175.)).child(
                         Input::new(&form.timezone)
                             .accessibility_id("notifications-quiet-zone")
-                            .aria_label("IANA time zone, blank for local"),
+                            .aria_label("Quiet hours time zone override, blank for user time zone"),
                     ),
                 );
             let weekdays = quiet.weekdays;
@@ -920,6 +920,7 @@ impl ReaderWorkspace {
     }
 
     fn feed_controls(&self, palette: Palette, cx: &mut Context<Self>) -> AnyElement {
+        let zone = crate::display_time::DisplayClock::current(cx);
         let mut panel = div()
             .id("activity-feed")
             .role(Role::Group)
@@ -1005,7 +1006,7 @@ impl ReaderWorkspace {
                     } else {
                         "Unread"
                     },
-                    time_label(event.occurred_at_ms.or(Some(event.observed_at_ms))),
+                    time_label(zone, event.occurred_at_ms.or(Some(event.observed_at_ms))),
                     reason,
                 )));
             let mut buttons = div().flex().flex_wrap().gap_1().child(

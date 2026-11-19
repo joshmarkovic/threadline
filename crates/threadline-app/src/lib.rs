@@ -3,6 +3,7 @@ mod accounts;
 mod activity_delivery;
 #[cfg(feature = "e2e")]
 mod activity_fixture;
+mod display_time;
 mod fixtures;
 #[cfg(feature = "e2e")]
 mod lifecycle_fixture;
@@ -39,6 +40,7 @@ use threadline_storage::Store;
 
 #[derive(Debug, Default)]
 pub struct Options {
+    pub display_timezone: Option<String>,
     pub seed: u64,
     pub open_review: bool,
     pub notification_com_server: bool,
@@ -117,6 +119,11 @@ fn start_platform(
 }
 
 pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error::Error>> {
+    let clock = display_time::DisplayClock::open(options.profile.as_deref())?;
+    if let Some(name) = options.display_timezone.as_deref() {
+        clock.save(name)?;
+        return Ok(());
+    }
     #[cfg(feature = "e2e")]
     let mut startup = options
         .e2e_report
@@ -233,6 +240,7 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
             #[cfg(feature = "e2e")]
             mark_startup(observation::StartupStage::ApplicationCallbackEntered);
             cx.set_global(activity_delivery::ActivityInbox);
+            clock.install(cx);
             cx.set_quit_mode(QuitMode::LastWindowClosed);
             gpui_kit::init(cx);
             #[cfg(feature = "e2e")]

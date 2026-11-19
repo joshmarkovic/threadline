@@ -25,7 +25,6 @@ pub(super) async fn execute(
     store: &Arc<Store>,
     core: &Shared,
     bound: &mut BoundReaders,
-    local: &Local,
     claim: ReadClaim,
     generation: u64,
 ) -> bool {
@@ -60,7 +59,7 @@ pub(super) async fn execute(
                 core.record(id, Reachability::ReceivedResponse, None);
             }
             hold(store, claim.account, Some(rate), None).await;
-            let system_zone = zone(&local.settings);
+            let user_zone = crate::display_time::calendar_zone(&core.user_zone).name();
             let committed = blocking(store, move |store| {
                 let changed = match outcome {
                     Outcome::Prepared => {
@@ -72,7 +71,7 @@ pub(super) async fn execute(
                             &claim,
                             ReadCompletion::NotModified(validators),
                             now.0,
-                            &system_zone?,
+                            user_zone,
                         )?;
                         false
                     }
@@ -85,13 +84,13 @@ pub(super) async fn execute(
                             *summary,
                             &validators,
                             now.0,
-                            &system_zone?,
+                            user_zone,
                         )?;
                         true
                     }
                     Outcome::Pr(page) => {
                         let changed = page.changed();
-                        page.commit(store, &claim, now.0, &system_zone?)?;
+                        page.commit(store, &claim, now.0, user_zone)?;
                         changed
                     }
                     Outcome::PullIndex(page, validators) => {
@@ -100,16 +99,16 @@ pub(super) async fn execute(
                             page,
                             &validators,
                             now.0,
-                            &system_zone?,
+                            user_zone,
                         )?;
                         true
                     }
                     Outcome::PullActivity(page) => {
-                        store.commit_pull_activity(&claim, *page, now.0, &system_zone?)?;
+                        store.commit_pull_activity(&claim, *page, now.0, user_zone)?;
                         true
                     }
                     Outcome::History(page) => {
-                        return match page.commit(store, &claim, now.0, &system_zone?) {
+                        return match page.commit(store, &claim, now.0, user_zone) {
                             Ok(changed) => Ok(changed),
                             Err(error) => {
                                 let failure = if matches!(&error, Error::Conflict(_)) {
@@ -138,7 +137,7 @@ pub(super) async fn execute(
                         if limited {
                             store.commit_observed_partial(&claim, page, now.0)?;
                         } else {
-                            store.commit_observed_page(&claim, page, now.0, &system_zone?)?;
+                            store.commit_observed_page(&claim, page, now.0, user_zone)?;
                         }
                         true
                     }

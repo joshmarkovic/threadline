@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::display_time::DisplayClock;
 use gpui_kit::{
     AnyElement, AppContext, Context, Entity, EventEmitter, InteractiveElement, IntoElement,
     ParentElement, Render, Role, StatefulInteractiveElement, Styled, Window,
@@ -10,7 +11,6 @@ use gpui_kit::{
     },
     div, px,
 };
-use threadline_core::sync::policy::system_timezone;
 use threadline_storage::{
     AccountId, Store,
     sync::{SyncControls, SyncSettings, SyncStatus, WorkSchedule},
@@ -29,7 +29,6 @@ pub(crate) struct SyncPanel {
     account: AccountId,
     details: Option<SyncStatus>,
     saved: Option<SyncSettings>,
-    system_zone: Option<String>,
     weekdays: u8,
     start: Entity<InputState>,
     end: Entity<InputState>,
@@ -108,11 +107,10 @@ impl SyncPanel {
             account,
             details: None,
             saved: None,
-            system_zone: None,
             weekdays: 0,
             start: input("09:00"),
             end: input("17:00"),
-            timezone: input("Operating system time zone"),
+            timezone: input("User time zone"),
             working: input("120"),
             off_hours: input("1800"),
             visible: input("60"),
@@ -133,7 +131,6 @@ impl SyncPanel {
             Ok::<_, threadline_storage::Error>((
                 store.sync_settings(account)?,
                 store.sync_status(account)?,
-                system_timezone().ok(),
             ))
         });
         cx.spawn_in(window, async move |panel, cx| {
@@ -141,13 +138,12 @@ impl SyncPanel {
             let _ = panel.update_in(cx, |panel, window, cx| {
                 panel.busy = false;
                 match result {
-                    Ok(Ok((settings, status, zone))) => {
+                    Ok(Ok((settings, status))) => {
                         if load_form || panel.saved.is_none() {
                             panel.set_inputs(&settings.schedule, window, cx);
                         }
                         panel.saved = Some(settings);
                         panel.details = Some(status);
-                        panel.system_zone = zone;
                         panel.message = None;
                     }
                     _ => panel.message = Some("Saved synchronization settings are unavailable."),
@@ -270,6 +266,7 @@ impl SyncPanel {
 
 impl Render for SyncPanel {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let zone = DisplayClock::current(cx);
         let palette = Palette::current(cx);
         let controls = self
             .saved
@@ -305,7 +302,11 @@ impl Render for SyncPanel {
         let fields = [
             ("sync-start", "Work starts (HH:MM)", &self.start),
             ("sync-end", "Work ends (HH:MM)", &self.end),
-            ("sync-timezone", "IANA time zone override", &self.timezone),
+            (
+                "sync-timezone",
+                "Work schedule time zone override",
+                &self.timezone,
+            ),
             (
                 "sync-work-interval",
                 "Work-hours interval in seconds",
@@ -407,12 +408,12 @@ impl Render for SyncPanel {
                             )
                     })),
             )
-            .child(div().text_xs().text_color(palette.muted).child(
-                self.system_zone.as_ref().map_or_else(
-                    || "Operating system time zone could not be determined.".into(),
-                    |zone| format!("Operating system time zone · {zone}"),
-                ),
-            ))
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(palette.muted)
+                    .child(format!("Default time zone · {}", zone.name())),
+            )
             .child(
                 div()
                     .flex()
@@ -464,7 +465,7 @@ impl Render for SyncPanel {
                     .child(format!("Pending reads · {}", details.pending))
                     .child(format!(
                         "Last successful sync · {}",
-                        stamp(details.last_success_ms)
+                        zone.label(details.last_success_ms, "none recorded")
                     ))
                     .children(
                         details
@@ -472,11 +473,12 @@ impl Render for SyncPanel {
                             .as_ref()
                             .map(|reason| format!("Most recent read failure · {reason}")),
                     )
-                    .children(
-                        details
-                            .budget_not_before_ms
-                            .map(|time| format!("Server budget resumes · {}", stamp(Some(time)))),
-                    )
+                    .children(details.budget_not_before_ms.map(|time| {
+                        format!(
+                            "Server budget resumes · {}",
+                            zone.label(Some(time), "none recorded")
+                        )
+                    }))
             }))
     }
 }
@@ -516,14 +518,6 @@ fn seconds(value: &str) -> Result<u32, &'static str> {
         .ok()
         .filter(|value| *value > 0)
         .ok_or("Refresh intervals must be positive seconds.")
-}
-
-fn stamp(at: Option<i64>) -> String {
-    at.and_then(chrono::DateTime::from_timestamp_millis)
-        .map_or_else(
-            || "none recorded".into(),
-            |time| time.format("%Y-%m-%d %H:%M UTC").to_string(),
-        )
 }
 
 #[cfg(test)]

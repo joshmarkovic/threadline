@@ -19,7 +19,7 @@ use threadline_core::{
         ConnectionSnapshot, ConnectionStatus, ConnectivityObserver, ObservationId, ProbeTrigger,
     },
     github::{AccessKind, GitHubSession, RateLimit, Reachability, reader::BoundRepositoryReader},
-    sync::{Cancellation, policy::system_timezone},
+    sync::Cancellation,
 };
 use threadline_storage::{
     AccountId, RepositoryId, Store, UtcMillis,
@@ -52,6 +52,7 @@ pub(crate) struct SyncWorker {
 }
 
 struct Shared {
+    user_zone: crate::display_time::CalendarZone,
     observer: Mutex<ConnectivityObserver>,
     scope: Mutex<Scope>,
     changed: Notify,
@@ -75,14 +76,25 @@ struct Active {
 }
 
 impl SyncWorker {
-    pub(crate) fn start(accounts: AccountService, runtime: &Handle, seed: u64) -> Self {
+    pub(crate) fn start(
+        accounts: AccountService,
+        runtime: &Handle,
+        seed: u64,
+        user_zone: crate::display_time::CalendarZone,
+    ) -> Self {
         let network = accounts.sync_worker_enabled();
-        Self::start_with_network(accounts, runtime, seed, network)
+        Self::start_with_network(accounts, runtime, seed, network, user_zone)
     }
 
     #[cfg(test)]
     pub(crate) fn start_fixture(accounts: AccountService, runtime: &Handle) -> Self {
-        Self::start_with_network(accounts, runtime, 42, true)
+        Self::start_with_network(
+            accounts,
+            runtime,
+            42,
+            true,
+            watch::channel(Some(threadline_core::display_time::DisplayZone::UTC)).1,
+        )
     }
 
     fn start_with_network(
@@ -90,6 +102,7 @@ impl SyncWorker {
         runtime: &Handle,
         seed: u64,
         network: bool,
+        user_zone: crate::display_time::CalendarZone,
     ) -> Self {
         let observer = ConnectivityObserver::new(seed);
         let (sender, updates) = watch::channel(SyncUpdate {
@@ -101,6 +114,7 @@ impl SyncWorker {
             eligible_outbox: 0,
         });
         let core = Arc::new(Shared {
+            user_zone,
             observer: Mutex::new(observer),
             scope: Mutex::new(Scope::default()),
             changed: Notify::new(),
@@ -580,10 +594,8 @@ async fn run(
                         let history =
                             threadline_storage::sync::HistoryRead::from_target(&claim.target)
                                 .is_some();
-                        if reads::execute(
-                            &accounts, &store, &core, &mut bound, &local, claim, generation,
-                        )
-                        .await
+                        if reads::execute(&accounts, &store, &core, &mut bound, claim, generation)
+                            .await
                         {
                             digest = digest.wrapping_add(1);
                             if history {
@@ -764,13 +776,6 @@ async fn wait(core: &Shared, delay: Option<Duration>) -> bool {
         _ = core.changed.notified() => true,
         _ = timer => false,
     }
-}
-
-fn zone(settings: &SyncSettings) -> threadline_storage::Result<String> {
-    settings.schedule.timezone.clone().map_or_else(
-        || system_timezone().map_err(threadline_storage::Error::InvalidInput),
-        Ok,
-    )
 }
 
 #[cfg(test)]

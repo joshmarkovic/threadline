@@ -1012,6 +1012,7 @@ impl ReaderWorkspace {
         palette: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let zone = crate::display_time::DisplayClock::current(cx);
         let mut body = div().relative();
         let lanes = page
             .rows
@@ -1082,7 +1083,10 @@ impl ReaderWorkspace {
                 .child(div().text_xs().text_color(palette.muted).child(format!(
                     "{} · {}{}{}",
                     row.entry.author.as_deref().unwrap_or("Unknown author"),
-                    time_label(row.entry.authored_at_ms.or(Some(commit.committed_at_ms))),
+                    time_label(
+                        zone,
+                        row.entry.authored_at_ms.or(Some(commit.committed_at_ms))
+                    ),
                     if labels.is_empty() {
                         String::new()
                     } else {
@@ -1162,7 +1166,7 @@ impl ReaderWorkspace {
                     .child(format!(
                         "{} · {}",
                         coverage_label(page.coverage),
-                        time_label(page.fetched_at_ms)
+                        time_label(zone, page.fetched_at_ms)
                     )),
             )
             .child(pagination)

@@ -490,6 +490,7 @@ impl ReaderWorkspace {
         palette: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let zone = crate::display_time::DisplayClock::current(cx);
         let operation = &detail.operation;
         let route = detail
             .repository
@@ -605,8 +606,8 @@ impl ReaderWorkspace {
             panel = panel.child(div().text_xs().text_color(palette.muted).child(format!(
                     "Attempt {} · claimed {} · sent {} · {}",
                     attempt.number,
-                    super::view::time_label(Some(attempt.claimed_at)),
-                    super::view::time_label(attempt.sending_at),
+                    super::view::time_label(zone, Some(attempt.claimed_at)),
+                    super::view::time_label(zone, attempt.sending_at),
                     attempt
                         .outcome
                         .as_deref()

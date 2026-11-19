@@ -722,6 +722,16 @@ impl ReaderWorkspace {
             status: None,
         };
         reader.ensure_focus_handles(MAX_PANES, window, cx);
+        reader
+            .focus_events
+            .push(
+                cx.observe_global::<crate::display_time::DisplayClock>(|reader, cx| {
+                    if let Some(worker) = &reader.sync_worker {
+                        worker.wake(None);
+                    }
+                    cx.notify();
+                }),
+            );
         reader.focus_events.push(
             cx.observe_global_in::<crate::activity_delivery::ActivityInbox>(
                 window,

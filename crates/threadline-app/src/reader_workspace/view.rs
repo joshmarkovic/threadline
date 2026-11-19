@@ -13,6 +13,7 @@ use gpui_kit::{
     prelude::FluentBuilder,
     rgb,
 };
+use threadline_core::display_time::DisplayZone;
 use threadline_storage::{
     ItemKind,
     queue::DraftKind,
@@ -336,18 +337,28 @@ impl ReaderWorkspace {
     }
 
     fn apply_filters(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let zone = crate::display_time::DisplayClock::current(cx);
         let get = |input: &Entity<InputState>| {
             let text = input.read(cx).value().trim().to_owned();
             (!text.is_empty()).then_some(text)
         };
         let since = get(&self.dates_after);
         let before = get(&self.dates_before);
-        let updated_since_ms = since.as_deref().and_then(parse_date);
-        let updated_before_ms = before.as_deref().and_then(parse_date);
+        let updated_since_ms = since
+            .as_deref()
+            .and_then(|value| zone.day_bounds(value))
+            .map(|(start, _)| start);
+        let updated_before_ms = before
+            .as_deref()
+            .and_then(|value| zone.day_bounds(value))
+            .map(|(start, _)| start);
         if since.is_some() != updated_since_ms.is_some()
             || before.is_some() != updated_before_ms.is_some()
+            || matches!((updated_since_ms, updated_before_ms), (Some(start), Some(end)) if start >= end)
         {
-            self.status = Some("Use YYYY-MM-DD for date filters.");
+            self.status = Some(
+                "Enter valid calendar dates as YYYY-MM-DD, with the start earlier than the exclusive end.",
+            );
             cx.notify();
             return;
         }
@@ -429,6 +440,7 @@ impl ReaderWorkspace {
     }
 
     fn sidebar(&self, palette: Palette, cx: &mut Context<Self>) -> impl IntoElement {
+        let zone = crate::display_time::DisplayClock::current(cx);
         let count_scope = match self.scope {
             ReaderScope::Selected => "selected repositories".into(),
             ReaderScope::Repository(id) => self
@@ -456,6 +468,7 @@ impl ReaderWorkspace {
             .flex_col()
             .gap_1()
             .child(rail(
+                zone,
                 "reader-review",
                 "Review requested",
                 &count_scope,
@@ -469,6 +482,7 @@ impl ReaderWorkspace {
                 }),
             ))
             .child(rail(
+                zone,
                 "reader-assigned",
                 "Assigned to me",
                 &count_scope,
@@ -484,6 +498,7 @@ impl ReaderWorkspace {
             .child(self.observed_control(
                 "reader-outbox",
                 rail(
+                    zone,
                     "reader-outbox",
                     "Outbox",
                     "active account",
@@ -596,6 +611,7 @@ impl ReaderWorkspace {
     }
 
     fn browse_view(&self, palette: Palette, cx: &mut Context<Self>) -> impl IntoElement {
+        let zone = crate::display_time::DisplayClock::current(cx);
         let filter_modes = [
             ("All items", KindFilter::All),
             ("Issues", KindFilter::Issues),
@@ -791,7 +807,7 @@ impl ReaderWorkspace {
                                     (&self.label, "Label"),
                                     (&self.assignee, "Assignee"),
                                     (&self.reviewer, "Reviewer"),
-                                    (&self.dates_after, "Updated after"),
+                                    (&self.dates_after, "Updated since"),
                                     (&self.dates_before, "Updated before"),
                                 ]
                                 .into_iter()
@@ -828,7 +844,7 @@ impl ReaderWorkspace {
                 div()
                     .text_xs()
                     .text_color(palette.muted)
-                    .child(coverage_label("Repository history", coverage, age))
+                    .child(coverage_label(zone, "Repository history", coverage, age))
             }))
             .child(hits)
             .children(self.remote_search.as_ref().map(|result| {
@@ -1066,6 +1082,7 @@ impl ReaderWorkspace {
         palette: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let zone = crate::display_time::DisplayClock::current(cx);
         let Some(view) = self.tab_views.get(&tab.id) else {
             return div()
                 .p_4()
@@ -1114,7 +1131,7 @@ impl ReaderWorkspace {
                         div().text_xs().text_color(palette.muted).child(format!(
                             "{} · {}",
                             entry.author.as_deref().unwrap_or("Unknown author"),
-                            time_label(Some(entry.created_at_ms))
+                            time_label(zone, Some(entry.created_at_ms))
                         ))
                     }))
                     .child(self.markdown_element(text, Some(item.locator.repository), palette, cx))
@@ -1195,7 +1212,7 @@ impl ReaderWorkspace {
                 kind_label(item.kind),
                 item.locator.number
             )))
-            .children(view.data.metadata.as_ref().map(|metadata|item_metadata(metadata,palette)))
+            .children(view.data.metadata.as_ref().map(|metadata|item_metadata(zone, pane, metadata,palette)))
             .children(
                 view.body
                     .as_ref()
@@ -1215,7 +1232,7 @@ impl ReaderWorkspace {
                 div()
                     .text_xs()
                     .text_color(palette.muted)
-                    .child(coverage_label(
+                    .child(coverage_label(zone,
                         "Comments",
                         view.data.discussion.state.coverage,
                         view.data.discussion.state.last_fetch_at_ms,
@@ -1234,13 +1251,13 @@ impl ReaderWorkspace {
             .child(notes)
             .children(view.data.anchor_missing.then(||div().text_sm().child("The selected discussion location is unavailable in the downloaded conversation.")))
             .child(div().text_sm().child("Timeline"))
-            .child(div().text_xs().text_color(palette.muted).child(coverage_label("Timeline",view.data.timeline.state.coverage,view.data.timeline.state.last_fetch_at_ms)))
+            .child(div().text_xs().text_color(palette.muted).child(coverage_label(zone, "Timeline",view.data.timeline.state.coverage,view.data.timeline.state.last_fetch_at_ms)))
             .children(view.data.timeline.state.error.map(|_|resource_problem("Timeline",&view.data.timeline.state,palette)))
             .children(view.data.timeline.entries.iter().enumerate().map(|(position,event)|{
                 let target=view.data.linked_items.get(&event.remote_key).copied();
                 div().flex().flex_col().gap_1()
                     .child(div().text_sm().child(format!("{} · {} · {}",event.event,
-                        event.actor.as_deref().unwrap_or("Unknown actor"),time_label(event.occurred_at_ms))))
+                        event.actor.as_deref().unwrap_or("Unknown actor"),time_label(zone, event.occurred_at_ms))))
                     .children(event.linked_item.as_ref().map(|linked|{
                         let label=format!("{}/{} #{}",linked.owner,linked.repository,linked.number);
                         match target {
@@ -1530,12 +1547,19 @@ pub(crate) fn bind_shortcuts(cx: &mut App) {
 
 impl ReaderWorkspace {
     fn workspace_connection(&self, palette: Palette, cx: &mut Context<Self>) -> AnyElement {
+        let zone = crate::display_time::DisplayClock::current(cx);
         let (connection, color) = self.connection_label();
         let snapshot = self.shared_connection();
         let connection_details = format!(
             "{connection}. Last check {}. Last successful contact {}.",
-            time_label(snapshot.map_or(self.checked, |state| state.last_checked_ms)),
-            time_label(snapshot.map_or(self.contact, |state| state.last_contact_ms)),
+            time_label(
+                zone,
+                snapshot.map_or(self.checked, |state| state.last_checked_ms)
+            ),
+            time_label(
+                zone,
+                snapshot.map_or(self.contact, |state| state.last_contact_ms)
+            ),
         );
 
         div()
@@ -1884,6 +1908,7 @@ pub(super) const BADGE_BACKGROUND: u32 = 0x173e70;
 pub(super) const BADGE_FOREGROUND: u32 = 0xffffff;
 
 fn rail(
+    zone: DisplayZone,
     id: &'static str,
     label: &'static str,
     scope: &str,
@@ -1901,7 +1926,7 @@ fn rail(
             format!(
                 "{label}. {} {detail} for {scope}. Last checked {}.",
                 count.known,
-                time_label(count.last_validated_at_ms)
+                time_label(zone, count.last_validated_at_ms)
             )
         }
     };
@@ -1964,7 +1989,12 @@ fn kind_label(kind: ItemKind) -> &'static str {
     }
 }
 
-pub(super) fn item_metadata(metadata: &ReaderItemMetadata, palette: Palette) -> impl IntoElement {
+pub(super) fn item_metadata(
+    zone: DisplayZone,
+    pane: usize,
+    metadata: &ReaderItemMetadata,
+    palette: Palette,
+) -> impl IntoElement {
     let labels = observed_people(metadata.labels.as_deref());
     let assignees = observed_people(metadata.assignees.as_deref());
     let milestone = match &metadata.milestone {
@@ -2004,21 +2034,29 @@ pub(super) fn item_metadata(metadata: &ReaderItemMetadata, palette: Palette) -> 
             }
         },
     );
+    let times = format!(
+        "{} · Created {} · Updated {}",
+        metadata
+            .author
+            .as_deref()
+            .unwrap_or("Author not downloaded"),
+        time_label(zone, metadata.created_at_ms),
+        time_label(zone, metadata.remote_updated_at_ms)
+    );
     div()
         .flex()
         .flex_col()
         .gap_1()
         .text_xs()
         .text_color(palette.muted)
-        .child(format!(
-            "{} · Created {} · Updated {}",
-            metadata
-                .author
-                .as_deref()
-                .unwrap_or("Author not downloaded"),
-            time_label(metadata.created_at_ms),
-            time_label(metadata.remote_updated_at_ms)
-        ))
+        .child(
+            div()
+                .id(format!("reader-item-times-{pane}"))
+                .accessibility_id(format!("reader-item-times-{pane}"))
+                .role(Role::Label)
+                .aria_label(times.clone())
+                .child(times),
+        )
         .child(format!(
             "Labels {labels} · Assignees {assignees} · Milestone {milestone}"
         ))
@@ -2033,22 +2071,22 @@ fn observed_people(values: Option<&[String]>) -> String {
     }
 }
 
-pub(super) fn time_label(value: Option<i64>) -> String {
-    value
-        .and_then(chrono::DateTime::from_timestamp_millis)
-        .map_or_else(
-            || "not yet recorded".into(),
-            |at| at.format("%Y-%m-%d %H:%M UTC").to_string(),
-        )
+pub(super) fn time_label(zone: DisplayZone, value: Option<i64>) -> String {
+    zone.label(value, "not yet recorded")
 }
 
-pub(super) fn coverage_label(label: &str, coverage: Coverage, time: Option<i64>) -> String {
+pub(super) fn coverage_label(
+    zone: DisplayZone,
+    label: &str,
+    coverage: Coverage,
+    time: Option<i64>,
+) -> String {
     let text = match coverage {
         Coverage::Missing => "not checked",
         Coverage::Partial => "partially downloaded",
         Coverage::Complete => "downloaded",
     };
-    format!("{label} · {text} · Last saved {}", time_label(time))
+    format!("{label} · {text} · Last saved {}", time_label(zone, time))
 }
 
 pub(super) fn resource_problem(
@@ -2143,10 +2181,4 @@ fn comment_number(value: &str) -> Option<std::num::NonZeroU64> {
         return None;
     }
     value.parse().ok()
-}
-
-fn parse_date(value: &str) -> Option<i64> {
-    let date = chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").ok()?;
-    date.and_hms_opt(0, 0, 0)
-        .map(|time| time.and_utc().timestamp_millis())
 }

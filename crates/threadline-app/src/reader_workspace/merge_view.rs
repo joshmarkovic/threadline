@@ -69,6 +69,7 @@ impl ReaderWorkspace {
         palette: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let zone = crate::display_time::DisplayClock::current(cx);
         let revision = &pr.data.revision;
         let expanded = self.merge_views.get(&tab.id);
         let active = expanded.filter(|view| &view.revision == revision);
@@ -142,7 +143,7 @@ impl ReaderWorkspace {
         };
         panel = panel.child(div().text_xs().text_color(palette.muted).child(format!(
             "Options checked {}",
-            time_label(Some(cached.observed_at_ms))
+            time_label(zone, Some(cached.observed_at_ms))
         )));
         if !available(&cached.policy) {
             return panel

@@ -14,6 +14,7 @@ use gpui_kit::{
     },
     div,
 };
+use threadline_core::display_time::DisplayZone;
 use threadline_storage::{
     pr::{
         BodyReference, NarrowSurface, PrContextMode, PrDiffMode, PrFamily, PrRecord, PrRevision,
@@ -302,6 +303,7 @@ impl ReaderWorkspace {
         palette: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let zone = crate::display_time::DisplayClock::current(cx);
         let settings = tab_settings(tab);
         let linked_review = tab
             .view
@@ -392,7 +394,7 @@ impl ReaderWorkspace {
                     .child(format!(
                         "Linked review comment · {} · {}",
                         comment.author.as_deref().unwrap_or("Unknown reviewer"),
-                        time_label(comment.created_at_ms),
+                        time_label(zone, comment.created_at_ms),
                     ))
                     .child(comment.body.clone())
                     .into_any_element(),
@@ -461,6 +463,7 @@ impl ReaderWorkspace {
         palette: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let zone = crate::display_time::DisplayClock::current(cx);
         let title = match &item.title {
             Change::Value(title) => title.as_str(),
             _ => "Title not downloaded",
@@ -519,8 +522,8 @@ impl ReaderWorkspace {
                     )))
                 .child(div().text_xs().text_color(palette.muted).child(format!(
                     "Opened {} · merged {} · Head {}",
-                    time_label(h.created_at_ms),
-                    time_label(h.merged_at_ms),
+                    time_label(zone, h.created_at_ms),
+                    time_label(zone, h.merged_at_ms),
                     &pr.data.revision.head.as_str()[..12],
                 )))
                 .child(self.pr_download_header(pane, tab, pr, palette, cx))
@@ -667,6 +670,7 @@ impl ReaderWorkspace {
         palette: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let zone = crate::display_time::DisplayClock::current(cx);
         let settings = tab_settings(tab);
         let mut viewport = div()
             .id(format!("pr-{pane}-records"))
@@ -719,7 +723,7 @@ impl ReaderWorkspace {
                 } else {
                     None
                 };
-                viewport = viewport.child(pr_record(record, palette, mute));
+                viewport = viewport.child(pr_record(zone, record, palette, mute));
                 if let Some(thread) = super::review_threads::Thread::from_record(record) {
                     viewport = viewport.child(self.thread_controls(
                         (pane, index),
@@ -762,6 +766,7 @@ impl ReaderWorkspace {
         palette: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let zone = crate::display_time::DisplayClock::current(cx);
         let label = match family {
             PrFamily::Files => "Files",
             PrFamily::Commits => "Commits",
@@ -776,7 +781,7 @@ impl ReaderWorkspace {
         let coverage_id = format!("pr-{pane}-{name}-coverage");
         let coverage = pr_status(
             coverage_id.clone(),
-            coverage_label(label, state.coverage, state.last_validation_at_ms),
+            coverage_label(zone, label, state.coverage, state.last_validation_at_ms),
             palette,
         );
         let limitation = api_capped.then(|| {
@@ -1064,6 +1069,7 @@ impl ReaderWorkspace {
         palette: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let zone = crate::display_time::DisplayClock::current(cx);
         let Some(set) = &pr.data.references else {
             return pr_status(
                 format!("pr-{pane}-reference-state"),
@@ -1126,7 +1132,7 @@ impl ReaderWorkspace {
                 .children(
                     link.metadata
                         .as_ref()
-                        .map(|metadata| super::view::item_metadata(metadata, palette)),
+                        .map(|metadata| super::view::item_metadata(zone, pane, metadata, palette)),
                 )
                 .child(pr.linked_body.as_ref().map_or_else(
                     || {
@@ -1145,6 +1151,7 @@ impl ReaderWorkspace {
                         .role(Role::Status)
                         .text_xs()
                         .child(coverage_label(
+                            zone,
                             "Linked issue conversation",
                             state.coverage,
                             state.last_validation_at_ms,
@@ -2024,7 +2031,12 @@ fn reference_status(reference: &BodyReference, offline: bool) -> &'static str {
     }
 }
 
-fn pr_record(record: &PrRecord, palette: Palette, mute: Option<AnyElement>) -> AnyElement {
+fn pr_record(
+    zone: DisplayZone,
+    record: &PrRecord,
+    palette: Palette,
+    mute: Option<AnyElement>,
+) -> AnyElement {
     let mut card = div()
         .text_sm()
         .p_1()
@@ -2044,8 +2056,8 @@ fn pr_record(record: &PrRecord, palette: Palette, mute: Option<AnyElement>) -> A
             ))
             .child(div().text_xs().text_color(palette.muted).child(format!(
                 "Authored {} · committed {}",
-                time_label(*authored_at_ms),
-                time_label(*committed_at_ms)
+                time_label(zone, *authored_at_ms),
+                time_label(zone, *committed_at_ms)
             )))
             .child(message.clone()),
         PrRecord::Review {
@@ -2059,7 +2071,7 @@ fn pr_record(record: &PrRecord, palette: Palette, mute: Option<AnyElement>) -> A
             .child(format!(
                 "{} · {state} · {}",
                 author.as_deref().unwrap_or("Unknown reviewer"),
-                time_label(*submitted_at_ms)
+                time_label(zone, *submitted_at_ms)
             ))
             .children(mute)
             .child(
@@ -2111,7 +2123,10 @@ fn pr_record(record: &PrRecord, palette: Palette, mute: Option<AnyElement>) -> A
                 thread = thread.child(
                     div()
                         .p_1()
-                        .child(format!("{author} · {}", time_label(comment.created_at_ms)))
+                        .child(format!(
+                            "{author} · {}",
+                            time_label(zone, comment.created_at_ms)
+                        ))
                         .children(comment.anchor.as_ref().map(|anchor| {
                             div().text_xs().text_color(palette.muted).child(format!(
                                 "Original position · {} · {:?} line {} · {}",
@@ -2137,7 +2152,7 @@ fn pr_record(record: &PrRecord, palette: Palette, mute: Option<AnyElement>) -> A
         } => card.child(format!(
             "{name} · {status} · {} · {}",
             conclusion.as_deref().unwrap_or("No conclusion reported"),
-            time_label(*completed_at_ms)
+            time_label(zone, *completed_at_ms)
         )),
         PrRecord::Status {
             context,
@@ -2146,7 +2161,7 @@ fn pr_record(record: &PrRecord, palette: Palette, mute: Option<AnyElement>) -> A
             ..
         } => card.child(format!(
             "{context} · {state} · {}",
-            time_label(*updated_at_ms)
+            time_label(zone, *updated_at_ms)
         )),
         _ => return div().into_any_element(),
     };

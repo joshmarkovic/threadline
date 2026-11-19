@@ -54,7 +54,7 @@ function Open-FixtureReviewCommits([IntPtr]$Window, [long]$Item, [long]$Revision
 function Wait-FixtureCommitCoverage([IntPtr]$Window, [switch]$Downloaded) {
     $dot = ' ' + [char]0x00b7 + ' '
     $expected = if ($Downloaded) {
-        '^' + [regex]::Escape('Commits' + $dot + 'downloaded' + $dot + 'Last saved ') + '\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC$'
+        '^' + [regex]::Escape('Commits' + $dot + 'downloaded' + $dot + 'Last saved ') + '\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC \(\+00:00\)$'
     } else {
         '^' + [regex]::Escape('Commits' + $dot + 'not checked' + $dot + 'Last saved not yet recorded') + '$'
     }

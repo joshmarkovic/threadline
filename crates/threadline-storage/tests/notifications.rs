@@ -3,6 +3,63 @@ use threadline_storage as storage;
 #[path = "support/write_profile.rs"]
 mod write_profile;
 use storage::{access::AccessProfile, notifications::*, resources::DeliveryPhase, *};
+
+#[test]
+fn display_timezone_drives_unset_work_and_quiet_windows_but_preserves_an_account_override() {
+    // Monday 14:30 UTC, simultaneously 09:30 in New York.
+    let now = 1_768_228_200_000;
+    for (override_zone, expected_local_window) in [(None, true), (Some("UTC"), false)] {
+        let profile = tempfile::tempdir().unwrap();
+        let db = Store::open_profile(profile.path()).unwrap();
+        let (account, repo, item) = write_profile::setup(&db);
+        let p = db.github_access_profile(account, "work").unwrap().unwrap();
+        let mut schedule = db.sync_settings(account).unwrap();
+        schedule.schedule.start_minute = 9 * 60;
+        schedule.schedule.end_minute = 10 * 60;
+        schedule.schedule.timezone = override_zone.map(str::to_owned);
+        db.save_sync_settings(account, &schedule).unwrap();
+        assert_eq!(
+            db.sync_settings(account)
+                .unwrap()
+                .schedule
+                .in_work_window(now, "America/New_York")
+                .unwrap(),
+            expected_local_window
+        );
+        db.enroll_notification_stream(&p, repo, "comments", now - 10)
+            .unwrap();
+        db.update_notification_settings(account, |settings| {
+            settings.fallback = DeliveryMode::Popup;
+            settings.quiet_hours = Some(QuietHours {
+                weekdays: 127,
+                start_minute: 9 * 60,
+                end_minute: 10 * 60,
+                timezone: override_zone.map(str::to_owned),
+            });
+        })
+        .unwrap();
+        assert!(record(
+            &db,
+            &p,
+            repo,
+            "scoped-comment",
+            now,
+            &facts(item, Category::OrdinaryComment)
+        ));
+        db.process_notification_events(account, now + 2, "America/New_York", true, 100)
+            .unwrap();
+        assert_eq!(
+            db.notification_feed(account, None, 10).unwrap()[0].occurred_at_ms,
+            Some(now)
+        );
+        assert_eq!(
+            db.claim_notification_popup(account, now + 3, "America/New_York", true)
+                .unwrap()
+                .is_none(),
+            expected_local_window
+        );
+    }
+}
 fn facts(item: ItemId, category: Category) -> EventFacts {
     EventFacts {
         target: NotificationTarget::Item { item, thread: None },

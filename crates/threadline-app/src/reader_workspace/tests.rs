@@ -544,7 +544,12 @@ fn cached_offline_account_adopts_worker_snapshot_published_before_hydration(
         .update_sync_settings(account, |settings| settings.controls.work_offline = true)
         .unwrap();
     let accounts = AccountService::new(Arc::clone(&setup.store)).unwrap();
-    let worker = Arc::new(SyncWorker::start(accounts, setup.runtime.handle(), 42));
+    let worker = Arc::new(SyncWorker::start(
+        accounts,
+        setup.runtime.handle(),
+        42,
+        tokio::sync::watch::channel(Some(threadline_core::display_time::DisplayZone::UTC)).1,
+    ));
     let mut updates = worker.watch();
     setup.runtime.block_on(async {
         tokio::time::timeout(

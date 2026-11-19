@@ -45,6 +45,15 @@ fn parse_args() -> Result<Options, String> {
     let mut arguments = std::env::args_os().skip(1);
     while let Some(argument) = arguments.next() {
         match argument.to_str() {
+            Some("--display-timezone") if options.display_timezone.is_none() => {
+                options.display_timezone = Some(
+                    arguments
+                        .next()
+                        .and_then(|value| value.into_string().ok())
+                        .filter(|value| !value.trim().is_empty())
+                        .ok_or("--display-timezone requires an IANA time zone or system.")?,
+                );
+            }
             #[cfg(windows)]
             Some("--notification-com-server") => options.notification_com_server = true,
             #[cfg(windows)]

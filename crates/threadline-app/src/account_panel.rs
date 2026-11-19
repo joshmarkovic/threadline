@@ -46,6 +46,9 @@ pub(crate) struct AccountPanel {
     runtime: tokio::runtime::Handle,
     focus: gpui_kit::FocusHandle,
     route: Entity<InputState>,
+    display_zone: Entity<InputState>,
+    display_zone_message: Option<&'static str>,
+    saving_display_zone: bool,
     token: Entity<InputState>,
     renew: Option<AccessProfile>,
     view: AccountView,
@@ -79,6 +82,10 @@ impl AccountPanel {
         cx: &mut Context<Self>,
     ) -> Self {
         let route = cx.new(|cx| InputState::new(window, cx).placeholder("owner/name"));
+        let clock = cx.try_global::<crate::display_time::DisplayClock>();
+        let value = clock.map_or("system", |clock| clock.setting());
+        let display_zone_message = clock.and_then(|clock| clock.warning);
+        let display_zone = cx.new(|cx| InputState::new(window, cx).default_value(value));
         let token = password_input(window, cx);
         #[cfg(feature = "e2e")]
         let route_observation = service
@@ -93,6 +100,9 @@ impl AccountPanel {
             runtime,
             focus: cx.focus_handle(),
             route,
+            display_zone,
+            display_zone_message,
+            saving_display_zone: false,
             token,
             renew: None,
             view: AccountView::default(),
@@ -121,6 +131,39 @@ impl AccountPanel {
 
     pub(crate) fn loaded(&self) -> bool {
         self.loaded
+    }
+
+    fn save_display_zone(&mut self, cx: &mut Context<Self>) {
+        let Some(clock) = cx
+            .try_global::<crate::display_time::DisplayClock>()
+            .cloned()
+        else {
+            return;
+        };
+        if self.saving_display_zone {
+            return;
+        }
+        self.saving_display_zone = true;
+        let value = self.display_zone.read(cx).value().to_string();
+        let write = self.runtime.spawn_blocking(move || clock.save(&value));
+        cx.spawn(async move |panel, cx| {
+            let result = write.await;
+            let _ = panel.update(cx, |panel, cx| {
+                panel.saving_display_zone = false;
+                panel.display_zone_message = Some(match result {
+                    Ok(Ok(clock)) => {
+                        cx.set_global(clock);
+                        cx.refresh_windows();
+                        "Display time zone saved."
+                    }
+                    Ok(Err(error)) => error,
+                    Err(_) => "The display time zone could not be saved.",
+                });
+                cx.notify();
+            });
+        })
+        .detach();
+        cx.notify();
     }
 
     pub(crate) fn reload_local_profile(&mut self, cx: &mut Context<Self>) {
@@ -699,6 +742,10 @@ impl Drop for AccountPanel {
 impl Render for AccountPanel {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let palette = Palette::current(cx);
+        let timezone_label = format!(
+            "Display time zone · {}",
+            crate::display_time::DisplayClock::current(cx).name()
+        );
         let status = self
             .github_error
             .as_ref()
@@ -761,6 +808,37 @@ impl Render for AccountPanel {
                     .text_xs()
                     .text_color(palette.muted)
                     .child(reachability),
+            )
+            .child(
+                div()
+                    .id("display-timezone-settings")
+                    .accessibility_id("display-timezone-settings")
+                    .role(Role::Group)
+                    .aria_label("Display time zone")
+                    .flex().flex_col().gap_2()
+                    .child(
+                        div().id("display-timezone-effective")
+                            .accessibility_id("display-timezone-effective")
+                            .role(Role::Status)
+                            .aria_label(timezone_label.clone())
+                            .child(timezone_label)
+                    )
+                    .child("Enter America/New_York, UTC, or another IANA zone. Enter system to follow this device.")
+                    .child(Input::new(&self.display_zone)
+                        .accessibility_id("display-timezone")
+                        .aria_label("Display time zone"))
+                    .child(Button::new("display-timezone-save")
+                        .label("Save time zone")
+                        .small()
+                        .accessibility_id("display-timezone-save")
+                        .disabled(self.saving_display_zone)
+                        .on_click(cx.listener(|panel, _, _, cx| panel.save_display_zone(cx))))
+                    .children(self.display_zone_message.map(|message| {
+                        div().id("display-timezone-message")
+                            .accessibility_id("display-timezone-message")
+                            .role(Role::Status)
+                            .aria_label(message).child(message)
+                    }))
             )
             .children(repos)
     }

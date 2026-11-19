@@ -4,7 +4,7 @@ use std::sync::{
     mpsc,
 };
 use std::time::Duration;
-use threadline_core::sync::policy::system_timezone;
+use threadline_core::display_time::DisplayZone;
 use threadline_platform::{ActivityId, ActivityNotification, PlatformControls, PlatformError};
 use threadline_storage::{
     Store, UtcMillis,
@@ -20,7 +20,7 @@ enum DeliveryTarget {
 #[cfg(all(test, feature = "e2e"))]
 pub(crate) fn deliver_to_test_capture(store: &Store, output: &tempfile::NamedTempFile) {
     let target = DeliveryTarget::Capture(crate::activity_fixture::Capture::for_test(output));
-    deliver(store, &target, &AtomicBool::new(false)).unwrap();
+    deliver(store, &target, &AtomicBool::new(false), DisplayZone::UTC).unwrap();
 }
 
 impl DeliveryTarget {
@@ -80,7 +80,14 @@ pub(crate) struct ActivityDelivery {
     wake: mpsc::SyncSender<()>,
 }
 impl ActivityDelivery {
-    pub(crate) fn start(store: &Arc<Store>, native: PlatformControls) -> Option<Self> {
+    pub(crate) fn wake(&self) {
+        let _ = self.wake.try_send(());
+    }
+    pub(crate) fn start(
+        store: &Arc<Store>,
+        native: PlatformControls,
+        zone: crate::display_time::CalendarZone,
+    ) -> Option<Self> {
         let target = DeliveryTarget::Native(native);
         #[cfg(feature = "e2e")]
         let target = if std::env::var_os("THREADLINE_E2E_NATIVE_ACTIVITY").is_some() {
@@ -95,7 +102,7 @@ impl ActivityDelivery {
         let weak = Arc::downgrade(store);
         std::thread::Builder::new()
             .name("threadline-activity".into())
-            .spawn(move || run(weak, target, rx, worker_stop))
+            .spawn(move || run(weak, target, rx, worker_stop, zone))
             .ok()?;
         let _ = wake.try_send(());
         Some(Self { stop, wake })
@@ -112,6 +119,7 @@ fn run(
     target: DeliveryTarget,
     wake: mpsc::Receiver<()>,
     stop: Arc<AtomicBool>,
+    zone: crate::display_time::CalendarZone,
 ) {
     let mut delay = None;
     loop {
@@ -126,7 +134,8 @@ fn run(
             break;
         }
         let Some(store) = store.upgrade() else { break };
-        delay = match deliver(&store, &target, &stop) {
+        let current_zone = crate::display_time::calendar_zone(&zone);
+        delay = match deliver(&store, &target, &stop, current_zone) {
             Ok(next) => next,
             Err(error) => {
                 eprintln!("Threadline activity delivery: {error}");
@@ -139,6 +148,7 @@ fn deliver(
     store: &Store,
     target: &DeliveryTarget,
     stop: &AtomicBool,
+    zone: DisplayZone,
 ) -> threadline_storage::Result<Option<Duration>> {
     let Some(account) = store.active_github_account()? else {
         return Ok(None);
@@ -146,13 +156,12 @@ fn deliver(
     if !store.notification_work_pending(account)? {
         return Ok(None);
     }
-    let zone = system_timezone().map_err(threadline_storage::Error::InvalidInput)?;
     let availability = target.availability();
     while !stop.load(Ordering::Acquire)
         && store.process_notification_events(
             account,
             UtcMillis::now()?.0,
-            &zone,
+            zone.name(),
             availability,
             128,
         )? == 128
@@ -161,7 +170,7 @@ fn deliver(
         let Some(group) = store.claim_ready_notification_popup(
             account,
             UtcMillis::now()?.0,
-            &zone,
+            zone.name(),
             availability,
         )?
         else {
