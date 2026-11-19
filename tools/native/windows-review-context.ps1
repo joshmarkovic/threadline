@@ -31,6 +31,41 @@ function Wait-ExactFixtureReview([string]$DraftId, [string]$Head, [string]$Fixtu
     }
 }
 
+function Open-FixtureReviewCommits([IntPtr]$Window, [long]$Item, [long]$Revision, [string]$Head) {
+    Wait-For 'the owned PR Commits control' { Invoke-OwnedFixtureControl $Window 'pr-0-commits' $null 'Commits' }
+    $null = Wait-PrReader 'Commits on the original pull request and comparison' {
+        param($pr, $reader)
+        $reader.active_item -eq $Item -and $reader.active_number -eq 42 -and
+            $pr.section -ceq 'Commits' -and $pr.revision_id -eq $Revision -and $pr.head -ceq $Head
+    }
+}
+
+function Wait-FixtureCommitCoverage([IntPtr]$Window, [switch]$Downloaded) {
+    $dot = ' ' + [char]0x00b7 + ' '
+    $expected = if ($Downloaded) {
+        '^' + [regex]::Escape('Commits' + $dot + 'downloaded' + $dot + 'Last saved ') + '\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC$'
+    } else {
+        '^' + [regex]::Escape('Commits' + $dot + 'not checked' + $dot + 'Last saved not yet recorded') + '$'
+    }
+    Wait-For 'the owned status for PR Commits coverage' {
+        try {
+            $label = Find-OwnedFixtureControl $Window 'pr-0-commits-coverage' -AllowDisabled
+            return $null -ne $label -and $label.Current.Name -cmatch $expected
+        } catch [Windows.Automation.ElementNotAvailableException] {
+            return $false
+        }
+    }
+}
+
+function Return-ToFixtureReviewFiles([IntPtr]$Window, [string]$DraftId, [string]$Head, [long]$Revision) {
+    Wait-For 'the owned PR Files control' { Invoke-OwnedFixtureControl $Window 'pr-0-files' $null 'Files' }
+    $null = Wait-ExactFixtureReview $DraftId $Head
+    $null = Wait-PrReader 'the original comparison and selected review line after leaving Commits' {
+        param($pr)
+        $pr.section -ceq 'Files' -and $pr.revision_id -eq $Revision -and $pr.selected_source_line -eq 1
+    }
+}
+
 function Invoke-ReviewContextProof([IntPtr]$Window, [string]$Profile) {
     $head = 'b' * 40
     $otherHead = 'e' * 40
@@ -58,10 +93,25 @@ function Invoke-ReviewContextProof([IntPtr]$Window, [string]$Profile) {
     Wait-For 'the owned inline review editor accepts the fixture note' {
         Set-OwnedFixtureEditValue $Window $editor 'Inline review comment' $text
     }
-    $null = Wait-ExactFixtureReview $draftId $head
+    $saved = Wait-ExactFixtureReview $draftId $head
+    $revision = $saved.cached_reader.pull_request.revision_id
     Add-Evidence 'Enter and save a native inline review on the exact source line' ([ordered]@{
         item = $firstItem; draft = $draftId; expected_head = $head
         path = 'src/first.rs'; side = 'Right'; first_line = 1; last_line = 1
+    })
+
+    Set-WriteFixtureOffline $Window $true
+    Open-FixtureReviewCommits $Window $firstItem $revision $head
+    Wait-FixtureCommitCoverage $Window
+    Set-WriteFixtureOffline $Window $false
+    Wait-For 'the owned PR Commits fetch control' {
+        Invoke-OwnedFixtureControl $Window 'pr-0-commits-fetch' $null 'Fetch from GitHub'
+    }
+    Wait-FixtureCommitCoverage $Window -Downloaded
+    Return-ToFixtureReviewFiles $Window $draftId $head $revision
+    Add-Evidence 'Read the native Commits coverage before and after fetch and return to the saved review' ([ordered]@{
+        item = $firstItem; revision = $revision; initial_coverage = 'Not checked'; fetched_coverage = 'Downloaded'
+        returned_to_selected_line = $true; draft_retained = $true
     })
 
     Click-PrContext $Window 0
@@ -126,8 +176,20 @@ function Invoke-ReviewContextProof([IntPtr]$Window, [string]$Profile) {
     if (!$retained.cached_reader.offline -or $retained.cached_reader.active_item -ne $firstItem) {
         throw 'Restart did not restore the original offline review item.'
     }
+    Open-FixtureReviewCommits $restarted $firstItem $revision $head
+    Wait-FixtureCommitCoverage $restarted -Downloaded
+    Return-ToFixtureReviewFiles $restarted $draftId $head $revision
     Stop-ThroughUi
-    $script:report.detail = 'The real Windows review draft retained its source line, code comparison and original head through verified issue switches, app layout changes and a separate offline restart.'
+    if (!('ThreadlineReviewCache' -as [type])) {
+        Add-Type -Path (Join-Path $PSScriptRoot 'ThreadlineReviewCache.cs')
+    }
+    if (![ThreadlineReviewCache]::HasSingleCommit((Join-Path $Profile 'threadline.sqlite3'), $firstItem, $revision)) {
+        throw 'The isolated offline profile did not retain exactly the original fixture commit on PR 42.'
+    }
+    Add-Evidence 'Verify downloaded Commits and the original review after a separate offline restart' ([ordered]@{
+        item = $firstItem; revision = $revision; commit = $head; cached_commit_count = 1; draft_retained = $true
+    })
+    $script:report.detail = 'The Windows review retained its exact source and draft through Commits, linked-issue and layout changes and a separate offline restart. The original comparison retained the verified commit.'
 }
 
 function Enter-FixtureAnchoredReview([IntPtr]$Window, [string]$Head, [string]$FixturePath, [switch]$AlreadyMaximized) {
