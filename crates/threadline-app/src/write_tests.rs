@@ -21,10 +21,16 @@ use threadline_storage::{
     writes::{WriteIntent, WriteSubmission},
 };
 
+#[path = "write_tests/completion.rs"]
+mod completion;
+
+const ACCEPTED_ISSUE_TITLE: &str = "Fixture accepted issue edit";
+
 struct WriteFixture {
     address: std::net::SocketAddr,
     stop: Arc<AtomicBool>,
     sent: Arc<AtomicUsize>,
+    readbacks: Arc<AtomicUsize>,
     server: Option<thread::JoinHandle<()>>,
 }
 
@@ -67,16 +73,20 @@ impl WriteFixture {
         let address = listener.local_addr().unwrap();
         let stop = Arc::new(AtomicBool::new(false));
         let sent = Arc::new(AtomicUsize::new(0));
-        let (stopping, writes) = (stop.clone(), sent.clone());
+        let readbacks = Arc::new(AtomicUsize::new(0));
+        let (stopping, writes, reads) = (stop.clone(), sent.clone(), readbacks.clone());
         let server = thread::spawn(move || {
             let merged = AtomicBool::new(false);
+            let issue_edited = AtomicBool::new(false);
             while !stopping.load(Ordering::Acquire) {
                 match listener.accept() {
                     Ok((stream, _)) => {
                         serve(
                             stream,
                             &writes,
+                            &reads,
                             &merged,
+                            &issue_edited,
                             fault.as_ref(),
                             preflight.as_deref(),
                         );
@@ -92,6 +102,7 @@ impl WriteFixture {
             address,
             stop,
             sent,
+            readbacks,
             server: Some(server),
         }
     }
@@ -112,7 +123,9 @@ impl Drop for WriteFixture {
 fn serve(
     mut stream: TcpStream,
     writes: &AtomicUsize,
+    readbacks: &AtomicUsize,
     merged: &AtomicBool,
+    issue_edited: &AtomicBool,
     fault: Option<&MergeFault>,
     preflight: Option<&PreflightFault>,
 ) {
@@ -155,6 +168,19 @@ fn serve(
             "pull_request_url":"https://api.github.com/repos/fixture-org/private/pulls/42"
         })
     };
+    let issue = |title, updated_at| {
+        json!({
+            "id":55,"number":42,"title":title,"body":null,"state":"open","locked":false,
+            "updated_at":updated_at,"user":{"id":41,"login":"fixture-user"},
+            "repository_url":"https://api.github.com/repos/fixture-org/private"
+        })
+    };
+    let confirmed_comment = || {
+        json!({
+            "id":92,"body":"confirmed fixture","issue_url":"https://api.github.com/repos/fixture-org/private/issues/42",
+            "user":{"id":41,"login":"fixture-user"},"created_at":"2023-01-01T00:01:00Z","updated_at":"2023-01-01T00:01:00Z"
+        })
+    };
     let (status, response) = match (method.as_str(), path.as_str()) {
         ("GET", "/user") => ("200 OK", json!({"id":41,"login":"fixture-user"})),
         ("GET", "/repos/fixture-org/private") => ("200 OK", repo),
@@ -170,14 +196,26 @@ fn serve(
                 json!({"message": "Synthetic issue preflight unavailable"}),
             )
         }
-        ("GET", "/repos/fixture-org/private/issues/42") => (
-            "200 OK",
-            json!({
-                "id":55,"number":42,"title":"Existing issue","body":null,"state":"open","locked":false,
-                "updated_at":"2023-01-01T00:00:00Z","user":{"id":41,"login":"fixture-user"},
-                "repository_url":"https://api.github.com/repos/fixture-org/private"
-            }),
-        ),
+        ("GET", "/repos/fixture-org/private/issues/42") => {
+            let observed = if issue_edited.load(Ordering::SeqCst) {
+                issue(ACCEPTED_ISSUE_TITLE, "2023-01-01T00:01:00Z")
+            } else {
+                issue("Existing issue", "2023-01-01T00:00:00Z")
+            };
+            ("200 OK", observed)
+        }
+        ("PATCH", "/repos/fixture-org/private/issues/42") => {
+            assert_eq!(
+                serde_json::from_slice::<Value>(&data).unwrap(),
+                json!({"title": ACCEPTED_ISSUE_TITLE})
+            );
+            assert_eq!(writes.fetch_add(1, Ordering::SeqCst), 0);
+            issue_edited.store(true, Ordering::SeqCst);
+            (
+                "200 OK",
+                issue(ACCEPTED_ISSUE_TITLE, "2023-01-01T00:01:00Z"),
+            )
+        }
         ("GET", "/repositories/71/pulls/42") if merged.load(Ordering::SeqCst) => (
             "200 OK",
             json!({
@@ -201,7 +239,13 @@ fn serve(
             ("200 OK", json!([]))
         }
         ("GET", "/repos/fixture-org/private/pulls/42/reviews/91") => {
-            ("200 OK", pending_review("PENDING"))
+            let state = if writes.load(Ordering::SeqCst) == 2 {
+                readbacks.fetch_add(1, Ordering::SeqCst);
+                "COMMENTED"
+            } else {
+                "PENDING"
+            };
+            ("200 OK", pending_review(state))
         }
         ("POST", "/repos/fixture-org/private/pulls/42/reviews") => {
             let payload: Value = serde_json::from_slice(&data).unwrap();
@@ -234,6 +278,7 @@ fn serve(
             });
             if query.starts_with("query ThreadlineMergedPull") {
                 assert!(merged.load(Ordering::SeqCst));
+                readbacks.fetch_add(1, Ordering::SeqCst);
                 if let Some(fault) = fault {
                     fault.hold(MergeStage::Readback);
                 }
@@ -282,13 +327,12 @@ fn serve(
             if body == "accepted with lost response" {
                 return;
             }
-            (
-                "201 Created",
-                json!({
-                    "id":92,"body":body,"issue_url":"https://api.github.com/repos/fixture-org/private/issues/42",
-                    "user":{"id":41,"login":"fixture-user"},"created_at":"2023-01-01T00:01:00Z","updated_at":"2023-01-01T00:01:00Z"
-                }),
-            )
+            ("201 Created", confirmed_comment())
+        }
+        ("GET", "/repos/fixture-org/private/issues/comments/92") => {
+            assert_eq!(writes.load(Ordering::SeqCst), 1);
+            readbacks.fetch_add(1, Ordering::SeqCst);
+            ("200 OK", confirmed_comment())
         }
         _ => panic!("Unexpected route in write fixture"),
     };
@@ -300,28 +344,7 @@ async fn prepare_fixture_pr(
     store: &Arc<Store>,
     address: std::net::SocketAddr,
 ) -> (AccountService, PrRevision) {
-    let accounts = AccountService {
-        store: store.clone(),
-        credentials: Arc::new(FixtureVault::default()),
-        github: GitHubClient::loopback(address).unwrap(),
-        fixture: true,
-    };
-    let reply = accounts
-        .execute(
-            AccountCommand::Connect {
-                repository: "fixture-org/private".into(),
-                pat: Pat::from_input("threadline-test-fixture".into()),
-                renew: None,
-            },
-            &Cancellation::new(),
-        )
-        .await;
-    assert!(reply.github_error.is_none());
-    let account = reply.view.active.unwrap();
-    let repository = reply.view.repositories[0].id;
-    store
-        .select_github_repository(account, repository, true)
-        .unwrap();
+    let (accounts, account, repository) = select_fixture_repository(store, address).await;
     let base = CommitOid::parse(&"a".repeat(40)).unwrap();
     let head = CommitOid::parse(&"b".repeat(40)).unwrap();
     let now = UtcMillis::now().unwrap();
@@ -365,6 +388,84 @@ async fn prepare_fixture_pr(
         )
         .unwrap();
     (accounts, rev)
+}
+
+async fn select_fixture_repository(
+    store: &Arc<Store>,
+    address: std::net::SocketAddr,
+) -> (AccountService, AccountId, RepositoryId) {
+    let accounts = AccountService {
+        store: store.clone(),
+        credentials: Arc::new(FixtureVault::default()),
+        github: GitHubClient::loopback(address).unwrap(),
+        fixture: true,
+    };
+    let reply = accounts
+        .execute(
+            AccountCommand::Connect {
+                repository: "fixture-org/private".into(),
+                pat: Pat::from_input("threadline-test-fixture".into()),
+                renew: None,
+            },
+            &Cancellation::new(),
+        )
+        .await;
+    assert!(reply.github_error.is_none());
+    let account = reply.view.active.unwrap();
+    let repository = reply.view.repositories[0].id;
+    store
+        .select_github_repository(account, repository, true)
+        .unwrap();
+    (accounts, account, repository)
+}
+
+fn seed_fixture_issue(
+    store: &Store,
+    account: AccountId,
+    repository: RepositoryId,
+) -> threadline_storage::ItemId {
+    store
+        .ingest(
+            account,
+            ItemLocator {
+                repository,
+                number: 42,
+            },
+            ItemUpdate {
+                representation: ItemRepresentation::Issue(IssueRecord {
+                    id: 55.try_into().unwrap(),
+                    node_id: None,
+                    classification: IssueClassification::Issue,
+                }),
+                remote_updated_at: UtcMillis(1_672_531_200_000),
+                title: Change::Value("Existing issue".into()),
+                body: Change::Null,
+                closed: Change::Value(false),
+            },
+        )
+        .unwrap()
+}
+
+fn seed_fixture_merge_policy(store: &Store, revision: &PrRevision, now: i64) {
+    let profile = store
+        .github_access_profile(revision.account, "fixture-org")
+        .unwrap()
+        .unwrap();
+    let cached = MergePolicy {
+        allowed_methods: Some([MergeMethod::Squash].into_iter().collect()),
+        viewer_permission: threadline_storage::writes::Permission::Allowed,
+        open: Some(true),
+        draft: Some(false),
+        merged: Some(false),
+        mergeable: Some(true),
+        queue: QueueRequirement::NotRequired,
+        checks: Gate::Satisfied,
+        reviews: Gate::Satisfied,
+        branch_rules: Gate::Satisfied,
+    };
+    store
+        .record_merge_policy(&profile, revision, &cached, now)
+        .unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -452,25 +553,7 @@ async fn check_merge_delivery(lose_response: bool) {
     let (accounts, rev) = prepare_fixture_pr(&store, fixture.address).await;
     let account = rev.account;
     let now = UtcMillis::now().unwrap().0;
-    let profile = store
-        .github_access_profile(account, "fixture-org")
-        .unwrap()
-        .unwrap();
-    let cached = MergePolicy {
-        allowed_methods: Some([MergeMethod::Squash].into_iter().collect()),
-        viewer_permission: threadline_storage::writes::Permission::Allowed,
-        open: Some(true),
-        draft: Some(false),
-        merged: Some(false),
-        mergeable: Some(true),
-        queue: QueueRequirement::NotRequired,
-        checks: Gate::Satisfied,
-        reviews: Gate::Satisfied,
-        branch_rules: Gate::Satisfied,
-    };
-    store
-        .record_merge_policy(&profile, &rev, &cached, now)
-        .unwrap();
+    seed_fixture_merge_policy(&store, &rev, now);
     store
         .update_sync_settings(account, |settings| {
             settings.controls.pause_background = true;
@@ -563,29 +646,7 @@ async fn write_dispatch_uses_durable_offline_outbox_and_stops_after_lost_respons
     let fixture = WriteFixture::start();
     let dir = tempfile::tempdir().unwrap();
     let store = Arc::new(Store::open_profile(dir.path()).unwrap());
-    let accounts = AccountService {
-        store: store.clone(),
-        credentials: Arc::new(FixtureVault::default()),
-        github: GitHubClient::loopback(fixture.address).unwrap(),
-        fixture: true,
-    };
-    let cancel = Cancellation::new();
-    let reply = accounts
-        .execute(
-            AccountCommand::Connect {
-                repository: "fixture-org/private".to_owned(),
-                pat: Pat::from_input("threadline-test-fixture".to_owned()),
-                renew: None,
-            },
-            &cancel,
-        )
-        .await;
-    assert!(reply.github_error.is_none());
-    let account = reply.view.active.unwrap();
-    let repository = reply.view.repositories[0].id;
-    store
-        .select_github_repository(account, repository, true)
-        .unwrap();
+    let (accounts, account, repository) = select_fixture_repository(&store, fixture.address).await;
     store
         .update_sync_settings(account, |settings| {
             settings.controls.work_offline = true;
@@ -593,26 +654,7 @@ async fn write_dispatch_uses_durable_offline_outbox_and_stops_after_lost_respons
             settings.controls.notification_quiet = true;
         })
         .unwrap();
-    let issue = store
-        .ingest(
-            account,
-            ItemLocator {
-                repository,
-                number: 42,
-            },
-            ItemUpdate {
-                representation: ItemRepresentation::Issue(IssueRecord {
-                    id: 55.try_into().unwrap(),
-                    node_id: None,
-                    classification: IssueClassification::Issue,
-                }),
-                remote_updated_at: UtcMillis(1_672_531_200_000),
-                title: Change::Value("Existing issue".into()),
-                body: Change::Null,
-                closed: Change::Value(false),
-            },
-        )
-        .unwrap();
+    let issue = seed_fixture_issue(&store, account, repository);
     for (id, body) in [
         (CONFIRMED, "confirmed fixture"),
         (LOST, "accepted with lost response"),
