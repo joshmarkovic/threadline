@@ -16,6 +16,26 @@ if (@($helpers.Name | Sort-Object -Unique).Count -ne 5 -or $helpers.Count -ne 5)
     throw 'Could not load the native driver test functions.'
 }
 . ([scriptblock]::Create(($helpers | ForEach-Object { $_.Extent.Text }) -join [Environment]::NewLine))
+$seedAssignments = @($ast.FindAll({
+    param($node)
+    $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $node.Left.Extent.Text -ceq '$info.EnvironmentVariables[''THREADLINE_TEST_SEED'']'
+}, $true))
+if ($seedAssignments.Count -ne 1) { throw 'Could not locate the single native child seed assignment.' }
+function Test-NestedNativeSeed([scriptblock]$Assignment) {
+    $seed = [pscustomobject]@{ fixture_revision = 's12-offline-mixed-outbox-v1' }
+    $info = [Diagnostics.ProcessStartInfo]::new()
+    & $Assignment
+    return $info.EnvironmentVariables['THREADLINE_TEST_SEED']
+}
+$script:Seed = [uint64]::Parse('18446744073709551615', [Globalization.CultureInfo]::InvariantCulture)
+try {
+    if ((Test-NestedNativeSeed ([scriptblock]::Create($seedAssignments[0].Extent.Text))) -cne '18446744073709551615') {
+        throw 'The native child did not receive the exact top-level unsigned seed.'
+    }
+} finally {
+    Remove-Variable -Name Seed -Scope Script
+}
 . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
 . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1')
 . (Join-Path $PSScriptRoot 'windows-sync.ps1')
