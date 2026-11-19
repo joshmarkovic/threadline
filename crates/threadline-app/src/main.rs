@@ -51,10 +51,7 @@ fn parse_args() -> Result<Options, String> {
             Some(arg)
                 if options.notification_com_server
                     && (arg.eq_ignore_ascii_case("-embedding")
-                        || arg.eq_ignore_ascii_case("/embedding")) =>
-            {
-                ()
-            }
+                        || arg.eq_ignore_ascii_case("/embedding")) => {}
             Some("--open-review") => options.open_review = true,
             Some("--e2e-report") if cfg!(feature = "e2e") && options.e2e_report.is_none() => {
                 let path = PathBuf::from(
