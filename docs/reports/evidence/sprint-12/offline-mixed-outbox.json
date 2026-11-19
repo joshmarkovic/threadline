@@ -1,0 +1,74 @@
+{
+  "scenario": "S12-OFFLINE-MIXED-OUTBOX",
+  "status": "Pass",
+  "scope": "Windows test-build native process with an isolated SQLite profile and loopback fixture",
+  "host": {
+    "os": "Windows 11 Enterprise",
+    "build": "10.0.22631.7652",
+    "architecture": "x86_64",
+    "dpi": 96
+  },
+  "app_and_runner_revision": "6bed83806db73c12a40870f7a88cacfe58c513ff",
+  "driver_revision": "e32162c023cc72afa188b5753f4cbe312e808014",
+  "app_version": "0.1.0",
+  "binary_sha256": "723c907ff4618c4c75756c6b48595f5aa43debd46b83da9847c8d2d7d51af8c7",
+  "binary_bytes": 45604864,
+  "cargo_lock_sha256": "ba1fa2481ba47ebb082dae4aff8bf1a099cea5775b4196b096aeb3bb094d4efb",
+  "command": "cargo xtask test e2e --suite full --case S12-OFFLINE-MIXED-OUTBOX --binary <binary-path> --seed 12345 --report-dir <report-dir>",
+  "fixture_revision": "s12-offline-mixed-outbox-v1",
+  "seed": 12345,
+  "run_directory": "e2e-1795062273706-30376",
+  "started_at_unix_ms": 1795062273706,
+  "finished_at_unix_ms": 1795062344321,
+  "exit_code": 0,
+  "native_actions": 23,
+  "loopback_requests": 0,
+  "protected_fixture_key_removed": true,
+  "before": {
+    "downloaded_summaries": 30,
+    "discussion_records": 92,
+    "cached_text_bytes": 9041,
+    "offline_pins": 0,
+    "unresolved_actions": 4
+  },
+  "after": {
+    "downloaded_summaries": 0,
+    "discussion_records": 0,
+    "cached_text_bytes": 0,
+    "offline_pins": 0,
+    "unresolved_actions": 3,
+    "readable_submissions": ["Comment", "EditIssue", "Review", "Merge"],
+    "retained_unsent_drafts": ["IssueEdit", "Comment", "Review", "Reply"],
+    "tabs_per_pane": [10, 10],
+    "parent_state": "Cancelled",
+    "child_states": ["Queued", "Queued", "Queued"],
+    "operation_snapshot_hashes_and_dependencies_unchanged": true,
+    "attempts": 0
+  },
+  "proof": [
+    "The native Storage panel explained the scope of cleanup before clearing unpinned downloads.",
+    "The offline Outbox reopened the original issue after cleanup and retained the original comment in History after cancellation.",
+    "Each queued child remained readable under All with the same dependency. The review exposed the original head and inline source anchor. The squash merge exposed the original head and target branch.",
+    "Reopening the closed profile confirmed each original submission snapshot, all four unsent draft digests, the saved tabs, and an empty request and attempt history for this case."
+  ],
+  "sha256": {
+    "result.json": "a16d482f91968e04bd6750403b1901bb7423aa3a5bc92a62fe77614295f60455",
+    "offline-mixed-outbox-native.json": "e3a62d5c3b6ae99d2db767b3cd485cf4bc01c551990b129d99a091945331f92a",
+    "github-access-trace.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "native-lifecycle-cleanup.json": "dcc7ae0c8264f6549354d6538beeaee578907fc1047dfd466e0a5383b3db1580",
+    "native-lifecycle-seeded.json": "402bb7b3ab0f395681ebf30f796774606b6f2412fb6d6fd852ffcf565fbc297c",
+    "offline-outbox-durable.json": "6ddb08f14a2579fcce0dd6bb86821a6f728d412bc616206e3c79bc744526f715"
+  },
+  "previous_attempt": {
+    "status": "Fail",
+    "run_directory": "e2e-1795062097565-26060",
+    "app_runner_and_driver_revision": "6bed83806db73c12a40870f7a88cacfe58c513ff",
+    "exit_code": 1,
+    "native_actions": 22,
+    "loopback_requests": 0,
+    "protected_fixture_key_removed": true,
+    "detail": "The driver completed the native inspection, including all three children after the parent was cancelled. A nested PowerShell fixture object shadowed the numeric seed and prevented the final closed-profile checkpoint.",
+    "result_sha256": "4ff4fabf70d2acf303d9fcb92512f80d390ae0d81af87519d29b07ae73ef0e87",
+    "native_sha256": "c83ec05b49e0775fc09e0d0772eef04f4bc6643432dee037fda3ec8663c5649b"
+  }
+}
