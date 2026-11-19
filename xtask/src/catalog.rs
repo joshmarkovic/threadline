@@ -79,6 +79,9 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == "S10-HISTORY-MONITOR" {
         return Some("s10-history-monitor-v1");
     }
+    if case == "S05-WINDOWS-RATE-LIMIT" {
+        return Some("s05-native-rate-limit-v1");
+    }
     if case == "E2E-011" {
         return Some("s10-history-endpoints-v3");
     }
@@ -248,6 +251,7 @@ pub fn associations(case: &str) -> Associations {
             "SYNC-01;SYNC-04;SYNC-08;CONNECT-01;CONNECT-02;TEST-04",
             "AC-11;AC-12;AC-57",
         ),
+        "S05-WINDOWS-RATE-LIMIT" => ("SYNC-10;CONNECT-03;CACHE-03;TEST-04", "AC-12"),
         _ => catalog_associations(case).unwrap_or_default(),
     };
     Associations {

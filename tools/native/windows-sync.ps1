@@ -81,6 +81,77 @@ function Invoke-SyncProof([IntPtr]$Window, [string]$Profile) {
     $script:report.detail = 'Native synchronization settings survived restart and distinguished HTTP, throttling and transport outcomes.'
 }
 
+function Invoke-RateLimitedCacheProof([IntPtr]$Window) {
+    Wait-SeededFixtureAccount
+    $item = Open-WriteFixtureIssue $Window -UserConnected
+    $null = Wait-Reader 'the downloaded issue with discussion still unfetched' {
+        param($reader)
+        $reader.active_item -eq $item -and $reader.cached_content_ready -and
+            $reader.comments_coverage -ceq 'Missing' -and $reader.outbox -eq 0
+    }
+    Open-SyncSettings $Window
+    $null = Wait-Sync 'online with neither background nor Outbox paused by the operator' {
+        param($sync)
+        $sync.connection -ceq 'Reachable' -and !$sync.controls.work_offline -and
+            !$sync.controls.pause_background -and !$sync.controls.pause_queued_actions
+    }
+
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    Set-AccessPhase 'sync-rate-throttle'
+    Click-AccountControl $Window 'sync-check-now'
+    $null = Wait-Sync 'the reachable service reporting the fixture rate limit' {
+        param($sync) $sync.connection -ceq 'Reachable' -and $sync.reason -ceq 'RateLimited' -and !$sync.controls.work_offline
+    }
+    Set-AccessPhase 'sync-rate-floor'
+    Click-AccountControl $Window 'sync-check-now'
+    Click-AccountControl $Window 'reader-browse'
+    Click-AccountControl $Window 'reader-close-tab'
+    $null = Wait-Reader 'the original issue tab is closed before searching the local cache' {
+        param($reader) $null -eq $reader.active_item -and $reader.tab_counts[0] -eq 0
+    }
+    $query = 'Existing issue for offline edits'
+    Wait-For 'the owned search field for already downloaded content' {
+        Set-OwnedFixtureEditValue $Window 'reader-search' 'Search downloaded content' $query
+    }
+    Wait-For 'confirmation of the local query in the owned native field' {
+        $pattern = Get-OwnedFixtureEditPattern $Window 'reader-search' 'Search downloaded content'
+        try { $null -ne $pattern -and $pattern.Current.Value -ceq $query }
+        catch [Windows.Automation.ElementNotAvailableException] { $false }
+    }
+    Click-AccountControl $Window 'reader-search-submit'
+    $null = Wait-Reader 'one local search result for the same downloaded issue' {
+        param($reader)
+        $reader.search_generation -gt 0 -and $reader.search_results -eq 1 -and $reader.first_search_item -eq $item -and !$reader.offline
+    }
+    Click-AccountControl $Window 'reader-result-0'
+    $null = Wait-Reader 'reopen the same cached issue without network or offline mode' {
+        param($reader) $reader.active_item -eq $item -and $reader.cached_content_ready -and !$reader.offline
+    }
+    Click-AccountControl $Window 'reader-maximize-pane'
+    Click-AccountControl $Window 'reader-fetch-comments-0'
+    $null = Wait-Reader 'the explicit fetch is held while existing content stays available' {
+        param($reader)
+        $reader.comments_coverage -ceq 'Missing' -and $reader.comment_fetch_state -ceq 'Failed' -and
+            $reader.active_item -eq $item -and $reader.cached_content_ready -and !$reader.offline
+    }
+    Click-AccountControl $Window 'reader-draft-comment-0'
+    $body = 'A local draft saved during the rate limit.'
+    Type-WriteFixtureField $Window 'reader-draft-input-0' $body
+    Wait-WriteFixtureDraft $item $body
+    $saved = Wait-Reader 'the exact draft is saved locally and absent from the Outbox' {
+        param($reader) $reader.active_item -eq $item -and $reader.active_draft_saved -and !$reader.active_draft_submitted -and $reader.outbox -eq 0
+    }
+    Stop-ThroughUi
+    # The fixture sends Retry-After 180. Start the clock before the first Check now.
+    if ($clock.Elapsed.TotalSeconds -ge 180) { throw 'The native controls completed outside the server retry window.' }
+    Add-Evidence 'Search and reopen cached content and save the unsubmitted draft while provider reads are held' ([ordered]@{
+        item = $item; fixture_http_status = 429; retry_after_seconds = 180; seconds_since_throttle_phase_begin = $clock.Elapsed.TotalSeconds
+        search_results = 1; second_probe_requested = $true; discussion_fetch = 'Failed'; work_offline = $false
+        draft_sha256 = $saved.cached_reader.active_draft_sha256; outbox = 0
+    })
+    $script:report.detail = 'After a real HTTP 429 the native reader searched and reopened cached content, held an explicit provider fetch, and saved a local draft before the retry window elapsed.'
+}
+
 function Open-NotificationSchedule([IntPtr]$Window, [switch]$FromActivity) {
     if (!$FromActivity) {
         Wait-For 'the process-owned Activity action' {

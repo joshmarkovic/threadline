@@ -612,6 +612,8 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
                 Some(NativeMode::WindowsIssueWrites)
             } else if id == "S12-HISTORICAL-READER" {
                 Some(NativeMode::WindowsReaderResume)
+            } else if id == "S05-WINDOWS-RATE-LIMIT" {
+                Some(NativeMode::WindowsSync)
             } else if id == "S06-SHARED-PR-PANES" {
                 Some(NativeMode::WindowsPullRequest)
             } else if id == "S11-NATIVE-ACTIVITY" {
@@ -876,6 +878,7 @@ fn native_driver(
         }
         NativeMode::WindowsReaderPerformance => Some("Performance"),
         NativeMode::WindowsLargeWorkspace => Some("LargeWorkspace"),
+        NativeMode::WindowsSync if id == "S05-WINDOWS-RATE-LIMIT" => Some("RateLimit"),
         NativeMode::WindowsSync => Some("Sync"),
         NativeMode::WindowsNotificationSchedule => Some("NotificationSchedule"),
         NativeMode::WindowsPullRequest if id == "S06-SHARED-PR-PANES" => Some("SharedPullRequest"),
@@ -1070,6 +1073,9 @@ fn native_driver(
                 TraceCheck::HistoricalReader
             }
             (Status::Pass, NativeMode::WindowsReaderResume) => TraceCheck::ReaderResume,
+            (Status::Pass, NativeMode::WindowsSync) if id == "S05-WINDOWS-RATE-LIMIT" => {
+                TraceCheck::RateLimitedCache
+            }
             (Status::Pass, NativeMode::WindowsSync) => TraceCheck::SyncJourney,
             (Status::Pass, NativeMode::WindowsNotificationSchedule) => {
                 TraceCheck::NotificationSchedule

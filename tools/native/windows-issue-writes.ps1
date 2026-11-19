@@ -33,6 +33,7 @@ function Type-WriteFixtureField([IntPtr]$Window, [string]$Id, [string]$Value) {
                 'This cancelled issue draft stays in the same profile.',
                 'Threadline S07 explicitly queued comment.',
                 'Threadline S07 unsent local draft.',
+                'A local draft saved during the rate limit.',
                 'Threadline S07 accepted comment with a lost response.',
                 'Retain the local issue description across the conflict.',
                 'Threadline dependency original comment.',

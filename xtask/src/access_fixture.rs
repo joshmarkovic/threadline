@@ -23,6 +23,7 @@ mod history;
 mod lifecycle;
 mod merge;
 mod pr;
+mod rate_limit;
 mod review_decisions;
 mod review_threads;
 mod writes;
@@ -72,6 +73,9 @@ enum Phase {
     SyncOffline,
     SyncService,
     SyncThrottle,
+    SyncRateReady,
+    SyncRateThrottle,
+    SyncRateFloor,
     SyncTransport,
     SyncNotificationSend,
     PrLoad,
@@ -140,6 +144,9 @@ impl Phase {
             "sync-offline" => Ok(Self::SyncOffline),
             "sync-service" => Ok(Self::SyncService),
             "sync-throttle" => Ok(Self::SyncThrottle),
+            "sync-rate-ready" => Ok(Self::SyncRateReady),
+            "sync-rate-throttle" => Ok(Self::SyncRateThrottle),
+            "sync-rate-floor" => Ok(Self::SyncRateFloor),
             "sync-transport" => Ok(Self::SyncTransport),
             "sync-notification-send" => Ok(Self::SyncNotificationSend),
             "pr-load" => Ok(Self::PrLoad),
@@ -319,6 +326,7 @@ pub enum TraceCheck {
     IssueEditConflict,
     ReaderResume,
     SyncJourney,
+    RateLimitedCache,
     NotificationSchedule,
     PullRequestJourney,
     SharedPrPanes,
@@ -407,6 +415,7 @@ impl AccessFixture {
             TraceCheck::HistoricalReader => historical_reader::trace(&records),
             TraceCheck::ReaderResume => complete_reader_resume(&records),
             TraceCheck::SyncJourney => complete_sync_journey(&records),
+            TraceCheck::RateLimitedCache => rate_limit::trace(&records),
             TraceCheck::NotificationSchedule => complete_notification_schedule(&records),
             TraceCheck::PullRequestJourney => pr::trace(&records),
             TraceCheck::SharedPrPanes => pr::trace_shared(&records),
@@ -741,6 +750,9 @@ fn answer(
     if phase == Phase::SyncThrottle && route == Route::User && reply.status == 429 {
         socket.write_all(b"Retry-After: 2\r\n")?;
     }
+    if phase == Phase::SyncRateThrottle && route == Route::User && reply.status == 429 {
+        write!(socket, "Retry-After: {}\r\n", rate_limit::RETRY_SECONDS)?;
+    }
     if phase == Phase::ReaderFailure && route == Route::CommentsFirst && reply.status == 200 {
         let local = socket.local_addr()?;
         write!(
@@ -794,6 +806,8 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
                 phase,
                 Phase::WriteOnline
                     | Phase::WriteDrop
+                    | Phase::SyncRateReady
+                    | Phase::SyncRateThrottle
                     | Phase::IssueEditBaseline
                     | Phase::IssueEditRemoteChange
                     | Phase::SyncNotificationSend
@@ -975,6 +989,9 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
         return response;
     }
     if let Some(response) = comment_dependency::response(phase, route) {
+        return response;
+    }
+    if let Some(response) = rate_limit::response(phase, route) {
         return response;
     }
     if matches!(route, Route::UpdatedInlineComments | Route::OpenPullIndex) {

@@ -396,7 +396,7 @@ fn known_case(lane: Lane, case: &str) -> bool {
                     | "S12-HISTORICAL-READER"
                     | "S12-NATIVE-LIFECYCLE"
             )
-            | (Lane::E2e, "S05-WINDOWS-SYNC")
+            | (Lane::E2e, "S05-WINDOWS-SYNC" | "S05-WINDOWS-RATE-LIMIT")
             | (Lane::E2e, "S06-SHARED-PR-PANES")
             | (Lane::E2e, "S09-MERGE-QUEUE")
             | (Lane::E2e, "S08-REVIEW-DECISIONS")
