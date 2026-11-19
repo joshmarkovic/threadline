@@ -1,0 +1,456 @@
+{
+  "run": "e2e-1795060611350-42336",
+  "canonical": {
+    "source_revision": "c0e49579a930aa6690b3351f985308832ebf193b",
+    "source_dirty": false,
+    "fixture_revision": "s10-history-endpoints-v3",
+    "lane": "e2e",
+    "suite": "full",
+    "seed": 12345,
+    "status": "Pass",
+    "exit_code": 0,
+    "command": {
+      "program": "xtask",
+      "argv": [
+        "test",
+        "e2e",
+        "--suite",
+        "full",
+        "--case",
+        "E2E-011",
+        "--binary",
+        "<binary-path>",
+        "--seed",
+        "12345",
+        "--report-dir",
+        "<report-dir>"
+      ],
+      "redacted": true
+    },
+    "case": "E2E-011",
+    "host": {
+      "os": "windows",
+      "architecture": "x86_64",
+      "version": "Microsoft Windows [Version 10.0.22631.7652]",
+      "display_session": "Windows desktop availability is checked by native driver"
+    }
+  },
+  "source_sha256": {
+    "native_driver": "612c598049f0b0dafc75dfbbcca955b9cbb5b65a7562866adce9213af8704c68",
+    "loopback_fixture": "fff7745066e833e29d13de381821717035d98cadf10f83968d92cad2fdbcc8dc",
+    "runner_executable": "89962d7694f40331f6306dde463d57c666a02151f0c87a8bb8b723f97f98e116"
+  },
+  "tested_application": {
+    "binary_sha256": "d934b66d9f69ac001ff19a3d35a44625095467592bd6b4b8ff68af17c37eb364",
+    "executable_bytes": 45495296,
+    "windows_product": "Microsoft Windows 11 Enterprise",
+    "os_version": "10.0.22631",
+    "architecture": "AMD64",
+    "dpi": 96,
+    "shell_version": "5.1.22621.7649",
+    "driver": "Windows PowerShell / owned UI Automation and guarded Win32 SendInput",
+    "authentication_setup": "Fixed isolated loopback identity, verified by the application",
+    "app_pid": 44572,
+    "restarted_pid": 45508
+  },
+  "native_action_count": 47,
+  "actions": [
+    {
+      "action": "Load the isolated verified account and scope",
+      "observed": {
+        "user": 41,
+        "repository_count": 1
+      }
+    },
+    {
+      "action": "Open the labeled PR merge-base comparison and save an unsent inline draft",
+      "observed": {
+        "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "merge_base": "cccccccccccccccccccccccccccccccccccccccc",
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "file": "src/first.rs",
+        "draft": "review-1"
+      }
+    },
+    {
+      "action": "Read the bounded graph before and after the native older-history action",
+      "observed": {
+        "initial_rows": 1,
+        "initial_boundaries": 2,
+        "expanded_rows": 3,
+        "expanded_boundaries": 0
+      }
+    },
+    {
+      "action": "Choose the actual second merge parent and open its file changes",
+      "observed": {
+        "base": "cccccccccccccccccccccccccccccccccccccccc",
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "parent_order": 2,
+        "file": "parent-two.txt"
+      }
+    },
+    {
+      "action": "Compare the two independent commits with exact cached Git objects",
+      "observed": {
+        "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head": "cccccccccccccccccccccccccccccccccccccccc",
+        "file": "divergent.txt"
+      }
+    },
+    {
+      "action": "The watched branch moves and disappears while the saved file selection and native draft survive",
+      "observed": {
+        "reference": "main",
+        "inspected_tip": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "updated_tip": "cccccccccccccccccccccccccccccccccccccccc",
+        "deleted": true,
+        "file": "divergent.txt",
+        "draft": "review-1",
+        "queued": false
+      }
+    },
+    {
+      "action": "Relaunch the same SQLite profile in a separate process",
+      "observed": {
+        "pid": 45508,
+        "sqlite_retained": true
+      }
+    },
+    {
+      "action": "Preserve the exact two-commit comparison and selected file offline after restart",
+      "observed": {
+        "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "head": "cccccccccccccccccccccccccccccccccccccccc",
+        "file": "divergent.txt",
+        "offline": true
+      }
+    }
+  ],
+  "request_trace": [
+    {
+      "phase": "pr_load",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "pr_load",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "pr_load",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "pr_load",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "pr_load",
+      "route": "items",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "pr_load",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "pr_load",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "pr_load",
+      "route": "pull_a",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "pr_load",
+      "route": "compare_a",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "history_branches",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "history_tags",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "history_branch",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "history_first",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "history_branch",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "history_older",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "history_parent_diff",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "history_pair_diff",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": "history_divergent_pair",
+      "fixture_authorization": true,
+      "status": 404
+    },
+    {
+      "phase": "history",
+      "route": {
+        "history_exact_object": "left_commit"
+      },
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": {
+        "history_exact_object": "right_commit"
+      },
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": {
+        "history_exact_object": "left_tree"
+      },
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": {
+        "history_exact_object": "right_tree"
+      },
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": {
+        "history_exact_object": "left_blob"
+      },
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history",
+      "route": {
+        "history_exact_object": "right_blob"
+      },
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history_moved",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history_moved",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history_moved",
+      "route": "history_branches",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history_moved",
+      "route": "history_tags",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history_deleted",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history_deleted",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history_deleted",
+      "route": "history_branches",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "history_deleted",
+      "route": "history_tags",
+      "fixture_authorization": true,
+      "status": 200
+    }
+  ],
+  "restart": {
+    "active_item": 1,
+    "active_number": 42,
+    "cached_content_ready": true,
+    "offline": true,
+    "outbox": 0,
+    "history": {
+      "repository": 1,
+      "refs": 2,
+      "commits": 3,
+      "coverage": "Complete",
+      "unloaded_parents": 0,
+      "selected": "cccccccccccccccccccccccccccccccccccccccc",
+      "comparison": "Pair",
+      "comparison_base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "comparison_head": "cccccccccccccccccccccccccccccccccccccccc",
+      "comparison_coverage": "Complete",
+      "parent": null,
+      "files": 1,
+      "displayed_file": "divergent.txt"
+    },
+    "review_draft": {
+      "id": "review-1",
+      "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "saved": true,
+      "summary_nonempty": true,
+      "queued": false,
+      "anchors": [
+        {
+          "path": "src/first.rs",
+          "side": "Right",
+          "first_line": 1,
+          "last_line": 1,
+          "source_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "comment_nonempty": true
+        }
+      ]
+    }
+  },
+  "raw_receipt_sha256": {
+    "result.json": "6f689b73f8ae6bd96ebc36db01939bc5cc1c0c86391034370b0f6ff594c11a4d",
+    "junit.xml": "822136e2da0c16c72729d1e3570e377d2dfcd3bd32b147c0fcc100cf15ed3ab5",
+    "binary.json": "53c240267641aa8acb54fc3fe4a5db9cd36638d7ac2886ad2582653a657890ce",
+    "history-native.json": "eaaf44dc0491aeb9294bb4ec603dd20b7fe7e587a7e290c9551383c437710463",
+    "github-access-trace.json": "ed28bb13e209bdf9f367c72fad180a54f7232f65c22bd32bedb3b51361603908",
+    "reader-restart-observation.json": "741a61c0c8b47ace3930d2a841602af807d6f0422907eacbc7ca2885a1deed7d",
+    "ui-observation.json": "6c498d16502bb98d5316f1e2bbd43ad2b99c797720f5acb35b8ade235f36d4aa"
+  }
+}
