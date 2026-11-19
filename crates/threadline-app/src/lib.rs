@@ -213,19 +213,37 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
         .unzip();
     #[cfg(not(feature = "e2e"))]
     let _ = started;
-    gpui_kit::application()
+    #[cfg(feature = "e2e")]
+    let mark_startup = {
+        let observer = observer.clone();
+        move |stage| {
+            if let Some(observer) = &observer {
+                observer.mark_startup(stage);
+            }
+        }
+    };
+    #[cfg(feature = "e2e")]
+    mark_startup(observation::StartupStage::ApplicationConstructionStarted);
+    let application = gpui_kit::application();
+    #[cfg(feature = "e2e")]
+    mark_startup(observation::StartupStage::ApplicationConstructed);
+    application
         .with_assets(gpui_kit::assets::Assets)
         .run(move |cx| {
+            #[cfg(feature = "e2e")]
+            mark_startup(observation::StartupStage::ApplicationCallbackEntered);
             cx.set_global(activity_delivery::ActivityInbox);
             cx.set_quit_mode(QuitMode::LastWindowClosed);
             gpui_kit::init(cx);
+            #[cfg(feature = "e2e")]
+            mark_startup(observation::StartupStage::ComponentsInitialized);
             bind_shortcuts(cx);
             reader_workspace::bind_shortcuts(cx);
+            #[cfg(feature = "e2e")]
+            mark_startup(observation::StartupStage::ApplicationActivationRequested);
             cx.activate(true);
             #[cfg(feature = "e2e")]
-            if let Some(observer) = observer.as_ref() {
-                observer.mark_startup(observation::StartupStage::ToolkitReady);
-            }
+            mark_startup(observation::StartupStage::ToolkitReady);
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
                     None,

@@ -80,8 +80,14 @@ pub(crate) enum StartupStage {
     PlatformReady,
     ProfileOpening,
     ProfileOpened,
+    ApplicationConstructionStarted,
+    ApplicationConstructed,
+    ApplicationCallbackEntered,
+    ComponentsInitialized,
+    ApplicationActivationRequested,
     ToolkitReady,
     WindowCreated,
+    WindowObservedActiveAtPaint,
     AccountLoaded,
     LayoutLoaded,
     ActivePanesHydrated,
@@ -333,6 +339,11 @@ impl Observer {
             startup,
             ..
         } = &mut *recorder;
+        if let Some(startup) = startup.as_mut()
+            && window.is_window_active()
+        {
+            startup.mark(StartupStage::WindowObservedActiveAtPaint);
+        }
         if let Some(opening) = opening {
             bounds.insert(Cow::Borrowed("markdown_copy"), logical_bounds(opening));
         }
@@ -488,13 +499,38 @@ mod tests {
         let profile = timing.milestones[&StartupStage::ProfileOpened];
         timing.started -= Duration::from_secs(1);
         timing.mark(StartupStage::ProfileOpened);
+        for step in [
+            StartupStage::ApplicationConstructionStarted,
+            StartupStage::ApplicationConstructed,
+            StartupStage::ApplicationCallbackEntered,
+            StartupStage::ComponentsInitialized,
+            StartupStage::ApplicationActivationRequested,
+            StartupStage::ToolkitReady,
+        ] {
+            timing.mark(step);
+        }
         timing.mark(StartupStage::WindowCreated);
         assert_eq!(timing.milestones[&StartupStage::ProfileOpened], profile);
         assert!(timing.milestones[&StartupStage::WindowCreated] >= profile + 1_000.);
         let fields = serde_json::to_value(timing.milestones).unwrap();
         assert!(fields["profile_opened"].is_number());
         assert!(fields["window_created"].is_number());
+        let mut prior = profile;
+        for key in [
+            "application_construction_started",
+            "application_constructed",
+            "application_callback_entered",
+            "components_initialized",
+            "application_activation_requested",
+            "toolkit_ready",
+            "window_created",
+        ] {
+            let value = fields[key].as_f64().expect("instrumented startup stage");
+            assert!(prior <= value);
+            prior = value;
+        }
         assert!(fields.get("active_panes_hydrated").is_none());
+        assert!(fields.get("window_observed_active_at_paint").is_none());
     }
 
     #[test]
