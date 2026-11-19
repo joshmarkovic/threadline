@@ -608,7 +608,9 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
             return vec![crate::activity::run(id, options, root, dir)];
         }
         Some(id) => {
-            let mode = if matches!(
+            let mode = if id == "S12-NATIVE-LIFECYCLE" {
+                Some(NativeMode::WindowsNativeLifecycle)
+            } else if matches!(
                 id,
                 "S04-READER-PERF" | "S12-PHYSICAL-READER" | "S12-READER-CONCURRENT"
             ) {
@@ -789,6 +791,7 @@ enum NativeMode {
     WindowsReviewContext,
     WindowsDirectMerge,
     WindowsCredentialBoundary,
+    WindowsNativeLifecycle,
     WindowsIssueWrites,
     WindowsWriteSurface,
 }
@@ -864,6 +867,7 @@ fn native_driver(
         NativeMode::WindowsReviewContext => Some("ReviewContext"),
         NativeMode::WindowsDirectMerge => Some("DirectMerge"),
         NativeMode::WindowsCredentialBoundary => Some("CredentialBoundary"),
+        NativeMode::WindowsNativeLifecycle => Some("NativeLifecycle"),
         NativeMode::WindowsIssueWrites => Some("Writes"),
         NativeMode::WindowsWriteSurface => Some("WriteSurface"),
         _ => None,
@@ -972,6 +976,7 @@ fn native_driver(
         NativeMode::WindowsReviewContext => "review-context-native.json",
         NativeMode::WindowsDirectMerge => "direct-merge-native.json",
         NativeMode::WindowsCredentialBoundary => "credential-boundary-native.json",
+        NativeMode::WindowsNativeLifecycle => "native-lifecycle.json",
         NativeMode::WindowsIssueWrites | NativeMode::WindowsWriteSurface => "writes-native.json",
     };
     let details = fs::read(dir.join(driver_report))
@@ -1036,6 +1041,7 @@ fn native_driver(
             (Status::Pass, NativeMode::WindowsReviewContext) => TraceCheck::ReviewContextJourney,
             (Status::Pass, NativeMode::WindowsDirectMerge) => TraceCheck::MergeJourney,
             (Status::Pass, NativeMode::WindowsCredentialBoundary) => TraceCheck::CredentialBoundary,
+            (Status::Pass, NativeMode::WindowsNativeLifecycle) => TraceCheck::NativeLifecycle,
             (Status::Pass, NativeMode::WindowsIssueWrites) => TraceCheck::WritesWithLoss,
             (Status::Pass, NativeMode::WindowsWriteSurface) => TraceCheck::WriteSurface,
             _ => TraceCheck::Observe,

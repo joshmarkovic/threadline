@@ -17,6 +17,7 @@ use serde_json::{Value, json};
 mod backlog;
 mod concurrent;
 mod history;
+mod lifecycle;
 mod merge;
 mod pr;
 mod writes;
@@ -85,6 +86,12 @@ enum Phase {
     BacklogHold,
     BacklogDrain,
     BacklogConcurrent,
+    LifecycleOffline,
+    LifecycleReady,
+    LifecycleDelay,
+    LifecycleCrash,
+    LifecycleRecovery,
+    LifecycleSignedOut,
 }
 
 impl Phase {
@@ -122,6 +129,12 @@ impl Phase {
             "backlog-hold" => Ok(Self::BacklogHold),
             "backlog-drain" => Ok(Self::BacklogDrain),
             "backlog-concurrent" => Ok(Self::BacklogConcurrent),
+            "lifecycle-offline" => Ok(Self::LifecycleOffline),
+            "lifecycle-ready" => Ok(Self::LifecycleReady),
+            "lifecycle-delay" => Ok(Self::LifecycleDelay),
+            "lifecycle-crash" => Ok(Self::LifecycleCrash),
+            "lifecycle-recovery" => Ok(Self::LifecycleRecovery),
+            "lifecycle-signed-out" => Ok(Self::LifecycleSignedOut),
             _ => Err(io::Error::other("invalid access fixture phase")),
         }
     }
@@ -178,6 +191,7 @@ enum Route {
     BacklogCachedPr,
     BacklogArchive,
     BacklogAuxiliaryFeed,
+    LifecycleComment,
     Unexpected,
 }
 
@@ -202,6 +216,7 @@ pub enum TraceCheck {
     OfflineReader,
     LargeWorkspaceBacklog,
     ConcurrentReader,
+    NativeLifecycle,
     ReaderResume,
     SyncJourney,
     NotificationSchedule,
@@ -256,6 +271,7 @@ impl AccessFixture {
             TraceCheck::OfflineReader => records.is_empty(),
             TraceCheck::LargeWorkspaceBacklog => backlog::trace(&records),
             TraceCheck::ConcurrentReader => concurrent::trace(&records),
+            TraceCheck::NativeLifecycle => lifecycle::trace(&records),
             TraceCheck::ReaderResume => complete_reader_resume(&records),
             TraceCheck::SyncJourney => complete_sync_journey(&records),
             TraceCheck::NotificationSchedule => complete_notification_schedule(&records),
@@ -452,6 +468,14 @@ fn answer(
     socket.set_read_timeout(timeout)?;
     socket.set_write_timeout(timeout)?;
     let (route, authorized, feed_target) = read_request(socket, phase)?;
+    if authorized && let Some(status) = lifecycle::hold(phase, route, phase_file, stopping)? {
+        return Ok(RequestEvidence {
+            phase,
+            route,
+            fixture_authorization: true,
+            status,
+        });
+    }
     if phase == Phase::PrDelay && route == Route::Item && authorized {
         pr::wait_for_release(phase_file, stopping)?;
     }
@@ -610,7 +634,8 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
             Some("HTTP/1.1"),
         ) => Route::OpenPullIndex,
         (Some("POST"), Some("/graphql"), Some("HTTP/1.1")) => Route::Graphql,
-        (Some("GET"), Some(target), Some("HTTP/1.1")) => backlog::read_route(phase, target)
+        (Some("GET"), Some(target), Some("HTTP/1.1")) => lifecycle::read_route(phase, target)
+            .or_else(|| backlog::read_route(phase, target))
             .or_else(|| history::route(phase, target))
             .or_else(|| pr::route(target))
             .unwrap_or(Route::Unexpected),
@@ -661,7 +686,8 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         let payload = serde_json::from_slice::<Value>(&body).ok();
         if route != Route::Graphql {
             route = payload.as_ref().map_or(Route::Unexpected, |body| {
-                backlog::post(phase, &post_path, body)
+                lifecycle::post(phase, &post_path, body)
+                    .or_else(|| backlog::post(phase, &post_path, body))
                     .or_else(|| pr::post(phase, &post_path, body))
                     .unwrap_or_else(|| writes::post(phase, &post_path, body))
             });
@@ -719,6 +745,9 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
     };
     if !authorized || phase == Phase::Revoked {
         return result(401, "Unauthorized", json!({"message":"Bad credentials"}));
+    }
+    if let Some(response) = lifecycle::response(phase, route) {
+        return response;
     }
     if matches!(route, Route::UpdatedInlineComments | Route::OpenPullIndex) {
         return result(200, "OK", json!([]));

@@ -180,10 +180,16 @@ impl AccountService {
                 return None;
             }
             let github = GitHubClient::loopback(address.to_str()?.parse().ok()?).ok()?;
+            let credentials: Arc<dyn CredentialStore + Send + Sync> =
+                if std::env::var_os("THREADLINE_E2E_NATIVE_LIFECYCLE").is_some() {
+                    Arc::new(crate::lifecycle_fixture::LifecycleVault::open()?)
+                } else {
+                    Arc::new(FixtureVault::default())
+                };
             return Some(Self {
                 store,
                 github,
-                credentials: Arc::new(FixtureVault::default()),
+                credentials,
                 fixture: true,
             });
         }
@@ -202,6 +208,7 @@ impl AccountService {
     pub(crate) fn initial_command(&self) -> AccountCommand {
         #[cfg(feature = "e2e")]
         if self.fixture
+            && std::env::var_os("THREADLINE_E2E_NATIVE_LIFECYCLE").is_none()
             && std::env::var_os("THREADLINE_E2E_FIXTURE_AUTH").is_some_and(|value| value == "1")
         {
             return AccountCommand::LoadFixture;

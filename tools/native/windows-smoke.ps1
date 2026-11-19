@@ -8,7 +8,7 @@ param(
     [switch]$PlatformProof,
     [switch]$ToastProof,
     [switch]$AccessProof,
-    [ValidateSet('Offline', 'Resume', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface')][string]$ReaderProof,
+    [ValidateSet('Offline', 'Resume', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'NativeLifecycle', 'History', 'Writes', 'WriteSurface')][string]$ReaderProof,
     [switch]$AccessibilityProof,
     [string]$AccessAddress,
     [string]$AccessPhaseFile,
@@ -47,6 +47,8 @@ $reportName = if ($Measure) {
     'direct-merge-native.json'
 } elseif ($ReaderProof -eq 'CredentialBoundary') {
     'credential-boundary-native.json'
+} elseif ($ReaderProof -eq 'NativeLifecycle') {
+    'native-lifecycle.json'
 } elseif ($ReaderProof -eq 'History') {
     'history-native.json'
 } elseif ($ReaderProof -in @('Writes', 'WriteSurface')) {
@@ -206,7 +208,7 @@ function Get-ThreadlineArguments([string]$Observation, [switch]$OpenReview, [str
     return $arguments
 }
 
-function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenReview, [string]$SeedReader, [switch]$ReaderIdle, [switch]$SeedQuietEvent, [switch]$ReaderBacklog) {
+function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenReview, [string]$SeedReader, [switch]$ReaderIdle, [switch]$SeedQuietEvent, [switch]$ReaderBacklog, [ValidateSet('seed','inspect','cleanup')][string]$Lifecycle) {
     $info = New-Object System.Diagnostics.ProcessStartInfo
     $info.FileName = $script:Binary
     $info.UseShellExecute = $false
@@ -222,6 +224,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_ACCOUNT_FORM')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_READER_TIMING')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_READER_IDLE')
+    $info.EnvironmentVariables.Remove('THREADLINE_E2E_NATIVE_LIFECYCLE')
     if ($ReaderProof -in @('Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) { $info.EnvironmentVariables['THREADLINE_E2E_READER_TIMING'] = '1' }
     if ($ReaderIdle) { $info.EnvironmentVariables['THREADLINE_E2E_READER_IDLE'] = '1' }
     if ($ToastProof -and $null -ne $script:toastFixture) {
@@ -234,6 +237,11 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     if ($ReaderProof -eq 'CredentialBoundary') { $info.EnvironmentVariables['THREADLINE_E2E_ACCOUNT_FORM'] = '1' }
     if ($ReaderBacklog) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
     if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'DirectMerge', 'CredentialBoundary', 'Writes', 'WriteSurface', 'PerformanceConcurrent')) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
+    if ($ReaderProof -eq 'NativeLifecycle') {
+        $info.EnvironmentVariables['THREADLINE_E2E_NATIVE_LIFECYCLE'] = '1'
+        $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1'
+        if ($Lifecycle) { $info.Arguments = "--e2e-native-lifecycle $Lifecycle " + $info.Arguments }
+    }
     return [Diagnostics.Process]::Start($info)
 }
 
@@ -907,25 +915,27 @@ try {
         }
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
-    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) {
+    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'NativeLifecycle', 'History', 'Writes', 'WriteSurface', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) {
         Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
         . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
         $script:UseOwnedUiAutomation = !$AccessibilityProof -and $ReaderProof -ne 'PerformancePhysical'
         $report.driver = 'Windows PowerShell / owned UI Automation and guarded Win32 SendInput'
     }
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
-    if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'DirectMerge', 'PerformanceConcurrent')) { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
+    if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'DirectMerge', 'NativeLifecycle', 'PerformanceConcurrent')) { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
     if ($ReaderProof -in @('PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge')) { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
     if ($ReaderProof -in @('NotificationSchedule', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface')) { . (Join-Path $PSScriptRoot 'windows-issue-writes.ps1') }
     if ($ReaderProof -in @('ReviewDraft', 'ReviewContext')) { . (Join-Path $PSScriptRoot 'windows-review-context.ps1') }
     if ($ReaderProof -eq 'DirectMerge') { . (Join-Path $PSScriptRoot 'windows-merge.ps1') }
     if ($ReaderProof -eq 'CredentialBoundary') { . (Join-Path $PSScriptRoot 'windows-credential-boundary.ps1') }
+    if ($ReaderProof -eq 'NativeLifecycle') { . (Join-Path $PSScriptRoot 'windows-native-lifecycle.ps1') }
     if ($ReaderProof -eq 'History') { . (Join-Path $PSScriptRoot 'windows-history.ps1') }
     $firstProfile = Join-Path $ProfileDir ('initial-' + [guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $firstProfile -Force
     if ($ReaderProof -eq 'Offline') { Initialize-ReaderProfile $firstProfile 'small' }
     if ($ReaderProof -in @('Performance', 'PerformancePhysical')) { Initialize-ReaderProfile $firstProfile 'section-16' }
     if ($ReaderProof -in @('LargeWorkspace', 'PerformanceConcurrent')) { Initialize-ReaderProfile $firstProfile 'section-16-backlog' }
+    if ($ReaderProof -eq 'NativeLifecycle') { Initialize-NativeLifecycle $firstProfile }
     if ($script:UseSeededFixtureAuth) {
         $fixturePhase = switch ($ReaderProof) {
             Resume { 'reader-failure' }
@@ -1005,6 +1015,7 @@ try {
             ReviewContext { Invoke-ReviewContextProof $window $firstProfile }
             DirectMerge { Invoke-MergeProof $window }
             CredentialBoundary { Invoke-CredentialBoundaryProof $window $firstProfile }
+            NativeLifecycle { Invoke-NativeLifecycleProof $window $firstProfile }
             History { Invoke-HistoryProof $window $firstProfile }
             Writes { Invoke-IssueWriteProof $window $firstProfile }
             WriteSurface { Invoke-IssueWriteSurfaceProof $window }
@@ -1088,6 +1099,18 @@ try {
     } finally {
         if ($ToastProof -and $null -ne $toastFixture) {
             Complete-AppToastFixture
+        }
+        if ($ReaderProof -eq 'NativeLifecycle' -and $firstProfile -and
+            (Test-Path -LiteralPath (Join-Path $firstProfile 'native-lifecycle.owner') -PathType Leaf)) {
+            try {
+                $null = Read-NativeLifecycle $firstProfile 'cleanup' 'native-lifecycle-cleanup.json'
+            } catch {
+                $report.fixture_cleanup_error = 'Could not verify cleanup of the isolated Windows protected fixture key.'
+                if ($report.status -eq 'Pass') {
+                    $report.status = 'Fail'
+                    $report.detail = $report.fixture_cleanup_error
+                }
+            }
         }
     }
     # The canonical Rust runner owns profile cleanup. An invocation made directly keeps isolated

@@ -14,6 +14,8 @@ use crate::{
 
 mod backlog;
 pub use backlog::*;
+mod lifecycle;
+pub use lifecycle::*;
 
 const FIXTURE_TIME_MS: i64 = 1_700_000_000_000;
 const BATCH: usize = 250;
@@ -71,11 +73,19 @@ enum Profile {
     Data,
     Reader,
     Backlog,
+    Lifecycle,
+}
+
+impl Profile {
+    fn uses_loopback_identity(self) -> bool {
+        matches!(self, Self::Backlog | Self::Lifecycle)
+    }
 }
 
 fn populate_profile(store: &Store, seed: u64, scale: Scale, profile: Profile) -> Result<Fixture> {
     let reader = profile != Profile::Data;
     let backlog = profile == Profile::Backlog;
+    let loopback = profile.uses_loopback_identity();
     let empty: bool = store.read(|db| {
         Ok(
             db.query_row("SELECT NOT EXISTS(SELECT 1 FROM accounts)", [], |r| {
@@ -95,9 +105,9 @@ fn populate_profile(store: &Store, seed: u64, scale: Scale, profile: Profile) ->
         } else {
             "fixtures.invalid"
         },
-        if backlog { BACKLOG_USER } else { seed.max(1) },
+        if loopback { BACKLOG_USER } else { seed.max(1) },
     )?;
-    let (provider_repository, owner, name) = if backlog {
+    let (provider_repository, owner, name) = if loopback {
         (BACKLOG_REPOSITORY, BACKLOG_OWNER, BACKLOG_REPO_NAME)
     } else {
         (1, "fixture", "relay")
@@ -329,9 +339,9 @@ fn populate_profile(store: &Store, seed: u64, scale: Scale, profile: Profile) ->
         },
     )?;
 
-    let outbox_count = match (scale, reader) {
+    let outbox_count = match (scale, profile) {
         (Scale::Section16, _) => 1000,
-        (Scale::Small, true) => 10,
+        (Scale::Small, Profile::Reader) => 10,
         _ => 0,
     };
     if reader {
@@ -360,6 +370,7 @@ fn populate_profile(store: &Store, seed: u64, scale: Scale, profile: Profile) ->
     Ok(Fixture {
         revision: match profile {
             Profile::Backlog => LARGE_WORKSPACE_REVISION,
+            Profile::Lifecycle => "s12-native-lifecycle-v1",
             Profile::Reader => "s04-reader-v1",
             Profile::Data => REVISION,
         },
@@ -392,7 +403,7 @@ fn enroll_reader(
     use crate::{
         IssueApiId, ItemLocator, TransferEvidence, TransferOutcome, reader::repository_list_key,
     };
-    let (archive, owner, login) = if fixture == Profile::Backlog {
+    let (archive, owner, login) = if fixture.uses_loopback_identity() {
         (BACKLOG_ARCHIVE, BACKLOG_OWNER, BACKLOG_LOGIN)
     } else {
         (2, "fixture", "fixture-reader")

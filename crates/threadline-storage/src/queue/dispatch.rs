@@ -225,6 +225,17 @@ impl Store {
         })
     }
     /// Expired validating leases had no send authorization. Expired sending leases must reconcile.
+    pub fn next_operation_recovery(&self, account: AccountId) -> Result<Option<i64>> {
+        self.read(|db| {
+            Ok(db.query_row(
+                "SELECT MIN(lease_until) FROM operations
+                 WHERE account_id=? AND state IN ('validating','sending')",
+                [account],
+                |row| row.get(0),
+            )?)
+        })
+    }
+
     pub fn recover_expired(&self, account: AccountId, now: i64) -> Result<usize> {
         self.write(|tx| {
             tx.execute("UPDATE operation_attempts SET outcome=CASE WHEN sending_at IS NULL THEN 'expired_before_dispatch' ELSE 'outcome_unknown' END

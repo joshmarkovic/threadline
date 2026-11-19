@@ -10,7 +10,7 @@ mod reader_fixture;
 
 fn main() {
     #[cfg(feature = "e2e")]
-    if let Some(result) = reader_fixture::run() {
+    if let Some(result) = threadline_app::native_lifecycle_command().or_else(reader_fixture::run) {
         if let Err(error) = result {
             eprintln!("{error}");
             std::process::exit(1);

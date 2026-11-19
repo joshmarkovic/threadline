@@ -2,6 +2,8 @@ mod account_panel;
 mod accounts;
 mod activity_delivery;
 mod fixtures;
+#[cfg(feature = "e2e")]
+mod lifecycle_fixture;
 #[cfg(windows)]
 mod notification_commands;
 #[cfg(feature = "e2e")]
@@ -14,6 +16,8 @@ mod sync_panel;
 mod sync_worker;
 mod workspace;
 
+#[cfg(feature = "e2e")]
+pub use lifecycle_fixture::native_lifecycle_command;
 #[cfg(windows)]
 pub use notification_commands::handle_notification_command;
 pub use workspace::{Workspace, bind_shortcuts};

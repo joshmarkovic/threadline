@@ -240,6 +240,7 @@ struct Local {
     status: SyncStatus,
     waiting: u64,
     profiles: Vec<AccessProfile>,
+    next_recovery: Option<i64>,
     next_read: Option<i64>,
     next_write: Option<i64>,
 }
@@ -258,6 +259,12 @@ impl Local {
         if network && enroll {
             store.schedule_selected_activity(account, now)?;
         }
+        // This deadline is local. Pausing transport does not pause recovery of an expired lease.
+        let mut next_recovery = store.next_operation_recovery(account)?;
+        if next_recovery.is_some_and(|due| due <= now) {
+            store.recover_expired(account, now)?;
+            next_recovery = store.next_operation_recovery(account)?;
+        }
         Ok(Some(Self {
             account,
             settings,
@@ -268,6 +275,7 @@ impl Local {
                 .into_iter()
                 .filter(|profile| profile.account == account)
                 .collect(),
+            next_recovery,
             next_read: if network {
                 store.next_sync_due(account, now)?
             } else {
@@ -366,6 +374,9 @@ async fn run(
             .expect("connectivity observer")
             .next_stale_at(elapsed);
         let mut next = deadline.map(|due| due.saturating_sub(elapsed));
+        if let Some(due) = local.next_recovery {
+            next = earliest(next, until(now, due));
+        }
         if network && !offline {
             let status = core
                 .observer
@@ -648,4 +659,104 @@ fn zone(settings: &SyncSettings) -> threadline_storage::Result<String> {
         || system_timezone().map_err(threadline_storage::Error::InvalidInput),
         Ok,
     )
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+    use threadline_storage::{
+        fixtures::{LIFECYCLE_ACTIONS, populate_native_lifecycle},
+        queue::State,
+        writes::{IssueValues, Permission, WriteAdmission, WriteObservation},
+    };
+
+    #[test]
+    fn worker_recovers_expired_native_send_lease_even_while_offline() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = Store::open_profile(directory.path()).unwrap();
+        let at = 1_700_000_200_000;
+        let fixture = populate_native_lifecycle(
+            &store,
+            12345,
+            "0123456789abcdef0123456789abcdef",
+            at,
+            || Ok(()),
+        )
+        .unwrap();
+        let account = fixture.account;
+        store
+            .update_sync_settings(account, |settings| {
+                settings.controls.work_offline = false;
+                settings.controls.pause_queued_actions = false;
+            })
+            .unwrap();
+        let deadline = at + 30_000;
+        let claim = store.claim_write(account, at, deadline).unwrap().unwrap();
+        let route = &claim.route;
+        let admission = store
+            .authorize_write(
+                &claim,
+                &WriteObservation {
+                    credential_generation: route.credential_generation,
+                    actor: route.actor,
+                    repository: route.repository_id,
+                    issue: route.issue_id,
+                    number: route.number,
+                    pull_request: route.pull_request,
+                    observed_at_ms: at,
+                    permission: Permission::Allowed,
+                    fields: IssueValues::default(),
+                    comment: None,
+                    choices: Default::default(),
+                },
+                at,
+            )
+            .unwrap();
+        let WriteAdmission::Send(ticket) = admission else {
+            panic!("eligible test write was held")
+        };
+        assert!(store.start_write_transport(&ticket, at).unwrap());
+        store
+            .update_sync_settings(account, |settings| settings.controls.work_offline = true)
+            .unwrap();
+        drop(store);
+
+        let restored = Store::open_profile(directory.path()).unwrap();
+        let op = || {
+            restored
+                .operation(account, LIFECYCLE_ACTIONS[0])
+                .unwrap()
+                .unwrap()
+        };
+        let before = Local::load(&restored, deadline - 1, false, false)
+            .unwrap()
+            .unwrap();
+        assert_eq!(before.next_recovery, Some(deadline));
+        assert_eq!(op().state, State::Sending);
+        let expiry = Local::load(&restored, deadline, false, false)
+            .unwrap()
+            .unwrap();
+        assert_eq!(expiry.next_recovery, None);
+        assert_eq!(op().state, State::OutcomeUnknown);
+        assert_eq!(
+            restored
+                .dependents(account, LIFECYCLE_ACTIONS[0])
+                .unwrap()
+                .len(),
+            3
+        );
+        assert_eq!(
+            restored
+                .attempts(account, LIFECYCLE_ACTIONS[0])
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(
+            restored
+                .claim_write(account, deadline, deadline + 1)
+                .unwrap()
+                .is_none()
+        );
+    }
 }
