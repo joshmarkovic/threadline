@@ -11,6 +11,123 @@ use threadline_storage::{
 };
 
 #[gpui_kit::test]
+fn ui_008_inactive_tab_labels_restore_and_follow_cached_title_updates(cx: &mut TestAppContext) {
+    let setup = ReaderHarness::seeded();
+    let account = setup.fixture.account;
+    let number = NonZeroU64::new(94821).unwrap();
+    let update_title = |title: &str, timestamp| {
+        setup
+            .store
+            .ingest(
+                account,
+                ItemLocator {
+                    repository: setup.fixture.repository,
+                    number: number.get(),
+                },
+                ItemUpdate {
+                    representation: ItemRepresentation::Issue(IssueRecord {
+                        id: threadline_core::domain::IssueApiId::new(number),
+                        node_id: None,
+                        classification: IssueClassification::Issue,
+                    }),
+                    remote_updated_at: UtcMillis(timestamp),
+                    title: Change::Value(title.into()),
+                    body: Change::Missing,
+                    closed: Change::Missing,
+                },
+            )
+            .unwrap()
+    };
+    let item = update_title("Saved title", 1_900_000_000_000);
+    let draft = "inactive-draft";
+    setup
+        .store
+        .create_draft(
+            account,
+            draft,
+            item,
+            DraftKind::Comment,
+            &threadline_storage::queue::DraftContent {
+                body: "Retain this draft".into(),
+                base: String::new(),
+                anchor: String::new(),
+            },
+        )
+        .unwrap();
+    let mut layout = setup.store.workspace(account).unwrap().unwrap();
+    for (index, pane) in layout.panes.iter_mut().enumerate() {
+        pane.active = Some(0);
+        pane.tabs[1].item = item;
+        pane.tabs[1].view = TabView {
+            draft: (index == 0).then(|| draft.to_string()),
+            ..Default::default()
+        };
+    }
+    setup.store.save_workspace(account, &layout).unwrap();
+    let other = setup
+        .store
+        .ensure_account("github.com", 98_765_432)
+        .unwrap();
+    assert!(
+        setup
+            .store
+            .tab_summaries(other, &[item])
+            .unwrap()
+            .is_empty()
+    );
+    let (window, reader) = setup.open(cx);
+    let check = |cx: &mut TestAppContext, title: &str| {
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            let reader = reader.read(cx);
+            for (index, pane) in reader.layout.panes.iter().enumerate() {
+                assert!(!reader.tab_views.contains_key(&pane.tabs[1].id));
+                let label = format!(
+                    "Issue fixture/relay #94821 {title}{}",
+                    if index == 0 { " · Draft" } else { "" }
+                );
+                assert_eq!(
+                    window.find(format!("reader-tab-{index}-1")).label(),
+                    Some(label.as_str())
+                );
+            }
+        })
+        .unwrap();
+    };
+    check(cx, "Saved title");
+    update_title("Confirmed new title", 1_900_000_000_001);
+    cx.update_window(window, |_, window, cx| {
+        reader.update(cx, |reader, cx| {
+            reader.update_sync(
+                crate::sync_worker::SyncUpdate {
+                    account: Some(account),
+                    status: None,
+                    connection: threadline_core::connectivity::ConnectivityObserver::new(1)
+                        .snapshot(std::time::Duration::ZERO),
+                    cache_generation: 1,
+                    history_generation: 0,
+                    eligible_outbox: 0,
+                },
+                window,
+                cx,
+            );
+        });
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| {
+            reader
+                .read(cx)
+                .tab_summaries
+                .get(&item)
+                .and_then(|row| row.title.as_deref())
+                == Some("Confirmed new title")
+        })
+    });
+    check(cx, "Confirmed new title");
+}
+
+#[gpui_kit::test]
 fn cached_navigation_shows_an_existing_tab_immediately_and_saves_both_open_and_switch(
     cx: &mut TestAppContext,
 ) {

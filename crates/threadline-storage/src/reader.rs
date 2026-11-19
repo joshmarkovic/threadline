@@ -275,6 +275,29 @@ impl BrowseFilter {
     }
 }
 impl Store {
+    /// Read cached tab labels by stable identity, including tabs outside the current browse filter.
+    pub fn tab_summaries(
+        &self,
+        account: AccountId,
+        items: &[ItemId],
+    ) -> Result<std::collections::HashMap<ItemId, BrowseRow>> {
+        let item_ids = serde_json::to_string(items)
+            .map_err(|_| Error::InvalidInput("invalid tab item identities"))?;
+        self.read(|db| {
+            let sql = format!(
+                "SELECT {ROW_FIELDS}
+                 FROM reader_rows v
+                 WHERE v.account_id = ?1 AND v.id IN (SELECT value FROM json_each(?2))"
+            );
+            let mut statement = db.prepare_cached(&sql)?;
+            let rows = statement.query_map(params![account, item_ids], |row| {
+                let summary = row_at(row, 0)?;
+                Ok((summary.item, summary))
+            })?;
+            Ok(rows.collect::<rusqlite::Result<_>>()?)
+        })
+    }
+
     /// Resolve a named repository for this account and honor previously verified transfer aliases.
     pub fn resolve_downloaded_route(
         &self,

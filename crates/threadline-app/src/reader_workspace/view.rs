@@ -372,6 +372,7 @@ impl ReaderWorkspace {
         self.launch(window,cx,move |store|store.clear_cache(account),|this,result,window,cx|{
             if result.is_ok(){
                 this.tab_views.clear();
+                this.tab_summaries.clear();
                 this.load_visible(window,cx);
                 this.show_cache(window,cx);
                 this.status=Some("Unpinned downloads were cleared. Draft and Outbox dependencies remain available.");
@@ -949,44 +950,22 @@ impl ReaderWorkspace {
                     .iter()
                     .enumerate()
                     .map(|(position, tab)| {
-                        let label = self
-                            .tab_views
-                            .get(&tab.id)
-                            .and_then(|view| view.data.item.as_ref())
-                            .map(|item| {
-                                let title = match &item.title {
-                                    Change::Value(title) => title.as_str(),
-                                    _ => "No downloaded title",
-                                };
-                                let repository = self
-                                    .repositories
-                                    .iter()
-                                    .find(|repo| repo.id == item.locator.repository)
-                                    .map_or_else(String::new, |repo| {
-                                        format!("{}/{} ", repo.owner, repo.name)
-                                    });
+                        let mut label = self.tab_summaries.get(&tab.item).map_or_else(
+                            || "Loading item…".to_owned(),
+                            |row| {
                                 format!(
-                                    "{} {repository}#{} {title}{}",
-                                    kind_label(item.kind),
-                                    item.locator.number,
-                                    if tab.view.draft.is_some() {
-                                        " · Draft"
-                                    } else {
-                                        ""
-                                    }
+                                    "{} {}/{} #{} {}",
+                                    kind_label(row.kind),
+                                    row.owner,
+                                    row.name,
+                                    row.number,
+                                    row.title.as_deref().unwrap_or("No downloaded title")
                                 )
-                            })
-                            .unwrap_or_else(|| {
-                                format!(
-                                    "Saved item {}{}",
-                                    tab.item.0,
-                                    if tab.view.draft.is_some() {
-                                        " · Draft"
-                                    } else {
-                                        ""
-                                    }
-                                )
-                            });
+                            },
+                        );
+                        if tab.view.draft.is_some() {
+                            label.push_str(" · Draft");
+                        }
                         let name = format!("reader-tab-{index}-{position}");
                         let tab_id = tab.id.clone();
                         #[cfg(feature = "e2e")]

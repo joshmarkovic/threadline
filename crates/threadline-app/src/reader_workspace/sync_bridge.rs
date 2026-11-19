@@ -83,6 +83,7 @@ impl ReaderWorkspace {
             self.refresh_cached_history(window, cx);
         }
         if cache_changes > history_changes {
+            self.refresh_tab_summaries(window, cx);
             self.refresh_sidebar_counts(window, cx);
             self.refresh_draft_submissions(window, cx);
             if self.surface == Surface::Outbox {

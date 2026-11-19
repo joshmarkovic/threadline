@@ -15,8 +15,8 @@ use threadline_storage::{
     access::{AccessState, RepositoryView},
     queue::{Pane, Projection, QueueRow, Tab, TabView, Workspace},
     reader::{
-        BrowseFilter, BrowsePage, CacheUsage, DiscussionPage, IssueDownload, ReaderItemMetadata,
-        ReaderScope, SearchHit, SidebarCounts, TimelinePage,
+        BrowseFilter, BrowsePage, BrowseRow, CacheUsage, DiscussionPage, IssueDownload,
+        ReaderItemMetadata, ReaderScope, SearchHit, SidebarCounts, TimelinePage,
     },
 };
 
@@ -180,6 +180,8 @@ pub(crate) struct ReaderWorkspace {
     focus_events: Vec<Subscription>,
     maximized: bool,
     tab_views: HashMap<String, ItemView>,
+    tab_summaries: HashMap<ItemId, BrowseRow>,
+    tab_summary_request: u64,
     pending_tabs: HashMap<String, u64>,
     tab_generation: u64,
     generation: u64,
@@ -596,6 +598,8 @@ impl ReaderWorkspace {
             focus_events: Vec::new(),
             maximized: false,
             tab_views: HashMap::new(),
+            tab_summaries: HashMap::new(),
+            tab_summary_request: 0,
             pending_tabs: HashMap::new(),
             tab_generation: 0,
             generation: 0,
@@ -794,6 +798,7 @@ impl ReaderWorkspace {
             self.queue.clear();
             self.outbox = outbox::OutboxState::default();
             self.tab_views.clear();
+            self.tab_summaries.clear();
             self.pending_tabs.clear();
             self.pending_tab_selection = None;
             self.search_hits = None;
@@ -830,13 +835,20 @@ impl ReaderWorkspace {
                 self.launch(
                     window,
                     cx,
-                    move |store| store.reader_layout(account),
+                    move |store| {
+                        let Some((layout, maximized)) = store.reader_layout(account)? else {
+                            return Ok(None);
+                        };
+                        let summaries = store.tab_summaries(account, &open_items(&layout))?;
+                        Ok(Some((layout, maximized, summaries)))
+                    },
                     |this, result, window, cx| {
                         this.layout_busy = false;
                         match result {
-                            Ok(Some((layout, maximized))) => {
+                            Ok(Some((layout, maximized, summaries))) => {
                                 this.ensure_focus_handles(layout.panes.len(), window, cx);
                                 this.layout = layout;
+                                this.tab_summaries = summaries;
                                 this.maximized = maximized.is_some();
                                 #[cfg(feature = "e2e")]
                                 if let Some(observer) = this.observer.as_ref() {
@@ -1222,7 +1234,43 @@ impl ReaderWorkspace {
         cx.notify();
     }
 
+    fn refresh_tab_summaries(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(account) = self.account else { return };
+        self.tab_summary_request += 1;
+        let request = self.tab_summary_request;
+        let items = open_items(&self.layout);
+        if items.is_empty() {
+            self.tab_summaries.clear();
+            return;
+        }
+        self.launch(
+            window,
+            cx,
+            move |store| store.tab_summaries(account, &items),
+            move |this, result, _, _| {
+                if request == this.tab_summary_request
+                    && let Ok(summaries) = result
+                {
+                    this.tab_summaries = summaries;
+                }
+            },
+        );
+    }
+
     fn load_visible(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let open: HashSet<_> = self
+            .layout
+            .panes
+            .iter()
+            .flat_map(|pane| pane.tabs.iter().map(|tab| tab.item))
+            .collect();
+        self.tab_summaries.retain(|item, _| open.contains(item));
+        if open
+            .iter()
+            .any(|item| !self.tab_summaries.contains_key(item))
+        {
+            self.refresh_tab_summaries(window, cx);
+        }
         let tabs: Vec<_> = self
             .layout
             .panes
@@ -1284,6 +1332,21 @@ impl ReaderWorkspace {
         };
         match result {
             Ok(mut data) => {
+                if let Some(item) = &data.item
+                    && let Some(summary) = self.tab_summaries.get(&item.id)
+                {
+                    let title = match &item.title {
+                        Change::Value(title) => Some(title.as_str()),
+                        _ => None,
+                    };
+                    if summary.title.as_deref() != title
+                        || summary.repository != item.locator.repository
+                        || summary.number != item.locator.number
+                        || summary.kind != item.kind
+                    {
+                        self.refresh_tab_summaries(window, cx);
+                    }
+                }
                 let mut old = self.tab_views.remove(&id);
                 let scroll = old
                     .as_ref()
@@ -1641,6 +1704,14 @@ impl ReaderWorkspace {
             },
         );
     }
+}
+
+fn open_items(layout: &Workspace) -> Vec<ItemId> {
+    layout
+        .panes
+        .iter()
+        .flat_map(|pane| pane.tabs.iter().map(|tab| tab.item))
+        .collect()
 }
 
 fn empty_workspace() -> Workspace {

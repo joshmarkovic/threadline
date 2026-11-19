@@ -135,6 +135,7 @@ impl ReaderWorkspace {
             },
             move |this, page, window, cx| {
                 let Some(page) = page else { return };
+                this.refresh_tab_summaries(window, cx);
                 this.status = if page.has_more {
                     Some("A repository page was saved. More items are available to download.")
                 } else if page.complete {
@@ -248,6 +249,7 @@ impl ReaderWorkspace {
             },
             |this, result, window, cx| {
                 if let Ok(item) = result {
+                    this.refresh_tab_summaries(window, cx);
                     this.open(item, None, false, false, window, cx)
                 } else {
                     this.status = Some("GitHub’s item could not be opened in this repository.")

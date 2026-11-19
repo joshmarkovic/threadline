@@ -127,6 +127,11 @@ function Invoke-PrMergeStateProof([IntPtr]$Window, [string]$Profile) {
             $pr.issue_rest_id -eq 443 -and $null -eq $pr.pull_request_rest_id -and $null -eq $pr.merged
     }
     Confirm-FixturePrMergeLabel $restart $unknownLabel
+    $tabLabel = "Pull request fixture-org/private #42 $updated"
+    Wait-For 'the updated title and item identity on the inactive restored PR tab' {
+        $null -ne (Find-OwnedFixtureControl $restart 'reader-tab-0-0' $tabLabel)
+    }
+    Add-Evidence 'Read the inactive restored tab without opening it' ([ordered]@{automation_id='reader-tab-0-0';name=$tabLabel})
     Activate-FixturePr $restart 'reader-result-' 42 $updated -Result
     $null = Wait-PrReader 'the confirmed merge and separate provider identities reload from SQLite' {
         param($pr, $reader)
