@@ -153,6 +153,15 @@
     "registered_uninstaller_sha256": "f50055e74d91b0b19189cfaf8df3116bea7e1c1f6c9416ce18ae15fff02a42ff",
     "default_data_absent": true
   },
+  "post_suite_uninstall": {
+    "highest_build": 18,
+    "exact_install_present": false,
+    "default_data_absent": true,
+    "registered_uninstaller_sha256": "f50055e74d91b0b19189cfaf8df3116bea7e1c1f6c9416ce18ae15fff02a42ff",
+    "retained_files_rehashed": 21,
+    "archive_manifest_sha256": "6ccbfbac741f0e5955366cabb0bb2dfe15359873f075db358b2e32acaf1d83f3",
+    "preference_sha256_before_and_after": "97a96def5389f70f749d69d5f58872871561f3155381b303845589bafcd48a0f"
+  },
   "raw_receipt_sha256": {
     "build": "5c47ef1a5ca1dee4c5bf42ecbb4dfd416f3b44eef1d33ba1d0c089f8857e3aec",
     "pinned_package_fixture": "89b18cf2c858000240fc84fee6dccd1b1e1596616a40a32f5cfacf72a8ed98ef",
@@ -162,6 +171,8 @@
     "matrix": "02c7133ae0f343882579e1e878307bd44a5a5f4998dafb12791de98c9e270adf",
     "retention": "0bba50738c7c2856a2c3f3fcc93c5f0c28415b78836685d9ae63f83a81ad086f",
     "preflight": "703e20ee6d79db8f5c560abefa6f219b0379b5d70eef4add14dbdebe2b2b345d",
-    "installed_for_suite": "2dcb23de7358165f29fbe70627291bde0c139f3b02722e589a635cca9859b6a8"
+    "installed_for_suite": "2dcb23de7358165f29fbe70627291bde0c139f3b02722e589a635cca9859b6a8",
+    "post_suite_uninstall": "934c10bf02fdbe39206a308adc9995a8a87a8f597f7853de4fcaf8351af4d6d0",
+    "post_suite_preservation": "5523c61385563d466152690c35b13f4d2b95a1daa16f839fb50fab99021b91f5"
   }
 }
