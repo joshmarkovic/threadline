@@ -341,26 +341,51 @@ function Invoke-ReviewDecisionsProof([IntPtr]$Window, [string]$Profile, [switch]
     }
 }
 
-function Show-FixtureThreadControl([IntPtr]$Window, [long]$Item, [string]$Id, [string]$Name, [int]$Direction, [switch]$Edit) {
+function Wait-FixtureThreadViewport([long]$Item) {
     $head = 'b' * 40
-    $viewportId = 'pr-0-conversation-records'
-    for ($step = 0; $step -le 5; $step++) {
-        $observed = Wait-PrReader 'the original PR and its downloaded review thread in Conversation' {
-            param($pr, $reader)
-            $coverage = $pr.PSObject.Properties['threads_coverage']
-            $count = $pr.PSObject.Properties['threads_on_page']
-            $reader.active_item -eq $Item -and $pr.head -ceq $head -and $pr.section -ceq 'Conversation' -and
-                $null -ne $coverage -and $coverage.Value -ceq 'Complete' -and $null -ne $count -and $count.Value -eq 1
+    $matched = @{ geometry = $null; state = $null }
+    Wait-For 'the original PR thread and a stable visible Conversation viewport' {
+        $candidate = Read-Observation
+        if ($null -eq $candidate -or !$candidate.ready -or $candidate.pid -ne $script:app.Id) {
+            $matched.geometry = $null
+            return $false
         }
-        if ($observed.pid -ne $script:app.Id -or !(Test-OwnedFixtureWindow $Window)) {
+        $account = $candidate.PSObject.Properties['account_access']
+        $reader = $candidate.PSObject.Properties['cached_reader']
+        $viewport = $candidate.bounds.PSObject.Properties['pr-0-conversation-records']
+        if ($null -eq $account -or $null -eq $account.Value -or $account.Value.panel_open -or
+            $null -eq $reader -or $null -eq $reader.Value -or $reader.Value.active_item -ne $Item -or
+            $null -eq $viewport -or $null -eq $viewport.Value -or $viewport.Value.Count -ne 4 -or
+            $viewport.Value[2] -le 0 -or $viewport.Value[3] -le 0 -or $candidate.scale_factor -le 0) {
+            $matched.geometry = $null
+            return $false
+        }
+        $pr = $reader.Value.PSObject.Properties['pull_request']
+        if ($null -eq $pr -or $null -eq $pr.Value -or $pr.Value.head -cne $head -or
+            $pr.Value.section -cne 'Conversation' -or $pr.Value.threads_coverage -cne 'Complete' -or
+            $pr.Value.threads_on_page -ne 1) {
+            $matched.geometry = $null
+            return $false
+        }
+        $geometry = (@($candidate.scale_factor) + $viewport.Value) -join ','
+        $stable = $matched.geometry -ceq $geometry
+        $matched.geometry = $geometry
+        $matched.state = $candidate
+        return $stable
+    }
+    return $matched.state
+}
+
+function Show-FixtureThreadControl([IntPtr]$Window, [long]$Item, [string]$Id, [string]$Name, [int]$Direction, [switch]$Edit) {
+    for ($step = 0; $step -le 5; $step++) {
+        if (!(Test-OwnedFixtureWindow $Window)) {
             Stop-Blocked 'The isolated Threadline conversation is no longer owned by the expected process.'
         }
+        $observed = Wait-FixtureThreadViewport $Item
         if ($null -ne $observed.bounds.PSObject.Properties[$Id] -and
             $null -ne (Find-OwnedFixtureControl $Window $Id $Name -Edit:$Edit)) { return }
-        $viewport = $observed.bounds.PSObject.Properties[$viewportId]
-        if ($step -eq 5 -or $null -eq $viewport) { break }
-        $rect = $viewport.Value
-        if ($rect.Count -ne 4 -or $rect[2] -le 0 -or $rect[3] -le 0) { break }
+        if ($step -eq 5) { break }
+        $rect = $observed.bounds.PSObject.Properties['pr-0-conversation-records'].Value
         $point = To-ClientPoint ($rect[0] + $rect[2] / 2) ($rect[1] + $rect[3] / 2) $observed.scale_factor
         $dpi = [uint32][Math]::Round(96 * $observed.scale_factor)
         [ThreadlineWinInput]::ScrollOwnedConversation($Window, [uint32]$script:app.Id, $dpi, $point, $Direction)

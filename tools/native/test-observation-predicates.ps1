@@ -22,6 +22,7 @@ if (@($helpers.Name | Sort-Object -Unique).Count -ne 5 -or $helpers.Count -ne 5)
 . (Join-Path $PSScriptRoot 'windows-native-lifecycle.ps1')
 . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1')
 . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
+. (Join-Path $PSScriptRoot 'windows-review-context.ps1')
 
 $notLoaded = '{"connection":"Reachable","cache_generation":2,"panel_open":false,"controls":null}' | ConvertFrom-Json
 if (Test-NotificationSyncReady $notLoaded) { throw 'Reachable fixture transport did not prove saved Sync controls had loaded.' }
@@ -55,6 +56,37 @@ if ((Get-NotificationChoiceName 'Enable quiet hours' $false) -cne ($quietChoice 
 function Read-Observation {
     if ($script:observations.Count -gt 1) { return $script:observations.Dequeue() }
     return $script:observations.Peek()
+}
+
+function New-FixtureConversation([int]$Serial, [int]$Process, [bool]$PanelOpen, [int]$Top, [string]$Head) {
+    $viewport = @{}
+    if ($Top -gt 0) { $viewport['pr-0-conversation-records'] = @(200, $Top, 700, 220) }
+    [pscustomobject]@{
+        serial = $Serial; ready = $true; pid = $Process; scale_factor = 1.5
+        account_access = [pscustomobject]@{ panel_open = $PanelOpen }
+        bounds = [pscustomobject]$viewport
+        cached_reader = [pscustomobject]@{
+            active_item = 1
+            pull_request = [pscustomobject]@{ head = $Head; section = 'Conversation'; threads_coverage = 'Complete'; threads_on_page = 1 }
+        }
+    }
+}
+
+$script:app = [pscustomobject]@{ Id = 41 }
+$head = 'b' * 40
+$script:observations = [System.Collections.Generic.Queue[object]]::new()
+$script:observations.Enqueue((New-FixtureConversation 1 41 $true 400 $head))
+$script:observations.Enqueue((New-FixtureConversation 2 41 $false 0 $head))
+$script:observations.Enqueue((New-FixtureConversation 3 40 $false 424 $head))
+$script:observations.Enqueue((New-FixtureConversation 4 41 $false 424 ('e' * 40)))
+$script:observations.Enqueue((New-FixtureConversation 5 41 $false 400 $head))
+$script:observations.Enqueue((New-FixtureConversation 6 41 $false 424 $head))
+$script:observations.Enqueue((New-FixtureConversation 7 41 $false 0 $head))
+$script:observations.Enqueue((New-FixtureConversation 8 41 $false 424 $head))
+$script:observations.Enqueue((New-FixtureConversation 9 41 $false 424 $head))
+$conversation = Wait-FixtureThreadViewport 1
+if ($conversation.serial -ne 9 -or $conversation.bounds.'pr-0-conversation-records'[1] -ne 424) {
+    throw 'The thread driver accepted an unsettled, covered, missing, or unrelated Conversation viewport.'
 }
 
 $script:observations = [System.Collections.Generic.Queue[object]]::new()
