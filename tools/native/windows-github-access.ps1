@@ -65,7 +65,7 @@ function Set-AccessPhase([string]$Phase) {
         'sync-live', 'sync-offline', 'sync-service', 'sync-throttle', 'sync-transport', 'sync-notification-send',
         'sync-rate-ready', 'sync-rate-throttle', 'sync-rate-floor',
         'backlog-auth', 'backlog-hold', 'backlog-drain', 'backlog-concurrent',
-        'pr-load', 'pr-merge-state', 'pr-delay', 'pr-release', 'pr-shared-ready', 'pr-shared-hold', 'pr-shared-release', 'review-send', 'review-changed', 'review-decisions', 'review-predecessor', 'review-resume', 'thread-queue', 'thread-outdated',
+        'pr-load', 'pr-merge-state', 'pr-pin-load', 'pr-pin-offline', 'pr-pin-interrupt', 'pr-pin-continue', 'pr-delay', 'pr-release', 'pr-shared-ready', 'pr-shared-hold', 'pr-shared-release', 'review-send', 'review-changed', 'review-decisions', 'review-predecessor', 'review-resume', 'thread-queue', 'thread-outdated',
         'merge-prepare', 'merge-send', 'merge-wrong-head', 'merge-queue-preflight', 'merge-queue-rejected',
         'history', 'history-moved', 'history-deleted', 'write-online', 'write-drop',
          'issue-edit-baseline', 'issue-edit-remote-change', 'issue-edit-commit',

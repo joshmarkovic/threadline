@@ -23,6 +23,7 @@ mod history;
 mod lifecycle;
 mod merge;
 mod pr;
+mod pr_pins;
 mod rate_limit;
 mod review_decisions;
 mod review_threads;
@@ -82,6 +83,10 @@ enum Phase {
     SyncNotificationSend,
     PrLoad,
     PrMergeState,
+    PrPinLoad,
+    PrPinOffline,
+    PrPinInterrupt,
+    PrPinContinue,
     PrDelay,
     PrRelease,
     PrSharedHold,
@@ -156,6 +161,10 @@ impl Phase {
             "sync-notification-send" => Ok(Self::SyncNotificationSend),
             "pr-load" => Ok(Self::PrLoad),
             "pr-merge-state" => Ok(Self::PrMergeState),
+            "pr-pin-load" => Ok(Self::PrPinLoad),
+            "pr-pin-offline" => Ok(Self::PrPinOffline),
+            "pr-pin-interrupt" => Ok(Self::PrPinInterrupt),
+            "pr-pin-continue" => Ok(Self::PrPinContinue),
             "pr-delay" => Ok(Self::PrDelay),
             "pr-release" => Ok(Self::PrRelease),
             "pr-shared-hold" => Ok(Self::PrSharedHold),
@@ -233,6 +242,14 @@ enum Route {
     PullActivityA,
     PullActivityB,
     PullA,
+    PrPinItem42,
+    PrPinItem43,
+    PrPinCommentsFirst,
+    PrPinCommentsNext,
+    PrPinReviews,
+    PrPinThreads,
+    PrPinChecks,
+    PrPinStatuses,
     PullB,
     CompareA,
     CompareB,
@@ -341,6 +358,7 @@ pub enum TraceCheck {
     NotificationSchedule,
     PullRequestJourney,
     PullRequestMergeState,
+    PullRequestOfflinePin,
     SharedPrPanes,
     ReviewContextJourney,
     ReviewDraftJourney,
@@ -432,6 +450,7 @@ impl AccessFixture {
             TraceCheck::NotificationSchedule => complete_notification_schedule(&records),
             TraceCheck::PullRequestJourney => pr::trace(&records),
             TraceCheck::PullRequestMergeState => pr::trace_merge_state(&records),
+            TraceCheck::PullRequestOfflinePin => pr_pins::trace(&records),
             TraceCheck::SharedPrPanes => pr::trace_shared(&records),
             TraceCheck::ReviewContextJourney => pr::trace_review_context(&records),
             TraceCheck::ReviewDraftJourney => pr::trace_review_draft(&records),
@@ -755,9 +774,11 @@ fn answer(
             Route::ReviewSubmitted => {
                 socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:4202:08\r\n")?
             }
-            Route::IssueEditCommitted => {
-                write!(socket, "X-GitHub-Request-Id: {}\r\n", writes::ISSUE_EDIT_REQUEST_ID)?
-            }
+            Route::IssueEditCommitted => write!(
+                socket,
+                "X-GitHub-Request-Id: {}\r\n",
+                writes::ISSUE_EDIT_REQUEST_ID
+            )?,
             Route::ReviewDecision(step) => {
                 write!(socket, "X-GitHub-Request-Id: SYNTHETIC:08:{step:?}\r\n")?
             }
@@ -788,8 +809,14 @@ fn answer(
             "Link: <http://{local}{PR_STATE_ITEMS_NEXT}>; rel=\"next\"\r\n"
         )?;
     }
+    if pr_pins::active(phase) && route == Route::PrPinCommentsFirst && reply.status == 200 {
+        let local = socket.local_addr()?;
+        let next = pr_pins::COMMENTS_NEXT;
+        write!(socket, "Link: <http://{local}{next}>; rel=\"next\"\r\n")?;
+    }
     socket.write_all(b"\r\n")?;
     socket.write_all(&body)?;
+    pr_pins::mark(phase, route, reply.status, phase_file)?;
     if let Some(request) = held_feed {
         request.response_written()?;
     }
@@ -871,6 +898,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         ) => Route::OpenPullIndex,
         (Some("POST"), Some("/graphql"), Some("HTTP/1.1")) => Route::Graphql,
         (Some("GET"), Some(target), Some("HTTP/1.1")) => historical_reader::get(phase, target)
+            .or_else(|| pr_pins::get(phase, target))
             .or_else(|| review_decisions::get(phase, target))
             .or_else(|| comment_dependency::get(phase, target))
             .or_else(|| activity::read_route(phase, target))
@@ -948,6 +976,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         } else if let Some(operation) = payload.as_ref().and_then(|body| {
             review_threads::graphql(phase, body)
                 .or_else(|| pr::shared_review_query(phase, body))
+                .or_else(|| pr_pins::graphql(phase, body))
                 .or_else(|| activity::graphql(phase, body))
                 .or_else(|| merge::graphql(phase, body))
                 .or_else(|| pr::activity_query(phase, body))
@@ -1049,6 +1078,9 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
     }
     if let Some(pr) = pr::response(phase, route) {
         return pr;
+    }
+    if let Some(pin) = pr_pins::response(phase, route) {
+        return pin;
     }
     if let Some(write) = writes::response(phase, route) {
         return write;

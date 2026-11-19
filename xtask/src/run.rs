@@ -619,7 +619,10 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
                 Some(NativeMode::WindowsReaderOffline)
             } else if id == "S05-WINDOWS-RATE-LIMIT" {
                 Some(NativeMode::WindowsSync)
-            } else if matches!(id, "S06-SHARED-PR-PANES" | "S06-PR-MERGE-STATE") {
+            } else if matches!(
+                id,
+                "S06-SHARED-PR-PANES" | "S06-PR-MERGE-STATE" | "S06-PR-OFFLINE-PIN"
+            ) {
                 Some(NativeMode::WindowsPullRequest)
             } else if id == "S11-NATIVE-ACTIVITY" {
                 Some(NativeMode::WindowsNativeActivity)
@@ -891,6 +894,9 @@ fn native_driver(
         NativeMode::WindowsPullRequest if id == "S06-PR-MERGE-STATE" => {
             Some("PullRequestMergeState")
         }
+        NativeMode::WindowsPullRequest if id == "S06-PR-OFFLINE-PIN" => {
+            Some("PullRequestOfflinePin")
+        }
         NativeMode::WindowsPullRequest => Some("PullRequest"),
         NativeMode::WindowsHistory => Some("History"),
         NativeMode::WindowsReviewDraft if id == "S08-REVIEW-DECISIONS" => Some("ReviewDecisions"),
@@ -1015,6 +1021,9 @@ fn native_driver(
         NativeMode::WindowsAccessibility => "accessibility-native.json",
         NativeMode::WindowsSync => "sync-native.json",
         NativeMode::WindowsNotificationSchedule => "notification-schedule-native.json",
+        NativeMode::WindowsPullRequest if id == "S06-PR-OFFLINE-PIN" => {
+            "pr-offline-pin-native.json"
+        }
         NativeMode::WindowsPullRequest => "pr-native.json",
         NativeMode::WindowsHistory => "history-native.json",
         NativeMode::WindowsReviewDraft => "review-draft-native.json",
@@ -1104,6 +1113,9 @@ fn native_driver(
             }
             (Status::Pass, NativeMode::WindowsPullRequest) if id == "S06-PR-MERGE-STATE" => {
                 TraceCheck::PullRequestMergeState
+            }
+            (Status::Pass, NativeMode::WindowsPullRequest) if id == "S06-PR-OFFLINE-PIN" => {
+                TraceCheck::PullRequestOfflinePin
             }
             (Status::Pass, NativeMode::WindowsPullRequest) => TraceCheck::PullRequestJourney,
             (Status::Pass, NativeMode::WindowsHistory) => TraceCheck::HistoryJourney,

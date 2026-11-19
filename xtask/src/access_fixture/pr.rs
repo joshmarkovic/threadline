@@ -43,6 +43,7 @@ pub(super) fn applies(phase: Phase) -> bool {
             | Phase::ReviewSend
             | Phase::ReviewChanged
     ) || merge::applies(phase)
+        || pr_pins::active(phase)
         || review_threads::active(phase)
         || review_decisions::active(phase)
 }
@@ -150,8 +151,13 @@ fn data(phase: Phase, route: Route) -> Option<Value> {
             Some(json!([updated]))
         }
         Route::Items => Some(json!([first(), second()])),
+        Route::PrPinItem42 => Some(first()),
+        Route::PrPinItem43 => Some(second()),
         Route::PullA => {
             let mut value = pull(first(), 42, A_BASE, A_HEAD);
+            if pr_pins::active(phase) {
+                value["changed_files"] = json!(302);
+            }
             if phase == Phase::PrMergeState {
                 value["state"] = json!("closed");
                 value["merged"] = json!(true);
@@ -193,6 +199,9 @@ fn data(phase: Phase, route: Route) -> Option<Value> {
         )),
         Route::CompareA => {
             let mut comparison = compare(A_BASE, A_HEAD, A_MERGE, "src/first.rs");
+            if pr_pins::active(phase) {
+                comparison["files"] = json!(pr_pins::comparison_files());
+            }
             if review_decisions::active(phase) {
                 comparison["files"][0]["additions"] = json!(2);
                 comparison["files"][0]["deletions"] = json!(2);

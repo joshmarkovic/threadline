@@ -401,6 +401,7 @@ fn known_case(lane: Lane, case: &str) -> bool {
             | (Lane::E2e, "S05-WINDOWS-SYNC" | "S05-WINDOWS-RATE-LIMIT")
             | (Lane::E2e, "S06-SHARED-PR-PANES")
             | (Lane::E2e, "S06-PR-MERGE-STATE")
+            | (Lane::E2e, "S06-PR-OFFLINE-PIN")
             | (Lane::E2e, "S09-MERGE-QUEUE")
             | (Lane::E2e, "S08-REVIEW-DECISIONS")
             | (Lane::E2e, "S08-THREAD-QUEUE")
@@ -447,7 +448,11 @@ mod tests {
 
     #[test]
     fn accepts_the_shared_pr_panes_in_the_native_full_suite() {
-        for id in ["S06-SHARED-PR-PANES", "S06-PR-MERGE-STATE"] {
+        for id in [
+            "S06-SHARED-PR-PANES",
+            "S06-PR-MERGE-STATE",
+            "S06-PR-OFFLINE-PIN",
+        ] {
             let options = parse(&arguments(&[
                 "test", "e2e", "--suite", "full", "--case", id,
             ]))
