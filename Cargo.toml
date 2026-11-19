@@ -16,3 +16,6 @@ rust-version = "1.98"
 
 [profile.release]
 debug = 0
+
+[patch.crates-io]
+gpui-component = { version = "=0.10.0", registry = "threadline-gpui" }

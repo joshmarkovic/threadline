@@ -613,7 +613,7 @@ impl ReaderWorkspace {
                 _summary_watch: subscription,
             },
         );
-        self.capture_scroll();
+        self.capture_scroll(cx);
         let mut layout = self.layout.clone();
         if let Some(current) = layout
             .panes

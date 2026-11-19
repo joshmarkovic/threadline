@@ -1,0 +1,60 @@
+diff --git a/crates/component/src/diff/selection.rs b/crates/component/src/diff/selection.rs
+index 3b97186..5294a43 100644
+--- a/crates/component/src/diff/selection.rs
++++ b/crates/component/src/diff/selection.rs
+@@ -18,7 +18,7 @@ use gpui_base::{
+ };
+ 
+ use super::{
+-    DiffFile, DiffSide,
++    DiffFile, DiffLinePosition, DiffSide,
+     state::{decode_key, encode_key},
+ };
+ 
+@@ -46,6 +46,27 @@ impl SelectionGeometry {
+         self.runs.clear();
+     }
+ 
++    pub(super) fn first_visible_source_line(&self) -> Option<DiffLinePosition> {
++        let run = self
++            .runs
++            .iter()
++            .filter(|run| run.visible.size.height > px(0.))
++            .min_by(|a, b| {
++                a.visible
++                    .top()
++                    .as_f32()
++                    .total_cmp(&b.visible.top().as_f32())
++                    .then_with(|| {
++                        (a.side != DiffSide::Modified).cmp(&(b.side != DiffSide::Modified))
++                    })
++            })?;
++        Some(DiffLinePosition::new(
++            run.document.path().clone(),
++            run.side,
++            run.document.line_number(run.side, run.line_ix),
++        ))
++    }
++
+     /// The widest painted source line, measured from its first text run.
+     pub fn painted_width(&self) -> Pixels {
+         self.runs
+diff --git a/crates/component/src/diff/state.rs b/crates/component/src/diff/state.rs
+index 217ba60..02071b1 100644
+--- a/crates/component/src/diff/state.rs
++++ b/crates/component/src/diff/state.rs
+@@ -864,6 +864,14 @@ impl DiffState {
+             .to_owned()
+     }
+ 
++    /// Returns the first source row intersecting the last laid-out viewport.
++    ///
++    /// File headers, hunk headers and folded ranges are not visible source.
++    /// In a pair with both sides, the modified line identifies the row.
++    pub fn first_visible_source_line(&self) -> Option<DiffLinePosition> {
++        self.geometry.borrow().first_visible_source_line()
++    }
++
+     /// Reveals and scrolls to a source line, expanding its file and hidden
+     /// context if needed.
+     pub fn scroll_to_line(&mut self, position: DiffLinePosition, cx: &mut Context<Self>) {

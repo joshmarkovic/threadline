@@ -4,9 +4,9 @@ use gpui_kit::component::diff::{
 };
 use threadline_storage::{
     pr::{
-        BodyReference, InlineComment, NarrowSurface, PatchEvidence, PrContextMode, PrDiffMode,
-        PrDownload, PrFamily, PrHeader, PrPage, PrRecord, PrRevision, PrSection, PrTabView,
-        ReviewAnchor, SourceLine, SourceSide,
+        BodyReference, CodeViewportAnchor, InlineComment, NarrowSurface, PatchEvidence,
+        PrContextMode, PrDiffMode, PrDownload, PrFamily, PrHeader, PrPage, PrRecord, PrRevision,
+        PrSection, PrTabView, ReviewAnchor, SourceLine, SourceSide,
     },
     queue::PrContext,
     resources::ResourceState,
@@ -488,6 +488,32 @@ impl PullRequestView {
         }
     }
 
+    pub(super) fn visible_code_anchor(
+        &self,
+        selected_path: Option<&str>,
+        cx: &gpui_kit::App,
+    ) -> Option<CodeViewportAnchor> {
+        let displayed = self
+            .data
+            .files
+            .as_ref()?
+            .selected
+            .as_ref()?
+            .summary
+            .path
+            .as_str();
+        let position = self.diff.as_ref()?.read(cx).first_visible_source_line()?;
+        if position.path().as_str() != displayed
+            || selected_path.is_some_and(|path| path != displayed)
+        {
+            return None;
+        }
+        Some(CodeViewportAnchor {
+            revision_id: self.data.revision.id,
+            source: source_anchor(&self.data.revision, &position)?,
+        })
+    }
+
     pub fn replace_files(&mut self, files: FilePage, tab: &Tab, cx: &mut Context<ReaderWorkspace>) {
         let old = self
             .data
@@ -524,19 +550,22 @@ fn new_diff(
 ) -> Entity<DiffState> {
     let diff =
         cx.new(|cx| DiffState::new([patch.clone()], cx).with_mode(diff_mode(recipe.diff_mode)));
-    if let Some(selection) = recipe
+    let selection = recipe
         .code_anchor
         .as_ref()
-        .and_then(|anchor| source_selection(anchor, &selected.summary.path, revision))
-    {
-        let position = DiffLinePosition::new(
-            selection.path().clone(),
-            selection.side(),
-            selection.start(),
-        );
+        .and_then(|anchor| source_selection(anchor, &selected.summary.path, revision));
+    let viewport = recipe
+        .code_viewport_anchor
+        .as_ref()
+        .filter(|anchor| anchor.revision_id == revision.id)
+        .and_then(|anchor| source_selection(&anchor.source, &selected.summary.path, revision));
+    if let Some(anchor) = viewport.as_ref().or(selection.as_ref()) {
+        let position = DiffLinePosition::new(anchor.path().clone(), anchor.side(), anchor.start());
         diff.update(cx, |state, cx| {
             state.scroll_to_line(position, cx);
-            state.set_selected_lines(Some(selection), cx);
+            if let Some(selection) = selection {
+                state.set_selected_lines(Some(selection), cx);
+            }
         });
     }
     diff
@@ -554,6 +583,20 @@ pub(super) fn source_selection(
     let line = usize::try_from(anchor.line).ok()?;
     (anchor.path == path && line > 0 && oid.is_some_and(|oid| oid.as_str() == anchor.original_oid))
         .then(|| DiffLineRange::new(anchor.path.clone(), side, line, line))
+}
+
+fn source_anchor(revision: &PrRevision, position: &DiffLinePosition) -> Option<ReviewAnchor> {
+    let (side, oid) = match position.side() {
+        DiffSide::Original => (SourceSide::Left, revision.merge_base.as_ref()?),
+        DiffSide::Modified => (SourceSide::Right, &revision.head),
+    };
+    let line = u32::try_from(position.line()).ok()?;
+    Some(ReviewAnchor {
+        path: position.path().to_string(),
+        side,
+        line,
+        original_oid: oid.as_str().to_owned(),
+    })
 }
 
 pub(super) fn diff_mode(mode: PrDiffMode) -> DiffMode {
@@ -625,7 +668,7 @@ impl ReaderWorkspace {
         if self.layout_busy {
             return;
         }
-        self.capture_scroll();
+        self.capture_scroll(cx);
         let mut layout = self.layout.clone();
         let Some(target) = layout
             .panes
@@ -710,7 +753,7 @@ impl ReaderWorkspace {
         if self.layout_busy {
             return;
         }
-        self.capture_scroll();
+        self.capture_scroll(cx);
         let id = tab.id;
         let item = tab.item;
         self.layout_busy = true;
@@ -760,18 +803,8 @@ impl ReaderWorkspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let (side, oid) = match position.side() {
-            DiffSide::Original => (SourceSide::Left, revision.merge_base.as_ref()),
-            DiffSide::Modified => (SourceSide::Right, Some(&revision.head)),
-        };
-        let (Some(oid), Ok(line)) = (oid, u32::try_from(position.line())) else {
+        let Some(anchor) = source_anchor(revision, &position) else {
             return;
-        };
-        let anchor = ReviewAnchor {
-            path: position.path().to_string(),
-            side,
-            line,
-            original_oid: oid.as_str().to_owned(),
         };
         self.edit_pr_tab(&tab, |view| view.code_anchor = Some(anchor), window, cx);
     }

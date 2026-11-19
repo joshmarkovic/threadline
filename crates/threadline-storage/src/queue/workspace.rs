@@ -238,6 +238,7 @@ pub(crate) fn write_workspace(
                         let previous = view.pr_reader.get_or_insert_with(Default::default);
                         previous.context_scroll = latest.context_scroll;
                         previous.issue_scroll = latest.issue_scroll;
+                        previous.code_viewport_anchor = latest.code_viewport_anchor.clone();
                     }
                 }
                 tx.execute(

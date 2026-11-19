@@ -166,13 +166,13 @@ impl ReaderWorkspace {
         subscriptions.publish(Some(ViewportDemand { account, targets }));
     }
 
-    pub(super) fn trim_inactive_views(&mut self) {
+    pub(super) fn trim_inactive_views(&mut self, cx: &gpui_kit::App) {
         const ACTIVE_PLUS_RECENT: usize = 8;
         let surplus = self.tab_views.len().saturating_sub(ACTIVE_PLUS_RECENT);
         if surplus == 0 {
             return;
         }
-        self.capture_scroll();
+        self.capture_scroll(cx);
         let active = self
             .layout
             .panes

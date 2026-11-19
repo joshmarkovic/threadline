@@ -7,7 +7,7 @@ use gpui_kit::{
     div,
 };
 use threadline_storage::{
-    pr::{PrRecord, PrRevision},
+    pr::{CodeViewportAnchor, PrRecord, PrRevision},
     queue::DraftSubmission,
     reviews::{ReviewIntent, ReviewSubmission},
 };
@@ -526,6 +526,7 @@ impl ReaderWorkspace {
             .and_then(|current| anchors.iter().position(|anchor| anchor == current))
             .map_or(0, |position| (position + 1) % anchors.len());
         let anchor = anchors.get(next)?.clone();
+        let revision_id = pr.data.revision.id;
         let target = tab.clone();
         let id = format!("pr-{pane}-next-unresolved-thread");
         let button = control(id.clone(), "Next unresolved thread")
@@ -556,6 +557,10 @@ impl ReaderWorkspace {
                     &target,
                     |settings| {
                         settings.selected_path = Some(anchor.path.clone());
+                        settings.code_viewport_anchor = Some(CodeViewportAnchor {
+                            revision_id,
+                            source: anchor.clone(),
+                        });
                         settings.code_anchor = Some(anchor);
                     },
                     window,

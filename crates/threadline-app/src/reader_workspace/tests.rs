@@ -2316,7 +2316,7 @@ fn verify_narrow_pr_layout_restart(
     use gpui_kit::{
         Focusable, Modifiers, PlatformInput, ScrollDelta, ScrollEvent, ScrollSource, TouchPhase,
     };
-    use threadline_storage::pr::{NarrowSurface, PrContextMode, PrSection};
+    use threadline_storage::pr::{NarrowSurface, PrContextMode, PrSection, SourceSide};
 
     let store = &setup.store;
     let account = setup.fixture.account;
@@ -2348,6 +2348,64 @@ fn verify_narrow_pr_layout_restart(
     })
     .unwrap();
     pick(cx, "pr-0-context-collapse");
+    let code_position = cx
+        .update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            let prepare = |phase, cx: &gpui_kit::App| {
+                let pr = reader.read(cx).tab_views[&tab.id].pr.as_ref().unwrap();
+                let diff = pr.diff.as_ref().unwrap().read(cx);
+                assert!(
+                    diff.first_visible_source_line().is_some(),
+                    "{phase}: the rendered comparison has no visible source line"
+                );
+                pr.visible_code_anchor(Some(&selected.path), cx)
+                    .unwrap_or_else(|| {
+                        panic!("{phase}: visible line does not belong to the original comparison")
+                    })
+            };
+            let source_rows = window
+                .within("pr-0-diff")
+                .find_all("source")
+                .into_iter()
+                .filter(|source| source.visible())
+                .collect::<Vec<_>>();
+            assert!(
+                !source_rows.is_empty(),
+                "The code has no visible source row"
+            );
+            let position = source_rows[source_rows.len() / 2].bounds().center();
+            let before = prepare("before scrolling", cx);
+            window.dispatch_event(
+                PlatformInput::Scroll(ScrollEvent {
+                    position,
+                    delta: ScrollDelta::Lines(Point::new(0., -35.)),
+                    modifiers: Modifiers::default(),
+                    touch_phase: TouchPhase::Moved,
+                    source: ScrollSource::Pointer,
+                }),
+                cx,
+            );
+            window.simulate_next_frame(cx);
+            window.render_frame(cx);
+            let after = prepare("after scrolling", cx);
+            assert!(after.source.line > before.source.line);
+            assert_ne!(after.source.line, selected.line);
+            assert_eq!(after.source.path, selected.path);
+            let revision = &reader.read(cx).tab_views[&tab.id]
+                .pr
+                .as_ref()
+                .unwrap()
+                .data
+                .revision;
+            assert_eq!(after.revision_id, revision.id);
+            assert_eq!(after.source.side, SourceSide::Left);
+            assert_eq!(
+                after.source.original_oid,
+                revision.merge_base.as_ref().unwrap().as_str()
+            );
+            after
+        })
+        .unwrap();
     pick(cx, "reader-duplicate-tab");
     until(cx, |cx| cx.read(|cx| reader.read(cx).tab_views.len() == 2));
     pick(cx, "pr-1-conversation");
@@ -2488,6 +2546,7 @@ fn verify_narrow_pr_layout_restart(
         (PrContextMode::Issue, NarrowSurface::Context)
     );
     assert_eq!(recipe.code_anchor.as_ref(), Some(&selected));
+    assert_eq!(recipe.code_viewport_anchor.as_ref(), Some(&code_position));
     assert_eq!(
         on_disk.review_draft(account, &draft_id).unwrap(),
         Some(original_review.clone())
@@ -2547,7 +2606,9 @@ fn verify_narrow_pr_layout_restart(
             !state.layout_busy && state.review_editors.contains_key(&item)
         })
     });
+    cx.simulate_window_resize(window, size(px(2200.), px(1450.)));
     cx.update_window(window, |_, window, cx| {
+        window.simulate_next_frame(cx);
         window.render_frame(cx);
         let state = reader.read(cx);
         let pr = state.tab_views[&tab.id].pr.as_ref().unwrap();
@@ -2562,6 +2623,10 @@ fn verify_narrow_pr_layout_restart(
         );
         assert!(!diff.read(cx).focus_handle(cx).is_focused(window));
         assert_eq!(pr.data.revision.head.as_str(), selected.original_oid);
+        assert_eq!(
+            pr.visible_code_anchor(Some(&selected.path), cx).as_ref(),
+            Some(&code_position)
+        );
         assert_eq!(state.review_editors[&item].tab_id, tab.id);
         assert_eq!(state.review_editors[&item].id(), draft_id);
     })
@@ -2756,6 +2821,18 @@ fn exercise_pr_context(cx: &mut TestAppContext, journey: PrContextJourney) {
         .start_pr_fetch(&revision, PrFamily::Files, WalkMode::Full)
         .unwrap();
     let filenames = ["src/main.rs", "src/renamed module.rs"];
+    let mut fixture_patch = "@@ -10,2 +20,2 @@\n unchanged\n-old line\n+new line\n@@ -30 +40 @@\n-old second\n+new second".to_owned();
+    if restore {
+        use std::fmt::Write as _;
+        for line in (55..405).step_by(5) {
+            write!(
+                fixture_patch,
+                "\n@@ -{line} +{},0 @@\n-old {line}",
+                line + 10
+            )
+            .unwrap();
+        }
+    }
     store
         .commit_pr_page(
             &revision,
@@ -2770,9 +2847,7 @@ fn exercise_pr_context(cx: &mut TestAppContext, journey: PrContextJourney) {
                         status: "renamed".into(),
                         additions: Some(2),
                         deletions: Some(2),
-                        patch: PatchEvidence::Text(
-                            "@@ -10,2 +20,2 @@\n unchanged\n-old line\n+new line\n@@ -30 +40 @@\n-old second\n+new second".into(),
-                        ),
+                        patch: PatchEvidence::Text(fixture_patch.clone()),
                     })
                     .collect(),
                 next_cursor: None,

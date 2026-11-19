@@ -1688,6 +1688,7 @@ impl ReaderWorkspace {
                     if view.selected_path.as_ref() != Some(&path) {
                         view.selected_path = Some(path);
                         view.code_anchor = None;
+                        view.code_viewport_anchor = None;
                         view.code_scroll = 0;
                     }
                 },
@@ -1813,7 +1814,7 @@ impl ReaderWorkspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.capture_scroll();
+        self.capture_scroll(cx);
         let mut layout = self.layout.clone();
         if let Some(current) = layout
             .panes

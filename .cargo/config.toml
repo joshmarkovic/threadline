@@ -1,2 +1,12 @@
 [alias]
 xtask = "run --quiet --locked -p xtask --"
+
+[registries.threadline-gpui]
+index = "https://cargo.threadline.invalid/gpui-component/visible-source-line-v1"
+
+[source.threadline-gpui]
+registry = "https://cargo.threadline.invalid/gpui-component/visible-source-line-v1"
+replace-with = "threadline-gpui-archive"
+
+[source.threadline-gpui-archive]
+local-registry = "third_party/gpui-component"

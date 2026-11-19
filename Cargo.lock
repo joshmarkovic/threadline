@@ -2302,8 +2302,8 @@ dependencies = [
 [[package]]
 name = "gpui-component"
 version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "607c90f6985ac2b96e54102338994eaea143aff521375c6f9e7fc7ecb3ba3646"
+source = "registry+https://cargo.threadline.invalid/gpui-component/visible-source-line-v1"
+checksum = "23afa0aac16a640d0f7a45599d1076031127c3b7d7495577ac4ade08b58377a7"
 dependencies = [
  "anyhow",
  "chrono",

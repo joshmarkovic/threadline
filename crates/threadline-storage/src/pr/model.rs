@@ -96,6 +96,12 @@ pub struct ReviewAnchor {
     pub original_oid: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CodeViewportAnchor {
+    pub revision_id: i64,
+    pub source: ReviewAnchor,
+}
+
 /// GitHub's placement on the exact PR revision that supplied the thread page.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ReviewThreadLocation {
@@ -226,5 +232,7 @@ pub struct PrTabView {
     pub narrow_surface: NarrowSurface,
     pub context_anchor: Option<String>,
     pub code_anchor: Option<ReviewAnchor>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code_viewport_anchor: Option<CodeViewportAnchor>,
     pub selected_path: Option<String>,
 }

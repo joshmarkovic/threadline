@@ -67,7 +67,7 @@ impl ReaderWorkspace {
         if self.layout_busy {
             return;
         }
-        self.capture_scroll();
+        self.capture_scroll(cx);
         let mut layout = self.layout.clone();
         let source = layout.focused_pane;
         let count = layout.panes.len();
@@ -184,7 +184,7 @@ impl ReaderWorkspace {
             self.restore_pr_line_selection(&self.layout.panes[pane].tabs[tab], cx);
             return;
         }
-        self.capture_scroll();
+        self.capture_scroll(cx);
         let mut layout = self.layout.clone();
         layout.focused_pane = pane;
         layout.panes[pane].active = Some(tab);

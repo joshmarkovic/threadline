@@ -753,7 +753,7 @@ impl ReaderWorkspace {
         if self.layout_busy || self.layout.focused_pane == pane || pane >= self.layout.panes.len() {
             return;
         }
-        self.capture_scroll();
+        self.capture_scroll(cx);
         let mut layout = self.layout.clone();
         layout.focused_pane = pane;
         self.save_layout(layout, window, cx);
@@ -998,7 +998,7 @@ impl ReaderWorkspace {
             return;
         }
         let Some(account) = self.account else { return };
-        self.capture_scroll();
+        self.capture_scroll(cx);
         let layout = self.layout.clone();
         let maximized = self.maximized.then_some(layout.focused_pane);
         self.layout_busy = true;
@@ -1450,7 +1450,7 @@ impl ReaderWorkspace {
                         scroll,
                     },
                 );
-                self.trim_inactive_views();
+                self.trim_inactive_views(cx);
                 self.restore_review(tab, window, cx);
                 #[cfg(feature = "e2e")]
                 if let Some(observer) = self.observer.as_ref()
@@ -1466,7 +1466,7 @@ impl ReaderWorkspace {
         self.maybe_start_sync();
     }
 
-    fn capture_scroll(&mut self) {
+    fn capture_scroll(&mut self, cx: &gpui_kit::App) {
         for tab in self.layout.panes.iter_mut().flat_map(|pane| &mut pane.tabs) {
             if let Some(view) = self.tab_views.get(&tab.id) {
                 tab.view.scroll_offset = (-view.scroll.offset().y.as_f32()).max(0.) as u64;
@@ -1479,6 +1479,13 @@ impl ReaderWorkspace {
                     if pr_view.issue_scroll.bounds().size.height > px(0.) {
                         settings.issue_scroll =
                             (-pr_view.issue_scroll.offset().y.as_f32()).max(0.) as u32;
+                    }
+                    if settings.section == threadline_storage::pr::PrSection::Files
+                        && pr_view.data.revision.pr == tab.item
+                        && let Some(anchor) =
+                            pr_view.visible_code_anchor(settings.selected_path.as_deref(), cx)
+                    {
+                        settings.code_viewport_anchor = Some(anchor);
                     }
                 }
             }
@@ -1660,7 +1667,7 @@ impl ReaderWorkspace {
             return;
         }
         let current = self.active_tab().map(|tab| tab.item);
-        self.capture_scroll();
+        self.capture_scroll(cx);
         let mut layout = self.layout.clone();
         let activation = matches!(mode, OpenTab::Activation)
             .then(|| layout.activation_tab(item))
@@ -1754,7 +1761,7 @@ impl ReaderWorkspace {
         };
         let Some(item) = source.pop() else { return };
         push_history(target, current);
-        self.capture_scroll();
+        self.capture_scroll(cx);
         let mut layout = self.layout.clone();
         let pane = &mut layout.panes[layout.focused_pane];
         let index = pane.matching_tab(item).unwrap_or_else(|| {
