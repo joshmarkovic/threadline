@@ -44,3 +44,17 @@ The Windows metadata finalizer wrote a fixture manifest after verifying the inde
 E2E-020 passed on Windows 11 x64 build 22631.7652. Clean runner `1bf7e77` launched the normal installed executable from local package 9. Through the window's native controls, it opened an offline Markdown image attachment, observed the unavailable-image state, selected cached PR file `second.txt`, and switched the diff to split mode. The saved workspace corroborated the file and view. The app quit normally. [Native actions, persisted state and artifact identities](evidence/sprint-12/installed-runtime.json)
 
 The matched build contained 393 unique Windows dependency names and imported 39 libraries from its PE executable. The three process observations each found 72 loaded modules, zero descendants and zero recognized browser components. These observations cover the installed local artifact and the sampled UI states. The exact published package remains pending. [Inventory inputs and counts](evidence/sprint-12/installed-runtime.json) · [Canonical runner and fixture](../../tools/native/README.md)
+
+## Local regression suites
+
+Formatting and strict Clippy passed on clean `f06de5e` in WSL Linux. Clippy checked all workspace targets with the app's E2E feature enabled and warnings treated as errors. The canonical runner used seed 12345 for the local test lanes. [Commands and test receipts](evidence/sprint-12/local-suite-validation.json)
+
+| Linux test lane | Selectors passed | Test results passed |
+| --- | ---: | ---: |
+| Unit | 23 | 96 |
+| Integration | 36 | 136 |
+| In-process GPUI | 9 | 18 |
+
+On Windows 11 x64 build 22631.7652, 32 native test executables from `3dc5b64` recorded 238 passes, two failures and two ignored credential tests. The original IT-021 failure came from a staged bootstrap path. The corrected test at `575b609` passed with the actual Windows installer executable supplied explicitly. The other failure came from a one-nanosecond subtraction in an idle sampling test that rounded to the same tick on Windows. The `4619aa5` native app rerun passed all 42 tests, including the corrected idle test. [Original outcomes, test names and follow-ups](evidence/sprint-12/local-suite-validation.json)
+
+A separate Windows test delivered modeled suspend and resume messages to its own hidden platform window. The broker emitted one normal resume event. Physical sleep still needs target evidence. [Native resume receipt](evidence/sprint-12/local-suite-validation.json)

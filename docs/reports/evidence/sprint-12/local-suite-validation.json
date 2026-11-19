@@ -1,0 +1,184 @@
+{
+  "linux": {
+    "host": {
+      "os": "linux",
+      "architecture": "x86_64",
+      "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+      "display_session": "Wayland and X11 environment"
+    },
+    "source_revision": "f06de5ebff4a2ceed102c81c176a073d3c097112",
+    "source_dirty": false,
+    "package_version": "0.1.0",
+    "checks": [
+      {
+        "command": "cargo fmt --all -- --check",
+        "status": "Pass",
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "cargo clippy --workspace --all-targets --features threadline-app/e2e -- -D warnings",
+        "status": "Pass",
+        "exit_code": 0,
+        "log_sha256": "60859313905c7db762a5621d82f7d7e60d5c40e76a79e604379ac03b31f331b1"
+      }
+    ],
+    "canonical_lanes": [
+      {
+        "run": "unit-1795045397368-2229911",
+        "lane": "unit",
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "unit",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "seed": 12345,
+        "fixture_revision": "mixed",
+        "status": "Pass",
+        "exit_code": 0,
+        "selector_count": 23,
+        "passed": 96,
+        "all_selectors_passed": true,
+        "raw_sha256": {
+          "result_json": "202bd530be1533599877ec7a5b434c084d04f9aed3e968ec1878bdd7991c7660",
+          "junit_xml": "301c45dc818f0264695916bf07de27801e64064b91eb2a3a7db0a4e603588378"
+        }
+      },
+      {
+        "run": "integration-1795045524668-2233392",
+        "lane": "integration",
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "integration",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "seed": 12345,
+        "fixture_revision": "mixed",
+        "status": "Pass",
+        "exit_code": 0,
+        "selector_count": 36,
+        "passed": 136,
+        "all_selectors_passed": true,
+        "raw_sha256": {
+          "result_json": "273a76424711130d14d7ef24f07df2f6ac196eef316e606575e7c1db10e97a5a",
+          "junit_xml": "b06b83aa5d3eca84ad6a2a09db8a3a63191f41de0c709560ec49b48fc62e11f6"
+        }
+      },
+      {
+        "run": "ui-1795045753732-2238167",
+        "lane": "ui",
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "ui",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "seed": 12345,
+        "fixture_revision": "mixed",
+        "status": "Pass",
+        "exit_code": 0,
+        "selector_count": 9,
+        "passed": 18,
+        "all_selectors_passed": true,
+        "raw_sha256": {
+          "result_json": "ade6c510d67e3ba10333453ce8396f132c738502cc2cfb4905167ac2aaf5ac0a",
+          "junit_xml": "11c72b7841d7eb750199e6f548806851a6963448497f57534f60e62b19bef1b6"
+        }
+      }
+    ]
+  },
+  "windows": {
+    "host": {
+      "platform": "Windows 11",
+      "architecture": "x86_64",
+      "version": "10.0.22631.7652"
+    },
+    "source_revision": "3dc5b641efbffb56231eaba1600cdfc215f5c4c3",
+    "status": "Fail",
+    "counts": {
+      "native_test_executables": 32,
+      "passed": 238,
+      "failed": 2,
+      "ignored": 2
+    },
+    "scope": "Native Rust test executables, including in-process GPUI tests",
+    "native_log_inventory_sha256": "fa5a7f7681c0f15ec5bee01491d1710d2b605de3e6cc261bb6c7b7a0dc5dbd03",
+    "inventory_rule": "SHA-256 of sorted lines of each raw log SHA-256, two spaces, and its basename",
+    "failures": [
+      {
+        "target": "bootstrap_command",
+        "test": "it_021_command_explains_wrong_channel_and_invalid_manifest_pin_before_accessing_files",
+        "observed": "Windows could not open the compiled-in installer path when the test executable was staged separately",
+        "raw_log_sha256": "0ff3eb293516c5d7acded94d95e50aa2837f205a32595885bdf8b6796dc77aa3"
+      },
+      {
+        "target": "threadline_app",
+        "test": "observation::reader_idle::tests::idle_sample_excludes_settling_and_counts_only_the_bounded_window",
+        "observed": "The 1 ns subtraction rounded to an existing Windows monotonic clock tick",
+        "raw_log_sha256": "01f02dabdffb416bce82b26bf2e78e291ea48cb635f633b27da0198c0375069d"
+      }
+    ],
+    "ignored": [
+      "native_restart_fixture_reader",
+      "native_synthetic_protected_store_round_trip"
+    ],
+    "followups": [
+      {
+        "source_revision": "575b6090e6ebdfa9c57790d3a3e1394b089d858f",
+        "target": "bootstrap_command",
+        "status": "Pass",
+        "passed": 1,
+        "scope": "Native test with its explicitly staged installer executable",
+        "test_binary_sha256": "7d8f654f323673b8c4e943e971ec05b2c670e7f2d2b82f9b942fcd800bb51567",
+        "installer_binary_sha256": "70933c3d9a68567e579017aea9e1fc71f25a3b55367b63c1712c943d6f04597e",
+        "raw_log_sha256": "f0b7ca79f0972dfcf134b14c7200ada3774995fd577b60e2a26b4bea8dd34a28"
+      },
+      {
+        "source_revision": "4619aa5b100ab3c7306c5273c2dd94b62c27872b",
+        "target": "threadline_app",
+        "change": "The idle unit test now uses an earlier 1 ms tick",
+        "corrected_idle_test": "Pass",
+        "status": "Pass",
+        "passed": 42,
+        "failed": 0,
+        "ignored": 0,
+        "elapsed_seconds": 145.74,
+        "test_binary_sha256": "de5a117c3d2342fc731f9be9c6e508fadca6f1b3a35444ac7e5f513488c31198",
+        "raw_log_sha256": "3406ffb1d825cd619db916cc902d50d398358824895bd1fa10a607519028b878"
+      }
+    ]
+  },
+  "windows_lifecycle": {
+    "test": "platform_windows::tests::isolated_native_broker_reports_resume_without_suspending_the_machine",
+    "test_source_base": "047588ca8dbf310819ddfe08994448241578a765",
+    "test_source_patch_sha256": "d9aa10ea174f025edb59e06ba0bdb185e4f2e48407970aa44d4444d43c8e686a",
+    "tracked_test_revision": "b88773b1eff6ce3f2e1da1b6c625612b9350ccd5",
+    "status": "Pass",
+    "passed": 1,
+    "elapsed_seconds": 0.02,
+    "scope": "The isolated native Windows broker received a suspend and resume message on its own HWND. Physical system sleep is separately untested.",
+    "binary_sha256": "a7f991ea021c32fbfef9acc071ff111b539e3016eefb758b9f2d99d729d75a0b",
+    "raw_log_sha256": "5ee262f535c1976e85579eeef3741f0f16d25f97d977fcc7e6da49f821423c6f"
+  },
+  "publication": "Pending under the approved local installer scope"
+}
