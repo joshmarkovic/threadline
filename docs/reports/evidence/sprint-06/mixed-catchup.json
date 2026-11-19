@@ -1,0 +1,213 @@
+{
+  "run": "e2e-1795067255438-40808",
+  "source_revision": "1c9d035568e033df77f460e447e917d55fd48d40",
+  "source_dirty": false,
+  "fixture_revision": "s06-mixed-catchup-v1",
+  "status": "Pass",
+  "exit_code": 0,
+  "seed": 12345,
+  "os": "Microsoft Windows 11 Enterprise",
+  "dpi": 96,
+  "app_sha256": "5bc1c477542a0ec9bd7f195ca950cff9e62745db8aeb50bc427ab03d76a92ea2",
+  "native_actions": 29,
+  "distinct_processes": true,
+  "offline_restart_matches_saved_state": true,
+  "before": {
+    "discussion": {
+      "coverage": 1,
+      "fetch": 1,
+      "error": null,
+      "cursor": "2",
+      "last_page": 1795067284380,
+      "last_success": null,
+      "last_validation": null
+    },
+    "comments": [
+      {
+        "id": "00000000000000005101",
+        "edited_original": false,
+        "node": "IC_5101",
+        "created_ms": 1514851200000,
+        "updated_ms": 1514851200000,
+        "author": "fixture-author"
+      }
+    ],
+    "checkpoint": 1795067268604,
+    "timeline_digest": "d3c8e90debfb1705973a4a0a829aa583176b5291d0b260ab11ab9b9d35f2dc7b",
+    "monitoring": {
+      "comments": 1795067268604,
+      "issues": 1795067267590,
+      "pr-checks": 1795067265514,
+      "pr-inline-comments": 1795067265514,
+      "pr-review-requests": 1795067265514,
+      "pr-reviews": 1795067265514
+    },
+    "pr": [
+      {
+        "family": "checks",
+        "coverage": 2,
+        "validated_ms": 1795067308014,
+        "check_id": 7202,
+        "check": "in_progress"
+      },
+      {
+        "family": "reviews",
+        "coverage": 2,
+        "validated_ms": 1795067300887,
+        "review_id": 7201,
+        "review": "APPROVED"
+      },
+      {
+        "family": "statuses",
+        "coverage": 2,
+        "etag": "\"fixture-status-v1\"",
+        "validated_ms": 1795067314094,
+        "status_id": 7203,
+        "status": "success"
+      }
+    ]
+  },
+  "after": {
+    "discussion": {
+      "coverage": 2,
+      "fetch": 0,
+      "error": null,
+      "cursor": null,
+      "last_page": 1795067396676,
+      "last_success": 1795067396676,
+      "last_validation": 1795067396676
+    },
+    "comments": [
+      {
+        "id": "00000000000000005101",
+        "edited_original": true,
+        "node": "IC_5101",
+        "created_ms": 1514851200000,
+        "updated_ms": 1795067337454,
+        "author": "fixture-author"
+      },
+      {
+        "id": "00000000000000005102",
+        "edited_original": false,
+        "node": "IC_5102",
+        "created_ms": 1514851200000,
+        "updated_ms": 1514851200000,
+        "author": "fixture-author"
+      }
+    ],
+    "checkpoint": 1795067337454,
+    "timeline_digest": "d3c8e90debfb1705973a4a0a829aa583176b5291d0b260ab11ab9b9d35f2dc7b",
+    "monitoring": {
+      "comments": 1795067268604,
+      "issues": 1795067267590,
+      "pr-checks": 1795067265514,
+      "pr-inline-comments": 1795067265514,
+      "pr-review-requests": 1795067265514,
+      "pr-reviews": 1795067265514
+    },
+    "pr": [
+      {
+        "family": "checks",
+        "coverage": 2,
+        "validated_ms": 1795067368558,
+        "check_id": 7202,
+        "check": "completed",
+        "conclusion": "success"
+      },
+      {
+        "family": "reviews",
+        "coverage": 2,
+        "validated_ms": 1795067378699,
+        "review_id": 7201,
+        "review": "DISMISSED"
+      },
+      {
+        "family": "statuses",
+        "coverage": 2,
+        "etag": "\"fixture-status-v1\"",
+        "validated_ms": 1795067372606,
+        "status_id": 7203,
+        "status": "success"
+      }
+    ]
+  },
+  "http": {
+    "before_count": 49,
+    "offline_count": 0,
+    "after_count": 31,
+    "all_matched_test_credential": true,
+    "after_by_route": {
+      "comments_next": {
+        "count": 1,
+        "status": 200
+      },
+      "mixed_followup_comments": {
+        "count": 1,
+        "status": 200
+      },
+      "mixed_recent_comments": {
+        "count": 1,
+        "status": 200
+      },
+      "mixed_status_validated": {
+        "count": 2,
+        "status": 304
+      },
+      "open_pull_index": {
+        "count": 2,
+        "status": 200
+      },
+      "pr_pin_checks": {
+        "count": 2,
+        "status": 200
+      },
+      "pr_pin_item42": {
+        "count": 1,
+        "status": 200
+      },
+      "pr_pin_reviews": {
+        "count": 2,
+        "status": 200
+      },
+      "pr_pin_threads": {
+        "count": 1,
+        "status": 200
+      },
+      "pull_a": {
+        "count": 4,
+        "status": 200
+      },
+      "repository": {
+        "count": 5,
+        "status": 200
+      },
+      "scheduled_issue": {
+        "count": 1,
+        "status": 200
+      },
+      "updated_inline_comments": {
+        "count": 2,
+        "status": 200
+      },
+      "updated_items": {
+        "count": 1,
+        "status": 200
+      },
+      "user": {
+        "count": 5,
+        "status": 200
+      }
+    },
+    "first_comment_query_matches_saved_watermark_minus_ms": 300000
+  },
+  "hashes": {
+    "result.json": "791404dfe3eb5373c4bcf1375fc449421c24ad489f917e4ab54bc737b18db978",
+    "junit.xml": "dee96dcd500aeac54f2af2bf9471749ebc67c00de098730c3a996d285ca64d11",
+    "binary.json": "fb9e2e2b0015e63d06a53b3f5f05a2e95b3eba642d3b51f37e2e40cb93ea7704",
+    "mixed-catchup-native.json": "619a861b61339d65f40f387268fc24ed932876af609aa534e1fa86d40edc5c90",
+    "mixed-before.json": "0e24be5558ce67f4b1405e55b762bd88555abeef1b6edda41661a596992ccf23",
+    "mixed-restored.json": "0e24be5558ce67f4b1405e55b762bd88555abeef1b6edda41661a596992ccf23",
+    "mixed-after.json": "c92f3887bda9fe19117e95f8f4af18d696dab998a41978f9315b90c6fbe5138d",
+    "github-access-trace.json": "ade1fdb61e3d58208dff30469de8971535fee87c980d7355955cecf0e11b5cef"
+  }
+}
