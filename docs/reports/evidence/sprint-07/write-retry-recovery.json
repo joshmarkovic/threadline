@@ -1,0 +1,52 @@
+{
+  "acceptance": "AC-64",
+  "scope": "Native Windows test executables against a synthetic loopback GitHub fixture and a fresh SQLite profile",
+  "status": "Pass",
+  "host": {
+    "os": "Windows 11",
+    "build": "22631",
+    "architecture": "x86_64",
+    "rust_target": "x86_64-pc-windows-msvc"
+  },
+  "source": "1c9d035568e033df77f460e447e917d55fd48d40",
+  "cargo_lock_sha256": "ba1fa2481ba47ebb082dae4aff8bf1a099cea5775b4196b096aeb3bb094d4efb",
+  "app": {
+    "test": "accounts::write_tests::write_dispatch_exhausted_issue_write_survives_probes_and_resumes_the_original_after_reconnect",
+    "runner_case": "S07-WRITE-WORKER",
+    "executable": "threadline_app-2ae9192585e4506d.exe",
+    "executable_sha256": "976beed8ab4ef20570731a125891241f00a5e8a8d9f8674e52771f20c671f9f3",
+    "log_sha256": "6e3c39431e03f3e5e4c57a2791f9dc2136a0d510ab7977ba3b2052455de5927b",
+    "exit_code": 0,
+    "passed": 65,
+    "failed": 0,
+    "observed": {
+      "original_issue": 42,
+      "failed_preflights": 5,
+      "failed_preflight_http_status": 503,
+      "mutations_before_reconnect": 0,
+      "durable_retry_delays_seconds_before_jitter": [5, 15, 30, 60, 900],
+      "same_cooldown_after_worker_restart_and_authentication_check": true,
+      "mutation_requests_after_reconnection": 1,
+      "confirmed_attempt": 6,
+      "confirmed_fixture_comment_id": 92,
+      "same_submitted_snapshot_and_original_target": true
+    },
+    "timing_method": "The test verified each original durable delay. It advanced only the first four fixture deadlines to avoid waiting in real time. It preserved the exhausted cooldown until the app worker verified reconnection."
+  },
+  "storage": {
+    "test": "it_009_credential_repair_releases_only_its_original_exhausted_owner",
+    "runner_case": "IT-009",
+    "executable": "writes-a18e3c24ed3c6ae9.exe",
+    "executable_sha256": "de386d5a258c18f532afd833d8d4f2a8e2d6f2125bb045f37c9b4619ce38d4aa",
+    "log_sha256": "d26698f5218549dd573b8403452d29f74fd1f170e20e64c601ea9d5c804f2b09",
+    "exit_code": 0,
+    "passed": 13,
+    "failed": 0,
+    "observed": "The same user's repaired credential resumed only the original owner scope. An independent owner's retry deadline and the shared server floor remained in effect."
+  },
+  "related_receipts": [
+    "issue-conflict.json",
+    "../sprint-03/windows-account-restart.json",
+    "../sprint-05/verification.json"
+  ]
+}

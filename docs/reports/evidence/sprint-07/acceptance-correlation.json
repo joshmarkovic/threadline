@@ -22,6 +22,13 @@
       "status": "Pass",
       "observed": "A fresh read after the offline restart put the original issue edit in Needs attention. The submitted and GitHub fields remained readable, and the trace contained no write."
     },
+    "write_retry_recovery": {
+      "receipt": "write-retry-recovery.json",
+      "source": "1c9d035568e033df77f460e447e917d55fd48d40",
+      "cases": ["S07-WRITE-WORKER", "IT-009"],
+      "status": "Pass",
+      "observed": "The worker held the same submitted comment through five HTTP 503 preflights and an ordinary authenticated check. It sent the original request once after verified reconnection. SQLite independently proved same-owner repair and the preserved server floor."
+    },
     "native_creation_inventory": {
       "receipt": "native-editors.json",
       "run": "e2e-1795041019153-47996",
@@ -62,8 +69,5 @@
       "crates/threadline-core/src/github/access/writer/merge.rs"
     ],
     "observed": "Native commands and durable intent types cover existing issues, ordinary comments, reviews, replies, thread resolution, and direct merges. The typed writers use the original issue, comment, review, thread, or PR identity. The complete set includes no issue or PR creation operation or fallback."
-  },
-  "remaining": {
-    "AC-64": "The conflict, persisted 429 floor, and credential cases have evidence. No recorded run drives an eligible write through all transient retries and then records automatic dispatch after reconnection or same-user repair."
   }
 }
