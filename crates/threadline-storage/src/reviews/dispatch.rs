@@ -279,6 +279,42 @@ fn finish_preflight(
     Ok(changed == 1)
 }
 
+fn project_thread_resolution(
+    tx: &Transaction<'_>,
+    route: &crate::mutations::PrMutationRoute,
+    id: &str,
+    resolved: bool,
+) -> Result<()> {
+    let Some((revision, _)) = pr::revision_in(tx, route.account, route.item, route.revision_id)?
+    else {
+        return Ok(());
+    };
+    let Some(resource) = pr::family_id(tx, &revision, PrFamily::Threads)? else {
+        return Ok(());
+    };
+    let key = format!("thread:{id}");
+    let Some(mut saved) = stored_record(tx, &revision, PrFamily::Threads, &key)? else {
+        return Ok(());
+    };
+    let PrRecord::Thread {
+        node_id,
+        resolved: state,
+        ..
+    } = &mut saved.record
+    else {
+        return Err(Error::Corrupt);
+    };
+    if node_id != id {
+        return Err(Error::Corrupt);
+    }
+    *state = Some(resolved);
+    tx.execute(
+        "UPDATE cached_resource_records SET body=? WHERE resource_id=? AND record_key=?",
+        params![encode(&saved)?, resource, key],
+    )?;
+    crate::resources::discard_unfinished_walk(tx, resource)
+}
+
 impl Store {
     pub fn submit_review(&self, rev: &PrRevision, s: ReviewSubmission<'_>) -> Result<String> {
         s.intent.validate()?;
@@ -726,6 +762,9 @@ impl Store {
                     Delivery::Confirmed(&receipt)
                 },
             )?;
+            if let ReviewResult::Thread { id, resolved } = &response.result {
+                project_thread_resolution(tx, &route, id, *resolved)?;
+            }
             tx.execute(
                 "INSERT INTO review_activity VALUES(?,?,?,?,?,?,?)",
                 params![account, id, step.key(), route.item, route.head, remote, now],

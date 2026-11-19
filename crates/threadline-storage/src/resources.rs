@@ -435,6 +435,19 @@ pub(crate) fn start_walk_in(
     })
 }
 
+/// A locally confirmed remote mutation supersedes any page staged before the receipt.
+pub(crate) fn discard_unfinished_walk(tx: &Transaction<'_>, id: i64) -> Result<()> {
+    if tx.execute(
+        "UPDATE cached_resources SET generation=generation+1,fetch=0,error=NULL,
+         continuation=NULL,has_page=0 WHERE id=? AND fetch!=0",
+        [id],
+    )? != 0
+    {
+        discard_walk(tx, id)?;
+    }
+    Ok(())
+}
+
 pub(crate) fn resume_walk_in(tx: &Transaction<'_>, id: i64) -> Result<Option<ResourceProgress>> {
     let error: Option<ResourceError> = tx.query_row(
         "SELECT error FROM cached_resources WHERE id=?1",

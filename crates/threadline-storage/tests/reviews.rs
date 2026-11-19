@@ -504,6 +504,14 @@ fn it_013_thread_actions_require_original_thread_and_an_unchanged_authorized_rev
             resolved: true,
         },
     );
+    let staged = db
+        .start_pr_fetch(&second, PrFamily::Threads, WalkMode::Full)
+        .unwrap();
+    let cached_thread = |revision| {
+        db.pr_record(revision, PrFamily::Threads, "thread:THREAD")
+            .unwrap()
+            .unwrap()
+    };
     assert!(
         db.confirm_review_step(
             a,
@@ -515,6 +523,14 @@ fn it_013_thread_actions_require_original_thread_and_an_unchanged_authorized_rev
         )
         .is_err()
     );
+    let old_thread = cached_thread(&second);
+    assert!(matches!(
+        old_thread,
+        PrRecord::Thread {
+            resolved: Some(false),
+            ..
+        }
+    ));
     db.confirm_review_step(
         a,
         &independent,
@@ -526,6 +542,41 @@ fn it_013_thread_actions_require_original_thread_and_an_unchanged_authorized_rev
         36,
     )
     .unwrap();
+    assert_eq!(db.receipts(a, &independent).unwrap().len(), 1);
+    assert!(matches!(
+        cached_thread(&second),
+        PrRecord::Thread {
+            resolved: Some(true),
+            ..
+        }
+    ));
+    assert!(matches!(
+        cached_thread(&first),
+        PrRecord::Thread {
+            resolved: Some(false),
+            ..
+        }
+    ));
+    assert!(
+        db.commit_pr_page(
+            &second,
+            PrFamily::Threads,
+            &staged,
+            PrInputPage {
+                records: vec![old_thread],
+                next_cursor: None,
+                validators: None,
+                partial: None,
+                fetched_at_ms: 37,
+            }
+        )
+        .is_err()
+    );
+    assert!(
+        db.resume_pr_fetch(&second, PrFamily::Threads)
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
