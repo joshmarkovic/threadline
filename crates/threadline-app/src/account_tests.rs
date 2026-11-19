@@ -105,8 +105,7 @@ impl Simulator {
                             }),
                             (&server_check_arrived, &server_check_hold),
                             &server_probe,
-                            &server_linked_issue,
-                            &server_inventory,
+                            (&server_linked_issue, &server_inventory),
                         ) {
                             server_user_requests.fetch_add(1, Ordering::Relaxed);
                         }
@@ -160,8 +159,7 @@ fn respond(
     reader: Option<(SocketAddr, bool, &AtomicUsize)>,
     (check_arrived, hold_check_response): (&AtomicBool, &AtomicBool),
     probe: &ProbeHold,
-    linked_issue: &LinkedIssueGate,
-    inventory: &FixtureInventory,
+    (linked_issue, inventory): (&LinkedIssueGate, &FixtureInventory),
 ) -> bool {
     // Windows can inherit the nonblocking listener mode on an accepted socket.
     stream.set_nonblocking(false).unwrap();
