@@ -24,6 +24,7 @@ function Initialize-ReaderProfile([string]$Profile, [string]$Scale) {
         'section-16-backlog' { 's12-large-workspace-v2' }
         'small-pane-positions' { 's12-pane-positions-v1' }
         'small-comment-links' { 's12-cached-comment-links-v1' }
+        'small-display-timezone' { 's12-display-timezone-v1' }
         default { 's04-reader-v1' }
     }
     if ($receipt.fixture_revision -cne $revision -or $receipt.scale -cne $Scale -or
@@ -51,6 +52,13 @@ function Initialize-ReaderProfile([string]$Profile, [string]$Scale) {
         if ($receipt.open_tabs -ne 3 -or $receipt.comment_links.query -cne 'QuasarLedger' -or
             $receipt.comment_links.issue.item -eq $receipt.comment_links.pull_request.item) {
             throw 'The cached comment fixture must have three tabs and independent issue and PR targets.'
+        }
+    }
+    if ($Scale -ceq 'small-display-timezone') {
+        $times = $receipt.PSObject.Properties['display_time_zone']
+        if ($null -eq $times -or $null -eq $times.Value -or $times.Value.issue_number -ne 1 -or
+            $times.Value.created_at_ms -ne 1689163200000 -or $times.Value.updated_at_ms -ne 1700000000000) {
+            throw 'The time-zone fixture must retain the exact cached issue and UTC instants.'
         }
     }
     Add-Evidence 'Seed the isolated profile with the application and bundled SQLite' $receipt
