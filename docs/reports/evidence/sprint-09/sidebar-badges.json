@@ -151,6 +151,157 @@
         "ui-observation.json": "52180da759a1f154b1c57d707dd60aa0fea04462576ad232ecfa4a0893dd73e9"
       },
       "exit_code": 78
+    },
+    {
+      "raw_directory": "sidebar-connected-2870642.NPXC7q",
+      "app_revision": "287064229188f6cc5f5d85c86693c0f74bd5e438",
+      "app_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861",
+      "driver": "618c943fce39ded80781ce65e33456ff992fc5bf",
+      "status": "Fail",
+      "exit_code": 1,
+      "detail": "The owned reader-review badge did not meet its size, fill, text or alignment requirements.",
+      "hwnd_dpi": 144,
+      "app_scale": 1.5,
+      "fixture": {
+        "fixture_revision": "s04-reader-v1",
+        "seed": 12345,
+        "scale": "section-16",
+        "account_id": 1,
+        "repository_id": 1,
+        "discussion_item": 1,
+        "review_item": 3,
+        "items": 50000,
+        "comments": 250000,
+        "open_tabs": 20,
+        "outbox_count": 1000,
+        "typed_outbox_count": 0,
+        "unresolved_outbox": 900,
+        "offline": true
+      },
+      "sidebar": {
+        "dpi": 144,
+        "scale": 1.5,
+        "capture": "PrintWindow",
+        "print_window_badge": true,
+        "rows": [
+          {
+            "id": "reader-review",
+            "total": 5555,
+            "coverage": "complete cached count",
+            "blue": 2629,
+            "white_digits": 920,
+            "width_px": 113,
+            "height_px": 61,
+            "right_px": 299,
+            "right_inset_px": 13,
+            "digit_offset_x_px": 0,
+            "digit_offset_y_px": 0
+          },
+          {
+            "id": "reader-assigned",
+            "total": 7142,
+            "coverage": "complete cached count",
+            "blue": 2626,
+            "white_digits": 69,
+            "width_px": 61,
+            "height_px": 61,
+            "right_px": 299,
+            "right_inset_px": 13,
+            "digit_offset_x_px": -0.5,
+            "digit_offset_y_px": 0
+          },
+          {
+            "id": "reader-outbox",
+            "total": 900,
+            "coverage": "complete cached count",
+            "blue": 1755,
+            "white_digits": 50,
+            "width_px": 51,
+            "height_px": 51,
+            "right_px": 299,
+            "right_inset_px": 13,
+            "digit_offset_x_px": -1,
+            "digit_offset_y_px": 0
+          }
+        ]
+      },
+      "raw_sha256": "6cb58de9f8bcdafa3dc9526a7206a7117a5f8a3655d61b8a9fd4be53c77adc3a"
+    },
+    {
+      "raw_directory": "sidebar-connected-gap-2870642.ATCXnt",
+      "app_revision": "287064229188f6cc5f5d85c86693c0f74bd5e438",
+      "app_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861",
+      "driver": "01cf77d122e1398a48b96f93502ce1b05f1be5be",
+      "status": "Pass",
+      "exit_code": 0,
+      "detail": "Scoped native sidebar pixels and accessible counts verified.",
+      "hwnd_dpi": 144,
+      "app_scale": 1.5,
+      "fixture": {
+        "fixture_revision": "s04-reader-v1",
+        "seed": 12345,
+        "scale": "section-16",
+        "account_id": 1,
+        "repository_id": 1,
+        "discussion_item": 1,
+        "review_item": 3,
+        "items": 50000,
+        "comments": 250000,
+        "open_tabs": 20,
+        "outbox_count": 1000,
+        "typed_outbox_count": 0,
+        "unresolved_outbox": 900,
+        "offline": true
+      },
+      "sidebar": {
+        "dpi": 144,
+        "scale": 1.5,
+        "capture": "PrintWindow",
+        "print_window_badge": true,
+        "rows": [
+          {
+            "id": "reader-review",
+            "total": 5555,
+            "coverage": "complete cached count",
+            "blue": 2628,
+            "white_digits": 77,
+            "width_px": 61,
+            "height_px": 61,
+            "right_px": 299,
+            "right_inset_px": 13,
+            "digit_offset_x_px": 0,
+            "digit_offset_y_px": 0
+          },
+          {
+            "id": "reader-assigned",
+            "total": 7142,
+            "coverage": "complete cached count",
+            "blue": 2626,
+            "white_digits": 69,
+            "width_px": 61,
+            "height_px": 61,
+            "right_px": 299,
+            "right_inset_px": 13,
+            "digit_offset_x_px": -0.5,
+            "digit_offset_y_px": 0
+          },
+          {
+            "id": "reader-outbox",
+            "total": 900,
+            "coverage": "complete cached count",
+            "blue": 1755,
+            "white_digits": 50,
+            "width_px": 51,
+            "height_px": 51,
+            "right_px": 299,
+            "right_inset_px": 13,
+            "digit_offset_x_px": -1,
+            "digit_offset_y_px": 0
+          }
+        ]
+      },
+      "offline_fixture_received_connection": false,
+      "raw_sha256": "5ed72f951cd6caafe632f9c4a7d82b6f49c2fc72b7592f25bf3a436b8d80ea7d"
     }
   ],
   "saved_pixel_images": 0
