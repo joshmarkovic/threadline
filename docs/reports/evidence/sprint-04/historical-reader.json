@@ -1,0 +1,302 @@
+{
+  "run": "e2e-1795059774951-21044",
+  "canonical": {
+    "source_revision": "fc916579c6205df66cc4765b397ac71b9425317a",
+    "source_dirty": false,
+    "fixture_revision": "s12-historical-reader-v1",
+    "lane": "e2e",
+    "suite": "full",
+    "seed": 12345,
+    "status": "Pass",
+    "exit_code": 0,
+    "command": {
+      "program": "xtask",
+      "argv": [
+        "test",
+        "e2e",
+        "--suite",
+        "full",
+        "--case",
+        "S12-HISTORICAL-READER",
+        "--binary",
+        "<binary-path>",
+        "--seed",
+        "12345",
+        "--report-dir",
+        "<report-dir>"
+      ],
+      "redacted": true
+    },
+    "case": "S12-HISTORICAL-READER",
+    "host": {
+      "os": "windows",
+      "architecture": "x86_64",
+      "version": "Microsoft Windows [Version 10.0.22631.7652]",
+      "display_session": "Windows desktop availability is checked by native driver"
+    }
+  },
+  "source_sha256": {
+    "native_driver": "982a6e20e04b6bc4d6e83d269d7889cbd61ce56befccca140107be61cd672cd2",
+    "loopback_fixture": "dc2768d64ae3c02db1c73581c723a1d69bb86c4227f1dd8e918c804e64bb60ed",
+    "runner_executable": "798df874a2f1e219179a5703aca7e1707d6741d6a8a0eb1928432f4dbdf272ea"
+  },
+  "tested_application": {
+    "binary_sha256": "f88478a2857f77a6fb9615c99d5637cac3641a6d176d49bba8ec7a3a3b84dd2e",
+    "executable_bytes": 45408256,
+    "windows_product": "Microsoft Windows 11 Enterprise",
+    "os_version": "10.0.22631",
+    "architecture": "AMD64",
+    "dpi": 96,
+    "shell_version": "5.1.22621.7649",
+    "driver": "Windows PowerShell / owned UI Automation and guarded Win32 SendInput",
+    "authentication_setup": "Fixed isolated loopback identity, verified by the application",
+    "app_pid": 39392,
+    "restarted_pid": 14208
+  },
+  "actions": [
+    {
+      "action": "Load the isolated verified account and scope",
+      "observed": {
+        "user": 41,
+        "repository_count": 1
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "reader-repository-1",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Edit an owned synthetic field",
+      "observed": {
+        "automation_id": "reader-search",
+        "input": "UIA ValuePattern"
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "reader-search-submit",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Search downloaded content before fetching the historical issue",
+      "observed": {
+        "local_matches": 0
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "reader-search-github",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "reader-remote-result-0",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "reader-fetch-metadata-0",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Edit an owned synthetic field",
+      "observed": {
+        "automation_id": "reader-search",
+        "input": "UIA ValuePattern"
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "reader-search-submit",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Open the old closed issue and refresh its details",
+      "observed": {
+        "number": 719,
+        "state": "closed",
+        "fixture_closed_utc": "2018-01-03",
+        "local_body_matches": 1
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "reader-sync-settings",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "sync-work-offline",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Relaunch the same SQLite profile in a separate process",
+      "observed": {
+        "pid": 14208,
+        "sqlite_retained": true
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "reader-close-tab",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Edit an owned synthetic field",
+      "observed": {
+        "automation_id": "reader-search",
+        "input": "UIA ValuePattern"
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "reader-search-submit",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Activate an owned accessibility control",
+      "observed": {
+        "automation_id": "reader-result-0",
+        "input": "UIA InvokePattern"
+      }
+    },
+    {
+      "action": "Find and reopen the historical issue body after an offline process restart",
+      "observed": {
+        "number": 719,
+        "local_matches": 1,
+        "offline": true,
+        "separate_process": true
+      }
+    }
+  ],
+  "request_trace": [
+    {
+      "phase": "historical_local",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "historical_local",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "historical_local",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "historical_local",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "historical_local",
+      "route": "updated_items",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "historical_local",
+      "route": "updated_comments",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "historical_local",
+      "route": "updated_inline_comments",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "historical_local",
+      "route": "open_pull_index",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "historical_remote",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "historical_remote",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "historical_remote",
+      "route": "historical_search",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "historical_remote",
+      "route": "historical_issue",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "historical_remote",
+      "route": "user",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "historical_remote",
+      "route": "repository",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "historical_remote",
+      "route": "historical_issue",
+      "fixture_authorization": true,
+      "status": 200
+    }
+  ],
+  "restart": {
+    "active_item": 1,
+    "active_number": 719,
+    "cached_content_ready": true,
+    "search_results": 1,
+    "offline": true
+  },
+  "raw_receipt_sha256": {
+    "result.json": "b17c535116d38850c5da01f0209c7c32c0fc5981bf2b9cd944c77bb96a192496",
+    "junit.xml": "5a31ae30d432f168f12ed6069eec00a9cee30c52a5ff63c916b67944b2369a0d",
+    "binary.json": "b8b6f2edf1159356cccadddb76fe3ecc3ee14beb8600b544ca5dcdf81b722722",
+    "reader-native.json": "f08ad3c06ec81ac718bd3601eccee5c1b526e2bf4412fc182c9cdc3394749662",
+    "github-access-trace.json": "645dda29c8cae95ae8ebb659655de99483ee2b8d8749491d46e6100b7e8f2276",
+    "reader-restart-observation.json": "06bc5fa931e406339c2d167ba7e35ad62b256ae70df8d2b39a4d479d21e55f1d",
+    "ui-observation.json": "b82c5aad2f1ca5a20b9369b672819f16295ec4e064d73aecac11fa9612815990"
+  }
+}

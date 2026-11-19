@@ -4,6 +4,8 @@ Threadline reopened the Section 16 fixture on Windows 11 while signed out and of
 
 ## Reader and verification
 
+On Windows 11 x64, `S12-HISTORICAL-READER` passed on clean `fc91657`. The visible **Search downloaded content** control returned zero matches for “Observatory.” **Search GitHub** discovered fixture issue #719, closed January 3, 2018, in the selected repository. After refreshing the details, the local index found “Xenolith,” a word present only in the downloaded body. The driver enabled Work Offline, restarted the app, closed the restored tab and reopened the same issue from local search. The loopback fixture recorded one scoped search and two exact issue reads, with no bulk archive or offline request. The private GitHub reads below had no records of that age. [Windows actions, scoped request trace and restart evidence](evidence/sprint-04/historical-reader.json)
+
 The reader scopes cached lists, counts and full-text search to the selected account and repositories. It distinguishes an incomplete discussion from a downloaded empty discussion. Drafts belong to stable items and retain one editor across duplicate tabs. The app restores inactive tabs lazily. The reader can also request a remote search separately from its local index and retrieve individual resources with the verified GitHub provider. [SQLite reader](../../crates/threadline-storage/src/reader.rs) · [Native workspace](../../crates/threadline-app/src/reader_workspace.rs) · [Provider read tests](../../crates/threadline-core/tests/github_reader.rs)
 
 | Test layer | Source and command | Outcome |
