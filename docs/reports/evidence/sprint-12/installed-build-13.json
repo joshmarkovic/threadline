@@ -143,6 +143,19 @@
     "canonical_junit": "b9d3d7dd00adc50c2329db959b11a2a176bf57b36e7414bec9a045f2c65d791b",
     "normal_matrix": "dc9618e10beef89cd76d9a5d0be92b6cb9884c260b2af1fbcc191c007633df4b",
     "retention": "9f79762aa563a10f0a97ef415b3b557d1d87695e3a2878947089f0bc2935fb96",
-    "installed_for_suite": "6fcd5f536fc0c279b924b2f54f7f8768a09656f5ef4359de1c6af0aad7107465"
+    "installed_for_suite": "6fcd5f536fc0c279b924b2f54f7f8768a09656f5ef4359de1c6af0aad7107465",
+    "uninstalled_after_full_suite": "dcdadfa45e4f3e7fcc7a2d83c569c4edfc8a985fb10c4cdbada1a96550963657",
+    "sealed_archive_manifest": "4f0c0bf30bd37d22a907bf5227e52a0828c5f11824cc67e776b3f44f9d150c22"
+  },
+  "after_full_suite": {
+    "highest_build": 13,
+    "exact_install_present": false,
+    "default_data_absent": true,
+    "registered_uninstaller_sha256": "9f51d653a40f1b9d49d6b98a1ced01d41ef6535e42d0892d135f75e94745212e",
+    "archived_files_verified": 9,
+    "local13_archive": {
+      "threadline-package-retention.owner": "8e44a5245ab2ec04d8c9697632b2bcc2b5420bde7d7021b643564c37df0172c5",
+      "threadline.sqlite3": "6975b715326daca6880085aa6a7864bee35551486bebcc738a465b8bf698478c"
+    }
   }
 }
