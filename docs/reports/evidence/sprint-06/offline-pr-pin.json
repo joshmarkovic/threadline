@@ -1,0 +1,244 @@
+{
+  "case": "S06-PR-OFFLINE-PIN",
+  "fixture_revision": "s06-pr-offline-pin-v1",
+  "seed": 12345,
+  "command": "cargo xtask test e2e --suite full --case S06-PR-OFFLINE-PIN --binary <binary-path> --seed 12345 --report-dir <report-dir>",
+  "scope": "Windows native test build, generated local SQLite profile, and loopback GitHub responses.",
+  "requirement_ids": [
+    "DIFF-07",
+    "OFFLINE-03",
+    "TEST-04"
+  ],
+  "acceptance_ids": [
+    "AC-23",
+    "AC-70"
+  ],
+  "attempts": [
+    {
+      "run": "e2e-1795063008112-45184",
+      "status": "Fail",
+      "exit_code": 1,
+      "app_runner_and_driver_revision": "d5dfe77c53abb0cc662e92ff724c26987e54c70a",
+      "app_sha256": "c87da7e7233ef49ada20c493cc51b8d210a945118a1d803c5d71ece4d2b5ec74",
+      "runner_sha256": "6ea4ef5b5f783f0a45c4932b78b8a32f031774b3981c9c5b378a7a4b9ce7bd48",
+      "windows": {
+        "product": "Microsoft Windows 11 Enterprise",
+        "version": "Microsoft Windows [Version 10.0.22631.7652]",
+        "architecture": "x86_64",
+        "dpi": 96
+      },
+      "elapsed_ms": 52391,
+      "receipt_requirement_ids": [
+        "CACHE-06",
+        "DIFF-03",
+        "TEST-04"
+      ],
+      "native_actions": 12,
+      "authenticated_loopback_requests": 19,
+      "offline_phase_requests": 0,
+      "failed_requests": [
+        {
+          "phase": "pr_pin_load",
+          "route": "updated_items",
+          "fixture_authorization": true,
+          "status": 404
+        },
+        {
+          "phase": "pr_pin_load",
+          "route": "updated_comments",
+          "fixture_authorization": true,
+          "status": 404
+        }
+      ],
+      "discussion_requests": [],
+      "observed": [
+        {
+          "action": "Read the exact unavailable or incomplete patch state",
+          "observed": {
+            "label": "Binary file. No text patch is available.",
+            "path": "src/binary.dat",
+            "revision": 1
+          }
+        },
+        {
+          "action": "Read the exact unavailable or incomplete patch state",
+          "observed": {
+            "label": "Partial patch. GitHub did not supply every changed line.",
+            "path": "src/truncated.rs",
+            "revision": 1
+          }
+        }
+      ],
+      "detail": "The capped comparison and two exact file labels appeared. The third file was clipped, and the original driver stopped before any offline pin actions. Two baseline fixture feed requests received 404.",
+      "source_receipt_sha256": {
+        "result.json": "4cde778ee8799d790e2919237fe0987a79a784df4ff62ee976873b62ecb7e624",
+        "pr-offline-pin-native.json": "8975189b2e1d70172ae814735188c1eb3c938d6c7d1ea46e568fb6bd2351bb95",
+        "github-access-trace.json": "5521f370cac945f9d66d7918822963951f524d172f9db3a1f978d1f2f95fbd4f",
+        "binary.json": "11d1644ccf47996cbf4c103782050162b0e36b391ecfee4a03463b81c36e2d6b"
+      }
+    },
+    {
+      "run": "e2e-1795063443414-40468",
+      "status": "Pass",
+      "exit_code": 0,
+      "app_runner_and_driver_revision": "a062a187a10b65e37481233fbe6b16e2dd632c9f",
+      "app_sha256": "0262a2f571a36108599b577a8b43aa9b68c756cf4971c8729de59de6351b29b5",
+      "runner_sha256": "2bc509973fb4c54b1a1e19063390eb16e82c2ef5c5c386151a7553309c7c57e4",
+      "windows": {
+        "product": "Microsoft Windows 11 Enterprise",
+        "version": "Microsoft Windows [Version 10.0.22631.7652]",
+        "architecture": "x86_64",
+        "dpi": 96
+      },
+      "elapsed_ms": 122065,
+      "receipt_requirement_ids": [
+        "CACHE-06",
+        "DIFF-03",
+        "TEST-04"
+      ],
+      "native_actions": 35,
+      "authenticated_loopback_requests": 47,
+      "offline_phase_requests": 0,
+      "failed_requests": [
+        {
+          "phase": "pr_pin_interrupt",
+          "route": "pr_pin_comments_next",
+          "fixture_authorization": true,
+          "status": 502
+        }
+      ],
+      "discussion_requests": [
+        {
+          "phase": "pr_pin_interrupt",
+          "route": "pr_pin_comments_first",
+          "fixture_authorization": true,
+          "status": 200
+        },
+        {
+          "phase": "pr_pin_interrupt",
+          "route": "pr_pin_comments_next",
+          "fixture_authorization": true,
+          "status": 502
+        },
+        {
+          "phase": "pr_pin_continue",
+          "route": "pr_pin_comments_next",
+          "fixture_authorization": true,
+          "status": 200
+        }
+      ],
+      "resumed_pr_families": [
+        {
+          "phase": "pr_pin_continue",
+          "route": "compare_a",
+          "fixture_authorization": true,
+          "status": 200
+        },
+        {
+          "phase": "pr_pin_continue",
+          "route": "compare_a",
+          "fixture_authorization": true,
+          "status": 200
+        },
+        {
+          "phase": "pr_pin_continue",
+          "route": "pr_pin_reviews",
+          "fixture_authorization": true,
+          "status": 200
+        },
+        {
+          "phase": "pr_pin_continue",
+          "route": "pr_pin_threads",
+          "fixture_authorization": true,
+          "status": 200
+        },
+        {
+          "phase": "pr_pin_continue",
+          "route": "pr_pin_checks",
+          "fixture_authorization": true,
+          "status": 200
+        },
+        {
+          "phase": "pr_pin_continue",
+          "route": "pr_pin_statuses",
+          "fixture_authorization": true,
+          "status": 200
+        }
+      ],
+      "same_sqlite_profile_relaunched": true,
+      "observed": [
+        {
+          "action": "Read the native API limit on the original comparison",
+          "observed": {
+            "files_on_page": 20,
+            "revision": 1,
+            "item": 1,
+            "coverage": "Partial"
+          }
+        },
+        {
+          "action": "Read the exact unavailable or incomplete patch state",
+          "observed": {
+            "label": "Binary file. No text patch is available.",
+            "path": "src/binary.dat",
+            "revision": 1
+          }
+        },
+        {
+          "action": "Read the exact unavailable or incomplete patch state",
+          "observed": {
+            "label": "Partial patch. GitHub did not supply every changed line.",
+            "path": "src/truncated.rs",
+            "revision": 1
+          }
+        },
+        {
+          "action": "Reveal an off-screen changed file with the ordinary Maximize pane control",
+          "observed": {
+            "revision": 1,
+            "path": "src/unavailable.rs"
+          }
+        },
+        {
+          "action": "Read the exact unavailable or incomplete patch state",
+          "observed": {
+            "label": "GitHub did not supply a text patch for this file.",
+            "path": "src/unavailable.rs",
+            "revision": 1
+          }
+        },
+        {
+          "action": "Queue and cancel a selected source and media pin while offline",
+          "observed": {
+            "revision": 1,
+            "item": 1
+          }
+        },
+        {
+          "action": "Reach an interrupted second discussion page while reading another PR",
+          "observed": {
+            "active_item": 2,
+            "fixture_status": 502,
+            "pinned_item": 1
+          }
+        },
+        {
+          "action": "Read complete resumed discussion and honest partial coverage on the original pinned PR",
+          "observed": {
+            "comments": 2,
+            "revision": 1,
+            "files": "Partial",
+            "item": 1
+          }
+        }
+      ],
+      "detail": "The native PR reader identified binary, truncated, unavailable and capped content. Offline cancellation made no requests. A second pin resumed its saved page after interruption and restart while another PR stayed active. Two discussion records became complete and the capped comparison remained partial.",
+      "source_receipt_sha256": {
+        "result.json": "c418a9092f1f13cc745cba82645a633d70b82aa384c995b87cb26b93cea5d8e3",
+        "pr-offline-pin-native.json": "28d2988b1eb7374ed13c4a835a4a13f9c221b2e20aa91840d26c5d3aa1382ae1",
+        "github-access-trace.json": "13e22367fc2f2b0245d3f814096b4073d83f1e56efb5ec5fa2d1278f3062b549",
+        "binary.json": "d38329686b82b7bc5051eaae2616c66e7bc60cbc62263047c0096def3a71e4df"
+      }
+    }
+  ]
+}
