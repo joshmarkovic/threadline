@@ -1,0 +1,85 @@
+{
+  "case": "E2E-004",
+  "acceptance": ["AC-07", "AC-08", "AC-70"],
+  "scope": "Windows development executable, separate app processes and an authenticated synthetic loopback fixture",
+  "fixture_revision": "s04-reader-v1",
+  "package_version": "0.1.0",
+  "cargo_lock_sha256": "ba1fa2481ba47ebb082dae4aff8bf1a099cea5775b4196b096aeb3bb094d4efb",
+  "host": {
+    "os": "Windows 11",
+    "build": "22631.7652",
+    "architecture": "x86_64",
+    "dpi": 96
+  },
+  "command": "xtask test e2e --suite full --case E2E-004 --binary <binary-path> --seed 12345 --report-dir <report-dir>",
+  "native_runs": [
+    {
+      "run": "e2e-1795066958379-8012",
+      "app_and_runner_source": "ace7068fafc60f63084ff71be87e77d64d4bced2",
+      "driver_source": "dfb40b92e42f152f03d01143a76f2fea88eae414",
+      "app_sha256": "855539edd345b41c48113fdee5be8866299e95f139afd51587d59beffa2f077f",
+      "app_bytes": 45911552,
+      "status": "Fail",
+      "exit_code": 1,
+      "native_child_exit_code": 0,
+      "native_actions": 14,
+      "provider_requests": 24,
+      "unexpected_responses": 1,
+      "observed": "The native driver completed the recovery. The case failed verification because the loopback fixture returned an unrecognized 404 during scheduled metadata refresh.",
+      "raw_sha256": {
+        "result.json": "ec1b5a28c75d2edeea8a8148ad1079d01eecc215d02025c8521b66fd346c816e",
+        "reader-native.json": "473e8cab2beb0888f97b1d0ecc6c190d235bf902760f1c582bbd4898360d6118",
+        "reader-restart-observation.json": "3595ed35b8a820f378e75e98b3509f8fa6294c581bd108d609beb6eeddb51456",
+        "github-access-trace.json": "4fd8e142cfe91710f0e3dfa75eeaff491c819eecfaaf577e51a1080f7bc010c3",
+        "binary.json": "c79853a260a9e2c2547f92223bdb4512fd1f4300ab3bf05d5574a0846886bcb7"
+      }
+    },
+    {
+      "run": "e2e-1795067400338-12728",
+      "source": "d1a950e534c5bb2ca97f8fca45082e907941a248",
+      "app_sha256": "1a0acbc1e974e667a1680bfe2e81ee2c26b76a4c8ed55b04f868c0d199fa51c1",
+      "app_bytes": 46021120,
+      "status": "Pass",
+      "exit_code": 0,
+      "native_child_exit_code": 0,
+      "native_actions": 14,
+      "provider_requests": 25,
+      "unexpected_responses": 0,
+      "requests_while_offline": 0,
+      "started_at_unix_ms": 1795067400337,
+      "finished_at_unix_ms": 1795067768523,
+      "discussion_requests": [
+        {"phase": "reader_failure", "page": 1, "status": 200},
+        {"phase": "reader_failure", "page": 2, "status": 502},
+        {"phase": "reader_resume", "page": 2, "status": 200}
+      ],
+      "observed": "Issue 41 kept one visible comment and Partial coverage when page two failed. Work Offline and the pending download survived relaunch of the same database. Returning online automatically downloaded only the original continuation. Two unique comments and Complete coverage became visible.",
+      "raw_sha256": {
+        "result.json": "5a7fa8a5261a9987bb7c381f7dd148765649cc933d0b15540ac45837c27328a4",
+        "reader-native.json": "fb925e22ae70827a50b6785d8201621fabc90ca9595526199a75db83aa084b27",
+        "reader-restart-observation.json": "db647400a2c2628b49c966fbd48acda40b0d77a535165c8873d04291868b76bf",
+        "github-access-trace.json": "053b6ccd7726d93cdd715ecd697d01598e69492aaa0383a173e62280af4b71ea",
+        "binary.json": "0dfb8959a39151c4dbb2da3e00cb78f8a985d1c05ae952ffb629eddc80c15441"
+      }
+    }
+  ],
+  "windows_test_executables": {
+    "source": "ace7068fafc60f63084ff71be87e77d64d4bced2",
+    "storage": {
+      "case": "issue_downloads",
+      "exit_code": 0,
+      "passed": 2,
+      "executable_sha256": "ce3d45d0069c072ddc7c751491040e631ffb4395c0afc0b1eb55b13b38d0dcde",
+      "log_sha256": "cd1111f2702c3cd54222ce0d860130c107e68b7368e9cba6c9b1256c061ae1fe",
+      "observed": "A schema 17 job kept its identity and exact cursor through schema 18 migration. Two SQLite connections could not claim the same step. An expired lease and a cancelled generation both rejected late responses."
+    },
+    "worker": {
+      "case": "accounts::tests::issue_downloads::issue_pin_resumes_offline_request_after_restart_without_any_open_tab",
+      "exit_code": 0,
+      "passed": 1,
+      "executable_sha256": "d094ef89a6fc14f7226dc99cf3d9ef38ee5b9fe4ddcf9cce88e8ffa3c852a665",
+      "log_sha256": "a4f3cbfd435c43e0248a9e1b83dce1d54031f9a0064c132387e6fa9aa6999bfc",
+      "observed": "The normal worker reopened an offline request without any open workspace. It sent zero offline requests and completed the issue metadata, body and paginated discussion automatically once online."
+    }
+  }
+}
