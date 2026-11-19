@@ -10,7 +10,8 @@ function Select-FixtureRightReviewLine([IntPtr]$Window, [string]$Head, [string]$
     $null = Wait-PrReader 'the exact modified source line selected by the native action' {
         param($pr)
         $anchor = $pr.source_anchor
-        $pr.head -ceq $Head -and $null -ne $pr.selected_source_line -and $null -ne $anchor -and
+        $selected = if ($Line -eq 1) { $pr.selected_source_line -eq 1 } else { $null -ne $pr.selected_source_line }
+        $pr.head -ceq $Head -and $selected -and $null -ne $anchor -and
             $anchor.path -ceq $FixturePath -and $anchor.side -ceq 'Right' -and $anchor.line -eq $Line
     }
 }
