@@ -3,6 +3,7 @@ use std::path::PathBuf;
 pub const USAGE: &str =
     "cargo xtask test <unit|integration|ui> [--case ID] [--seed N] [--report-dir DIR]
 cargo xtask test e2e --suite <smoke|full> [--binary PATH] [--case ID] [--seed N] [--report-dir DIR]
+cargo xtask test e2e --suite full [--binary PATH] [--local-fixture TRUSTED_JSON] [--artifact PATH] [--seed N] [--report-dir DIR]
 cargo xtask test e2e --suite full --case E2E-014 [--binary PATH] [--artifact PATH] [--seed N] [--report-dir DIR]
 cargo xtask test e2e --suite full --case <E2E-012|E2E-018|E2E-020> --local-fixture TRUSTED_JSON [--report-dir DIR]
 cargo xtask test install --artifact PATH [--local-fixture TRUSTED_JSON] [--case ID] [--report-dir DIR]
@@ -166,9 +167,9 @@ pub fn parse(args: &[String]) -> Result<Options, String> {
         Lane::E2e
             if options.artifact.is_some()
                 && (options.suite.as_deref() != Some("full")
-                    || options.case.as_deref() != Some("E2E-014")) =>
+                    || !matches!(options.case.as_deref(), None | Some("E2E-014"))) =>
         {
-            return Err("--artifact for native tests requires --suite full --case E2E-014.".into());
+            return Err("--artifact for native tests requires --suite full, with no case or with --case E2E-014.".into());
         }
         Lane::E2e
             if options.local_fixture.is_some()
@@ -449,7 +450,7 @@ mod tests {
     }
 
     #[test]
-    fn native_artifact_is_only_for_the_full_large_workspace_case() {
+    fn native_artifact_is_only_for_the_full_suite_or_named_large_workspace() {
         let input = |suite, case, artifact| {
             arguments(&[
                 "test",
@@ -468,7 +469,11 @@ mod tests {
             PathBuf::from(&named[3])
         );
         assert_eq!(report_arguments(&named), named);
-        for (suite, case) in [("full", "E2E-015"), ("smoke", "E2E-014")] {
+        for (suite, case) in [
+            ("full", "E2E-015"),
+            ("full", "E2E-012"),
+            ("smoke", "E2E-014"),
+        ] {
             let invalid = input(suite, case, "private-fixtures/unnamed-test.zip");
             assert!(parse(&invalid).is_err());
             assert_eq!(report_arguments(&invalid)[3], "<artifact-path>");
@@ -478,10 +483,36 @@ mod tests {
             "e2e",
             "--suite",
             "full",
+            "--binary",
+            "target/release/threadline.exe",
+            "--local-fixture",
+            "/private-fixtures/installed.json",
             "--artifact",
-            "threadline.exe",
+            "/private-fixtures/ThreadlineSetup.exe",
         ]);
-        assert!(parse(&aggregate).is_err());
+        let parsed = parse(&aggregate).unwrap();
+        assert!(parsed.case.is_none());
+        assert_eq!(
+            parsed.artifact,
+            Some("/private-fixtures/ThreadlineSetup.exe".into())
+        );
+        assert_eq!(
+            parsed.local_fixture,
+            Some("/private-fixtures/installed.json".into())
+        );
+        let receipt = report_arguments(&aggregate);
+        assert_eq!(receipt[7], "<local-fixture-path>");
+        assert_eq!(receipt[9], "<artifact-path>");
+
+        let smoke = arguments(&[
+            "test",
+            "e2e",
+            "--suite",
+            "smoke",
+            "--artifact",
+            "ThreadlineSetup.exe",
+        ]);
+        assert!(parse(&smoke).is_err());
     }
 
     #[test]

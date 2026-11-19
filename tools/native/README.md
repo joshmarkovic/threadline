@@ -110,6 +110,8 @@ The driver measures a fresh app process with a fresh isolated profile. It does n
 
 Run `cargo xtask test e2e --suite full --case S12-READER-CONCURRENT --binary <optimized-e2e-binary>` to repeat the twenty cached opens, searches, and tab switches with scheduled reads in flight. The isolated Section 16 fixture keeps queued writes paused. Each accepted input must reach its first useful paint while a different verified loopback feed request is still waiting for a response. The report retains completed samples if a native input or a matching request becomes unavailable. Use the same optimized binary, desktop, and input source for the offline comparison.
 
+Pass `--artifact <setup-path>` with `cargo xtask test e2e --suite full` to record the candidate setup size and digest in E2E-014. The named `--case E2E-014` accepts the same option. Supply `--local-fixture <configuration.json>` separately for installed-package cases.
+
 ## Windows restart and interrupted writes
 
 Run `cargo xtask test e2e --suite full --case S12-NATIVE-LIFECYCLE --binary <optimized-e2e-binary> --seed 12345` from a Windows user session with Credential Manager available. The case uses a new temporary private workspace, the loopback provider and a unique synthetic protected credential. It uses the normal account, synchronization and Outbox controls. The runner terminates only the app process it launched, after the fixture received the exact known comment and while its response is held.
