@@ -20,6 +20,7 @@ if (@($helpers.Name | Sort-Object -Unique).Count -ne 5 -or $helpers.Count -ne 5)
 . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1')
 . (Join-Path $PSScriptRoot 'windows-sync.ps1')
 . (Join-Path $PSScriptRoot 'windows-native-lifecycle.ps1')
+. (Join-Path $PSScriptRoot 'windows-native-activity.ps1')
 . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1')
 . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
 . (Join-Path $PSScriptRoot 'windows-review-context.ps1')
@@ -273,6 +274,26 @@ $state = Wait-PrReader 'isolated pull request observation' {
 }
 if ($state.cached_reader.active_item -ne 2 -or ($visited -join ',') -cne '1,2') {
     throw 'Wait-PrReader did not verify its exact nested predicate.'
+}
+
+$activityBaseline = [pscustomobject]@{ cached_reader = [pscustomobject]@{
+    active_number = 43
+    pull_request = [pscustomobject]@{
+        merged = $true; head = 'b' * 40; section = 'Files'; files_coverage = 'Partial'; files_on_page = 1
+    }
+} }
+if ((Test-NativeActivityBaselineComparison $null) -or
+    (Test-NativeActivityBaselineComparison ([pscustomobject]@{})) -or
+    (Test-NativeActivityBaselineComparison $activityBaseline)) {
+    throw 'The native baseline accepted an unavailable or partial comparison.'
+}
+$activityBaseline.cached_reader.pull_request.files_coverage = 'Complete'
+if (!(Test-NativeActivityBaselineComparison $activityBaseline)) {
+    throw 'The native baseline rejected the fully downloaded comparison for the old merged pull request.'
+}
+$activityBaseline.cached_reader.active_number = 42
+if (Test-NativeActivityBaselineComparison $activityBaseline) {
+    throw 'The native baseline accepted a different pull request.'
 }
 
 $script:observations.Clear()

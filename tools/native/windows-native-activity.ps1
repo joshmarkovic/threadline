@@ -80,6 +80,19 @@ function Wait-NativeActivityDelivery([string]$Profile, [string]$Stage, [string]$
     }
 }
 
+function Test-NativeActivityBaselineComparison($State) {
+    if ($null -eq $State -or !$State.PSObject.Properties['cached_reader'] -or
+        $null -eq $State.cached_reader) { return $false }
+    $reader = $State.cached_reader
+    if (!$reader.PSObject.Properties['pull_request'] -or $null -eq $reader.pull_request) {
+        return $false
+    }
+    $pr = $reader.pull_request
+    return $reader.active_number -eq 43 -and $pr.merged -eq $true -and
+        $pr.head -ceq ('b' * 40) -and $pr.section -ceq 'Files' -and
+        $pr.files_coverage -ceq 'Complete' -and $pr.files_on_page -eq 1
+}
+
 function Invoke-NativeActivityProof([IntPtr]$Window, [string]$Profile) {
     Start-NativeActivitySync $Window 'activity-baseline'
     Wait-For 'the bounded background activity baseline' {
@@ -92,16 +105,14 @@ function Invoke-NativeActivityProof([IntPtr]$Window, [string]$Profile) {
     Click-AccountControl $Window 'reader-repository-1'
     Click-AccountControl $Window 'reader-fetch-repository'
     Activate-FixturePr $Window 'reader-result-' 43 'Activity fixture pull request 43' -Result
-    $downloaded = Wait-PrReader 'the old already-merged pull request and its downloaded comparison' {
-        param($pr, $reader)
-        $reader.active_number -eq 43 -and $pr.merged -and
-            $pr.head -ceq ('b' * 40) -and $pr.files_coverage -ceq 'Complete' -and $pr.files_on_page -eq 1
-    }
+    Wait-For 'the old already-merged pull request and its downloaded comparison' {
+        Test-NativeActivityBaselineComparison (Read-Observation)
+    } 30000 150
     $baseline = Read-NativeActivityFixture $Profile 'inspect' 'native-activity-baseline.json'
     if (@($baseline.feed).Count -ne 0 -or $baseline.delivered_groups -ne 0 -or @((Read-NativeActivityCapture $Profile)).Count -ne 0) {
         throw 'Historical activity produced an alert or feed row at the monitoring baseline.'
     }
-    $baseline | Add-Member -NotePropertyName comparison_complete -NotePropertyValue ($downloaded.cached_reader.pull_request.files_coverage -ceq 'Complete')
+    $baseline | Add-Member -NotePropertyName comparison_complete -NotePropertyValue $true
     Add-Evidence 'Download the old pull request and retain a zero-alert baseline' $baseline
 
     Set-AccessPhase 'activity-fresh'
