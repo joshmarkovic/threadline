@@ -53,18 +53,34 @@ function Invoke-CachedCommentLinksProof([IntPtr]$Window) {
     Click-AccountControl $Window 'reader-tab-1-0'
     Click-AccountControl $Window 'reader-draft-comment-1'
     $typed = 'Keep this unsent edit in the independent pane.'
+    $hash = [Security.Cryptography.SHA256]::Create()
+    try {
+        $digest = [BitConverter]::ToString($hash.ComputeHash([Text.Encoding]::UTF8.GetBytes($typed))).Replace('-', '').ToLowerInvariant()
+    } finally { $hash.Dispose() }
     Wait-For 'the owned right-pane Markdown editor' {
         Set-OwnedFixtureEditValue $Window 'reader-draft-input-1' 'Local Markdown draft' $typed
     }
-    $old = Wait-Reader 'the durable right-pane editor, original tab, and existing anchor' {
+    $null = Wait-Reader 'the exact saved right-pane draft revision' {
         param($reader)
         $pane = $reader.pane_positions.panes[1]
         $reader.active_item -eq $editor.item -and $reader.active_draft_saved -and
             $pane.tab -ceq $editor.tab -and $pane.discussion_anchor -ceq $editor.anchor -and
-            $null -ne $pane.saved_draft_sha256
+            $pane.saved_draft_sha256 -ceq $digest
+    }
+    Click-AccountControl $Window 'reader-tab-0-0'
+    $old = Wait-Reader 'both settled panes after returning keyboard focus to the original issue' {
+        param($reader)
+        $pane = $reader.pane_positions.panes[1]
+        $reader.focused_pane -eq 0 -and $reader.active_item -eq $issue.item -and
+            $reader.pane_positions.layout.settled -and $pane.tab -ceq $editor.tab -and
+            $pane.discussion_anchor -ceq $editor.anchor -and $pane.saved_draft_sha256 -ceq $digest -and
+            $null -ne $pane.discussion_offset
     }
     $right = $old.cached_reader.pane_positions.panes[1]
-    Click-AccountControl $Window 'reader-tab-0-0'
+    Add-Evidence 'Record the independent editor after the exact text was saved and focus returned left' ([ordered]@{
+        tab = $right.tab; anchor = $right.discussion_anchor; offset = $right.discussion_offset
+        exact_saved_text = $true
+    })
     $search = Invoke-HistoricalLocalSearch $Window $fixture.query
     if ($search.cached_reader.search_results -ne 2) {
         throw 'Two ordinary comments per item must yield one cached issue result and one cached PR result.'
@@ -96,7 +112,7 @@ function Invoke-CachedCommentLinksProof([IntPtr]$Window) {
             $reader.pane_positions.panes[0].discussion_anchor -ceq $second
     }
     Invoke-CachedCommentUrl $Window "https://github.com/fixture/relay/pull/$($pull.number)#discussion_r$($pull.review_reply)"
-    $linked = Wait-PrReader 'the exact cached review reply and original file placement' {
+    $null = Wait-PrReader 'the exact cached review reply and original file placement' {
         param($pr,$reader)
         $reader.active_item -eq $pull.item -and $pr.section -ceq 'Conversation' -and
             $reader.pane_positions.panes[0].tab -ceq 'comment-links-pull' -and
@@ -108,11 +124,21 @@ function Invoke-CachedCommentLinksProof([IntPtr]$Window) {
     Wait-For 'the owned linked-review comment group' {
         $null -ne (Find-OwnedFixtureControl $Window 'pr-0-linked-review-comment' 'Linked review comment' -AllowDisabled)
     }
-    $final = $linked.cached_reader
+    $final = (Wait-PrReader 'both settled panes after the linked review is visible' {
+        param($pr,$reader)
+        $pr.linked_review_comment -eq $pull.review_reply -and $reader.pane_positions.layout.settled -and
+            $reader.pane_positions.panes.Count -eq 2 -and $null -ne $reader.pane_positions.panes[1].discussion_offset
+    }).cached_reader
     $later = $final.pane_positions.panes[1]
-    if (($final.tab_counts -join ',') -cne '2,1' -or $later.tab -cne $right.tab -or
-        $later.item -ne $right.item -or $later.saved_draft_sha256 -cne $right.saved_draft_sha256 -or
-        $later.discussion_anchor -cne $right.discussion_anchor -or $later.discussion_offset -ne $right.discussion_offset) {
+    $retained = [ordered]@{
+        original_tab_counts = ($final.tab_counts -join ',') -ceq '2,1'
+        same_tab = $later.tab -ceq $right.tab -and $later.item -eq $right.item
+        same_draft = $later.saved_draft_sha256 -ceq $digest
+        same_anchor = $later.discussion_anchor -ceq $right.discussion_anchor
+        same_offset = $later.discussion_offset -eq $right.discussion_offset
+    }
+    Add-Evidence 'Compare the independent pane before and after navigation' $retained
+    if ($false -cin $retained.Values) {
         throw 'Opening comment links changed the independent tab, editor, or discussion position.'
     }
     Click-AccountControl $Window 'reader-tab-1-0'
