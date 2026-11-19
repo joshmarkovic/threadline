@@ -2,13 +2,24 @@
 
 Threadline is a native desktop client for GitHub issues and pull requests. It keeps downloaded conversations, reviews, tabs, and drafts in a local SQLite profile. You can reopen cached work offline and inspect queued changes in the Outbox.
 
-## Build and run
+## Install from source
 
-Use Rust 1.98 or later. The dependency set is pinned in `Cargo.lock`. On Windows, use the x64 MSVC toolchain, Visual Studio 2022 Build Tools with the Desktop development with C++ workload, a Windows SDK that includes `fxc.exe`, and CMake. See the [GPUI Kit installation guide](https://gpui-kit.com/docs/installation/) for the development prerequisites on other hosts.
+You need Git, Rust 1.98 or later, and a GitHub account with access to the private Threadline repository. Make sure Cargo's bin directory is on your `PATH`.
+
+Sign in to GitHub when Git prompts. If you're already signed in with GitHub CLI, you can run `gh auth setup-git` once before cloning. [GitHub CLI credential setup](https://cli.github.com/manual/gh_auth_setup-git)
+
+On Windows, use the x64 MSVC toolchain, Visual Studio 2022 Build Tools with the Desktop development with C++ workload, a Windows SDK that includes `fxc.exe`, and CMake. See the [GPUI Kit installation guide](https://gpui-kit.com/docs/installation/) for the development prerequisites on other hosts.
+
+Copy these commands into PowerShell or a POSIX shell.
 
 ```sh
-cargo run --locked -p threadline-app
+git clone https://github.com/joshmarkovic/threadline.git
+cd threadline
+cargo install --locked --path crates/threadline-app
+threadline
 ```
+
+From an existing checkout, use `cargo run --locked -p threadline-app` to build and run a development copy.
 
 Open **Accounts**, enter the private repository as `owner/repository`, paste its GitHub personal access token into the masked field, and choose **Check access**. Threadline verifies the account and repository with GitHub. Select the repositories you want to keep in the reader. On Windows, the native credential store protects the token. The token's repository selection and permissions govern which reads and writes GitHub allows. [Account setup and endpoint permissions](docs/architecture/github-api.md)
 
