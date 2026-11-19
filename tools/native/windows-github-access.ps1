@@ -6,6 +6,18 @@ function Wait-Account([string]$Description, [scriptblock]$AccountCheck) {
     }
 }
 
+function Test-FixtureTokenFocus($Snapshot, [int]$Owner) {
+    if ($null -eq $Snapshot -or $Owner -le 0) { return $false }
+    $pidProperty = $Snapshot.PSObject.Properties['pid']
+    $account = $Snapshot.PSObject.Properties['account_access']
+    if ($null -eq $pidProperty -or $pidProperty.Value -ne $Owner -or $null -eq $account -or $null -eq $account.Value) {
+        return $false
+    }
+    return $account.Value.panel_open -and !$account.Value.busy -and
+        $account.Value.fixture_route_entered -and !$account.Value.fixture_route_focused -and
+        $account.Value.fixture_token_focused
+}
+
 function Wait-SeededFixtureAccount {
     if (!$script:UseSeededFixtureAuth) { throw 'This case must use normal native credential entry.' }
     $observed = Wait-Account 'the authorized synthetic fixture and selected repository' {
@@ -161,9 +173,16 @@ function Enter-FixtureAccountForm([IntPtr]$Window, [switch]$LoopbackTokenAction)
         $null = Wait-Account 'focus in the masked native token field' {
             param($account) $account.panel_open -and $account.fixture_token_focused
         }
-        $syntheticPat = 'threadline-test-fixture'
-        if ($script:UseOwnedUiAutomation) { Assert-OwnedMaskedFixtureField $Window -RequireFocus }
-        [ThreadlineWinInput]::ReplaceFixtureText($Window, [uint32]$script:app.Id, $syntheticPat)
+        $uiaFocus = if ($script:UseOwnedUiAutomation) {
+            Assert-OwnedMaskedFixtureField $Window -ObserveFocus
+        } else { 'not-used' }
+        if (!(Test-FixtureTokenFocus (Read-Observation) $script:app.Id)) {
+            Stop-Blocked 'The isolated app no longer reports focus in the exact masked editor.'
+        }
+        [ThreadlineWinInput]::ReplaceFixtureText($Window, [uint32]$script:app.Id, 'threadline-test-fixture')
+        Add-Evidence 'Type the synthetic credential in the owned masked editor' ([ordered]@{
+            automation_id = 'account-token'; native_editor_focused = $true; uia_focus = $uiaFocus
+        })
     }
     $null = Wait-Account 'the exact synthetic credential entered into the masked native form' {
         param($account) $account.fixture_route_entered -and $account.fixture_token_entered

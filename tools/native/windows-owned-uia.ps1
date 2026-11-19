@@ -151,7 +151,7 @@ function Set-OwnedFixtureRepository([IntPtr]$Window) {
     return $true
 }
 
-function Assert-OwnedMaskedFixtureField([IntPtr]$Window, [switch]$RequireFocus) {
+function Assert-OwnedMaskedFixtureField([IntPtr]$Window, [switch]$ObserveFocus) {
     $element = Find-OwnedFixtureControl $Window 'account-token'
     if ($null -eq $element -or !$element.Current.IsPassword) {
         Stop-Blocked 'The exact masked fixture field is unavailable in the owned accessibility tree.'
@@ -160,14 +160,32 @@ function Assert-OwnedMaskedFixtureField([IntPtr]$Window, [switch]$RequireFocus) 
     if ($element.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) {
         throw 'Unexpected readable ValuePattern for the masked fixture credential.'
     }
-    if ($RequireFocus) {
-        Wait-For 'Windows keyboard focus on the exact owned masked field' {
-            $current = Find-OwnedFixtureControl $Window 'account-token'
-            try {
-                $null -ne $current -and $current.Current.IsPassword -and $current.Current.HasKeyboardFocus
-            } catch [Windows.Automation.ElementNotAvailableException] {
-                $false
+    if ($ObserveFocus) {
+        try {
+            if ($element.Current.HasKeyboardFocus) { return 'masked-editor' }
+            $condition = [Windows.Automation.AndCondition]::new([Windows.Automation.Condition[]]@(
+                [Windows.Automation.PropertyCondition]::new(
+                    [Windows.Automation.AutomationElement]::ProcessIdProperty, [int]$script:app.Id)
+                [Windows.Automation.PropertyCondition]::new(
+                    [Windows.Automation.AutomationElement]::HasKeyboardFocusProperty, $true)
+            ))
+            if ($null -ne $element.FindFirst([Windows.Automation.TreeScope]::Descendants, $condition)) {
+                return 'masked-descendant'
             }
+            if (!(Test-OwnedFixtureWindow $Window)) {
+                Stop-Blocked 'The isolated window changed while checking the masked field.'
+            }
+            $root = [Windows.Automation.AutomationElement]::FromHandle($Window)
+            if ($null -eq $root -or $root.Current.ProcessId -ne $script:app.Id) {
+                Stop-Blocked 'The isolated accessibility root changed while checking the masked field.'
+            }
+            if ($null -ne $root.FindFirst([Windows.Automation.TreeScope]::Descendants, $condition)) {
+                return 'other-owned-descendant'
+            }
+            if ($root.Current.HasKeyboardFocus) { return 'owned-window' }
+            return 'not-reported'
+        } catch [Windows.Automation.ElementNotAvailableException] {
+            Stop-Blocked 'The owned masked fixture field was replaced before input.'
         }
     }
 }

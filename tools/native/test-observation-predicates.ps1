@@ -45,6 +45,26 @@ try {
 . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
 . (Join-Path $PSScriptRoot 'windows-review-context.ps1')
 
+$account = [pscustomobject]@{
+    panel_open = $true
+    busy = $false
+    fixture_route_entered = $true
+    fixture_route_focused = $false
+    fixture_token_focused = $true
+}
+$focus = [pscustomobject]@{ pid = 123; account_access = $account }
+if (!(Test-FixtureTokenFocus $focus 123) -or (Test-FixtureTokenFocus $focus 456) -or
+    (Test-FixtureTokenFocus $null 123) -or (Test-FixtureTokenFocus ([pscustomobject]@{ pid = 123 }) 123)) {
+    throw 'The masked editor check must use the owned process receipt.'
+}
+foreach ($field in @('panel_open', 'busy', 'fixture_route_entered', 'fixture_route_focused', 'fixture_token_focused')) {
+    $account.$field = !$account.$field
+    if (Test-FixtureTokenFocus $focus 123) {
+        throw "The masked editor check accepted stale native account state for $field."
+    }
+    $account.$field = !$account.$field
+}
+
 $script:AccessPhaseFile = [IO.Path]::GetTempFileName()
 try {
     foreach ($phase in @('issue-edit-baseline', 'issue-edit-remote-change', 'issue-edit-commit',
