@@ -1,7 +1,12 @@
-use std::{fs, process::Command};
+use std::{env, fs, path::PathBuf, process::Command};
 
 #[test]
 fn it_021_command_explains_wrong_channel_and_invalid_manifest_pin_before_accessing_files() {
+    let installer = env::var_os("THREADLINE_TEST_INSTALLER_EXE")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_BIN_EXE_threadline-installer")))
+        .canonicalize()
+        .expect("locate the Cargo installer or the explicitly staged test executable");
     let dir = tempfile::tempdir().unwrap();
     let retained = dir.path().join("retained-profile");
     fs::write(&retained, b"intact").unwrap();
@@ -9,7 +14,7 @@ fn it_021_command_explains_wrong_channel_and_invalid_manifest_pin_before_accessi
         ("1.2.0-rc.1", "bad", "channel"),
         ("1.2.0", "bad", "SHA-256"),
     ] {
-        let output = Command::new(env!("CARGO_BIN_EXE_threadline-installer"))
+        let output = Command::new(&installer)
             .current_dir(dir.path())
             .args([
                 "--version",
