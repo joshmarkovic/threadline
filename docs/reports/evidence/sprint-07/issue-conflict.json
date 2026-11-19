@@ -1,0 +1,193 @@
+{
+  "scenario": "S07-ISSUE-CONFLICT",
+  "fixture_revision": "s07-native-issue-conflict-v1",
+  "windows_version": "Microsoft Windows [Version 10.0.22631.7652]",
+  "command": {
+    "program": "xtask",
+    "argv": [
+      "test",
+      "e2e",
+      "--suite",
+      "full",
+      "--case",
+      "S07-ISSUE-CONFLICT",
+      "--binary",
+      "<binary-path>",
+      "--seed",
+      "12345",
+      "--report-dir",
+      "<report-dir>"
+    ],
+    "redacted": true
+  },
+  "seed": 12345,
+  "app_source": "4114c34134549d7639122116688aa1b025be9cf5",
+  "runner_source": "4114c34134549d7639122116688aa1b025be9cf5",
+  "records": [
+    {
+      "run": "e2e-1795057708424-15052",
+      "status": "Fail",
+      "exit_code": 1,
+      "driver": "a007590a069d4ec4061356a6f96a8c7ba5a5b91c",
+      "source_dirty": false,
+      "binary_sha256": "cceb73f543b7b77dc821cf3f6fa00e31a74ffab3cfc3cd06c6095f518514ed30",
+      "dpi": 96,
+      "native_actions": 0,
+      "request_count": 3,
+      "routes": {
+        "write_online/user/200": 2,
+        "write_online/repository/200": 1
+      },
+      "detail": "The PowerShell driver refused its unlisted synthetic phase before recording any action.",
+      "raw_sha256": {
+        "result.json": "85406542d689ad036984fbd24cf52cf313d13a79da07d0b638a9bbea4c963904",
+        "issue-conflict-native.json": "5db0919fffec24efd1c199e65da032bafbc70f600ad212a474b9386880f31816",
+        "github-access-trace.json": "d3918c3cce8cb258db4a494fee6d265379ea0523f6a69cb4a3f6a419c54db54f",
+        "binary.json": "1474de2d5666b60a78350c13e3da22e6314673bd364c57f10de0609c585b40af"
+      }
+    },
+    {
+      "run": "e2e-1795057859677-6084",
+      "status": "Fail",
+      "exit_code": 1,
+      "driver": "b7abf451b05935ba9e662614bac024195492e7cc",
+      "source_dirty": false,
+      "binary_sha256": "cceb73f543b7b77dc821cf3f6fa00e31a74ffab3cfc3cd06c6095f518514ed30",
+      "dpi": 96,
+      "native_actions": 14,
+      "request_count": 12,
+      "routes": {
+        "issue_edit_baseline/user/200": 3,
+        "issue_edit_baseline/repository/200": 3,
+        "issue_edit_baseline/updated_items/200": 1,
+        "issue_edit_baseline/updated_comments/200": 1,
+        "issue_edit_baseline/updated_inline_comments/200": 1,
+        "issue_edit_baseline/items/200": 1,
+        "issue_edit_baseline/open_pull_index/200": 1,
+        "issue_edit_baseline/scheduled_issue/200": 1
+      },
+      "detail": "The app restored the exact draft and queued issue edit while offline. The driver expected an in-memory submission marker to survive restart.",
+      "raw_sha256": {
+        "result.json": "9448e10f811a8fc42fe14767b97d5e4fbcbeac4c2e8817679f90ff778922fb62",
+        "issue-conflict-native.json": "499a5b6dab5bf1595775d02ba7dbf22fef43cb0e0c049df1bf728d38b78b8c04",
+        "github-access-trace.json": "fd6f27ca44bb12326013652ebacc905e442ff30f2a0cc25e6a0412f627b03a8e",
+        "binary.json": "1474de2d5666b60a78350c13e3da22e6314673bd364c57f10de0609c585b40af"
+      }
+    },
+    {
+      "run": "e2e-1795060034719-42684",
+      "status": "Pass",
+      "exit_code": 0,
+      "driver": "4114c34134549d7639122116688aa1b025be9cf5",
+      "source_dirty": false,
+      "binary_sha256": "5bb55a61e55943d85647a9c72fc5629e2db49f088409d113cb07746be0cb1131",
+      "dpi": 96,
+      "native_actions": 28,
+      "request_count": 17,
+      "routes": {
+        "issue_edit_baseline/user/200": 3,
+        "issue_edit_baseline/repository/200": 3,
+        "issue_edit_baseline/updated_items/200": 1,
+        "issue_edit_baseline/updated_comments/200": 1,
+        "issue_edit_baseline/updated_inline_comments/200": 1,
+        "issue_edit_baseline/open_pull_index/200": 1,
+        "issue_edit_baseline/items/200": 1,
+        "issue_edit_baseline/scheduled_issue/200": 1,
+        "issue_edit_remote_change/user/200": 2,
+        "issue_edit_remote_change/repository/200": 2,
+        "issue_edit_remote_change/item/200": 1
+      },
+      "detail": "The native reader restored the queued edit after restart, detected changed GitHub fields during preflight, showed its original, local and remote values, and kept the original issue draft available.",
+      "raw_sha256": {
+        "result.json": "e2e1be41586ddf8a47d03988e8b6fe5f6fcf8a2b5a1fc509b9af4e19b9d6f379",
+        "issue-conflict-native.json": "31b9f6b5b7e2b135c6d967e6c34bcb1bc3a40bf3f002354528c8e5b16252ed8d",
+        "github-access-trace.json": "3a35ea76b52eeec23b9aa5d197b528275f0d71163ee1f4d348a2b5ccd321253b",
+        "binary.json": "0df00d6559a646c4734688914cf0635111441244e483560440d0c7acdbc7ebf2"
+      }
+    }
+  ],
+  "checkpoints": [
+    {
+      "action": "Load the isolated verified account and scope",
+      "observed": {
+        "user": 41,
+        "repository_count": 1
+      }
+    },
+    {
+      "action": "Open existing GitHub issue 41 from the downloaded repository",
+      "observed": 41
+    },
+    {
+      "action": "Queue the exact existing issue title and description while offline",
+      "observed": {
+        "issue_number": 41,
+        "queued": 1
+      }
+    },
+    {
+      "action": "Relaunch the same SQLite profile in a separate process",
+      "observed": {
+        "pid": 41772,
+        "sqlite_retained": true
+      }
+    },
+    {
+      "action": "Load the isolated verified account and scope",
+      "observed": {
+        "user": 41,
+        "repository_count": 1
+      }
+    },
+    {
+      "action": "Read the original, local and remote values in the same pending native action",
+      "observed": {
+        "issue_number": 41,
+        "exact_original_local_remote_values": true,
+        "operation_state": "NeedsAttention"
+      }
+    },
+    {
+      "action": "Reopen the exact existing issue and verify the saved local edit",
+      "observed": {
+        "issue_number": 41,
+        "draft_retained": true
+      }
+    }
+  ],
+  "offline_restart_observation": {
+    "snapshot_sha256": "0fa437d20729e3f6ee97683aa701521c24fa0b1c4730a895be57bb0c735a745a",
+    "item": 1,
+    "number": 41,
+    "draft_sha256": "9548508dfa01fe4ffbd053d23ec240fb8fd54f147aaf5d99ffbb4e92c8979193",
+    "matching_saved_revision_is_submitted": true
+  },
+  "verified_values": {
+    "title": {
+      "original": "Existing issue for offline edits",
+      "local": "Local change to the same issue",
+      "remote": "Remote change to the same issue"
+    },
+    "description": {
+      "original": "Synthetic existing issue.",
+      "local": "Retain the local issue description across the conflict.",
+      "remote": "The original issue was changed remotely."
+    }
+  },
+  "focused_windows_checks": [
+    {
+      "app_revision": "05f9c3e",
+      "name": "reader_workspace::tests::ui_006_reopened_issue_draft_uses_the_durable_submission_for_its_exact_revision",
+      "status": "Pass",
+      "elapsed_s": 9.67,
+      "raw_sha256": "7cf50befd93813cbcce80e2f5d8035c1c39a449e1501a0cc3404ed0832a4ff7b"
+    },
+    {
+      "app_revision": "05f9c3e",
+      "name": "reader_workspace::outbox::tests::submitted_status_from_a_closed_editor_cannot_replace_a_reopened_editor",
+      "status": "Pass",
+      "elapsed_s": 0,
+      "raw_sha256": "3f795d8f15bea9911cb88cff57efb5af98a102c4f3076a8a8473fa29580d1508"
+    }
+  ]
+}
