@@ -155,6 +155,14 @@ A separate Windows test delivered modeled suspend and resume messages to its own
 
 ## Full native Windows suite
 
+### Full suite with installed local build 14
+
+The clean `1668ccc` Windows 11 suite recorded **12 Pass, eight Blocked and one Fail** across 21 cases, exit 1. History, offline writes and installed notification fallback passed. The installed normal executable opened the offline fixture and quit normally. The cold notification case showed the delivered group of 37 events and stopped before a shell click. Seven other cases stopped at the foreground check. [All cases, applications and native receipt hashes](evidence/sprint-12/full-native-1668ccc-installed14.json)
+
+E2E-014 missed four timing budgets. Warm startup took 8413.96 ms against 2000 ms. After app entry, the profile opened at 14.31 ms, toolkit initialization and activation returned at 6024.32 ms, and the first useful cached paint occurred at 6192.12 ms. External p95 was 2119.86 ms for cached open, 2181.54 ms for local search and 2120.06 ms for tab switch. Idle redraw, working set, reported GPU memory and the 11,144,800-byte package passed their checks. [Timing observations and limits](evidence/sprint-12/full-native-1668ccc-installed14.json)
+
+After the suite, the registered uninstaller removed the verified build 14 program and registration. The default Data directory was absent, the installation high-water mark remained 14, and all 12 sealed archive files matched their saved hashes. [Setup, migration and post-suite teardown](evidence/sprint-12/installed-build-14.json)
+
 ### Full suite with installed local build 13
 
 The clean `fda5d91` suite recorded **11 Pass, eight Blocked and two Fail** on Windows 11 x64, exit 1. E2E-012, E2E-018 and E2E-020 used the installed normal build 13. The other cases used the optimized test executable from the same revision. [Builds, command and all 21 case outcomes](evidence/sprint-12/full-native-fda5d91-installed13.json)

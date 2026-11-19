@@ -149,7 +149,8 @@
     "retention": "daa528839f14834218ddfd0c55153a0300e91e4db80c46e5470c8f969fb65170",
     "first_attempt_result": "9dcbeec57515b3b49b1832f5c21e9651709b014a268d41d082740dd06e919416",
     "first_attempt_failure": "c4e9df2c120adc5e31898a9cb39cb413ad55015be202145fe3ba8f11eb3887d9",
-    "predecessor_recovery": "309a5898a7eb8884f7846cfca2cd5af5dbe540fabdbb618cea25a14c43417816"
+    "predecessor_recovery": "309a5898a7eb8884f7846cfca2cd5af5dbe540fabdbb618cea25a14c43417816",
+    "post_suite_uninstall": "d7b4903ed762182eef50b9de66ac23982cdc1f0b7dbd402df937deeb3de22fff"
   },
   "first_attempt": {
     "run": "install-1795064680735-41360",
@@ -161,6 +162,12 @@
     "protected_data": "Driver preserved the owned interrupted fixture and cleared its generated credential.",
     "subsequent_predecessor_repair_exit": 0,
     "registered_predecessor_uninstall_passed": true
+  },
+  "post_suite_uninstall": {
+    "highest_build": 14,
+    "exact_install_present": false,
+    "default_data_absent": true,
+    "registered_uninstaller_sha256": "8535df871fcbd2108ad69e2c6ad9f2ef17cf2e6a18ce335ce5a35d8159cf3157"
   },
   "sealed_archives": {
     "earlier_files": 9,
