@@ -189,6 +189,12 @@ With driver `3c2da26`, a separate E2E-004 run passed at 144 DPI. The normal Sync
 
 The automatic approval check declined a new full suite because it includes the deferred timing case. The build 17 functional runs excluded E2E-014. The full build 16 results and timing measurements remain below. [Verification scope](evidence/sprint-12/native-e3aec22-functional.json)
 
+### Reader repairs after build 17
+
+E2E-003 passed on Windows at 144 DPI with app and runner `5ffb9c1` and driver `e3cac32`. In the original two-pane workspace, the visible Markdown editor confirmed native GPUI focus. The driver entered the synthetic draft through guarded Windows keyboard input. A separate process restored the same draft digest on item 3, the same focused pane and ten tabs per pane while signed out and offline. The loopback fixture recorded zero requests. [New typed-input result](evidence/sprint-12/native-reader-after-build17.json) · [Original build 17 failures](evidence/sprint-12/native-e3aec22-functional.json)
+
+An E2E-008 development replay at app and runner `ad94129` with driver `31cc7cf` returned from Commits to the selected line both before and after fetching commits. It then restarted offline. The last return kept the exact comparison, file, saved source position and draft. The live source selection was absent and the case exited 1. [Verified stages and remaining failure](evidence/sprint-12/native-reader-after-build17.json)
+
 ### Connected Windows desktop with installed local build 16
 
 The connected Windows 11 x64 run on clean `2870642` ended with exit 1 after 11 passes, three blocked cases and seven failures. All 18 cases using the optimized test executable recorded 144 DPI. The remaining cases used the ordinary build 16 executable. [All 21 outcomes, source and executable hashes](evidence/sprint-12/full-native-2870642-installed16-connected.json)

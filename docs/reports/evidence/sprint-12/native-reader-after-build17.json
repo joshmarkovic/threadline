@@ -1,0 +1,135 @@
+{
+  "phase": "Targeted development repairs after local build 17",
+  "original_build_17_unchanged": true,
+  "seed": 12345,
+  "runs": [
+    {
+      "run": "e2e-1795104346537-48200",
+      "case": "E2E-008",
+      "state": "Fail",
+      "numeric_exit": 1,
+      "child_exit": 1,
+      "detail": "Timed out waiting for the original comparison and selected review line after leaving Commits. See native-driver.log.",
+      "app_source": "ad9412966cfb17a5f00d223ad69d6ed6b42bf655",
+      "driver": "31cc7cfb66649a0022a06118894fbd1898126c8a",
+      "app_sha256": "0c84cb2871b3b30b6e0bcbff643cf801f85e69f7c4fbcb8c5c812035951e3e34",
+      "runner_sha256": "81f92f29fb61a512ed8f1e9ec2e35c0c366257aaba622d6f8f736525834221d7",
+      "window_dpi": 144,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-008",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_utc": "2026-11-19T16:05:46.537Z",
+      "finished_at_utc": "2026-11-19T16:06:37.590Z",
+      "action_count": 57,
+      "receipts": {
+        "result.json": "a9a7b44af16c4a0cd02515184b02b4e7cc860d848f3ed71759a0f2f9f8a2d832",
+        "junit.xml": "70cb8eb7743ab91a72bf0b80873c6ce30c89e833b13e49dbaefe4c13c44011fd",
+        "binary.json": "5fdcc5fe0868e762d704dcc88daea5787a00235860b40dd159aa09ba85e361e0",
+        "review-context-native.json": "d44ddfd18a3a0fe51a9cc65ce13d503ddda584e3f81fb9aaefaa6f196b1bd0e8",
+        "reader-restart-observation.json": "2a8e1da7796de270a4c92ea7fa8a2d085dfae6f849c8da73ba3ec8a38bbcb6a9",
+        "ui-observation.json": "1aacb5c5d0e9078c3587116d7e55664578aac75c1d370c275757370e833f6c42",
+        "github-access-trace.json": "48291219bf3d60807b0c3fcddcf2668abdfc678d78405cb0415c154faeb4267c"
+      },
+      "verified_before_failure": {
+        "item": 1,
+        "revision": 1,
+        "initial_coverage": "Not checked",
+        "fetched_coverage": "Downloaded",
+        "returned_to_selected_line_before_and_after_fetch": true,
+        "draft_retained": true
+      },
+      "offline_return": {
+        "active_number": 42,
+        "focused_pane": 0,
+        "offline": true,
+        "section": "Files",
+        "revision_id": 1,
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "selected_file": "src/first.rs",
+        "selected_source_line": null,
+        "source_anchor": {
+          "side": "Right",
+          "line": 1,
+          "path": "src/first.rs"
+        }
+      }
+    },
+    {
+      "run": "e2e-1795104687251-47092",
+      "case": "E2E-003",
+      "state": "Pass",
+      "numeric_exit": 0,
+      "child_exit": 0,
+      "detail": "Cached content, panes and the local Markdown draft survived a separate-process restart while signed out and offline. See native-driver.log.",
+      "app_source": "5ffb9c10c62fdac9de957d0ce8cb01397ba237f2",
+      "driver": "e3cac32140579d66d1c77b2c181fb53a1a16610e",
+      "app_sha256": "3863503b571257ab3ea60fd13ff3a1af2eeda07707275db2ed8c274cc601fe70",
+      "runner_sha256": "989ef58b7693f8aeda4ec2b4dd4a49d4c1e929bddd1ecac280eb12b59516fe4d",
+      "window_dpi": 144,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-003",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_utc": "2026-11-19T16:11:27.250Z",
+      "finished_at_utc": "2026-11-19T16:11:47.827Z",
+      "action_count": 5,
+      "receipts": {
+        "result.json": "1e10f3dd8ada73183fed76eda6255aa405345b407f6f6255eb65c0626a3ec3dd",
+        "junit.xml": "e4f876e2c4ca3834c404baae523f6900b756801e20f8c5a52e252becdaa05240",
+        "binary.json": "eb18f4c155afbbf7cdac40bc2185e214c66289e6a3cb171c4c4cc668e54293aa",
+        "reader-native.json": "8ca0711af933e68014f5600faca1aef2d833649c10103dcfb0a0f444771cf7b5",
+        "reader-restart-observation.json": "8231fb1955047f81a4cffa3cc1b86e6632369ff225bde71232863c7e64bf9b18",
+        "ui-observation.json": "eaf965e171a2e6d26ce2922cc232f65520b651dad28ad2597e39b4639b16b353",
+        "github-access-trace.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "verified": {
+        "focus_provider": "GPUI FocusHandle",
+        "input": "guarded Win32 SendInput",
+        "draft_sha256_before_and_after_restart": "8feca84e766104606481f760813ce90e1fe9136c95b4c05d315bdc0326a43062",
+        "separate_process": true,
+        "provider_requests": 0,
+        "original": {
+          "active_item": 3,
+          "active_number": 3,
+          "focused_pane": 1,
+          "pane_count": 2,
+          "tab_counts": [
+            10,
+            10
+          ],
+          "offline": true,
+          "signed_out": true
+        }
+      }
+    }
+  ]
+}
