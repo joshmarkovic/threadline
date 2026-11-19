@@ -297,6 +297,94 @@
         "app": "ce206a32114ef32f229a92a656cb4ee80a0253f215f11beb4ed39099e62c1a14",
         "redacted_http_trace": "ae6a6a1891fb0df1b158dec1e295398795673c22d1cc38fd898a3064eab59de4"
       }
+    },
+    "expanded_return_attempt": {
+      "run": "e2e-1795060095031-11384",
+      "app_revision": "4114c34134549d7639122116688aa1b025be9cf5",
+      "driver_revision": "4114c34134549d7639122116688aa1b025be9cf5",
+      "fixture_revision": "s10-history-endpoints-v3",
+      "seed": 12345,
+      "host": {
+        "os": "windows",
+        "architecture": "x86_64",
+        "version": "Microsoft Windows [Version 10.0.22631.7652]",
+        "display_session": "Windows desktop availability is checked by native driver"
+      },
+      "status": "Fail",
+      "exit_code": 1,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-011",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_unix_ms": 1795060095031,
+      "finished_at_unix_ms": 1795060177959,
+      "detail": "Timed out waiting for account control history-back.",
+      "binary_sha256": "5bb55a61e55943d85647a9c72fc5629e2db49f088409d113cb07746be0cb1131",
+      "native_actions": 37,
+      "dpi": 96,
+      "compare_pinned": {
+        "commits": 3,
+        "coverage": "Complete",
+        "comparison": "Pair",
+        "comparison_base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "comparison_head": "cccccccccccccccccccccccccccccccccccccccc",
+        "displayed_file": "divergent.txt"
+      },
+      "review_retained_while_in_history": {
+        "id": "review-1",
+        "revision": 4,
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "saved": true,
+        "queued": false,
+        "anchors": [
+          {
+            "path": "src/first.rs",
+            "side": "Right",
+            "first_line": 1,
+            "last_line": 1,
+            "source_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "comment_nonempty": true
+          }
+        ]
+      },
+      "provider_phases": [
+        {
+          "phase": "history",
+          "count": 27
+        },
+        {
+          "phase": "history_deleted",
+          "count": 4
+        },
+        {
+          "phase": "history_moved",
+          "count": 4
+        },
+        {
+          "phase": "pr_load",
+          "count": 9
+        }
+      ],
+      "raw_sha256": {
+        "result": "7ef4cee61a9a59f9418f6564c80cb5dbfb981b237534d250cb4f310e3ba958bd",
+        "native": "6707000caa8b050d5f597edffb5024f4460ab651156974220349ff4251cd7dc3",
+        "app": "bbd7fe1598a5e74e3b08a47e750bec4fe84362a4776f164e9e12ab9541e32d40",
+        "redacted_http_trace": "ed28bb13e209bdf9f367c72fad180a54f7232f65c22bd32bedb3b51361603908"
+      }
     }
   },
   "portable_monitor": {
