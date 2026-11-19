@@ -243,7 +243,9 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
         $info.EnvironmentVariables['THREADLINE_E2E_GITHUB_ADDR'] = $script:AccessAddress
     }
     if ($script:UseSeededFixtureAuth -or $ReaderBacklog) { $info.EnvironmentVariables['THREADLINE_E2E_FIXTURE_AUTH'] = '1' }
-    if ($ReaderProof -eq 'CredentialBoundary') { $info.EnvironmentVariables['THREADLINE_E2E_ACCOUNT_FORM'] = '1' }
+    if ($ReaderProof -eq 'CredentialBoundary' -or ($ReaderProof -eq 'NativeLifecycle' -and !$Lifecycle)) {
+        $info.EnvironmentVariables['THREADLINE_E2E_ACCOUNT_FORM'] = '1'
+    }
     if ($ReaderBacklog) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
     if ($ReaderProof -in @('Historical', 'Sync', 'NotificationSchedule', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'DirectMerge', 'MergeQueue', 'CredentialBoundary', 'CommentDependency', 'IssueConflict', 'Writes', 'WriteSurface', 'PerformanceConcurrent')) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
     if ($ReaderProof -eq 'NativeLifecycle') {

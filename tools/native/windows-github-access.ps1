@@ -93,7 +93,17 @@ function Open-AccountFixture {
 }
 
 function Enter-FixtureAccountForm([IntPtr]$Window, [switch]$LoopbackTokenAction) {
-    if (!$script:UseOwnedUiAutomation -or !(Set-OwnedFixtureRepository $Window)) {
+    if ($LoopbackTokenAction) {
+        $port = [regex]::Match($script:AccessAddress, '^127\.0\.0\.1:([1-9][0-9]{0,4})$')
+        if (!$script:UseOwnedUiAutomation -or !$port.Success -or [int]$port.Groups[1].Value -gt 65535 -or
+            $ReaderProof -cnotin @('CredentialBoundary', 'NativeLifecycle') -or
+            ($ReaderProof -ceq 'NativeLifecycle' -and [IO.File]::ReadAllText($script:AccessPhaseFile).Trim() -cne 'lifecycle-return')) {
+            throw 'The synthetic fill action requires an isolated native credential scenario.'
+        }
+        Wait-For 'the owned repository field in the isolated credential scenario' {
+            Set-OwnedFixtureRepository $Window
+        }
+    } elseif (!$script:UseOwnedUiAutomation -or !(Set-OwnedFixtureRepository $Window)) {
         if ($script:UseOwnedUiAutomation) { Set-WindowFocus $Window }
         Click-AccountControl $Window 'account-repository'
         $null = Wait-Account 'focus in the native repository field' {
@@ -105,9 +115,6 @@ function Enter-FixtureAccountForm([IntPtr]$Window, [switch]$LoopbackTokenAction)
         param($account) $account.fixture_route_entered
     }
     if ($LoopbackTokenAction) {
-        if (!$script:UseOwnedUiAutomation -or $ReaderProof -cne 'CredentialBoundary') {
-            throw 'The synthetic fill action is limited to the scoped credential boundary driver.'
-        }
         Assert-OwnedMaskedFixtureField $Window
         Wait-For 'the owned synthetic credential setup action' {
             Invoke-OwnedFixtureControl $Window 'account-fill-synthetic-token' $null 'Fill synthetic test credential'
