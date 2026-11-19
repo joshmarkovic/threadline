@@ -39,17 +39,20 @@ function Read-TabSelection([Diagnostics.Process]$Process, [string]$Id) {
     $root = Get-OwnedWindow $Process
     $value = Find-OwnedId $root $Process.Id $Id
     if ($null -eq $value) { return $false }
+    $name = $value.Current.Name
+    $signals = [ordered]@{ active_label=$name.EndsWith((' ' + [char]0x00B7 + ' Active tab'), [StringComparison]::Ordinal)
+        selection_item=$null; toggle_on=$null }
     $selection = $null
     if ($value.TryGetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern, [ref]$selection)) {
-        return $selection.Current.IsSelected
+        $signals.selection_item = $selection.Current.IsSelected
     }
     $toggle = $null
     if ($value.TryGetCurrentPattern([Windows.Automation.TogglePattern]::Pattern, [ref]$toggle)) {
-        return $toggle.Current.ToggleState -eq [Windows.Automation.ToggleState]::On
+        $signals.toggle_on = $toggle.Current.ToggleState -eq [Windows.Automation.ToggleState]::On
     }
-    $name = $value.Current.Name
-    if ($ExpectedIssueNumber -eq 0) { return $name.EndsWith(' · Active tab') }
-    return $name -match ("#" + $ExpectedIssueNumber + "(\s|$)")
+    $script:lastTabSignals = $signals
+    if ($ExpectedIssueNumber -gt 0 -and $name -notmatch ("#" + $ExpectedIssueNumber + "(\s|$)")) { return $false }
+    return $signals.active_label -or $signals.selection_item -or $signals.toggle_on
 }
 
 $child = $null
@@ -60,6 +63,8 @@ $openBefore = $false
 $closeRequested = $false
 $closedNormally = $false
 $attempts = 0
+$script:lastTabSignals = $null
+$initialTabSignals = $null
 try {
     $start = [Diagnostics.ProcessStartInfo]::new()
     $start.FileName = $exe
@@ -75,6 +80,7 @@ try {
     }
     if (!$ownedWindow) { throw 'Timed out waiting for the owned reader and preseeded tab.' }
     $openBefore = Read-TabSelection $child $TabId
+    $initialTabSignals = $script:lastTabSignals
     if (!$openBefore) {
         $invoked = Invoke-OwnedId $child $TabId
         if (!$invoked) { throw 'The exact preseeded tab did not support native activation.' }
@@ -117,6 +123,8 @@ try {
         tab_invoke_supported = $invoked
         tab_invoke_attempts = $attempts
         tab_activated = $selected
+        initial_selection_signals = $initialTabSignals
+        final_selection_signals = $script:lastTabSignals
         orderly_exit = $closedNormally
     } | ConvertTo-Json -Compress
 }
