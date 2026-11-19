@@ -1,0 +1,129 @@
+{
+  "platform": "Windows 11 x64, build 22631.7652",
+  "local_package": "0.1.0-local.10",
+  "app_source": "fbb24846d3231e4de973aebf46c790a3b07e99a8",
+  "app_sha256": "4d55fa80a274abaed77d160c961855f8efdc9096e2d792d0e7444b396213e691",
+  "migration": {
+    "source_sha256": {
+      "native-smoke.json": "97fbe00b201b9f38b8789f2096568db89ee048b4c5adcce86122b17363f3b9f2",
+      "migration-validated.json": "91324ba8648cac85f013e9db976bf8b900beb41df415afbb21466db8a3382638",
+      "uninstall-and-archive.json": "ddeb32c1e9372b59099bda3f61e31a331669b4fe173cc42a6d213f369f60b9a9"
+    },
+    "native_smoke": {
+      "installed_executable_sha256": "4d55fa80a274abaed77d160c961855f8efdc9096e2d792d0e7444b396213e691",
+      "owned_window": true,
+      "tab_automation_id": "reader-tab-0-0",
+      "selected_before_invocation": false,
+      "tab_invoke_supported": true,
+      "tab_invoke_attempts": 1,
+      "tab_activated": true,
+      "orderly_exit": true
+    },
+    "database": {
+      "status": "Pass",
+      "app_sha256": "4d55fa80a274abaed77d160c961855f8efdc9096e2d792d0e7444b396213e691",
+      "source_sha256": "071747249798f836c4371b2ed255d7a61019007cbd26816c2b48ffffc0152323",
+      "db_sha256": "8e79426df74445ad86eed5451daf41ecc1df144d42a6e49b7cdb2ea7454ac5ff",
+      "previous_user_version": 12,
+      "user_version": 15,
+      "migration_backup_version": 12,
+      "migration_backup_sha256": "b39129f7d9dcefad39d00c51b2d3c8777c5b9b0e4a11218ed347b2eaab90ebc3",
+      "matching_projections": 9,
+      "projections": {
+        "items": {
+          "rows": 30,
+          "sha256": "7a61313417f1af9232a8a5f1c78f8a92a264bcec35fd9e85992abf427ce6cd48"
+        },
+        "drafts": {
+          "rows": 1,
+          "sha256": "e2c7011b376e27b37b9c19962a672abaddea2d76a49cee65acb6776b84622e1d"
+        },
+        "operations": {
+          "rows": 10,
+          "sha256": "d845211810028f8fe0b81083a95cddcf81fcac7fd8447a77cd8f1fe1d13b7710"
+        },
+        "receipts": {
+          "rows": 1,
+          "sha256": "921af72bd3d120454abbd655b61600ca92759e32e405c3839a2b51ea3c2d9d88"
+        },
+        "dispatch": {
+          "rows": 1,
+          "sha256": "0a7e58150268e978346b814d0f51633a4ed5ebe529ed49d7822e501bbe472030"
+        },
+        "resources": {
+          "rows": 150,
+          "sha256": "fd8f9a108a0a94f983141839b1e9b5407fd70efc3c349559d430f8c5dd76d23a"
+        },
+        "credentials": {
+          "rows": 1,
+          "sha256": "644e56048e9789a1e5c7b4ff489842728c00705c5100aa0fb5178214d1c702b4"
+        },
+        "tabs": {
+          "rows": 20,
+          "sha256": "9034dee932f4f91327727cdd67faaddb42889ea01e6fd4a9fded9f7891826e45"
+        },
+        "sync": {
+          "rows": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "integrity_check": "ok",
+      "foreign_key_errors": 0,
+      "work_offline": true,
+      "retained_active_issue": 1
+    },
+    "uninstall": {
+      "status": "Pass",
+      "uninstall_exit": 0,
+      "default_data_absent": true,
+      "binaries_and_registration_removed": true,
+      "highest_build": 10,
+      "retained_sha256": "8e79426df74445ad86eed5451daf41ecc1df144d42a6e49b7cdb2ea7454ac5ff",
+      "all_retained_files_unchanged": true,
+      "source_archive_preserved": true
+    }
+  },
+  "installed_runtime": {
+    "case": "E2E-020",
+    "run": "e2e-1795046109829-37232",
+    "status": "Pass",
+    "exit_code": 0,
+    "source_revision": "f06de5ebff4a2ceed102c81c176a073d3c097112",
+    "source_dirty": false,
+    "seed": 12345,
+    "markdown_initial": "Open cached image",
+    "markdown_after": "Image unavailable. Retry",
+    "selected_file": "second.txt",
+    "diff_mode": "Split",
+    "offline": true,
+    "orderly_quit": true,
+    "synthetic_profile_archived": true,
+    "dependency_names": 393,
+    "imported_libraries": 39,
+    "observations": [
+      {
+        "phase": "Native Markdown with parsed image attachment",
+        "module_count": 72,
+        "descendants": 0,
+        "browser_matches": []
+      },
+      {
+        "phase": "Native selected comparison file and diff toolbar",
+        "module_count": 72,
+        "descendants": 0,
+        "browser_matches": []
+      },
+      {
+        "phase": "Native split diff after the persisted action",
+        "module_count": 72,
+        "descendants": 0,
+        "browser_matches": []
+      }
+    ],
+    "source_sha256": {
+      "result.json": "8e3603834684061b6d5e1d5ded1f533a85d5d3b35d071c7f00f04b53937a43f7",
+      "installed-runtime.json": "e97b95d9046c489fb69d2b50aba3a3c9bf8eda733f68a21eea711db9e04779fa",
+      "runtime-build.json": "03607c5e760c91f514d7f7eaaa2cf8e25378c894d9ae7d73447577bf90c520fd"
+    }
+  }
+}

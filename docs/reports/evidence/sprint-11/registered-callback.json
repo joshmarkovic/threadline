@@ -1,0 +1,144 @@
+{
+  "platform": "Windows 11 x64, build 22631.7652",
+  "local_package": "0.1.0-local.10",
+  "app_source": "fbb24846d3231e4de973aebf46c790a3b07e99a8",
+  "app_sha256": "4d55fa80a274abaed77d160c961855f8efdc9096e2d792d0e7444b396213e691",
+  "fixture_sha256": "a5973b5c83b459c19aac024d967c857666c4b42ab6d7df590c5101cbcc7322b9",
+  "case": "S11-REGISTERED-CALLBACK",
+  "mechanism": "The Windows COM client invoked the registered per-user local server with the fixture action returned by the installed sender. The driver verified native delivery history before each callback.",
+  "results": [
+    {
+      "driver": "047588c",
+      "action": "ColdOpen",
+      "status": "Fail",
+      "initial_pid": 23500,
+      "recipient_pid": 19096,
+      "source_sha256": "c691b926715c0c90d4ef4a482a1e21193412f76b8277ac28baa834be97bb61cf",
+      "driver_detail": "Timed out waiting for the active destination alongside the saved draft tab.",
+      "original_cleanup_detail": "The owned window remained open."
+    },
+    {
+      "driver": "047588c",
+      "action": "WarmOpen",
+      "status": "Fail",
+      "initial_pid": 36036,
+      "recipient_pid": 36036,
+      "source_sha256": "917f99d3b8bbc837f9a91c664478ab449e2b4efbfa39f4ef701e6dae9fbb05d3",
+      "driver_detail": "Timed out waiting for the active destination alongside the saved draft tab."
+    },
+    {
+      "driver": "047588c",
+      "action": "MarkRead",
+      "status": "Pass",
+      "initial_pid": 33708,
+      "recipient_pid": 33708,
+      "source_sha256": "e1c3b022f738da746e202c1527043b14d1a7be29cb2861072b7dbd6d3668ccf1",
+      "closed_profile": {
+        "source_events": 37,
+        "feed_count": 37,
+        "group_count": 1,
+        "read_count": 37,
+        "snoozed_targets": 0,
+        "selected_issue": 41,
+        "pending_opens": 0,
+        "draft_preserved": true,
+        "draft_tab_preserved": true
+      }
+    },
+    {
+      "driver": "047588c",
+      "action": "Snooze",
+      "status": "Pass",
+      "initial_pid": 47024,
+      "recipient_pid": 47024,
+      "source_sha256": "62bb3c80f4d36229a7d6a823d23d065733ff44784593143acf2d9eac3e53c90a",
+      "closed_profile": {
+        "source_events": 37,
+        "feed_count": 37,
+        "group_count": 1,
+        "read_count": 0,
+        "snoozed_targets": 1,
+        "selected_issue": 41,
+        "pending_opens": 0,
+        "draft_preserved": true,
+        "draft_tab_preserved": true
+      }
+    },
+    {
+      "driver": "2821b95",
+      "action": "ColdOpen",
+      "status": "Pass",
+      "initial_pid": 47604,
+      "recipient_pid": 44660,
+      "source_sha256": "7a500d330ef8e07145457ea36aae033956bc434c63f0e44cb828ecb21a85ef30",
+      "closed_profile": {
+        "source_events": 37,
+        "feed_count": 37,
+        "group_count": 1,
+        "read_count": 37,
+        "snoozed_targets": 0,
+        "selected_issue": 42,
+        "pending_opens": 0,
+        "draft_preserved": true,
+        "draft_tab_preserved": true
+      },
+      "visible": {
+        "active_present": true,
+        "draft_present": true,
+        "destination_selected": true
+      }
+    },
+    {
+      "driver": "2821b95",
+      "action": "WarmOpen",
+      "status": "Pass",
+      "initial_pid": 24188,
+      "recipient_pid": 24188,
+      "source_sha256": "b7673822919593034b3acfd38b9d275fb158d419773f8a17f0d0ced59eadf0b8",
+      "closed_profile": {
+        "source_events": 37,
+        "feed_count": 37,
+        "group_count": 1,
+        "read_count": 37,
+        "snoozed_targets": 0,
+        "selected_issue": 42,
+        "pending_opens": 0,
+        "draft_preserved": true,
+        "draft_tab_preserved": true
+      },
+      "visible": {
+        "active_present": true,
+        "draft_present": true,
+        "destination_selected": true
+      }
+    }
+  ],
+  "shell_click": {
+    "case": "E2E-012",
+    "status": "Blocked",
+    "reason": "The disconnected desktop session prevented the guarded Notification Center click.",
+    "evidence": "installed-build-10.json"
+  },
+  "fallback": {
+    "case": "E2E-018",
+    "run": "e2e-1795045664128-47180",
+    "status": "Pass",
+    "exit_code": 0,
+    "source_revision": "f06de5ebff4a2ceed102c81c176a073d3c097112",
+    "source_dirty": false,
+    "seed": 12345,
+    "observed": {
+      "source_events": 37,
+      "feed_count": 37,
+      "registration_feed_only": 37,
+      "group_count": 0,
+      "read_count": 1,
+      "snoozed_targets": 1,
+      "selected_issue": 41,
+      "draft_preserved": true,
+      "draft_tab_preserved": true
+    },
+    "results_sha256": "1fe656ca73859bfa6b3e8cef9c98965926af55e73216c669f6f6d0b88d55241c",
+    "native_sha256": "649389fb55ee2e058654f685a22653b47f80daea77f9cd0865cb13663b548c01"
+  }
+}

@@ -23,6 +23,8 @@ Local build 5 from `725632e` upgraded the same offline workspace. The installer 
 
 Windows PowerShell 5.1 also ran the release verifier against the exact local matrix setup with its correct size and digest and a fixture publisher pin. It exited 1 because Windows could not confirm a trusted Authenticode signature. [Release verifier](../../tools/windows/verify-release-installer.ps1) · [Verification receipt](evidence/sprint-12/installed-build-5.json)
 
+Installed local build 10 opened the retained schema 12 fixture and migrated it to schema 15. All nine ordered projections matched, SQLite reported zero integrity or foreign-key errors, and Work Offline stayed on. The normal window selected an initially inactive tab on the first invocation and quit cleanly. Uninstall exited 0, removed the installed binaries, shortcut and registration, and preserved every retained file byte for byte. The tester archived the owned profile and verified that the default data directory was absent. [Migration, native navigation and uninstall](evidence/sprint-12/installed-build-10.json)
+
 ## Windows release gates
 
 PKG-001 through PKG-006 and PKG-009 still require applicable release evidence. Outstanding checks include the published one-to-three-command path on a clean supported Windows user, release signature and independent trust, the exact shipping artifact's offline smoke, and wrong-architecture rejection. The local channel uses its own identity and seeded profile. The full Windows lifecycle, native E2E and release acceptance matrix remains open. macOS and Linux packaging have separate release gates. [Windows package scenarios](../spec/test_platform_traceability.csv) · [Acceptance criteria](../spec/acceptance_platform_traceability.csv) · [Sprint requirements](../spec/sprints/sprint_12_release_verification.md)
@@ -44,6 +46,8 @@ The Windows metadata finalizer wrote a fixture manifest after verifying the inde
 E2E-020 passed on Windows 11 x64 build 22631.7652. Clean runner `1bf7e77` launched the normal installed executable from local package 9. Through the window's native controls, it opened an offline Markdown image attachment, observed the unavailable-image state, selected cached PR file `second.txt`, and switched the diff to split mode. The saved workspace corroborated the file and view. The app quit normally. [Native actions, persisted state and artifact identities](evidence/sprint-12/installed-runtime.json)
 
 The matched build contained 393 unique Windows dependency names and imported 39 libraries from its PE executable. The three process observations each found 72 loaded modules, zero descendants and zero recognized browser components. These observations cover the installed local artifact and the sampled UI states. The exact published package remains pending. [Inventory inputs and counts](evidence/sprint-12/installed-runtime.json) · [Canonical runner and fixture](../../tools/native/README.md)
+
+E2E-020 also passed on installed local build 10. Its build contained 393 dependency names and 39 PE imports. Each of the three native Markdown and diff observations again recorded 72 modules, zero child processes and zero browser matches. [Build 10 runtime and artifact identities](evidence/sprint-12/installed-build-10.json)
 
 ## Cached reader performance
 

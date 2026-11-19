@@ -95,7 +95,7 @@ AC-31,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-32,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-32,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-32,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-33,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Sprint 01 verified warm activation of the registered fixture into PR 72. Full cached-item and cold-launch acceptance remains due. ../reports/evidence/windows-11-release/registered-notification.json
+AC-33,windows,11,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Sprint 01 verified a warm shell activation into PR 72. Installed local build 10 verified cold and warm registered callbacks into cached issue 42. The cold shell click remains blocked. ../reports/evidence/sprint-11/registered-callback.json
 AC-33,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-33,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-34,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
@@ -254,7 +254,7 @@ AC-84,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-85,windows,03,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-85,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-85,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-86,windows,11,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Local Windows feed fallback, retained draft, installed native group after full exit; cold activation awaiting verification. ../reports/sprint-11.md"
+AC-86,windows,11,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Installed local build 10 verified native delivery and all four callback paths. The cold shell click and exact published package remain open. ../reports/evidence/sprint-11/registered-callback.json
 AC-86,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-86,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-87,windows,,12,no,Not applicable,Scenario belongs to another platform-only milestone.,

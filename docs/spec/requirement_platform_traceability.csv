@@ -122,7 +122,7 @@ WORKSPACE-09,linux,Linux release,04,14,14,yes,Planned,Actual target evidence req
 WORKSPACE-10,windows,Windows first release,05,12,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Durable policy, SQLite scheduler, real update feeds and native Windows control evidence. docs/reports/sprint-05.md"
 WORKSPACE-10,macos,macOS release,05,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-10,linux,Linux release,05,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-WORKSPACE-11,windows,Windows first release,04,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
+WORKSPACE-11,windows,Windows first release,04,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. ../reports/sprint-04.md. Cold and warm installed Windows callbacks preserved the unrelated draft. ../reports/evidence/sprint-11/registered-callback.json"
 WORKSPACE-11,macos,macOS release,04,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-11,linux,Linux release,04,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 WORKSPACE-12,windows,Windows first release,04,08,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Cached reader, SQLite and GPUI evidence; external Windows journeys and release gates remain open. docs/reports/sprint-04.md"
@@ -377,7 +377,7 @@ NOTIFY-16,linux,Linux release,07,14,14,yes,Planned,Actual target evidence requir
 NOTIFY-17,windows,Windows first release,11,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-17,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-17,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-NOTIFY-18,windows,Windows first release,11,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
+NOTIFY-18,windows,Windows first release,11,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,Cold and warm Windows callbacks opened cached issue 42 and retained the issue 41 draft. ../reports/evidence/sprint-11/registered-callback.json
 NOTIFY-18,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-18,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-19,windows,Windows first release,11,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Local Windows feed fallback, retained draft and native registration. ../reports/sprint-11.md"
