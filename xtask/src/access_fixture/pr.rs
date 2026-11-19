@@ -37,6 +37,7 @@ pub(super) fn applies(phase: Phase) -> bool {
             | Phase::PrDelay
             | Phase::PrRelease
             | Phase::PrSharedHold
+            | Phase::PrSharedReady
             | Phase::PrSharedRelease
             | Phase::ReviewSend
             | Phase::ReviewChanged
@@ -83,11 +84,24 @@ fn data(phase: Phase, route: Route) -> Option<Value> {
             "pull_request":{"url":format!("https://api.github.com/repos/fixture-org/private/pulls/{number}")}
         })
     };
+    let shared_body = {
+        let mut body = "Closes #41. Resolves #44.".to_owned();
+        if matches!(
+            phase,
+            Phase::PrSharedReady | Phase::PrSharedHold | Phase::PrSharedRelease
+        ) {
+            for index in 1..=18 {
+                use std::fmt::Write as _;
+                write!(body, "\n\nReading checkpoint {index}. The original provider text stays in both views.").expect("write to String");
+            }
+        }
+        body
+    };
     let first = || {
         summary(
             42,
             "First fixture pull request",
-            "Closes #41. Resolves #44.",
+            shared_body.as_str(),
             "2021-01-01T00:00:00Z",
         )
     };
@@ -326,7 +340,7 @@ pub(super) fn trace_shared(records: &[RequestEvidence]) -> bool {
         .all(|route| {
             records
                 .iter()
-                .any(|row| row.phase == Phase::PrLoad && row.route == route)
+                .any(|row| row.phase == Phase::PrSharedReady && row.route == route)
         })
         && records
             .iter()
@@ -381,6 +395,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn shared_pr_refresh_changes_the_header_without_replacing_its_reading_text() {
+        let list = response(Phase::PrSharedReady, Route::Items).unwrap().body;
+        let body = list[0]["body"].as_str().unwrap();
+        assert_eq!(body.matches("Reading checkpoint ").count(), 18);
+        for phase in [
+            Phase::PrSharedReady,
+            Phase::PrSharedHold,
+            Phase::PrSharedRelease,
+        ] {
+            let pull = response(phase, Route::PullA).unwrap().body;
+            assert_eq!(pull["body"], body);
+            assert_eq!(pull["head"]["sha"], A_HEAD);
+            assert_eq!(pull["draft"], phase != Phase::PrSharedReady);
+        }
+    }
+
+    #[test]
     fn shared_pr_fixture_holds_the_exact_review_page_until_its_own_release() {
         let directory = tempfile::tempdir().unwrap();
         let fixture = AccessFixture::start(directory.path()).unwrap();
@@ -396,8 +427,10 @@ mod tests {
             socket.read_to_string(&mut output).unwrap();
             output
         };
-        fs::write(fixture.phase_file(), "pr-load").unwrap();
-        assert!(get(ITEMS).contains("First fixture pull request"));
+        fs::write(fixture.phase_file(), "pr-shared-ready").unwrap();
+        let list = get(ITEMS);
+        assert!(list.contains("First fixture pull request"));
+        assert!(list.contains("Reading checkpoint 18"));
         assert!(get("/repositories/71/pulls/42").contains("\"draft\":false"));
         assert!(
             get(&format!(

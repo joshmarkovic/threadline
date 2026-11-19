@@ -968,7 +968,7 @@ try {
             NotificationSchedule { 'sync-live' }
             NativeActivity { 'activity-offline' }
             PullRequest { 'pr-load' }
-            SharedPullRequest { 'pr-load' }
+            SharedPullRequest { 'pr-shared-ready' }
             ReviewDraft { 'pr-load' }
             ReviewDecisions { 'review-decisions' }
             ReviewPredecessor { 'review-predecessor' }

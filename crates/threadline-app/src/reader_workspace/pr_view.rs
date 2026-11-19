@@ -99,6 +99,8 @@ pub(crate) struct SharedPrPaneObservation {
     provider_draft: Option<bool>,
     review_coverage: Option<String>,
     review_rows: Option<usize>,
+    conversation_offset: Option<u32>,
+    files_context_offset: Option<u32>,
     view: PrObservation,
 }
 
@@ -119,7 +121,8 @@ impl ReaderWorkspace {
             .enumerate()
             .filter_map(|(pane, slot)| {
                 let tab = slot.active.and_then(|index| slot.tabs.get(index))?;
-                let cached = self.tab_views.get(&tab.id)?.pr.as_ref()?;
+                let item_view = self.tab_views.get(&tab.id)?;
+                let cached = item_view.pr.as_ref()?;
                 let reviews = cached
                     .data
                     .pages
@@ -132,6 +135,10 @@ impl ReaderWorkspace {
                     provider_draft: cached.data.header.draft,
                     review_coverage: reviews.map(|page| format!("{:?}", page.state.coverage)),
                     review_rows: reviews.map(|page| page.rows.len()),
+                    conversation_offset: (item_view.scroll.bounds().size.height > px(0.))
+                        .then(|| (-item_view.scroll.offset().y.as_f32()).max(0.) as u32),
+                    files_context_offset: (cached.context_scroll.bounds().size.height > px(0.))
+                        .then(|| (-cached.context_scroll.offset().y.as_f32()).max(0.) as u32),
                     view: self.pr_observation(tab, cx)?,
                 })
             })
@@ -827,6 +834,31 @@ impl ReaderWorkspace {
             ),
             PrContextMode::Issue => self.pr_issue_context(pane, tab, pr, palette, cx),
         };
+        let context_id = format!("pr-{pane}-context-content");
+        let viewport = div()
+            .id(context_id.clone())
+            .role(Role::Group)
+            .aria_label(match mode {
+                PrContextMode::Body => "Pull request body",
+                PrContextMode::Issue => "Linked issue",
+            })
+            .track_scroll(match mode {
+                PrContextMode::Body => &pr.context_scroll,
+                PrContextMode::Issue => &pr.issue_scroll,
+            })
+            .overflow_y_scroll()
+            .flex_1()
+            .min_h_0()
+            .p_2()
+            .child(content);
+        #[cfg(feature = "e2e")]
+        let viewport = if let Some(observer) = self.observer.as_ref() {
+            viewport
+                .relative()
+                .child(observer.visible_control_bounds(context_id))
+        } else {
+            viewport
+        };
         div()
             .flex()
             .flex_col()
@@ -839,24 +871,7 @@ impl ReaderWorkspace {
                     .relative()
                     .keep_text_selection(format!("pr-{pane}-context-controls")),
             )
-            .child(
-                div()
-                    .id(format!("pr-{pane}-context-content"))
-                    .role(Role::Group)
-                    .aria_label(match mode {
-                        PrContextMode::Body => "Pull request body",
-                        PrContextMode::Issue => "Linked issue",
-                    })
-                    .track_scroll(match mode {
-                        PrContextMode::Body => &pr.context_scroll,
-                        PrContextMode::Issue => &pr.issue_scroll,
-                    })
-                    .overflow_y_scroll()
-                    .flex_1()
-                    .min_h_0()
-                    .p_2()
-                    .child(content),
-            )
+            .child(viewport)
             .into_any_element()
     }
 

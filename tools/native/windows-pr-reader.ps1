@@ -179,8 +179,43 @@ function Wait-SharedPrPanes([string]$Description, [long]$Item, [scriptblock]$Che
     }
 }
 
+function Move-SharedPrReadingPosition([IntPtr]$Window, [long]$Item, [bool]$FilesContext) {
+    $pane = if ($FilesContext) { 1 } else { 0 }
+    $id = if ($FilesContext) { 'pr-1-context-content' } else { 'reader-conversation-0' }
+    $section = if ($FilesContext) { 'Files' } else { 'Conversation' }
+    $field = if ($FilesContext) { 'files_context_offset' } else { 'conversation_offset' }
+    $surface = Wait-State 'the precise visible viewport for the existing PR pane' {
+        param($state)
+        $reader = $state.PSObject.Properties['cached_reader']
+        if ($null -eq $reader -or $null -eq $reader.Value) { return $false }
+        $positions = $reader.Value.PSObject.Properties['shared_pr_panes']
+        $bounds = $state.bounds.PSObject.Properties[$id]
+        if ($null -eq $positions -or @($positions.Value).Count -ne 2 -or $null -eq $bounds -or
+            $bounds.Value[2] -le 0 -or $bounds.Value[3] -le 0) { return $false }
+        $target = $positions.Value[$pane]
+        $target.item -eq $Item -and $target.view.section -ceq $section -and
+            $null -ne $target.PSObject.Properties[$field].Value
+    }
+    $target = $surface.cached_reader.shared_pr_panes[$pane]
+    $before = $target.PSObject.Properties[$field].Value
+    $rect = $surface.bounds.PSObject.Properties[$id].Value
+    $point = To-ClientPoint ($rect[0] + $rect[2] / 2) ($rect[1] + $rect[3] / 2) $surface.scale_factor
+    [ThreadlineWinInput]::ScrollOwnedConversation($Window, [uint32]$script:app.Id,
+        [uint32][Math]::Round(96 * $surface.scale_factor), $point, -1)
+    $receipt = Wait-SharedPrPanes 'the same native viewport records a nonzero reading position' $Item {
+        param($left, $right)
+        $view = if ($FilesContext) { $right } else { $left }
+        $view.view.section -ceq $section -and $view.PSObject.Properties[$field].Value -gt $before
+    }
+    $after = $receipt.cached_reader.shared_pr_panes[$pane].PSObject.Properties[$field].Value
+    Add-Evidence 'Move the reading position of one exact owned PR viewport' ([ordered]@{
+        automation_id = $id; input = 'Owned HWND WM_MOUSEWHEEL'; before = $before; after = $after
+    })
+    return $after
+}
+
 function Invoke-SharedPrPanesProof([IntPtr]$Window) {
-    Set-AccessPhase 'pr-load'
+    Set-AccessPhase 'pr-shared-ready'
     Wait-SeededFixtureAccount
     Click-AccountControl $Window 'reader-repository-1'
     Click-AccountControl $Window 'reader-fetch-repository'
@@ -212,6 +247,12 @@ function Invoke-SharedPrPanesProof([IntPtr]$Window) {
         $reader.focused_pane -eq 1 -and $pr.head -ceq $head -and $pr.section -ceq 'Files' -and
             $pr.selected_file -ceq $path -and $pr.diff_mode -ceq 'Split'
     }
+    Click-AccountControl $Window 'pr-1-next-change'
+    $null = Wait-PrReader 'the right pane anchors its code to the exact modified source' {
+        param($pr, $reader)
+        $reader.focused_pane -eq 1 -and $null -ne $pr.source_anchor -and
+            $pr.source_anchor.path -ceq $path -and $pr.source_anchor.side -ceq 'Right' -and $pr.source_anchor.line -eq 1
+    }
     Wait-For 'restore both panes after setting the split view in the maximized duplicate' {
         Invoke-OwnedFixtureControl $Window 'reader-maximize-pane' $null 'Restore panes'
     }
@@ -222,6 +263,9 @@ function Invoke-SharedPrPanesProof([IntPtr]$Window) {
             $right.view.section -ceq 'Files' -and $right.view.selected_file -ceq $path -and $right.view.diff_mode -ceq 'Split'
     }
     Click-AccountControl $Window 'pr-0-conversation'
+    Click-PrContext $Window 1
+    $null = Move-SharedPrReadingPosition $Window $item $true
+    $filesContextOffset = Move-SharedPrReadingPosition $Window $item $true
     Click-AccountControl $Window 'pr-1-conversation'
     $baseline = Wait-SharedPrPanes 'the two existing views show conversation before either requests the review family' $item {
         param($left, $right, $reader)
@@ -230,6 +274,8 @@ function Invoke-SharedPrPanesProof([IntPtr]$Window) {
             [int]$left.review_rows -eq 0 -and [int]$right.review_rows -eq 0 -and
             $left.review_coverage -cne 'Complete' -and $right.review_coverage -cne 'Complete' -and $reader.pending_pr_reads -eq 0
     }
+    $conversationOffset = Move-SharedPrReadingPosition $Window $item $false
+    if ($conversationOffset -eq $filesContextOffset) { throw 'The two reading viewports did not establish distinct positions.' }
     $tabs = @($baseline.cached_reader.shared_pr_panes.tab)
     $revision = $baseline.cached_reader.shared_pr_panes[0].view.revision_id
     Set-AccessPhase 'pr-shared-hold'
@@ -246,6 +292,9 @@ function Invoke-SharedPrPanesProof([IntPtr]$Window) {
             $left.tab -ceq $tabs[0] -and $right.tab -ceq $tabs[1] -and $left.view.revision_id -eq $revision -and
                 $left.view.section -ceq 'Conversation' -and $right.view.section -ceq 'Files' -and
                 $right.view.selected_file -ceq $path -and $right.view.diff_mode -ceq 'Split' -and
+            $null -ne $right.view.source_anchor -and $right.view.source_anchor.path -ceq $path -and
+            $right.view.source_anchor.side -ceq 'Right' -and $right.view.source_anchor.line -eq 1 -and
+            $left.conversation_offset -eq $conversationOffset -and $right.files_context_offset -eq $filesContextOffset -and
                 [int]$left.review_rows -eq 0 -and $reader.pending_pr_reads -eq 1
         }
     } finally {
@@ -257,16 +306,21 @@ function Invoke-SharedPrPanesProof([IntPtr]$Window) {
         $anchor = @($left.view.review_draft.anchors)
         $left.tab -ceq $tabs[0] -and $right.tab -ceq $tabs[1] -and $left.view.revision_id -eq $revision -and
             $left.view.section -ceq 'Conversation' -and $right.view.section -ceq 'Files' -and
+            $left.conversation_offset -eq $conversationOffset -and $right.files_context_offset -eq $filesContextOffset -and
             $left.provider_draft -eq $true -and $right.provider_draft -eq $true -and
             $left.review_coverage -ceq 'Partial' -and $left.review_rows -eq 1 -and
             $right.view.files_coverage -ceq 'Complete' -and $right.view.selected_file -ceq $path -and $right.view.diff_mode -ceq 'Split' -and
+            $null -ne $right.view.source_anchor -and $right.view.source_anchor.path -ceq $path -and
+            $right.view.source_anchor.side -ceq 'Right' -and $right.view.source_anchor.line -eq 1 -and
             $left.view.review_draft.id -ceq $draft -and $right.view.review_draft.id -ceq $draft -and
             $left.view.review_draft.saved -and $left.view.review_draft.owner_tab -and !$right.view.review_draft.owner_tab -and
             $anchor.Count -eq 1 -and $anchor[0].path -ceq $path -and $anchor[0].side -ceq 'Right' -and
             $anchor[0].first_line -eq 1 -and $anchor[0].last_line -eq 1 -and $anchor[0].source_oid -ceq $head -and
             $reader.pending_pr_reads -eq 0 -and $reader.outbox -eq 0
     }
-    Add-Evidence 'Publish the shared refresh to both panes and retain the independent code and anchored unsent review' $after.cached_reader.shared_pr_panes
+    $null = Wait-AccountControl 'reader-conversation-0'
+    $null = Wait-AccountControl 'pr-1-context-content'
+    Add-Evidence 'Publish one shared refresh while the two visible reading positions and unsent review remain separate' $after.cached_reader.shared_pr_panes
     Stop-ThroughUi
     $script:report.detail = 'Two native tabs displayed Conversation and Files for the same pull request during a held shared review refresh. The same provider revision and draft remained bound, Files kept its split path, and the Conversation showed one partial review page.'
 }

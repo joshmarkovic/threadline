@@ -17,7 +17,7 @@ pub fn scenario_ids() -> impl Iterator<Item = &'static str> {
 
 pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == "S06-SHARED-PR-PANES" {
-        return Some("s06-shared-pr-panes-v1");
+        return Some("s06-shared-pr-panes-v2");
     }
     if case == "S08-COMMENT-DEPENDENCY" {
         return Some("s08-native-comment-dependency-v1");
