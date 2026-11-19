@@ -243,6 +243,7 @@ pub(super) fn run(action: &str, nonce: &str) -> R<Value> {
             result
         }
         "inspect-seed" => inventory(&stored, nonce, &key),
+        "inspect-backup-copy" => inventory(&root.join("migration-backup-check"), nonce, &key),
         "inspect-default" => inventory(&NativePaths.application_paths()?.data, nonce, &key),
         "cleanup-key" => {
             owned(&stored, nonce)?;

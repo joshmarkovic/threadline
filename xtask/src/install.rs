@@ -44,8 +44,17 @@ struct TrustedFixture {
 struct RetentionInputs {
     fixture: ExpectedPackage,
     bootstrap: ExpectedPackage,
+    migration: Option<RetainedMigration>,
     #[serde(default)]
     preserve_files: Vec<ExpectedPackage>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RetainedMigration {
+    predecessor_fixture: ExpectedPackage,
+    from_schema: u32,
+    to_schema: u32,
 }
 
 #[derive(Deserialize)]
@@ -309,6 +318,17 @@ fn run_matrix(
             .arg(&inputs.bootstrap.sha256)
             .arg("-EvidenceDirectory")
             .arg(dir);
+        if let Some(migration) = &inputs.migration {
+            native
+                .arg("-PredecessorFixture")
+                .arg(&migration.predecessor_fixture.path)
+                .arg("-PredecessorFixtureSha256")
+                .arg(&migration.predecessor_fixture.sha256)
+                .arg("-FromSchema")
+                .arg(migration.from_schema.to_string())
+                .arg("-ToSchema")
+                .arg(migration.to_schema.to_string());
+        }
     }
     let Ok(output) = native.output() else {
         return linked(
@@ -380,6 +400,27 @@ fn read_receipt(path: &Path) -> Option<MatrixReceipt> {
     serde_json::from_slice(&fs::read(path).ok()?).ok()
 }
 
+fn verified_schema_transition(receipt: &serde_json::Value, inputs: &RetentionInputs) -> bool {
+    let before = &receipt["before"];
+    let retained = &receipt["after_default_uninstall"];
+    let transition = &receipt["migration"];
+    let Some(migration) = &inputs.migration else {
+        return transition.is_null() && before == retained;
+    };
+    let mut expected_retained = before.clone();
+    if !before.is_object() || before["schema"] != migration.from_schema {
+        return false;
+    }
+    expected_retained["schema"] = json!(migration.to_schema);
+    let backup = &transition["backup_sha256"];
+    retained == &expected_retained
+        && transition["predecessor_fixture_sha256"] == migration.predecessor_fixture.sha256
+        && transition["backup_snapshot"] == *before
+        && backup.as_str().is_some_and(valid_digest)
+        && transition["backup_after_uninstall_sha256"] == *backup
+        && transition["backup_after_cleanup_sha256"] == *backup
+}
+
 fn verified_retention(path: &Path, inputs: &RetentionInputs, candidate: &str) -> bool {
     let Ok(file) = File::open(path) else {
         return false;
@@ -398,7 +439,7 @@ fn verified_retention(path: &Path, inputs: &RetentionInputs, candidate: &str) ->
         && receipt["fixture_sha256"] == inputs.fixture.sha256
         && receipt["bootstrap_sha256"] == inputs.bootstrap.sha256
         && receipt["current_sha256"] == candidate
-        && receipt["before"] == receipt["after_default_uninstall"]
+        && verified_schema_transition(&receipt, inputs)
         && receipt["before"]["protected_credential_present"] == true
         && receipt["before"]["step_receipts"] == 1
         && receipt["before"]["queued_operations"] == 8
@@ -499,6 +540,21 @@ fn trusted_fixture(config: &Path, candidate_digest: &str) -> Result<TrustedFixtu
         if inputs.preserve_files.len() > 64 {
             return Err("Supply at most 64 pinned files from the previous synthetic archives.");
         }
+        if let Some(migration) = &mut inputs.migration {
+            if migration.from_schema == 0
+                || migration.from_schema >= migration.to_schema
+                || migration.predecessor_fixture.path.file_name() != inputs.fixture.path.file_name()
+                || migration
+                    .predecessor_fixture
+                    .sha256
+                    .eq_ignore_ascii_case(&inputs.fixture.sha256)
+            {
+                return Err(
+                    "Pin the predecessor fixture and an increasing package schema interval.",
+                );
+            }
+            pinned.push(&mut migration.predecessor_fixture);
+        }
         pinned.extend([&mut inputs.fixture, &mut inputs.bootstrap]);
         pinned.extend(&mut inputs.preserve_files);
     }
@@ -565,6 +621,29 @@ mod tests {
         let approved = trusted_fixture(&notes, &digest).unwrap().retention.unwrap();
         assert_eq!(approved.fixture.path, helper);
         assert_eq!(approved.bootstrap.path, bootstrap);
+        let predecessor_dir = dir.path().join("previous");
+        fs::create_dir(&predecessor_dir).unwrap();
+        let predecessor_fixture = predecessor_dir.join("package_retention_fixture.exe");
+        fs::write(&predecessor_fixture, b"previous independently built seeder").unwrap();
+        extended["retention"]["migration"] = json!({
+            "predecessor_fixture": {"path": "previous/package_retention_fixture.exe", "sha256": sha256(&predecessor_fixture).unwrap()},
+            "from_schema": 15, "to_schema": 17
+        });
+        fs::write(&notes, serde_json::to_vec(&extended).unwrap()).unwrap();
+        let approved = trusted_fixture(&notes, &digest).unwrap().retention.unwrap();
+        assert_eq!(
+            approved.migration.unwrap().predecessor_fixture.path,
+            predecessor_fixture
+        );
+        extended["retention"]["migration"]["predecessor_fixture"]["sha256"] =
+            json!(sha256(&helper).unwrap());
+        fs::write(&notes, serde_json::to_vec(&extended).unwrap()).unwrap();
+        assert!(trusted_fixture(&notes, &digest).is_err());
+        extended["retention"]
+            .as_object_mut()
+            .unwrap()
+            .remove("migration");
+        fs::write(&notes, serde_json::to_vec(&extended).unwrap()).unwrap();
         fs::write(&helper, b"substituted helper").unwrap();
         assert_eq!(
             trusted_fixture(&notes, &digest).err(),
@@ -651,6 +730,7 @@ mod tests {
                 path: "threadline-installer.exe".into(),
                 sha256: "b".repeat(64),
             },
+            migration: None,
             preserve_files: vec![ExpectedPackage {
                 path: old.clone(),
                 sha256: sha256(&old).unwrap(),
@@ -689,6 +769,57 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&receipt).unwrap()).unwrap();
         fs::write(old, b"changed archive").unwrap();
         assert!(!verified_retention(&path, &inputs, &candidate));
+    }
+
+    #[test]
+    fn retained_migration_requires_the_predecessor_and_its_unchanged_backup() {
+        let package = |pin: &str| ExpectedPackage {
+            path: "package_retention_fixture.exe".into(),
+            sha256: pin.repeat(64),
+        };
+        let inputs = RetentionInputs {
+            fixture: package("a"),
+            bootstrap: package("b"),
+            migration: Some(RetainedMigration {
+                predecessor_fixture: package("c"),
+                from_schema: 15,
+                to_schema: 17,
+            }),
+            preserve_files: vec![],
+        };
+        let before = json!({"schema":15,"durable_projection_sha256":"1".repeat(64)});
+        let mut after = before.clone();
+        after["schema"] = json!(17);
+        let record = json!({
+            "before":before,"after_default_uninstall":after,
+            "migration":{"predecessor_fixture_sha256":"c".repeat(64),"backup_snapshot":before,
+                "backup_sha256":"2".repeat(64),"backup_after_uninstall_sha256":"2".repeat(64),
+                "backup_after_cleanup_sha256":"2".repeat(64)}
+        });
+        assert!(verified_schema_transition(&record, &inputs));
+        for (pointer, bad) in [
+            ("/before/schema", json!(17)),
+            ("/after_default_uninstall/schema", json!(15)),
+            (
+                "/after_default_uninstall/durable_projection_sha256",
+                json!("changed"),
+            ),
+            (
+                "/migration/predecessor_fixture_sha256",
+                json!("a".repeat(64)),
+            ),
+            ("/migration/backup_snapshot/schema", json!(17)),
+            ("/migration/backup_sha256", json!(null)),
+            ("/migration/backup_after_uninstall_sha256", json!(null)),
+            (
+                "/migration/backup_after_cleanup_sha256",
+                json!("f".repeat(64)),
+            ),
+        ] {
+            let mut damaged = record.clone();
+            *damaged.pointer_mut(pointer).unwrap() = bad;
+            assert!(!verified_schema_transition(&damaged, &inputs), "{pointer}");
+        }
     }
 
     #[test]

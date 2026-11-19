@@ -5,6 +5,7 @@ param(
     [Parameter(Mandatory)][string]$StageFailure, [Parameter(Mandatory)][string]$StageFailureSha256,
     [Parameter(Mandatory)][string]$Fixture, [Parameter(Mandatory)][string]$FixtureSha256,
     [Parameter(Mandatory)][string]$Bootstrap, [Parameter(Mandatory)][string]$BootstrapSha256,
+    [string]$PredecessorFixture, [string]$PredecessorFixtureSha256, [uint32]$FromSchema, [uint32]$ToSchema,
     [Parameter(Mandatory)][string]$EvidenceDirectory
 )
 Set-StrictMode -Version Latest
@@ -31,21 +32,34 @@ function Get-Digest([string]$Path) {
     Assert-Ordinary $Path
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
-function Get-Snapshot([string[]]$Arguments) {
-    if ((Get-Digest $Fixture) -ine $FixtureSha256) { throw 'The pinned fixture helper changed.' }
-    $output = & $Fixture @Arguments
+function Get-Snapshot([string[]]$Arguments,[string]$Helper=$Fixture,[string]$Pin=$FixtureSha256) {
+    if ((Get-Digest $Helper) -ine $Pin) { throw 'The pinned fixture helper changed.' }
+    $output = & $Helper @Arguments
     if ($LASTEXITCODE -ne 0) { throw 'The package fixture check failed. Preserve its workspace for inspection.' }
     $snapshot = $output | ConvertFrom-Json
     if ($snapshot.status -cne 'Pass') { throw 'The helper returned an incomplete fixture receipt.' }
     return $snapshot
 }
-function Get-ClosedDigest([string]$Directory) {
+function Get-ClosedDigest([string]$Directory,[string]$BackupName='') {
     Assert-Ordinary $Directory
-    if (@(Get-ChildItem -LiteralPath $Directory -Force).Count -ne 2) { throw 'Unknown profile entries were preserved.' }
+    $count = 2
+    if ($BackupName) {
+        if ($BackupName -cnotmatch ('^threadline-schema-'+$FromSchema+'-[A-Za-z0-9]{6}\.sqlite3$')) { throw 'Unexpected backup name.' }
+        Assert-Ordinary (Join-Path $Directory $BackupName)
+        $count++
+    }
+    if (@(Get-ChildItem -LiteralPath $Directory -Force).Count -ne $count) { throw 'Unknown profile entries were preserved.' }
     $marker = Join-Path $Directory 'threadline-package-retention.owner'
     Assert-Ordinary $marker
     if ([IO.File]::ReadAllText($marker) -cne ('package-retention-v1/'+$nonce)) { throw 'The owner marker changed.' }
     return Get-Digest (Join-Path $Directory 'threadline.sqlite3')
+}
+function Copy-CheckedFixture([string]$Source,[string]$Database,[string]$Destination,[string]$Digest) {
+    $null = New-Item -ItemType Directory -Path $Destination -ErrorAction Stop
+    $marker = 'threadline-package-retention.owner'
+    [IO.File]::Copy((Join-Path $Source $marker),(Join-Path $Destination $marker),$false)
+    [IO.File]::Copy((Join-Path $Source $Database),(Join-Path $Destination 'threadline.sqlite3'),$false)
+    if ((Get-ClosedDigest $Destination) -cne $Digest) { throw 'The fresh fixture copy differs.' }
 }
 function Assert-Seed($snapshot) {
     if (!$snapshot.protected_credential_present -or !$snapshot.profile_bound -or !$snapshot.work_offline -or
@@ -80,8 +94,19 @@ foreach ($asset in @(@($Fixture,$FixtureSha256),@($Bootstrap,$BootstrapSha256),@
     if ($asset[1] -cnotmatch '^[0-9A-Fa-f]{64}$' -or (Get-Digest $asset[0]) -ine $asset[1]) { throw 'A fixture asset differs from its independent pin.' }
 }
 $metadata = Get-Content -Raw -LiteralPath ($Current+'.json') | ConvertFrom-Json
-if ($metadata.channel -cne 'local-fixture' -or $metadata.sha256 -ine $CurrentSha256 -or $metadata.fixture_fault -cne 'none') {
+$previous = Get-Content -Raw -LiteralPath ($Predecessor+'.json') | ConvertFrom-Json
+if ($metadata.channel -cne 'local-fixture' -or $metadata.sha256 -ine $CurrentSha256 -or $metadata.fixture_fault -cne 'none' -or
+    $previous.channel -cne 'local-fixture' -or $previous.sha256 -ine $PredecessorSha256 -or $previous.fixture_fault -cne 'none' -or
+    $previous.current_schema -lt 1 -or $previous.current_schema -gt $metadata.current_schema) {
     throw 'Use the scoped local fixture package.'
+}
+$migrates = $previous.current_schema -ne $metadata.current_schema
+if ($migrates) {
+    if ($FromSchema -ne $previous.current_schema -or $ToSchema -ne $metadata.current_schema -or !$PredecessorFixture -or
+        $PredecessorFixtureSha256 -cnotmatch '^[A-Fa-f0-9]{64}$' -or $PredecessorFixtureSha256 -ieq $FixtureSha256 -or
+        (Get-Digest $PredecessorFixture) -ine $PredecessorFixtureSha256) { throw 'Pin the predecessor seeder and both package schemas.' }
+} elseif ($PredecessorFixture -or $PredecessorFixtureSha256 -or $FromSchema -or $ToSchema) {
+    throw 'The declared migration does not match the package schemas.'
 }
 $parent = Split-Path -Parent $data
 $nonce = [guid]::NewGuid().ToString('N')
@@ -90,17 +115,17 @@ $seed = Join-Path $root 'profile'
 $archive = Join-Path $root 'uninstalled-owned-data'
 $before = $null
 $enteredDefault = $false
+$backupName = ''
+$migration = $null
 $stage = 'seed'
 try {
-    $before = Get-Snapshot @('seed',$nonce)
+    $before = if ($migrates) { Get-Snapshot @('seed',$nonce) $PredecessorFixture $PredecessorFixtureSha256 }
+              else { Get-Snapshot @('seed',$nonce) }
+    if ($before.schema -ne $previous.current_schema) { throw 'The generated database does not match the predecessor schema.' }
     Assert-Seed $before
     $baseline = Get-ClosedDigest $seed
     $staging = Join-Path $root 'enter-default'
-    $null = New-Item -ItemType Directory -Path $staging
-    foreach ($file in @('threadline-package-retention.owner','threadline.sqlite3')) {
-        [IO.File]::Copy((Join-Path $seed $file),(Join-Path $staging $file),$false)
-    }
-    if ((Get-ClosedDigest $staging) -cne $baseline) { throw 'The fresh fixture copy differs.' }
+    Copy-CheckedFixture $seed 'threadline.sqlite3' $staging $baseline
     Assert-Ordinary $local
     if (!(Test-Path -LiteralPath $parent)) {
         $null = New-Item -ItemType Directory -Path $parent -ErrorAction Stop
@@ -125,8 +150,23 @@ try {
     $native = & (Join-Path $PSScriptRoot 'smoke-installed.ps1') -ExpectedExecutableSha256 $metadata.app_sha256
     $opened = ($native -join [Environment]::NewLine) | ConvertFrom-Json
     if (!$opened.owned_window -or !$opened.tab_activated -or $opened.selected_before_invocation -or !$opened.orderly_exit) { throw 'The installed fixture did not activate its inactive tab.' }
-    $closed = Get-ClosedDigest $data
-    Assert-Seed (Get-Snapshot @('inspect-default',$nonce))
+    if ($migrates) {
+        $backups = @(Get-ChildItem -LiteralPath $data -Force -File -Filter ('threadline-schema-'+$FromSchema+'-*.sqlite3'))
+        if ($backups.Count -ne 1) { throw 'Expected one pre-migration database backup from the installed app.' }
+        $backupName = $backups[0].Name
+    }
+    $closed = Get-ClosedDigest $data $backupName
+    $openedState = Get-Snapshot @('inspect-default',$nonce)
+    if ($openedState.schema -ne $metadata.current_schema) { throw 'Installed application did not open the advertised schema.' }
+    Assert-Seed $openedState
+    if ($migrates) {
+        $backupHash = Get-Digest (Join-Path $data $backupName)
+        Copy-CheckedFixture $data $backupName (Join-Path $root 'migration-backup-check') $backupHash
+        $backupState = Get-Snapshot @('inspect-backup-copy',$nonce)
+        if ($backupState.schema -ne $FromSchema) { throw 'The backup did not retain the predecessor schema.' }
+        Assert-Seed $backupState
+        $migration = [ordered]@{predecessor_fixture_sha256=$PredecessorFixtureSha256;backup_sha256=$backupHash;backup_snapshot=$backupState}
+    }
     $registered = Get-ItemProperty -LiteralPath $record
     $stage = 'final ordinary uninstall'
     if ($registered.InstallLocation -ine $installed -or $registered.UninstallString -ine ('"'+$uninstaller+'"') -or
@@ -141,29 +181,42 @@ try {
         if ($watch.ElapsedMilliseconds -gt 20000) { throw 'Installed fixture registration remains.' }
         Start-Sleep -Milliseconds 100
     }
-    if ((Get-ClosedDigest $data) -cne $closed) { throw 'Default uninstall changed the closed workspace.' }
+    if ((Get-ClosedDigest $data $backupName) -cne $closed) { throw 'Default uninstall changed the closed workspace.' }
     $retained = Get-Snapshot @('inspect-default',$nonce)
     Assert-Seed $retained
     [IO.Directory]::Move($data,$archive)
+    $checkpointSource = $archive
+    if ($migrates) {
+        $migration.backup_after_uninstall_sha256 = Get-Digest (Join-Path $archive $backupName)
+        if ($migration.backup_after_uninstall_sha256 -cne $backupHash) { throw 'Default uninstall changed the migration backup.' }
+        $copyRoot = Join-Path $root 'checkpoint-input'
+        $null = New-Item -ItemType Directory -Path $copyRoot -ErrorAction Stop
+        $checkpointSource = Join-Path $copyRoot 'uninstalled-owned-data'
+        Copy-CheckedFixture $archive 'threadline.sqlite3' $checkpointSource $closed
+    }
     $key = Get-Snapshot @('cleanup-key',$nonce)
     $stage = 'copied checkpoint resume'
-    $resume = Get-Snapshot @('resume',$archive,$nonce,$closed)
+    $resume = Get-Snapshot @('resume',$checkpointSource,$nonce,$closed)
     if ((Get-Digest $Bootstrap) -ine $BootstrapSha256) { throw 'The pinned bootstrap changed.' }
     $stage = 'separate confirmed cleanup'
-    $confirmed = Get-Snapshot @('confirm',$Bootstrap,$BootstrapSha256,$archive,$nonce,$closed)
+    $confirmed = Get-Snapshot @('confirm',$Bootstrap,$BootstrapSha256,$checkpointSource,$nonce,$closed)
+    if ($migrates) {
+        $migration.backup_after_cleanup_sha256 = Get-Digest (Join-Path $archive $backupName)
+        if ($migration.backup_after_cleanup_sha256 -cne $backupHash) { throw 'The archived migration backup changed.' }
+    }
     if (!$key.protected_fixture_key_absent -or !$resume.archived_bytes_unchanged -or !$confirmed.default_profile_absent_before_and_after -or
-        (Get-ClosedDigest $archive) -cne $closed -or (Test-Path -LiteralPath $data)) { throw 'Fixture cleanup or archive validation failed.' }
+        (Get-ClosedDigest $archive $backupName) -cne $closed -or (Test-Path -LiteralPath $data)) { throw 'Fixture cleanup or archive validation failed.' }
     Write-LocalReceipt 'windows-retained-package.json' ([ordered]@{status='Pass';fixture_sha256=$FixtureSha256;bootstrap_sha256=$BootstrapSha256;
         current_sha256=$CurrentSha256;retained_at_steps=$inspectedSteps.ToArray();native=$opened;
         initial_database_sha256=$baseline;closed_database_sha256=$closed;before=$before;after_default_uninstall=$retained;
-        copied_checkpoint=$resume;separate_confirmed_removal=$confirmed;default_data_absent=$true})
+        migration=$migration;copied_checkpoint=$resume;separate_confirmed_removal=$confirmed;default_data_absent=$true})
     $matrixReport | ConvertTo-Json -Depth 4
 } catch {
     $failure = $_
     if ($enteredDefault -and (Test-Path -LiteralPath $data)) {
         try {
             if (!(Get-Process -Name threadline -ErrorAction SilentlyContinue)) {
-                $null = Get-ClosedDigest $data
+                $null = Get-ClosedDigest $data $backupName
                 Assert-Seed (Get-Snapshot @('inspect-default',$nonce))
                 [IO.Directory]::Move($data,(Join-Path $root 'retained-after-interruption'))
             }
