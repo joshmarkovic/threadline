@@ -1,0 +1,79 @@
+{
+  "criterion": "AC-41",
+  "source_revision": "d851a780f19f58cdcfeb6f68279cd5e37459baf9",
+  "test": "ui_007_mention_delivery_respects_each_override_and_retains_the_comments",
+  "windows": {
+    "target": "x86_64-pc-windows-msvc",
+    "passed": 1,
+    "failed": 0,
+    "exit": 0,
+    "seconds": 0.91,
+    "binary_sha256": "788c72d4d6e66b18344bde28f77fa31b116e2e34a02c58c4e5fe30ed75ddd0cc",
+    "raw_log_sha256": "df05c26049dd81dd8f58fdc29a939344b7a32b9f7006d3e29cc94d1806f14ad6"
+  },
+  "linux_development": {
+    "passed": 1,
+    "seconds": 1.37,
+    "raw_log_sha256": "94f9b52e5fb1532bc5c43adb1ff6c535133aefcb9a3c34a5095831ed9c187a82"
+  },
+  "configuration": {
+    "ordinary_comments": "Off",
+    "direct_mentions": "Pop-up",
+    "sound": true
+  },
+  "cases": [
+    {
+      "comment": 8100,
+      "input": "ordinary comment",
+      "delivery": "Off",
+      "app_submissions": 0
+    },
+    {
+      "comment": 8101,
+      "input": "direct mention",
+      "delivery": "Pop-up",
+      "app_submissions": 1
+    },
+    {
+      "comment": 8102,
+      "input": "muted actor",
+      "delivery": "Off",
+      "app_submissions": 0
+    },
+    {
+      "comment": 8103,
+      "input": "muted actor with mention exception",
+      "delivery": "Pop-up",
+      "app_submissions": 1
+    },
+    {
+      "comment": 8104,
+      "input": "own action with mention exception",
+      "delivery": "Off",
+      "app_submissions": 0
+    },
+    {
+      "comment": 8105,
+      "input": "muted repository with mention exception",
+      "delivery": "Off",
+      "app_submissions": 0
+    },
+    {
+      "comment": 8106,
+      "input": "snoozed item with mention exception",
+      "delivery": "Feed only",
+      "app_submissions": 0
+    },
+    {
+      "comment": 8107,
+      "input": "quiet hours with mention exception",
+      "delivery": "Feed only",
+      "app_submissions": 0
+    }
+  ],
+  "cached_discussion_bodies_rendered": 8,
+  "captured_submissions": 2,
+  "single_event_groups_with_sound": 2,
+  "additional_submissions_on_next_delivery_pass": 0,
+  "scope": "Real incremental comment intake, SQLite decisions, application delivery and GPUI reader. A test adapter captured submissions. The separate installed shell click remains blocked."
+}

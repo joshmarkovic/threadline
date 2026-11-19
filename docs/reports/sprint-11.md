@@ -26,6 +26,8 @@ At `765e56c`, the read-only client checked the designated private repository and
 
 ## Windows Quiet hours and synchronization controls
 
+Windows UI-007 ingested eight comments with ordinary comments Off and direct mentions set to Pop-up. The app submitted exactly two single-event alerts, one for an ordinary direct mention and one for a muted actor with an explicit mention exception. Own actions and repository mute suppressed delivery. Snooze and quiet hours sent eligible mentions to the feed without sound. All eight comment bodies remained in the rendered issue discussion. The app used a fixture delivery adapter. [Decision for each comment and Windows test receipt](evidence/sprint-11/mention-precedence.json)
+
 E2E-013 passed on Windows 11 x64 build 22631.7652 at 96 DPI with clean app and runner `c93a8cf` and native driver `6b57731`. The native settings saved a UTC quiet window. A separate process restored Work Offline, background read pause and Outbox pause. The isolated fixture added one activity event and one typed queued action for the known repository. The native Activity feed displayed the event after reconnection with a Feed only decision, Quiet hours as the suppression reason, and sound off. [Native settings, restart and feed observations](evidence/sprint-11/native-schedule.json)
 
 The provider recorded 11 loopback requests. The initial issue and comment scans both returned 200. The offline restart produced no requests. With both pauses still set, Check now reached the provider and displayed HTTP 503 as a service error. Resuming just Outbox sent the original queued comment once and returned HTTP 201. [Recorded request trace and checkpoints](evidence/sprint-11/native-schedule.json)
