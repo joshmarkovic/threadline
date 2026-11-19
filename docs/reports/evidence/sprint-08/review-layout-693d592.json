@@ -1,0 +1,59 @@
+{
+  "acceptance": ["AC-78"],
+  "scenarios": ["UI-001", "UI-004"],
+  "scope": "In-process GPUI application tests with an isolated SQLite profile and synthetic downloaded pull requests",
+  "source_revision": "693d5921e0084a6ededffcb0840f6c0ea5d0329a",
+  "app_version": "0.1.0",
+  "cargo_lock_sha256": "ba1fa2481ba47ebb082dae4aff8bf1a099cea5775b4196b096aeb3bb094d4efb",
+  "fixtures": ["FX-PR", "FX-DIFF", "s02-storage-v1"],
+  "observations": {
+    "modeled_window_dip": {"wide": [2200, 1450], "narrow": [1220, 1450]},
+    "wide_default": "PR body starts beside the code comparison with 30 to 35 percent of the review width. Widen, collapse and expand the bound context pane.",
+    "narrow_layout": "Context and Code controls switch the focused surface. Two panes contain the original PR, an independent Conversation tab and another PR opened beside the original.",
+    "offline_reopen": "A fresh workspace reopens the persisted two-pane layout, linked issue 102 and split comparison. The PR body and linked issue each return to their own distinct nonzero position.",
+    "source_and_editor": "The original anchored source line returns before input, on the same file and head. The draft keeps both inline anchors and the same owner, identity and saved content. The diff and editor do not claim focus on hydration. Show review editor focuses it deliberately. The Outbox stays unchanged."
+  },
+  "windows": {
+    "host": {"os": "Windows 11 Enterprise", "build": "10.0.22631.7652", "architecture": "x86_64"},
+    "build_command": "cargo test --locked --offline -p threadline-app --lib --features e2e --no-run --target x86_64-pc-windows-msvc --message-format json",
+    "argv": ["threadline_app-2ae9192585e4506d.exe", "ui_004", "ui_001_pr_context", "--test-threads=1"],
+    "executable_sha256": "e1855bcfe914566bf881316c6d1fdfb330a9ddeff8bc602d9ea7a0d1c63f642d",
+    "status": "Pass",
+    "exit_code": 0,
+    "tests_passed": 4,
+    "tests_failed": 0,
+    "tests_ignored": 0,
+    "tested": [
+      "ui_001_pr_context_changes_keep_the_immutable_native_diff_and_each_tabs_state",
+      "ui_004_anchored_review_draft_survives_pr_context_changes_and_queues_the_original_head",
+      "ui_004_existing_threads_follow_verified_source_lines_in_both_diff_modes",
+      "ui_004_narrow_pr_layout_restores_context_positions_and_original_review"
+    ],
+    "raw_sha256": {
+      "test_stdout": "b277893b3cbf1aac7d5d84e83356e731f260099b5dcc89c10f493ce0b8ada0fc",
+      "numeric_exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "cargo_build_jsonl": "60930b0e6036f497b8897ce7b3794dfc918d237f99de0061d7574e219c22294b"
+    }
+  },
+  "portable_comparison": {
+    "before": {
+      "source": "b230bbd with the in-progress regression test",
+      "status": "Fail",
+      "observed": "The saved source anchor survived, but switching back to Code in the narrow pane returned no selected line.",
+      "log_sha256": "bab2ce0b0de5372162f1a311351bd39f26e44989e3bad60ea4df695e49691693"
+    },
+    "corrected": {
+      "source": "b230bbd with the application patch integrated as 693d592",
+      "command": "cargo test --offline --locked -p threadline-app --lib --features e2e -- ui_004 ui_001_pr_context --test-threads=1",
+      "status": "Pass",
+      "exit_code": 0,
+      "tests_passed": 4,
+      "tests_failed": 0,
+      "log_sha256": "9f6009febf22ef8d1db0a00b96d64ee1d312bab23edbd2ea72f4cf1be05c0aeb",
+      "strict_clippy_log_sha256": "d0e140b59023aa2794a24106b3767efee177c045e8711a66e53cde2f543c4b32"
+    }
+  },
+  "acceptance_status": "Partial",
+  "remaining": "Persist the visible code source position when the user scrolls without selecting a line. The pinned diff component can reveal a saved source line but exposes no public way to read the current virtualized viewport as a source anchor.",
+  "related_native_evidence": ["native-verification.json", "../sprint-06/shared-pr-panes.json"]
+}

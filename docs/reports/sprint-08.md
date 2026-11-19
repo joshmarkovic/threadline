@@ -24,6 +24,10 @@ On Windows 11 x64 at `f17e39c`, three local HTTP tests and six real SQLite revie
 
 The native runs used `cargo xtask test e2e --suite full --case <case> --binary <binary-path> --seed 12345 --report-dir <report-dir>` against the isolated loopback provider. The receipts record test-build hashes, source revisions, and sanitized observations. [Earlier native Windows review receipts](evidence/sprint-08/native-verification.json) · [Platform test ledger](../spec/test_platform_traceability.csv)
 
+## Reopening a narrow review layout
+
+The `693d592` Windows GPUI run passed four tests. The narrow-layout case reopened the original PR with two distinct nonzero reading positions for its body and linked issue, the split comparison and selected source line, and the same draft with both inline anchors. The diff and editor left focus alone on reopen. Show review editor then focused the editor. The earlier E2E-008 run exercised the real Windows window and its separate offline restart. AC-78 remains Partial for restoring the code reading position after scrolling without selecting a line. [GPUI results and earlier E2E evidence](evidence/sprint-08/review-layout-693d592.json)
+
 ## Existing threads in unified and split diffs
 
 `S08-REVIEW-THREAD-PLACEMENT` passed on Windows 11 x64 at 96 DPI using the matching `0e902a4` app, runner and driver. In both diff modes, Next unresolved thread opened the same downloaded review groups on the original side of line 9 and the modified side of line 17 in `src/first.rs`. Both groups exposed their downloaded replies through Windows UI Automation. File-level and outdated threads remained in Conversation. The simulator served one comparison and one thread-list request among 13 authenticated reads. [Windows AC-21 receipt](evidence/sprint-08/thread-placement-native.json)
