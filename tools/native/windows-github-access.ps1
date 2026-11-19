@@ -65,7 +65,7 @@ function Set-AccessPhase([string]$Phase) {
         'sync-live', 'sync-offline', 'sync-service', 'sync-throttle', 'sync-transport', 'sync-notification-send',
         'sync-rate-ready', 'sync-rate-throttle', 'sync-rate-floor',
         'backlog-auth', 'backlog-hold', 'backlog-drain', 'backlog-concurrent',
-        'pr-load', 'pr-merge-state', 'pr-pin-load', 'pr-pin-offline', 'pr-pin-interrupt', 'pr-pin-continue', 'pr-delay', 'pr-release', 'pr-shared-ready', 'pr-shared-hold', 'pr-shared-release', 'review-send', 'review-changed', 'review-decisions', 'review-predecessor', 'review-resume', 'thread-queue', 'thread-outdated',
+        'mixed-before', 'mixed-offline', 'mixed-after', 'pr-load', 'pr-merge-state', 'pr-pin-load', 'pr-pin-offline', 'pr-pin-interrupt', 'pr-pin-continue', 'pr-delay', 'pr-release', 'pr-shared-ready', 'pr-shared-hold', 'pr-shared-release', 'review-send', 'review-changed', 'review-decisions', 'review-predecessor', 'review-resume', 'thread-queue', 'thread-outdated',
         'merge-prepare', 'merge-send', 'merge-wrong-head', 'merge-queue-preflight', 'merge-queue-rejected',
         'merge-cancel-hold', 'merge-cancel-read', 'merge-cancel-finish',
         'history', 'history-moved', 'history-deleted', 'write-online', 'write-drop',
@@ -80,6 +80,18 @@ function Set-AccessPhase([string]$Phase) {
         throw 'Unknown access fixture phase.'
     }
     try {
+        if ($Phase -ceq 'mixed-offline') {
+            if ($ReaderProof -cne 'MixedCatchup' -or !$script:app.HasExited) {
+                throw 'Mixed provider edits require the original fixture process to have exited.'
+            }
+            $path = Join-Path ([IO.Path]::GetDirectoryName($script:AccessPhaseFile)) 'mixed-edit-time.txt'
+            $stamp = [DateTime]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'",[Globalization.CultureInfo]::InvariantCulture)
+            $stream = [IO.File]::Open($path,[IO.FileMode]::CreateNew)
+            try {
+                $bytes = [Text.Encoding]::ASCII.GetBytes($stamp)
+                $stream.Write($bytes,0,$bytes.Length)
+            } finally { $stream.Dispose() }
+        }
         [IO.File]::WriteAllText($script:AccessPhaseFile, $Phase, [Text.Encoding]::ASCII)
     } catch {
         throw 'Could not advance the isolated access fixture phase.'

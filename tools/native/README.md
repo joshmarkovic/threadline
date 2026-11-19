@@ -42,6 +42,8 @@ The smoke test checks the actual clipboard, pointer-driven splitters, draft inpu
 
 `cargo xtask test e2e --suite full --case E2E-005` opens two pull requests from that local simulator in independent native tabs. The simulator holds a verified linked-issue response while the second tab becomes active. The case checks that each tab keeps its own comparison and that the first linked issue appears only in its original tab.
 
+Run `cargo xtask test e2e --suite full --case S06-MIXED-CATCHUP` on Windows to test a restart with a partial issue discussion, completed PR review and check records, and a saved commit-status ETag. The synthetic provider changes the issue, an old comment, the existing review and check while the app is closed. The reopened reader first shows the saved profile offline. The trace checks the five-minute overlap against the recorded comment checkpoint, page two of the discussion and the conditional HTTP 304. The fixture uses a 20-second refresh interval for its isolated account.
+
 `cargo xtask test integration --case IT-020` exercises Windows Credential Manager and the native application paths separately. It uses fresh fixture entries, verifies the renewed value from a second process and checks removal.
 
 When source and a test-build executable are already local to Windows, use the direct driver. Supply a new evidence directory for each invocation. Use a disposable profile or provide the driver a test-owned temporary directory. The canonical Rust command automatically removes the temporary profiles it creates.

@@ -22,6 +22,7 @@ mod historical_reader;
 mod history;
 mod lifecycle;
 mod merge;
+mod mixed;
 mod pr;
 mod pr_pins;
 mod rate_limit;
@@ -73,6 +74,9 @@ enum Phase {
     HistoricalRemote,
     ReaderFailure,
     ReaderResume,
+    MixedBefore,
+    MixedOffline,
+    MixedAfter,
     RecoverBaseline,
     RecoverOffline,
     RecoverExpired,
@@ -160,6 +164,9 @@ impl Phase {
             "historical-remote" => Ok(Self::HistoricalRemote),
             "reader-failure" => Ok(Self::ReaderFailure),
             "reader-resume" => Ok(Self::ReaderResume),
+            "mixed-before" => Ok(Self::MixedBefore),
+            "mixed-offline" => Ok(Self::MixedOffline),
+            "mixed-after" => Ok(Self::MixedAfter),
             "recover-baseline" => Ok(Self::RecoverBaseline),
             "recover-offline" => Ok(Self::RecoverOffline),
             "recover-expired" => Ok(Self::RecoverExpired),
@@ -267,6 +274,9 @@ enum Route {
     PrPinCommentsNext,
     PrPinReviews,
     PrPinThreads,
+    MixedStatusValidated,
+    MixedRecentComments,
+    MixedFollowupComments,
     PrPinChecks,
     PrPinStatuses,
     PullB,
@@ -379,6 +389,7 @@ pub enum TraceCheck {
     NotificationSchedule,
     PullRequestJourney,
     PullRequestMergeState,
+    MixedCatchup,
     PullRequestOfflinePin,
     SharedPrPanes,
     ReviewContextJourney,
@@ -474,6 +485,7 @@ impl AccessFixture {
             TraceCheck::NotificationSchedule => complete_notification_schedule(&records),
             TraceCheck::PullRequestJourney => pr::trace(&records),
             TraceCheck::PullRequestMergeState => pr::trace_merge_state(&records),
+            TraceCheck::MixedCatchup => mixed::trace(&records),
             TraceCheck::PullRequestOfflinePin => pr_pins::trace(&records),
             TraceCheck::SharedPrPanes => pr::trace_shared(&records),
             TraceCheck::ReviewContextJourney => pr::trace_review_context(&records),
@@ -727,6 +739,9 @@ fn answer(
         });
     }
     let mut evidence_route = route;
+    if phase == Phase::MixedAfter && route == Route::MixedRecentComments && authorized {
+        evidence_route = mixed::after_feed(phase_file, binding.as_deref(), previous_requests)?;
+    }
     let mut held_feed = None;
     let mut next_feed_page = None;
     if let (true, Route::BacklogFeed(page), Some(target)) = (authorized, route, binding.as_deref())
@@ -754,8 +769,17 @@ fn answer(
     };
     let committed_issue =
         authorized && phase == Phase::IssueEditCommit && succeeded(Route::IssueEditCommitted);
-    let reply = (authorized.then(|| review_threads::response(phase, route, binding.as_deref())))
-        .flatten()
+    let mixed_reply = if authorized {
+        mixed::respond(phase, evidence_route, phase_file)?
+    } else {
+        None
+    };
+    let reply = mixed_reply
+        .or_else(|| {
+            authorized
+                .then(|| review_threads::response(phase, route, binding.as_deref()))
+                .flatten()
+        })
         .or_else(|| {
             committed_issue
                 .then(|| writes::committed_read(route))
@@ -768,7 +792,11 @@ fn answer(
                 });
             response(phase, route, authorized, merged)
         });
-    let body = serde_json::to_vec(&reply.body)?;
+    let body = if reply.status == 304 {
+        Vec::new()
+    } else {
+        serde_json::to_vec(&reply.body)?
+    };
     write!(
         socket,
         "HTTP/1.1 {} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n",
@@ -776,6 +804,9 @@ fn answer(
         reply.reason,
         body.len()
     )?;
+    if mixed::active(phase) && matches!(route, Route::PrPinStatuses | Route::MixedStatusValidated) {
+        write!(socket, "ETag: {}\r\n", mixed::STATUS_ETAG)?;
+    }
     if let Some(sso) = reply.sso {
         write!(socket, "X-GitHub-SSO: {sso}\r\n")?;
     }
@@ -838,7 +869,7 @@ fn answer(
     }
     if matches!(
         phase,
-        Phase::ReaderFailure | Phase::RecoverBaseline | Phase::RecoverRebuild
+        Phase::ReaderFailure | Phase::RecoverBaseline | Phase::RecoverRebuild | Phase::MixedBefore
     ) && route == Route::CommentsFirst
         && reply.status == 200
     {
@@ -921,7 +952,8 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
                     | Phase::CredentialReady
                     | Phase::CredentialOther
                     | Phase::CredentialReturn
-            ) || recovery::active(phase) =>
+            ) || recovery::active(phase)
+                || mixed::active(phase) =>
         {
             Route::ScheduledIssue
         }
@@ -932,7 +964,11 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
             Route::UpdatedItems
         }
         (Some("GET"), Some(target), Some("HTTP/1.1")) if sync_since(target, SYNC_COMMENTS) => {
-            Route::UpdatedComments
+            if phase == Phase::MixedAfter {
+                Route::MixedRecentComments
+            } else {
+                Route::UpdatedComments
+            }
         }
         (Some("GET"), Some(target), Some("HTTP/1.1")) if sync_since(target, SYNC_INLINE) => {
             Route::UpdatedInlineComments
@@ -944,6 +980,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         ) => Route::OpenPullIndex,
         (Some("POST"), Some("/graphql"), Some("HTTP/1.1")) => Route::Graphql,
         (Some("GET"), Some(target), Some("HTTP/1.1")) => historical_reader::get(phase, target)
+            .or_else(|| mixed::get(phase, target))
             .or_else(|| pr_pins::get(phase, target))
             .or_else(|| review_decisions::get(phase, target))
             .or_else(|| comment_dependency::get(phase, target))
@@ -956,7 +993,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         _ => Route::Unexpected,
     };
     let mut binding = match route {
-        Route::BacklogFeed(_) => request.1.map(str::to_owned),
+        Route::BacklogFeed(_) | Route::MixedRecentComments => request.1.map(str::to_owned),
         _ => None,
     };
     let dependency_failure =
@@ -972,6 +1009,13 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
             break;
         }
         if let Some((name, value)) = line.split_once(':') {
+            if mixed::active(phase)
+                && route == Route::PrPinStatuses
+                && name.eq_ignore_ascii_case("if-none-match")
+                && value.trim() == mixed::STATUS_ETAG
+            {
+                route = Route::MixedStatusValidated;
+            }
             if name.eq_ignore_ascii_case("authorization") {
                 authorized = value.trim() == FIXTURE_AUTHORIZATION;
             }
@@ -1022,6 +1066,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         } else if let Some(operation) = payload.as_ref().and_then(|body| {
             review_threads::graphql(phase, body)
                 .or_else(|| pr::shared_review_query(phase, body))
+                .or_else(|| mixed::graph(phase, body))
                 .or_else(|| pr_pins::graphql(phase, body))
                 .or_else(|| activity::graphql(phase, body))
                 .or_else(|| merge::graphql(phase, body))

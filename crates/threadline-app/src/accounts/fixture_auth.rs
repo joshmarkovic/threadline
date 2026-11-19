@@ -105,6 +105,13 @@ impl AccountService {
         )? {
             return Err(Problem::InactiveProfile);
         }
+        if std::env::var("THREADLINE_E2E_MIXED_CATCHUP").as_deref() == Ok("1") {
+            self.store.update_sync_settings(account, |settings| {
+                settings.schedule.work_interval_secs = 20;
+                settings.schedule.off_hours_interval_secs = 20;
+                settings.schedule.visible_interval_secs = 20;
+            })?;
+        }
         self.store.activate_local_profile(account)?;
         self.store.select_github_repository(account, repo, true)?;
         Ok((None, Reachability::ReceivedResponse))

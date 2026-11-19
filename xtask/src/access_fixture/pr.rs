@@ -45,6 +45,7 @@ pub(super) fn applies(phase: Phase) -> bool {
     ) || merge::applies(phase)
         || pr_pins::active(phase)
         || review_threads::active(phase)
+        || mixed::active(phase)
         || review_decisions::active(phase)
 }
 

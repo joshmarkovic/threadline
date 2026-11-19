@@ -28,6 +28,9 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == "S06-PR-MERGE-STATE" {
         return Some("s06-pr-merge-state-v1");
     }
+    if case == "S06-MIXED-CATCHUP" {
+        return Some("s06-mixed-catchup-v1");
+    }
     if case == "S06-PR-OFFLINE-PIN" {
         return Some("s06-pr-offline-pin-v1");
     }
@@ -242,6 +245,7 @@ pub fn associations(case: &str) -> Associations {
         "S08-REVIEW-THREAD-PLACEMENT" => ("DIFF-01;DIFF-02;REVIEW-02;TEST-04", "AC-21"),
         "S06-SHARED-PR-PANES" => ("WORKSPACE-07;CACHE-02;PR-02;TEST-04", "AC-44"),
         "S06-PR-MERGE-STATE" => ("DATA-07;DATA-09;PR-01;TEST-04", "AC-52"),
+        "S06-MIXED-CATCHUP" => ("SYNC-06;SYNC-07;SYNC-11;PR-02;PR-03;TEST-04", "AC-75"),
         "S06-PR-OFFLINE-PIN" => ("DIFF-07;OFFLINE-03;TEST-04", "AC-23;AC-70"),
         "S06-READER-CURSOR-RECOVERY" => ("SYNC-11;TEST-04", "AC-76"),
         "S07-ISSUE-CONFLICT" => ("ISSUE-03;ISSUE-05;OUTBOX-03;TEST-04", "AC-13;AC-15"),

@@ -11,6 +11,7 @@ use threadline_storage::{
     writes::{WriteIntent, WriteSubmission},
 };
 
+mod mixed;
 mod panes;
 mod recovery;
 

@@ -621,7 +621,10 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
                 Some(NativeMode::WindowsSync)
             } else if matches!(
                 id,
-                "S06-SHARED-PR-PANES" | "S06-PR-MERGE-STATE" | "S06-PR-OFFLINE-PIN"
+                "S06-SHARED-PR-PANES"
+                    | "S06-PR-MERGE-STATE"
+                    | "S06-PR-OFFLINE-PIN"
+                    | "S06-MIXED-CATCHUP"
             ) {
                 Some(NativeMode::WindowsPullRequest)
             } else if id == "S11-NATIVE-ACTIVITY" {
@@ -904,6 +907,7 @@ fn native_driver(
         NativeMode::WindowsPullRequest if id == "S06-PR-OFFLINE-PIN" => {
             Some("PullRequestOfflinePin")
         }
+        NativeMode::WindowsPullRequest if id == "S06-MIXED-CATCHUP" => Some("MixedCatchup"),
         NativeMode::WindowsPullRequest => Some("PullRequest"),
         NativeMode::WindowsHistory => Some("History"),
         NativeMode::WindowsReviewDraft if id == "S08-REVIEW-DECISIONS" => Some("ReviewDecisions"),
@@ -1038,6 +1042,7 @@ fn native_driver(
         NativeMode::WindowsPullRequest if id == "S06-PR-OFFLINE-PIN" => {
             "pr-offline-pin-native.json"
         }
+        NativeMode::WindowsPullRequest if id == "S06-MIXED-CATCHUP" => "mixed-catchup-native.json",
         NativeMode::WindowsPullRequest => "pr-native.json",
         NativeMode::WindowsHistory => "history-native.json",
         NativeMode::WindowsReviewDraft if id == "S08-REVIEW-THREAD-PLACEMENT" => {
@@ -1138,6 +1143,9 @@ fn native_driver(
             }
             (Status::Pass, NativeMode::WindowsPullRequest) if id == "S06-PR-OFFLINE-PIN" => {
                 TraceCheck::PullRequestOfflinePin
+            }
+            (Status::Pass, NativeMode::WindowsPullRequest) if id == "S06-MIXED-CATCHUP" => {
+                TraceCheck::MixedCatchup
             }
             (Status::Pass, NativeMode::WindowsPullRequest) => TraceCheck::PullRequestJourney,
             (Status::Pass, NativeMode::WindowsHistory) => TraceCheck::HistoryJourney,

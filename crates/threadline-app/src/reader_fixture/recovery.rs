@@ -54,6 +54,9 @@ fn database(mutating: bool) -> Option<PathBuf> {
                 | b"recover-expired"
                 | b"recover-rebuild"
                 | b"recover-resume"
+                | b"mixed-before"
+                | b"mixed-offline"
+                | b"mixed-after"
         )
     {
         return None;
@@ -190,7 +193,18 @@ pub(super) fn run(mut args: impl Iterator<Item = OsString>) -> Result<(), String
         .map_err(|_| ERROR)?;
     let (account, item, resource, offline) = scope;
     let tx = db.transaction().map_err(|_| ERROR)?;
-    let state = receipt(&tx, account, item, resource).map_err(|_| ERROR)?;
+    let mut state = receipt(&tx, account, item, resource).map_err(|_| ERROR)?;
+    if stage == "snapshot"
+        && std::env::var_os("THREADLINE_E2E_MIXED_CATCHUP").as_deref() == Some(OsStr::new("1"))
+    {
+        let mut mixed = super::mixed::snapshot(&tx, account, item, resource).map_err(|_| ERROR)?;
+        state["comments"] = mixed
+            .as_object_mut()
+            .ok_or(ERROR)?
+            .remove("comments")
+            .ok_or(ERROR)?;
+        state["mixed"] = mixed;
+    }
     if stage == "arm" {
         if !offline
             || state["discussion"]["cursor"] != "2"

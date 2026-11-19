@@ -402,7 +402,7 @@ fn known_case(lane: Lane, case: &str) -> bool {
             | (Lane::E2e, "S05-WINDOWS-SYNC" | "S05-WINDOWS-RATE-LIMIT")
             | (Lane::E2e, "S06-SHARED-PR-PANES")
             | (Lane::E2e, "S06-PR-MERGE-STATE")
-            | (Lane::E2e, "S06-PR-OFFLINE-PIN")
+            | (Lane::E2e, "S06-PR-OFFLINE-PIN" | "S06-MIXED-CATCHUP")
             | (Lane::E2e, "S06-READER-CURSOR-RECOVERY")
             | (Lane::E2e, "S09-MERGE-QUEUE")
             | (Lane::E2e, "S09-MERGE-CANCEL")
@@ -467,6 +467,7 @@ mod tests {
             "S06-SHARED-PR-PANES",
             "S06-PR-MERGE-STATE",
             "S06-PR-OFFLINE-PIN",
+            "S06-MIXED-CATCHUP",
             "S06-READER-CURSOR-RECOVERY",
             "S08-REVIEW-THREAD-PLACEMENT",
         ] {
