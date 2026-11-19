@@ -129,9 +129,20 @@ impl ReaderError {
         }
     }
 
-    fn resource_error(&self) -> ResourceError {
+    pub(crate) fn cursor_expired(&self, has_continuation: bool) -> bool {
+        matches!(self, Self::BadCursor)
+            || has_continuation
+                && matches!(self, Self::Remote(error)
+                if error.kind == AccessKind::InvalidPagination
+                    || error.kind == AccessKind::UnexpectedStatus
+                        && matches!(error.http_status, Some(410 | 422)))
+    }
+
+    fn resource_error(&self, has_continuation: bool) -> ResourceError {
+        if self.cursor_expired(has_continuation) {
+            return ResourceError::CursorExpired;
+        }
         match self {
-            Self::BadCursor => ResourceError::CursorExpired,
             Self::Offline => ResourceError::Transport,
             Self::ServerBackoff => ResourceError::RateLimited,
             Self::ProtectedStore(error) => match error {
@@ -749,9 +760,11 @@ impl ReaderService {
     ) -> Result<T, ReaderError> {
         if let Err(error) = &result {
             // A competing view may already own a newer generation. Never change its checkpoint.
-            let _ = self
-                .store
-                .record_resource_error(key, progress, error.resource_error());
+            let _ = self.store.record_resource_error(
+                key,
+                progress,
+                error.resource_error(progress.cursor.is_some()),
+            );
         }
         result
     }
@@ -858,6 +871,37 @@ fn field<T>(snapshot: Reported<T>) -> Change<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn provider_rejection_expires_only_the_saved_continuation() {
+        let remote = |kind, status| {
+            ReaderError::Remote(AccessError {
+                kind,
+                reachability: Reachability::ReceivedResponse,
+                http_status: Some(status),
+                sso_action: None,
+                rate: None,
+            })
+        };
+        for error in [
+            remote(AccessKind::UnexpectedStatus, 410),
+            remote(AccessKind::UnexpectedStatus, 422),
+            remote(AccessKind::InvalidPagination, 200),
+        ] {
+            assert_eq!(error.resource_error(true), ResourceError::CursorExpired);
+            assert_eq!(error.resource_error(false), ResourceError::InvalidResponse);
+        }
+        let inaccessible = remote(AccessKind::MissingOrInaccessible, 404);
+        assert_eq!(inaccessible.resource_error(true), ResourceError::NotFound);
+        let forbidden = remote(AccessKind::PermissionDenied, 403);
+        assert_eq!(forbidden.resource_error(true), ResourceError::Forbidden);
+        let interrupted = remote(AccessKind::ServiceFailure, 502);
+        assert_eq!(interrupted.resource_error(true), ResourceError::Transport);
+        assert_eq!(
+            ReaderError::BadCursor.resource_error(true),
+            ResourceError::CursorExpired
+        );
+    }
 
     #[test]
     fn image_preview_accepts_bounded_native_raster_formats() {

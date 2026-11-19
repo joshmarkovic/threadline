@@ -432,9 +432,11 @@ fn observed_comment(row: UpdatedComment) -> ObservedComment {
 }
 
 fn failure(error: &ReaderError, claim: &ReadClaim) -> ReadFailure {
+    if error.cursor_expired(claim.cursor.is_some()) {
+        return ReadFailure::ExpiredCursor;
+    }
     match error {
         ReaderError::Cancelled => ReadFailure::Cancelled,
-        ReaderError::BadCursor => ReadFailure::ExpiredCursor,
         ReaderError::ScopeChanged
         | ReaderError::CredentialUnavailable
         | ReaderError::ProtectedStore(_) => ReadFailure::Authorization,
@@ -447,12 +449,6 @@ fn failure(error: &ReaderError, claim: &ReadClaim) -> ReadFailure {
             | AccessKind::PermissionDenied
             | AccessKind::MissingOrInaccessible
             | AccessKind::IdentityMismatch => ReadFailure::Authorization,
-            AccessKind::InvalidPagination if claim.cursor.is_some() => ReadFailure::ExpiredCursor,
-            AccessKind::UnexpectedStatus
-                if claim.cursor.is_some() && matches!(error.http_status, Some(410 | 422)) =>
-            {
-                ReadFailure::ExpiredCursor
-            }
             _ => ReadFailure::Transient,
         },
         _ => ReadFailure::Transient,

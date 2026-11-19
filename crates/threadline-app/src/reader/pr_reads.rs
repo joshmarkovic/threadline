@@ -431,7 +431,7 @@ impl ReaderService {
                 &prepared.revision,
                 family,
                 &progress,
-                error.resource_error(),
+                error.resource_error(progress.cursor.is_some()),
             );
         }
         result
