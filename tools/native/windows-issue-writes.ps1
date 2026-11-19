@@ -129,8 +129,17 @@ function Invoke-IssueConflictProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Reader 'the submitted edit and original issue survive the offline restart' {
         param($reader)
         $reader.active_item -eq $item -and $reader.active_number -eq 41 -and $reader.offline -and
-            $reader.active_draft_submitted -and $reader.outbox -eq 1
+            $reader.active_draft_saved -and $reader.outbox -eq 1
     }
+    Click-AccountControl $restarted 'reader-outbox'
+    Inspect-WriteFixtureAction $restarted 0 'Queued' 'Issue edit'
+    Click-AccountControl $restarted 'reader-outbox-open'
+    $null = Wait-Reader 'the exact retained issue and editor after opening the durable queued edit' {
+        param($reader)
+        $reader.active_item -eq $item -and $reader.active_number -eq 41 -and $reader.offline -and
+            $reader.active_draft_saved -and !$reader.outbox_visible
+    }
+    Wait-WriteFixtureDraft $item $description
     Set-WriteFixtureOffline $restarted $false
     Wait-SeededFixtureAccount
     Click-AccountControl $restarted 'reader-outbox'
@@ -150,7 +159,7 @@ function Invoke-IssueConflictProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Reader 'the exact issue and conflict draft remain in the original reader' {
         param($reader)
         $reader.active_item -eq $item -and $reader.active_number -eq 41 -and !$reader.outbox_visible -and
-            $reader.active_draft_submitted -and $reader.outbox -eq 1
+            $reader.active_draft_saved -and $reader.outbox -eq 1
     }
     Wait-WriteFixtureDraft $item $description
     Wait-For 'the original native issue editor retains the local title' {
