@@ -246,6 +246,10 @@ pub fn associations(case: &str) -> Associations {
         "S08-REVIEW-PREDECESSOR" => ("REVIEW-04;OUTBOX-03;TEST-04", "AC-63"),
         "S09-MERGE-QUEUE" => ("MERGE-01;MERGE-03;MERGE-04;OUTBOX-03;TEST-04", "AC-77"),
         "S09-MERGE-CANCEL" => ("MERGE-02;MERGE-04;OUTBOX-03;TEST-04", "AC-62;AC-66"),
+        crate::install::LOCAL_CASE => (
+            "TEST-04;INSTALL-04;INSTALL-05;INSTALL-06;INSTALL-07",
+            "AC-96;AC-97;AC-98",
+        ),
         "S12-NATIVE-LIFECYCLE" => (
             "AUTH-05;CACHE-13;OUTBOX-10;TEST-04;TEST-05",
             "AC-68;AC-73;AC-74;AC-91;AC-92",
@@ -340,6 +344,22 @@ mod tests {
         );
         assert!(associations("UT-020").acceptance_ids.is_empty());
         assert!(associations("request").requirement_ids.is_empty());
+    }
+
+    #[test]
+    fn local_package_receipts_identify_exercised_lifecycle_requirements() {
+        let local = associations(crate::install::LOCAL_CASE);
+        assert_eq!(
+            local.requirement_ids,
+            [
+                "TEST-04",
+                "INSTALL-04",
+                "INSTALL-05",
+                "INSTALL-06",
+                "INSTALL-07"
+            ]
+        );
+        assert_eq!(local.acceptance_ids, ["AC-96", "AC-97", "AC-98"]);
     }
 
     #[test]
