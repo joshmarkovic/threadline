@@ -6,7 +6,7 @@ use super::{
 use crate::palette::Palette;
 use gpui_kit::{
     AnyElement, InteractiveElement, IntoElement, ParentElement, PathBuilder, Role,
-    StatefulInteractiveElement, Styled, canvas,
+    StatefulInteractiveElement, Styled, TestSupportExt, canvas,
     component::{
         Disableable, Selectable,
         diff::{Diff, DiffFile, DiffState},
@@ -18,7 +18,7 @@ use threadline_storage::{
     RepositoryId,
     history::{
         ComparisonOptions, HistoryComparison, HistoryCoverage, HistoryDiffPage, HistoryMonitoring,
-        HistoryPage, HistoryRef, HistoryRefState, HistoryRow, HistoryView,
+        HistoryPage, HistoryRef, HistoryRefState, HistoryRow, HistoryView, HistoryWindow,
     },
     pr::PrRecord,
     resources::{CommitOid, ComparisonMode},
@@ -26,7 +26,8 @@ use threadline_storage::{
 
 const VIEW_ID: &str = "reader-commit-history";
 const GRAPH_LIMIT: u16 = 48;
-const ROW_H: f32 = 58.;
+const ROW_HEIGHT: u32 = 58;
+const ROW_H: f32 = ROW_HEIGHT as f32;
 
 pub(super) struct HistoryState {
     pub busy: bool,
@@ -64,6 +65,20 @@ impl HistoryState {
             .as_ref()
             .and_then(|data| data.page.as_ref())
             .map_or(0, |page| page.rows.len())
+    }
+
+    pub(super) fn cached_graph(&self) -> Option<&HistoryPage> {
+        self.data.as_ref()?.page.as_ref()
+    }
+
+    pub(super) fn graph_offset(&self) -> u32 {
+        (-self.scroll.offset().y.as_f32()).max(0.) as u32
+    }
+
+    pub(super) fn graph_top(&self) -> Option<&HistoryRow> {
+        self.cached_graph()?
+            .rows
+            .get((self.graph_offset() / ROW_HEIGHT) as usize)
     }
 
     pub(super) fn cached_ref_tip(&self, reference: &HistoryRef) -> Option<Option<&CommitOid>> {
@@ -192,7 +207,8 @@ enum ChangeHistory {
     CompareWith(CommitOid),
     Parent(CommitOid),
     File(String),
-    Page(Option<i64>),
+    Older(i64),
+    Newest,
 }
 
 #[derive(Clone)]
@@ -244,14 +260,16 @@ impl HistoryData {
             .or_else(|| saved.as_ref().map(|saved| &saved.state.reference));
         let refs = bounded_history_refs(store, account, repository, inspected)?;
         let monitoring = store.history_monitoring(account, repository)?;
-        let (generation, view, after) = if let Some((generation, view, after)) = request {
+        let (generation, mut view, mut after) = if let Some((generation, view, after)) = request {
             (generation, Some(view), after)
         } else if let Some(saved) = saved {
-            let after = match saved.state.scroll_anchor.as_ref() {
-                Some(anchor) => store
+            let after = match (saved.state.graph_window, saved.state.scroll_anchor.as_ref()) {
+                (Some(window), _) => window.after,
+                (None, Some(anchor)) => store
                     .history_ordinal(account, repository, &saved.state.tip, anchor)?
-                    .map(|ordinal| ordinal.saturating_sub((ordinal % i64::from(GRAPH_LIMIT)) + 1)),
-                None => None,
+                    .map(|ordinal| ordinal - (ordinal % i64::from(GRAPH_LIMIT)) - 1)
+                    .filter(|after| *after >= 0),
+                (None, None) => None,
             };
             (Some(saved.generation), Some(saved.state), after)
         } else {
@@ -276,10 +294,27 @@ impl HistoryData {
                 None,
             )
         };
-        let page = view
+        let mut page = view
             .as_ref()
-            .map(|view| store.history_page(account, repository, &view.tip, after, GRAPH_LIMIT))
+            .map(|view| {
+                read_graph(
+                    store,
+                    account,
+                    repository,
+                    &view.tip,
+                    after,
+                    view.graph_window,
+                )
+            })
             .transpose()?;
+        if let (Some(view), Some(page)) = (view.as_mut(), page.as_mut()) {
+            if after.is_some() && page.rows.is_empty() {
+                after = None;
+                view.graph_window = None;
+                *page = read_graph(store, account, repository, &view.tip, None, None)?;
+            }
+            align_graph_scroll(view, page);
+        }
         let comparison = view
             .as_ref()
             .and_then(|view| view.selected.as_ref().map(|oid| (view, oid)))
@@ -392,6 +427,7 @@ fn new_view(reference: HistoryRef, tip: CommitOid) -> HistoryView {
         parent: None,
         scroll_anchor: None,
         scroll_offset: 0,
+        graph_window: None,
         file: None,
         file_scroll: 0,
         ignore_whitespace: false,
@@ -613,15 +649,22 @@ impl ReaderWorkspace {
             .diff
             .as_ref()
             .map(|diff| Arc::clone(&diff.binding));
+        let expanding = request.as_ref().is_some_and(|(_, view, after)| {
+            self.history.data.as_ref().is_some_and(|current| {
+                current.after == *after
+                    && view.graph_window.is_some()
+                    && current.view.as_ref().is_some_and(|old| {
+                        old.tip == view.tip
+                            && old.reference == view.reference
+                            && old.graph_window != view.graph_window
+                    })
+            })
+        });
         self.history.busy = true;
         self.launch(window, cx, move |store| {
             let persist = request.is_some();
             let mut data = HistoryData::load(store, account, repository, request)?;
             if persist && let Some(view) = data.view.as_mut() {
-                if view.scroll_anchor.is_none() {
-                    view.scroll_anchor = data.page.as_ref().and_then(|page| page.rows.first())
-                        .map(|row| row.entry.commit.oid.clone());
-                }
                 data.generation = Some(store.save_history_view(account, repository, VIEW_ID, data.generation, view)?);
             }
             let diff = data.prepare_diff(previous_diff);
@@ -633,11 +676,21 @@ impl ReaderWorkspace {
             this.history.busy = false;
             match outcome {
                 Ok((data, diff)) => {
-                    let offset = data.view.as_ref().map_or(0, |view| view.scroll_offset);
+                    let offset = data.view.as_ref().map_or(0, |view| {
+                        if let Some(page) = data.page.as_ref().filter(|_| expanding) {
+                            let mut visible = view.clone();
+                            remember_history_scroll(&this.history, &mut visible);
+                            align_graph_scroll(&mut visible, page);
+                            visible.scroll_offset
+                        } else {
+                            view.scroll_offset
+                        }
+                    });
                     this.set_history_diff(diff, cx);
                     this.history.data = Some(data);
-                    let scroll = this.history.scroll.clone();
-                    window.on_next_frame(move |_, _| scroll.set_offset(point(px(0.), -px(offset as f32))));
+                    let scroll = &this.history.scroll;
+                    let left = if expanding { scroll.offset().x } else { px(0.) };
+                    scroll.set_offset(point(left, -px(offset as f32)));
                 }
                 Err(_) => this.status = Some("History could not be loaded or saved. The previous view remains available."),
             }
@@ -665,10 +718,10 @@ impl ReaderWorkspace {
         let Some(data) = self.history.data.as_ref() else {
             return;
         };
-        let Some((tip, inspected)) = data
+        let Some((tip, inspected, graph_window)) = data
             .view
             .as_ref()
-            .map(|view| (view.tip.clone(), view.reference.clone()))
+            .map(|view| (view.tip.clone(), view.reference.clone(), view.graph_window))
         else {
             self.load_history(repository, None, window, cx);
             return;
@@ -681,7 +734,7 @@ impl ReaderWorkspace {
             cx,
             move |store| {
                 let refs = bounded_history_refs(store, account, repository, Some(&inspected))?;
-                let page = store.history_page(account, repository, &tip, after, GRAPH_LIMIT)?;
+                let page = read_graph(store, account, repository, &tip, after, graph_window)?;
                 Ok((refs, page))
             },
             move |this, result, window, cx| {
@@ -762,8 +815,15 @@ impl ReaderWorkspace {
                         view.file = Some(path);
                         view.file_scroll = 0;
                     }
-                    ChangeHistory::Page(request) => {
-                        after = request;
+                    ChangeHistory::Older(boundary) => {
+                        view.graph_window = Some(HistoryWindow {
+                            after,
+                            through: boundary.saturating_add(i64::from(GRAPH_LIMIT)),
+                        });
+                    }
+                    ChangeHistory::Newest => {
+                        after = None;
+                        view.graph_window = None;
                         view.scroll_anchor = None;
                         view.scroll_offset = 0;
                     }
@@ -1051,12 +1111,17 @@ impl ReaderWorkspace {
             body = body.child(row_element);
         }
         let mut pagination = div().flex().flex_wrap().gap_1();
-        if data.after.is_some() {
+        if data.after.is_some()
+            || data
+                .view
+                .as_ref()
+                .is_some_and(|view| view.graph_window.is_some())
+        {
             pagination = pagination.child(
                 control("history-first-page", "Newest downloaded commits")
                     .disabled(self.history.busy)
                     .on_click(cx.listener(|this, _, window, cx| {
-                        this.history_action(ChangeHistory::Page(None), window, cx);
+                        this.history_action(ChangeHistory::Newest, window, cx);
                     })),
             );
         }
@@ -1065,7 +1130,7 @@ impl ReaderWorkspace {
                 control("history-older-page", "Older downloaded commits")
                     .disabled(self.history.busy)
                     .on_click(cx.listener(move |this, _, window, cx| {
-                        this.history_action(ChangeHistory::Page(Some(after)), window, cx);
+                        this.history_action(ChangeHistory::Older(after), window, cx);
                     })),
             );
         }
@@ -1104,6 +1169,7 @@ impl ReaderWorkspace {
             .child(
                 div()
                     .id("history-graph")
+                    .accessibility_id("history-graph")
                     .role(Role::Group)
                     .aria_label("Commit ancestry")
                     .overflow_y_scroll()
@@ -1111,7 +1177,8 @@ impl ReaderWorkspace {
                     .track_scroll(&self.history.scroll)
                     .flex_1()
                     .min_h_0()
-                    .child(body),
+                    .child(body)
+                    .test_support(),
             )
             .into_any_element()
     }
@@ -1401,13 +1468,44 @@ fn toggle<T: Ord>(set: &mut std::collections::BTreeSet<T>, member: T) {
     }
 }
 
+fn read_graph(
+    store: &Store,
+    account: AccountId,
+    repository: RepositoryId,
+    tip: &CommitOid,
+    after: Option<i64>,
+    window: Option<HistoryWindow>,
+) -> Outcome<HistoryPage> {
+    match window {
+        Some(window) => store.history_window(account, repository, tip, window),
+        None => store.history_page(account, repository, tip, after, GRAPH_LIMIT),
+    }
+}
+
+fn align_graph_scroll(view: &mut HistoryView, page: &HistoryPage) {
+    if let Some(anchor) = view.scroll_anchor.as_ref()
+        && let Some(index) = page
+            .rows
+            .iter()
+            .position(|row| row.entry.commit.oid == *anchor)
+    {
+        let row = u32::try_from(index).unwrap_or(u32::MAX);
+        view.scroll_offset = row
+            .saturating_mul(ROW_HEIGHT)
+            .saturating_add(view.scroll_offset % ROW_HEIGHT);
+    } else {
+        view.scroll_anchor = page.rows.first().map(|row| row.entry.commit.oid.clone());
+        view.scroll_offset = 0;
+    }
+}
+
 fn remember_history_scroll(history: &HistoryState, view: &mut HistoryView) {
     view.scroll_offset = (-history.scroll.offset().y.as_f32()).max(0.) as u32;
     if let Some(row) = history
         .data
         .as_ref()
         .and_then(|data| data.page.as_ref())
-        .and_then(|page| page.rows.get((view.scroll_offset as f32 / ROW_H) as usize))
+        .and_then(|page| page.rows.get((view.scroll_offset / ROW_HEIGHT) as usize))
     {
         view.scroll_anchor = Some(row.entry.commit.oid.clone());
     }

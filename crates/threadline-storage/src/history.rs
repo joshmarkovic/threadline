@@ -457,6 +457,31 @@ impl Store {
         if !(1..=256).contains(&limit) {
             return Err(Error::InvalidInput("Invalid history page size"));
         }
+        self.history_rows(account, repo, tip, after, i64::MAX, i64::from(limit))
+    }
+
+    pub fn history_window(
+        &self,
+        account: AccountId,
+        repo: RepositoryId,
+        tip: &CommitOid,
+        window: HistoryWindow,
+    ) -> Result<HistoryPage> {
+        if !window.valid() {
+            return Err(Error::InvalidInput("Invalid history window"));
+        }
+        self.history_rows(account, repo, tip, window.after, window.through, i64::MAX)
+    }
+
+    fn history_rows(
+        &self,
+        account: AccountId,
+        repo: RepositoryId,
+        tip: &CommitOid,
+        after: Option<i64>,
+        through: i64,
+        limit: i64,
+    ) -> Result<HistoryPage> {
         self.read(|db| {
             let tx = db.unchecked_transaction()?;
             resources::require_repository(&tx, account, repo)?;
@@ -470,9 +495,12 @@ impl Store {
                     fetched_at_ms: None,
                 });
             };
-            let mut query=tx.prepare("SELECT ordinal,oid,lane,parents FROM history_rows WHERE series_id=? AND ordinal>? ORDER BY ordinal LIMIT ?")?;
+            let mut query = tx.prepare(
+                "SELECT ordinal,oid,lane,parents FROM history_rows
+                 WHERE series_id=? AND ordinal>? AND ordinal<=? ORDER BY ordinal LIMIT ?",
+            )?;
             let found = query.query_map(
-                params![series, after.unwrap_or(-1), i64::from(limit)],
+                params![series, after.unwrap_or(-1), through, limit],
                 |r| {
                     Ok((
                         r.get(0)?,

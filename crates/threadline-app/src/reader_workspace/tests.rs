@@ -3848,23 +3848,16 @@ fn ui_005_offline_merge_targets_the_confirmed_pane_and_updates_the_outbox_badge(
     );
 }
 
-#[gpui_kit::test]
-fn history_view_selects_exact_parents_and_restores_an_offline_comparison(cx: &mut TestAppContext) {
-    use gpui_kit::component::diff::{DiffLineRange, DiffSide};
-    use threadline_storage::{
-        access::{AccessState, DiscoveryState, RepositoryObservation, RepositoryObservationSource},
-        history::{
-            ComparisonOptions, HistoryComparison, HistoryDiffInput, HistoryEntry, HistoryRef,
-        },
-        pr::{PatchEvidence, PrRecord},
-        resources::{CommitOid, ComparisonMode, GraphCommit},
+fn history_fixture_profile(
+    setup: &ReaderHarness,
+    now: i64,
+) -> threadline_storage::access::AccessProfile {
+    use threadline_storage::access::{
+        AccessState, DiscoveryState, RepositoryObservation, RepositoryObservationSource,
     };
-    let setup = ReaderHarness::seeded();
     let store = &setup.store;
     let account = setup.fixture.account;
     let repository = setup.fixture.repository;
-    let reference = HistoryRef::Branch("main".into());
-    let now = now_ms();
     let original = store.github_access_profiles().unwrap().remove(0);
     let reserved = store
         .reserve_access_profile_credential(
@@ -3909,10 +3902,29 @@ fn history_view_selects_exact_parents_and_restores_an_offline_comparison(cx: &mu
         )
         .unwrap();
     store.set_dispatch_controls(account, false, false).unwrap();
-    let profile = store
+    store
         .github_access_profile(account, &reserved.owner_scope)
         .unwrap()
-        .unwrap();
+        .unwrap()
+}
+
+#[gpui_kit::test]
+fn history_view_selects_exact_parents_and_restores_an_offline_comparison(cx: &mut TestAppContext) {
+    use gpui_kit::component::diff::{DiffLineRange, DiffSide};
+    use threadline_storage::{
+        history::{
+            ComparisonOptions, HistoryComparison, HistoryDiffInput, HistoryEntry, HistoryRef,
+        },
+        pr::{PatchEvidence, PrRecord},
+        resources::{CommitOid, ComparisonMode, GraphCommit},
+    };
+    let setup = ReaderHarness::seeded();
+    let store = &setup.store;
+    let account = setup.fixture.account;
+    let repository = setup.fixture.repository;
+    let reference = HistoryRef::Branch("main".into());
+    let now = now_ms();
+    let profile = history_fixture_profile(&setup, now);
     let oid = |digit: char| CommitOid::parse(&digit.to_string().repeat(40)).unwrap();
     let commit = |digit, parents: &[char]| HistoryEntry {
         commit: GraphCommit {
@@ -4178,6 +4190,261 @@ fn history_view_selects_exact_parents_and_restores_an_offline_comparison(cx: &mu
         })
     });
     check_file(cx, reopened, &restored, "pair-specific text");
+}
+
+#[gpui_kit::test]
+fn history_graph_keeps_its_top_commit_through_expansion_and_offline_reopen(
+    cx: &mut TestAppContext,
+) {
+    use gpui_kit::{Modifiers, PlatformInput, ScrollDelta, ScrollEvent, ScrollSource, TouchPhase};
+    use threadline_storage::{
+        history::{HistoryComparison, HistoryCoverage, HistoryEntry, HistoryRef},
+        resources::{CommitOid, GraphCommit},
+    };
+
+    let setup = ReaderHarness::seeded();
+    let store = &setup.store;
+    let account = setup.fixture.account;
+    let repository = setup.fixture.repository;
+    let reference = HistoryRef::Branch("main".into());
+    let now = now_ms();
+    let profile = history_fixture_profile(&setup, now);
+    let oid = |index: usize| CommitOid::parse(&format!("{:040x}", index + 1)).unwrap();
+    let tip = oid(0);
+    let commits = (0..105)
+        .map(|index| {
+            let parents = match index {
+                0 => vec![oid(1), oid(2)],
+                1 | 2 => vec![oid(3)],
+                104 => Vec::new(),
+                index => vec![oid(index + 1)],
+            };
+            HistoryEntry {
+                commit: GraphCommit {
+                    oid: oid(index),
+                    title: format!("Ancestry fixture {index}"),
+                    committed_at_ms: now - index as i64,
+                    parents,
+                },
+                message: format!("Ancestry fixture {index}"),
+                author: Some("Fixture author".into()),
+                authored_at_ms: None,
+            }
+        })
+        .collect::<Vec<_>>();
+    store
+        .observe_history_ref(&profile, repository, &reference, Some(&tip), now)
+        .unwrap();
+    let walk = store
+        .begin_history_page(&profile, repository, &reference)
+        .unwrap()
+        .unwrap();
+    store
+        .commit_history_page(&walk, &commits[..60], Some("page-2"), false, now + 1)
+        .unwrap();
+
+    let repository_index = store
+        .github_repository_views(account)
+        .unwrap()
+        .iter()
+        .filter(|repo| repo.selected)
+        .position(|repo| repo.id == repository)
+        .unwrap();
+    let open_history = |cx: &mut TestAppContext| {
+        let (window, reader) = setup.open(cx);
+        click(cx, window, "reader-history");
+        if repository_index != 0 {
+            until(cx, |cx| cx.read(|cx| !reader.read(cx).history.busy));
+            cx.update_window(window, |_, window, cx| {
+                window.render_frame(cx);
+                window.click(format!("history-repository-{repository_index}"), cx);
+            })
+            .unwrap();
+        }
+        (window, reader)
+    };
+    let (window, reader) = open_history(cx);
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).history.cached_graph_rows() == 48)
+    });
+    let initial = cx.read(|cx| reader.read(cx).history.cached_graph().unwrap().rows.clone());
+    assert_eq!(initial[0].entry.commit.oid, tip);
+    assert_eq!(
+        initial[0]
+            .parents
+            .iter()
+            .map(|edge| &edge.oid)
+            .collect::<Vec<_>>(),
+        [&oid(1), &oid(2)]
+    );
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.try_find("history-first-page").is_none());
+        assert!(window.try_find("history-older-page").is_some());
+    })
+    .unwrap();
+    click(cx, window, "history-commit-0");
+    let has_selection = |reader: &ReaderWorkspace| {
+        matches!(reader.history.plan(), Some(HistoryComparison::Parent { key, .. })
+            if key.head == tip && key.base == oid(1))
+    };
+    until(cx, |cx| cx.read(|cx| has_selection(reader.read(cx))));
+
+    let scroll = |window: &mut Window, cx: &mut gpui_kit::App, pixels| {
+        window.render_frame(cx);
+        let bounds = window.find("history-graph").bounds();
+        window.dispatch_event(
+            PlatformInput::Scroll(ScrollEvent {
+                position: bounds.center(),
+                delta: ScrollDelta::Pixels(point(px(0.), px(pixels))),
+                modifiers: Modifiers::default(),
+                touch_phase: TouchPhase::Moved,
+                source: ScrollSource::Pointer,
+            }),
+            cx,
+        );
+        window.render_frame(cx);
+    };
+    cx.update_window(window, |_, window, cx| scroll(window, cx, -348.))
+        .unwrap();
+    let graph_position = |cx: &mut TestAppContext, window, reader: &Entity<ReaderWorkspace>| {
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            let history = &reader.read(cx).history;
+            let row = history.graph_top().unwrap();
+            let control = window.find(format!("history-commit-{}", row.ordinal));
+            let dy = control.bounds().top() - window.find("history-graph").bounds().top();
+            (row.entry.commit.oid.clone(), history.graph_offset(), dy)
+        })
+        .unwrap()
+    };
+    let position = graph_position(cx, window, &reader);
+    assert_eq!(position.1, 348);
+    assert_ne!(position.0, tip);
+
+    click(cx, window, "history-older-page");
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).history.cached_graph_rows() == 60)
+    });
+    assert_eq!(graph_position(cx, window, &reader), position);
+    cx.read(|cx| {
+        let reader = reader.read(cx);
+        let page = reader.history.cached_graph().unwrap();
+        assert_eq!(&page.rows[..48], initial.as_slice());
+        assert_eq!(page.coverage, HistoryCoverage::Partial);
+        assert!(!page.rows.last().unwrap().parents[0].loaded);
+        assert_eq!(page.next_ordinal, None);
+        assert!(has_selection(reader));
+    });
+
+    let walk = store
+        .begin_history_page(&profile, repository, &reference)
+        .unwrap()
+        .unwrap();
+    store
+        .commit_history_page(&walk, &commits[60..], None, true, now + 2)
+        .unwrap();
+    let connection = threadline_core::connectivity::ConnectivityObserver::new(1)
+        .snapshot(std::time::Duration::ZERO);
+    cx.update_window(window, |_, window, cx| {
+        reader.update(cx, |reader, cx| {
+            reader.update_sync(
+                crate::sync_worker::SyncUpdate {
+                    account: Some(account),
+                    status: None,
+                    connection,
+                    cache_generation: 1,
+                    history_generation: 1,
+                    eligible_outbox: 0,
+                },
+                window,
+                cx,
+            );
+        });
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| {
+            reader.read(cx).history.cached_graph().is_some_and(|page| {
+                page.coverage == HistoryCoverage::Complete && page.next_ordinal.is_some()
+            })
+        })
+    });
+    assert_eq!(graph_position(cx, window, &reader), position);
+
+    let live_offset = cx
+        .update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            window.click("history-older-page", cx);
+            scroll(window, cx, -116.);
+            reader.read(cx).history.graph_offset()
+        })
+        .unwrap();
+    assert_eq!(live_offset, position.1 + 116);
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).history.cached_graph_rows() == 105)
+    });
+    let position = graph_position(cx, window, &reader);
+    assert_eq!(position.1, live_offset);
+    cx.read(|cx| {
+        let reader = reader.read(cx);
+        let page = reader.history.cached_graph().unwrap();
+        assert_eq!(page.rows[59].parents[0].oid, oid(60));
+        assert!(page.rows[59].parents[0].loaded);
+        assert_eq!(page.rows.last().unwrap().entry.commit.oid, oid(104));
+        assert!(page.rows.last().unwrap().parents.is_empty());
+        assert_eq!(page.next_ordinal, None);
+        assert!(has_selection(reader));
+    });
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.try_find("history-older-page").is_none());
+        assert!(window.try_find("history-first-page").is_some());
+    })
+    .unwrap();
+
+    click(cx, window, "history-back");
+    until(cx, |cx| cx.read(|cx| !reader.read(cx).history.busy));
+    let saved = store
+        .history_view(account, repository, "reader-commit-history")
+        .unwrap()
+        .unwrap();
+    assert_eq!(saved.state.scroll_anchor.as_ref(), Some(&position.0));
+    assert_eq!(saved.state.scroll_offset, position.1);
+    assert_eq!(saved.state.selected.as_ref(), Some(&tip));
+    store
+        .observe_history_ref(&profile, repository, &reference, Some(&oid(3)), now + 3)
+        .unwrap();
+    store.sign_out_github_account(account, now + 4).unwrap();
+    store.set_dispatch_controls(account, true, false).unwrap();
+    let (reopened, restored) = open_history(cx);
+    until(cx, |cx| {
+        cx.read(|cx| restored.read(cx).history.cached_graph_rows() == 105)
+    });
+    assert_eq!(graph_position(cx, reopened, &restored), position);
+    cx.read(|cx| {
+        let reader = restored.read(cx);
+        assert!(reader.offline && has_selection(reader));
+        assert_eq!(
+            reader.history.cached_ref_tip(&reference),
+            Some(Some(&oid(3)))
+        );
+    });
+
+    click(cx, reopened, "history-first-page");
+    until(cx, |cx| {
+        cx.read(|cx| restored.read(cx).history.cached_graph_rows() == 48)
+    });
+    let (first_commit, offset, _) = graph_position(cx, reopened, &restored);
+    assert_eq!(first_commit, tip);
+    assert_eq!(offset, 0);
+    assert!(cx.read(|cx| has_selection(restored.read(cx))));
+    cx.update_window(reopened, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.try_find("history-first-page").is_none());
+        assert!(window.try_find("history-older-page").is_some());
+    })
+    .unwrap();
 }
 
 #[gpui_kit::test]

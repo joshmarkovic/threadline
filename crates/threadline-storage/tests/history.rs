@@ -104,11 +104,15 @@ fn it_006_history_checkpoints_layout_boundaries_and_exact_parents_survive_restar
         parent: Some(oid('e')),
         scroll_anchor: Some(oid('e')),
         scroll_offset: 7,
+        graph_window: None,
         file: Some("src/lib.rs".into()),
         file_scroll: 12,
         ignore_whitespace: false,
         context_lines: 3,
     };
+    let mut legacy = serde_json::to_value(&view).unwrap();
+    legacy.as_object_mut().unwrap().remove("graph_window");
+    assert_eq!(serde_json::from_value::<HistoryView>(legacy).unwrap(), view);
     assert_eq!(
         s.save_history_view(a, r, "view-one", None, &view).unwrap(),
         1

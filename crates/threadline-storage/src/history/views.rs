@@ -9,11 +9,27 @@ pub struct HistoryView {
     pub parent: Option<CommitOid>,
     pub scroll_anchor: Option<CommitOid>,
     pub scroll_offset: u32,
+    #[serde(default)]
+    pub graph_window: Option<HistoryWindow>,
     pub file: Option<String>,
     pub file_scroll: u32,
     pub ignore_whitespace: bool,
     pub context_lines: u16,
 }
+
+/// The explicitly expanded range within an immutable, repository-scoped history series.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct HistoryWindow {
+    pub after: Option<i64>,
+    pub through: i64,
+}
+
+impl HistoryWindow {
+    pub(super) fn valid(self) -> bool {
+        self.after.is_none_or(|after| after >= 0) && self.through > self.after.unwrap_or(-1)
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SavedHistoryView {
     pub generation: i64,
@@ -70,6 +86,7 @@ impl Store {
         state: &HistoryView,
     ) -> Result<i64> {
         if id.is_empty()
+            || state.graph_window.is_some_and(|window| !window.valid())
             || state
                 .file
                 .as_ref()
