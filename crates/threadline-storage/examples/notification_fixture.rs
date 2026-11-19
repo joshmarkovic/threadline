@@ -1,6 +1,8 @@
 //! Create an empty-profile fixture for the installed activity adapter, or inspect its durable state.
 #[path = "notification_fixture/grouped.rs"]
 mod grouped;
+#[path = "notification_fixture/selection.rs"]
+mod selection;
 #[path = "notification_fixture/watched.rs"]
 mod watched;
 
@@ -51,6 +53,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some("inspect-watched") => watched::inspect(root)?,
         Some("inspect-review") => grouped::inspect(root)?,
         Some("replay-review") => grouped::replay(root)?,
+        Some("inspect-runtime-selection") => selection::inspect(root)?,
         Some("inspect-runtime") => inspect_runtime(root)?,
         Some("inspect") => inspect(root)?,
         _ => return Err("Unknown activity fixture command.".into()),
