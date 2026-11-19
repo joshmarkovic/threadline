@@ -167,7 +167,12 @@ function Invoke-HistoryProof([IntPtr]$Window, [string]$Profile) {
             $history.comparison_base -ceq $firstParent -and $history.comparison_head -ceq $secondParent -and
             $history.displayed_file -ceq 'divergent.txt'
     }
-    Click-AccountControl $Window 'history-back'
+    Wait-For 'the owned Back to workspace history action' {
+        Invoke-OwnedFixtureControl $Window 'history-back' $null 'Back to workspace'
+    }
+    $null = Wait-Reader 'return to the open pull request outside History' {
+        param($reader) $null -eq $reader.history -and $reader.active_item -eq $prItem
+    }
     Click-AccountControl $Window 'reader-tab-0-0'
     Wait-HistoryUnsubmittedDraft $draft $head $prItem
     Add-Evidence 'The watched branch moves and disappears while the saved file selection and native draft survive' ([ordered]@{
