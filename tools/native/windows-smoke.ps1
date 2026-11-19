@@ -8,7 +8,7 @@ param(
     [switch]$PlatformProof,
     [switch]$ToastProof,
     [switch]$AccessProof,
-    [ValidateSet('Offline', 'PanePositions', 'PaneLifecycle', 'CachedCommentLinks', 'Resume', 'CursorRecovery', 'Historical', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace', 'Sync', 'RateLimit', 'NotificationSchedule', 'PullRequest', 'SharedPullRequest', 'PullRequestMergeState', 'MixedCatchup', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ThreadPlacement', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'CredentialBoundary', 'NativeLifecycle', 'OfflineMixedOutbox', 'ScopeHold', 'NativeActivity', 'History', 'CommentDependency', 'IssueConflict', 'IssuePropagation', 'Writes', 'WriteSurface')][string]$ReaderProof,
+    [ValidateSet('Offline', 'SidebarBadges', 'PanePositions', 'PaneLifecycle', 'CachedCommentLinks', 'Resume', 'CursorRecovery', 'Historical', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace', 'Sync', 'RateLimit', 'NotificationSchedule', 'PullRequest', 'SharedPullRequest', 'PullRequestMergeState', 'MixedCatchup', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ThreadPlacement', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'CredentialBoundary', 'NativeLifecycle', 'OfflineMixedOutbox', 'ScopeHold', 'NativeActivity', 'History', 'CommentDependency', 'IssueConflict', 'IssuePropagation', 'Writes', 'WriteSurface')][string]$ReaderProof,
     [switch]$AccessibilityProof,
     [string]$AccessAddress,
     [string]$AccessPhaseFile,
@@ -33,6 +33,8 @@ $reportName = if ($Measure) {
     'github-access-native.json'
 } elseif ($ReaderProof -in @('Performance', 'PerformancePhysical', 'PerformanceConcurrent')) {
     'reader-performance.json'
+} elseif ($ReaderProof -eq 'SidebarBadges') {
+    'sidebar-badges-native.json'
 } elseif ($ReaderProof -eq 'LargeWorkspace') {
     'large-workspace-native.json'
 } elseif ($ReaderProof -in @('Sync', 'RateLimit')) {
@@ -268,7 +270,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     if ($ToastProof -and $null -ne $script:toastFixture) {
         $info.EnvironmentVariables['THREADLINE_TEST_TOAST_TOKEN'] = $script:toastFixture.Token
     }
-    if ($AccessProof -or $ReaderProof) {
+    if ($AccessProof -or ($ReaderProof -and $ReaderProof -ne 'SidebarBadges')) {
         $info.EnvironmentVariables['THREADLINE_E2E_GITHUB_ADDR'] = $script:AccessAddress
     }
     if ($script:UseSeededFixtureAuth -or $ReaderBacklog) { $info.EnvironmentVariables['THREADLINE_E2E_FIXTURE_AUTH'] = '1' }
@@ -950,7 +952,7 @@ try {
     if (!$ProfileDir) {
         $ProfileDir = Join-Path ([IO.Path]::GetTempPath()) ('threadline-e2e-' + [guid]::NewGuid().ToString('N'))
     }
-    if ($AccessProof -or $ReaderProof) {
+    if ($AccessProof -or ($ReaderProof -and $ReaderProof -ne 'SidebarBadges')) {
         $fixtureAddress = [regex]::Match($AccessAddress, '^127\.0\.0\.1:([1-9][0-9]{0,4})$')
         if ($Measure -or $PlatformProof -or $ToastProof -or ($AccessProof -and $ReaderProof) -or
             !$fixtureAddress.Success -or [int]$fixtureAddress.Groups[1].Value -gt 65535 -or !$AccessPhaseFile -or
@@ -960,13 +962,14 @@ try {
         }
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
-    if ($AccessibilityProof -or $AccessProof -or $script:UsesNativeLifecycleFixture -or $script:UsesPaneFixture -or $ReaderProof -in @('CachedCommentLinks', 'Resume', 'CursorRecovery', 'Historical', 'Sync', 'RateLimit', 'NotificationSchedule', 'PullRequest', 'SharedPullRequest', 'PullRequestMergeState', 'MixedCatchup', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ThreadPlacement', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'CredentialBoundary', 'NativeActivity', 'History', 'CommentDependency', 'IssueConflict', 'IssuePropagation', 'Writes', 'WriteSurface', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) {
+    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -eq 'SidebarBadges' -or $script:UsesNativeLifecycleFixture -or $script:UsesPaneFixture -or $ReaderProof -in @('CachedCommentLinks', 'Resume', 'CursorRecovery', 'Historical', 'Sync', 'RateLimit', 'NotificationSchedule', 'PullRequest', 'SharedPullRequest', 'PullRequestMergeState', 'MixedCatchup', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ThreadPlacement', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'CredentialBoundary', 'NativeActivity', 'History', 'CommentDependency', 'IssueConflict', 'IssuePropagation', 'Writes', 'WriteSurface', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) {
         Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
         . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
         $script:UseOwnedUiAutomation = !$AccessibilityProof -and $ReaderProof -ne 'PerformancePhysical'
         $report.driver = 'Windows PowerShell / owned UI Automation and guarded Win32 SendInput'
     }
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
+    if ($ReaderProof -eq 'SidebarBadges') { . (Join-Path $PSScriptRoot 'windows-sidebar-badges.ps1') }
     if ($script:UsesPaneFixture) { . (Join-Path $PSScriptRoot 'windows-pane-positions.ps1') }
     if ($ReaderProof -in @('Historical', 'CachedCommentLinks')) { . (Join-Path $PSScriptRoot 'windows-historical-reader.ps1') }
     if ($ReaderProof -in @('Resume', 'CursorRecovery', 'Historical', 'Sync', 'RateLimit', 'NotificationSchedule', 'MixedCatchup', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'NativeLifecycle', 'ScopeHold', 'NativeActivity', 'PerformanceConcurrent')) { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
@@ -988,7 +991,7 @@ try {
     if ($ReaderProof -eq 'Offline') { Initialize-ReaderProfile $firstProfile 'small' }
     if ($ReaderProof -ceq 'CachedCommentLinks') { Initialize-ReaderProfile $firstProfile 'small-comment-links' }
     if ($script:UsesPaneFixture) { Initialize-ReaderProfile $firstProfile 'small-pane-positions' }
-    if ($ReaderProof -in @('Performance', 'PerformancePhysical')) { Initialize-ReaderProfile $firstProfile 'section-16' }
+    if ($ReaderProof -in @('SidebarBadges', 'Performance', 'PerformancePhysical')) { Initialize-ReaderProfile $firstProfile 'section-16' }
     if ($ReaderProof -in @('LargeWorkspace', 'PerformanceConcurrent')) { Initialize-ReaderProfile $firstProfile 'section-16-backlog' }
     if ($script:UsesNativeLifecycleFixture) { Initialize-NativeLifecycle $firstProfile }
     if ($ReaderProof -eq 'NativeActivity') { Initialize-NativeActivity $firstProfile 'native-activity-seeded.json' }
@@ -1074,6 +1077,7 @@ try {
         $report.detail = 'Native account controls verified the synthetic GitHub access and SSO journey and restored repository selection after restart.'
     } elseif ($ReaderProof) {
         switch ($ReaderProof) {
+            SidebarBadges { Invoke-SidebarBadgeProof $window }
             Offline { Invoke-OfflineReaderProof $window $firstProfile }
             PanePositions { Invoke-CrossRepositoryPaneProof $window }
             CachedCommentLinks { Invoke-CachedCommentLinksProof $window }
