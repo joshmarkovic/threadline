@@ -162,10 +162,21 @@ function Invoke-NativeActivityProof([IntPtr]$Window, [string]$Profile) {
         param($sync) $sync.connection -ceq 'Reachable' -and $sync.cache_generation -ge 3
     }
     Open-RestartedFixtureActivity $replay
-    $null = Wait-AccountControl ("activity-open-" + $merge[0].id)
+    $mergeAction = 'activity-open-' + $merge[0].id
+    $mergeItem = $merge[0].target.Item.item
+    Wait-For 'the exact reopened merge activity action in the owned window' {
+        Invoke-OwnedFixtureControl $replay $mergeAction $null 'Open'
+    }
+    $null = Wait-Reader 'the original cached pull request opened from its restored activity row' {
+        param($reader) $reader.cached_content_ready -and $reader.active_number -eq 42 -and $reader.active_item -eq $mergeItem
+    }
+    Add-Evidence 'Open the exact merged pull request from its restored native Activity row' ([ordered]@{
+        activity_id = $merge[0].id; item = $mergeItem; number = 42
+    })
     Stop-ThroughUi
     $final = Read-NativeActivityFixture $catchupProfile 'inspect' 'native-activity-replay.json'
-    if ($final.delivered_groups -ne 2 -or @($final.feed).Count -ne @($catchupResult.feed).Count -or
+    if ($final.opened_tabs -ne 1 -or $final.delivered_groups -ne 2 -or
+        (@($final.feed.key | Sort-Object) -join ',') -cne (@($catchupResult.feed.key | Sort-Object) -join ',') -or
         @((Read-NativeActivityCapture $catchupProfile)).Count -ne 2) {
         throw 'Restarted provider observations duplicated a delivery or feed entry.'
     }
