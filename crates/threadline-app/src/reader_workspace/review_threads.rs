@@ -102,17 +102,21 @@ impl ReaderWorkspace {
         );
         let input = format!("pr-{pane}-thread-{position}-reply-input");
         let submit = format!("pr-{pane}-thread-{position}-reply-submit");
-        let button = control(submit.clone(), "Queue reply")
-            .disabled(
-                !bound
-                    || !editor.saved()
-                    || editor.submitting
-                    || editor.body.trim().is_empty()
-                    || editor.submitted == Some(editor.durable_revision),
-            )
-            .on_click(cx.listener(move |this, _, window, cx| {
-                this.queue_reply(&key, current, window, cx);
-            }));
+        let submitted = editor.current_submission();
+        let button = control(
+            submit.clone(),
+            submitted.map_or("Queue reply", super::outbox::draft_submission_label),
+        )
+        .disabled(
+            !bound
+                || !editor.saved()
+                || editor.submitting
+                || editor.body.trim().is_empty()
+                || submitted.is_some(),
+        )
+        .on_click(cx.listener(move |this, _, window, cx| {
+            this.queue_reply(&key, current, window, cx);
+        }));
         actions
             .child(
                 self.observed_control(
@@ -155,7 +159,8 @@ impl ReaderWorkspace {
         }
         editor.capture(cx);
         let version = editor.durable_revision;
-        if !editor.saved() || editor.body.trim().is_empty() || editor.submitted == Some(version) {
+        if !editor.saved() || editor.body.trim().is_empty() || editor.current_submission().is_some()
+        {
             return;
         }
         let (account, item, lease, key) = (
@@ -204,7 +209,9 @@ impl ReaderWorkspace {
                 {
                     editor.submitting = false;
                     if result.is_ok() {
-                        editor.submitted = Some(version);
+                        editor.submitted = Some(
+                            threadline_storage::queue::DraftSubmissionStatus::queued(version),
+                        );
                     }
                 }
                 this.finish_thread_action(item, result.is_ok(), window, cx);

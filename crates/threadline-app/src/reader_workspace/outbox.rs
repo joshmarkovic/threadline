@@ -8,7 +8,7 @@ use gpui_kit::{
 };
 use std::num::NonZeroU64;
 use threadline_storage::{
-    queue::{ActionKind, Attempt, CancelResult, Operation, Receipt, State},
+    queue::{ActionKind, Attempt, CancelResult, DraftSubmissionStatus, Operation, Receipt, State},
     writes::{IssueChanges, WriteConflict, WriteIntent},
 };
 
@@ -29,6 +29,7 @@ pub(super) struct OutboxState {
     changing: bool,
     inspection_generation: u64,
     controls_generation: u64,
+    draft_status_generation: u64,
     pub(super) queue_generation: u64,
 }
 
@@ -42,6 +43,7 @@ impl Default for OutboxState {
             changing: false,
             inspection_generation: 0,
             controls_generation: 0,
+            draft_status_generation: 0,
             queue_generation: 0,
         }
     }
@@ -123,7 +125,79 @@ enum Action {
     Retry,
 }
 
+struct DraftStatusLookup {
+    id: String,
+    lease: String,
+    revision: i64,
+    review_item: Option<ItemId>,
+}
+
+impl DraftStatusLookup {
+    fn matches(&self, id: &str, lease: &str, revision: i64) -> bool {
+        self.id == id && self.lease == lease && self.revision == revision
+    }
+}
+
 impl ReaderWorkspace {
+    pub(super) fn refresh_draft_submissions(&mut self, window: &Window, cx: &mut Context<Self>) {
+        let Some(account) = self.account else { return };
+        let writes = self.drafts.values().filter_map(|editor| {
+            editor.current_submission().map(|status| DraftStatusLookup {
+                id: editor.id.clone(),
+                lease: editor.lease.clone(),
+                revision: status.revision,
+                review_item: None,
+            })
+        });
+        let reviews = self.review_editors.iter().filter_map(|(&item, editor)| {
+            editor.current_submission().map(|status| DraftStatusLookup {
+                id: editor.id().to_owned(),
+                lease: editor.lease_token().to_owned(),
+                revision: status.revision,
+                review_item: Some(item),
+            })
+        });
+        let lookups = writes.chain(reviews).collect::<Vec<_>>();
+        if lookups.is_empty() {
+            return;
+        }
+        self.outbox.draft_status_generation += 1;
+        let generation = self.outbox.draft_status_generation;
+        self.launch(
+            window,
+            cx,
+            move |store| {
+                lookups
+                    .into_iter()
+                    .map(|lookup| {
+                        let status =
+                            store.draft_submission_status(account, &lookup.id, lookup.revision)?;
+                        Ok((lookup, status))
+                    })
+                    .collect::<Outcome<Vec<_>>>()
+            },
+            move |this, result, _, _| {
+                if this.outbox.draft_status_generation != generation {
+                    return;
+                }
+                let Ok(statuses) = result else { return };
+                for (lookup, status) in statuses {
+                    if let Some(item) = lookup.review_item {
+                        if let Some(editor) = this.review_editors.get_mut(&item).filter(|editor| {
+                            lookup.matches(editor.id(), editor.lease_token(), editor.version)
+                        }) {
+                            editor.submitted = status;
+                        }
+                    } else if let Some(editor) = this.drafts.get_mut(&lookup.id).filter(|editor| {
+                        lookup.matches(&editor.id, &editor.lease, editor.durable_revision)
+                    }) {
+                        editor.submitted = status;
+                    }
+                }
+            },
+        );
+    }
+
     pub(super) fn refresh_sidebar_counts(&mut self, window: &Window, cx: &mut Context<Self>) {
         let Some(account) = self.account else { return };
         let scope = self.scope;
@@ -594,6 +668,14 @@ pub(super) fn state_label(state: State, cancelled: bool) -> &'static str {
     }
 }
 
+pub(super) fn draft_submission_label(status: DraftSubmissionStatus) -> &'static str {
+    match (status.state, status.cancel_requested) {
+        (State::Queued, false) => "Saved to Outbox",
+        (State::OutcomeUnknown, true) => "Outcome unknown · cancellation requested",
+        (state, cancelled) => state_label(state, cancelled),
+    }
+}
+
 fn reason_label(value: &str) -> String {
     match value {
         "remote_edit_conflict" | "changed_fields" | "issue_fields_conflict" => {
@@ -721,4 +803,23 @@ fn conflict_value(id: &'static str, field: &str, value: &str) -> AnyElement {
         .aria_label(presentation.clone())
         .child(presentation)
         .into_any_element()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DraftStatusLookup;
+
+    #[test]
+    fn submitted_status_from_a_closed_editor_cannot_replace_a_reopened_editor() {
+        let delayed = DraftStatusLookup {
+            id: "review-1".into(),
+            lease: "old-editor".into(),
+            revision: 6,
+            review_item: None,
+        };
+        assert!(delayed.matches("review-1", "old-editor", 6));
+        assert!(!delayed.matches("review-1", "reopened-editor", 6));
+        assert!(!delayed.matches("review-1", "old-editor", 7));
+        assert!(!delayed.matches("review-2", "old-editor", 6));
+    }
 }

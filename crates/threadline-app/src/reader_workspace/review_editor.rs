@@ -4,7 +4,7 @@ use gpui_kit::component::diff::{DiffLineRange, DiffSide};
 use std::time::Duration;
 use threadline_storage::{
     pr::{PrRevision, SourceSide},
-    queue::DraftSubmission,
+    queue::{DraftSubmission, DraftSubmissionStatus},
     reviews::{
         DraftInline, InlineAnchor, ReviewDraft, ReviewEvent, ReviewIntent, ReviewSubmission,
         SavedReviewDraft,
@@ -84,7 +84,7 @@ pub(super) struct ReviewEditor {
     pub failed: bool,
     pub sending: bool,
     pub(crate) version: i64,
-    pub(crate) submitted: Option<i64>,
+    pub(crate) submitted: Option<DraftSubmissionStatus>,
     pub remapped: HashMap<String, InlineAnchor>,
     pub remap_revision: Option<i64>,
     rebinding: bool,
@@ -100,9 +100,17 @@ impl ReviewEditor {
     pub(super) fn revision(&self) -> &PrRevision {
         &self.lease.revision
     }
-    #[cfg(feature = "e2e")]
     pub(super) fn id(&self) -> &str {
         &self.lease.id
+    }
+
+    pub(super) fn lease_token(&self) -> &str {
+        &self.lease.token
+    }
+
+    pub(super) fn current_submission(&self) -> Option<DraftSubmissionStatus> {
+        self.submitted
+            .filter(|status| status.revision == self.version && self.saved())
     }
 
     pub(super) fn saved(&self) -> bool {
@@ -183,7 +191,7 @@ impl ReviewEditor {
             collapsed: self.collapsed,
             event: format!("{:?}", self.event),
             saved: self.saved(),
-            queued: self.submitted == Some(self.version),
+            queued: self.current_submission().is_some(),
             summary_nonempty: !self.last.summary.trim().is_empty(),
             anchors: self
                 .last
@@ -282,6 +290,7 @@ async fn persist_review(
 
 struct ReviewOpen {
     saved: SavedReviewDraft,
+    submitted: Option<DraftSubmissionStatus>,
     proof: ReviewLease,
     extra: Option<InlineAnchor>,
 }
@@ -329,11 +338,21 @@ fn load_review(
             "The review draft is being edited in another window",
         ));
     }
-    let saved = store
-        .review_draft(saved_revision.account, &id)?
-        .ok_or(threadline_storage::Error::NotFound)?;
+    let opened = (|| -> Outcome<_> {
+        let saved = store
+            .review_draft(saved_revision.account, &id)?
+            .ok_or(threadline_storage::Error::NotFound)?;
+        let submitted =
+            store.draft_submission_status(saved_revision.account, &id, saved.revision)?;
+        Ok((saved, submitted))
+    })();
+    if opened.is_err() {
+        let _ = store.release_editor(saved_revision.account, &id, &token);
+    }
+    let (saved, submitted) = opened?;
     Ok(Some(ReviewOpen {
         saved,
+        submitted,
         proof: ReviewLease {
             id,
             token,
@@ -448,8 +467,8 @@ impl ReaderWorkspace {
             match result {
                 Ok(Some(open)) => {
                     if this.layout.panes.iter().flat_map(|pane|&pane.tabs).any(|current|current.id==tab.id&&current.item==item) {
-                        let ReviewOpen{saved,proof,extra}=open;
-                        this.install_review_editor(&tab,saved,proof,window,cx);
+                        let ReviewOpen{saved,submitted,proof,extra}=open;
+                        this.install_review_editor(&tab,saved,submitted,proof,window,cx);
                         if let Some(anchor)=extra {
                             this.add_review_inline(item,view_id(),anchor,window,cx);
                         } else if !restore {
@@ -471,6 +490,7 @@ impl ReaderWorkspace {
         &mut self,
         tab: &Tab,
         saved: SavedReviewDraft,
+        submitted: Option<DraftSubmissionStatus>,
         lease: ReviewLease,
         window: &mut Window,
         cx: &mut Context<Self>,
@@ -519,6 +539,7 @@ impl ReaderWorkspace {
                         {
                             if let Some(version) = receipt.version {
                                 editor.version = version;
+                                editor.submitted = editor.submitted.filter(|status| status.revision == version);
                                 editor.persisted =
                                     editor.persisted.max(receipt.sequence.unwrap_or_default());
                             }
@@ -580,7 +601,7 @@ impl ReaderWorkspace {
                 failed: false,
                 sending: false,
                 version: saved.revision,
-                submitted: None,
+                submitted,
                 remapped: HashMap::new(),
                 remap_revision: None,
                 rebinding: false,
@@ -903,7 +924,7 @@ impl ReaderWorkspace {
             return;
         }
         editor.capture(cx);
-        if !editor.saved() || editor.submitted == Some(editor.version) {
+        if !editor.saved() || editor.current_submission().is_some() {
             return;
         }
         let lease = editor.lease.clone();
@@ -941,7 +962,7 @@ impl ReaderWorkspace {
                 {
                     editor.sending = false;
                     if result.is_ok() {
-                        editor.submitted = Some(version);
+                        editor.submitted = Some(DraftSubmissionStatus::queued(version));
                     }
                 }
                 this.status = Some(if result.is_ok() {

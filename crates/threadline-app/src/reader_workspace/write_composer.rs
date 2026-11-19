@@ -269,7 +269,7 @@ impl ReaderWorkspace {
             editor.durable_revision,
             editor.lease.clone(),
         );
-        if editor.submitted == Some(version) {
+        if editor.current_submission().is_some() {
             return;
         }
         editor.submitting = true;
@@ -306,7 +306,9 @@ impl ReaderWorkspace {
                 {
                     editor.submitting = false;
                     if result.is_ok() {
-                        editor.submitted = Some(version);
+                        editor.submitted = Some(
+                            threadline_storage::queue::DraftSubmissionStatus::queued(version),
+                        );
                     }
                 }
                 match result {
@@ -334,6 +336,7 @@ impl ReaderWorkspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.refresh_draft_submissions(window, cx);
         let tabs = self
             .layout
             .panes
@@ -537,7 +540,7 @@ impl ReaderWorkspace {
     ) -> AnyElement {
         let id = format!("reader-submit-{pane}");
         let editor_id = editor.id.clone();
-        let already = editor.submitted == Some(editor.durable_revision);
+        let submitted = editor.current_submission();
         let action = if editor.issue_draft {
             "Queue issue edit"
         } else if editor.comment_edit {
@@ -547,16 +550,19 @@ impl ReaderWorkspace {
         };
         self.observed_control(
             id.clone(),
-            super::view::control(id, if already { "Saved to Outbox" } else { action })
-                .disabled(
-                    editor.submitting
-                        || already
-                        || !editor.saved()
-                        || !editor.has_write_changes(cx),
-                )
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.submit_editor(editor_id.clone(), window, cx)
-                })),
+            super::view::control(
+                id,
+                submitted.map_or(action, super::outbox::draft_submission_label),
+            )
+            .disabled(
+                editor.submitting
+                    || submitted.is_some()
+                    || !editor.saved()
+                    || !editor.has_write_changes(cx),
+            )
+            .on_click(cx.listener(move |this, _, window, cx| {
+                this.submit_editor(editor_id.clone(), window, cx)
+            })),
             false,
         )
     }

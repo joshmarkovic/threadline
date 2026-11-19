@@ -2003,6 +2003,142 @@ fn ui_006_failed_enqueue_keeps_the_saved_comment_and_reports_the_failure(cx: &mu
     });
 }
 
+#[gpui_kit::test]
+fn ui_006_reopened_issue_draft_uses_the_durable_submission_for_its_exact_revision(
+    cx: &mut TestAppContext,
+) {
+    use threadline_storage::queue::{CancelResult, DraftSubmissionStatus, State};
+
+    let setup = ReaderHarness::seeded();
+    let account = setup.fixture.account;
+    let item = setup.fixture.long_discussion;
+    let draft_id = format!("issue-{}", item.0);
+    setup.one_pane(&Tab {
+        id: "submitted-issue-draft".into(),
+        item,
+        view: TabView::default(),
+    });
+    let existing = setup.store.queue_page(account, 0, 100).unwrap().len();
+    let (window, reader) = setup.open(cx);
+    click(cx, window, "reader-edit-issue-0");
+    until(cx, |cx| {
+        cx.read(|cx| !reader.read(cx).layout_busy && reader.read(cx).drafts.contains_key(&draft_id))
+    });
+
+    let type_body =
+        |cx: &mut TestAppContext, window, reader: &Entity<ReaderWorkspace>, text: &'static str| {
+            cx.update_window(window, |_, window, cx| {
+                let editor = reader.read(cx).drafts[&draft_id].view.clone();
+                editor.focus_handle(cx).focus(window, cx);
+                window.render_frame(cx);
+                window.input(text, cx);
+            })
+            .unwrap();
+            until(cx, |cx| {
+                cx.read(|cx| {
+                    let editor = &reader.read(cx).drafts[&draft_id];
+                    editor.saved() && editor.body.contains(text)
+                })
+            });
+        };
+    type_body(cx, window, &reader, "Use the same issue after reopening.");
+    click(cx, window, "reader-submit-0");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            reader.read(cx).drafts[&draft_id]
+                .current_submission()
+                .is_some()
+        })
+    });
+    let operation = setup
+        .store
+        .queue_page(account, 0, 100)
+        .unwrap()
+        .remove(existing);
+    let version = setup
+        .store
+        .draft(account, &draft_id)
+        .unwrap()
+        .unwrap()
+        .revision;
+
+    let (finished, wait) = std::sync::mpsc::channel();
+    cx.update_window(window, |_, window, cx| {
+        reader.update(cx, |reader, cx| {
+            reader.request_departure(
+                true,
+                move |_, _| {
+                    finished.send(()).unwrap();
+                },
+                window,
+                cx,
+            );
+        });
+    })
+    .unwrap();
+    until(cx, |_| wait.try_recv().is_ok());
+
+    let (window, reader) = setup.open(cx);
+    until(cx, |cx| {
+        cx.read(|cx| {
+            reader
+                .read(cx)
+                .drafts
+                .get(&draft_id)
+                .and_then(drafts::Editor::current_submission)
+                == Some(DraftSubmissionStatus::queued(version))
+        })
+    });
+    assert_eq!(
+        setup.store.queue_page(account, 0, 100).unwrap().len(),
+        existing + 1
+    );
+
+    assert_eq!(
+        setup
+            .store
+            .cancel_operation(account, &operation.id)
+            .unwrap(),
+        CancelResult::Cancelled
+    );
+    cx.update_window(window, |_, window, cx| {
+        reader.update(cx, |reader, cx| {
+            reader.refresh_draft_submissions(window, cx)
+        });
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| {
+            reader.read(cx).drafts[&draft_id]
+                .current_submission()
+                .is_some_and(|status| outbox::draft_submission_label(status) == "Cancelled")
+        })
+    });
+    type_body(cx, window, &reader, "A newer edit is still a draft.");
+    cx.read(|cx| {
+        let editor = &reader.read(cx).drafts[&draft_id];
+        assert!(editor.durable_revision > version);
+        assert!(editor.current_submission().is_none());
+    });
+    assert_eq!(
+        setup
+            .store
+            .operation(account, &operation.id)
+            .unwrap()
+            .unwrap()
+            .state,
+        State::Cancelled
+    );
+    assert_eq!(
+        outbox::draft_submission_label(DraftSubmissionStatus {
+            revision: version,
+            state: State::OutcomeUnknown,
+            cancel_requested: true,
+        }),
+        "Outcome unknown · cancellation requested"
+    );
+}
+
 #[cfg(feature = "e2e")]
 #[gpui_kit::test]
 fn issue_conversation_observation_tracks_the_viewport_without_moving_it(cx: &mut TestAppContext) {

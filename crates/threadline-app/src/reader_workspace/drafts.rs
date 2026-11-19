@@ -3,7 +3,7 @@ use super::*;
 use gpui_kit::base::input::TextareaState;
 use gpui_kit::{Subscription, component::input::InputEvent};
 use threadline_storage::{
-    queue::{DraftContent, DraftKind},
+    queue::{DraftContent, DraftKind, DraftSubmissionStatus},
     resources::{ResourceFamily, ResourceKey, ResourceTarget},
     writes::CommentTarget,
 };
@@ -42,7 +42,7 @@ pub(super) struct Editor {
     base: String,
     pub(super) durable_revision: i64,
     pub(super) submitting: bool,
-    pub(super) submitted: Option<i64>,
+    pub(super) submitted: Option<DraftSubmissionStatus>,
     pub(super) write_base: Option<WriteBase>,
     pub(super) issue_choices: Option<IssueEditor>,
     pub(super) issue_draft: bool,
@@ -55,6 +55,11 @@ pub(super) struct Editor {
 }
 
 impl Editor {
+    pub(super) fn current_submission(&self) -> Option<DraftSubmissionStatus> {
+        self.submitted
+            .filter(|status| status.revision == self.durable_revision && self.saved())
+    }
+
     pub(super) fn saved(&self) -> bool {
         self.serial == self.persisted && !self.failed
     }
@@ -372,12 +377,23 @@ impl ReaderWorkspace {
                 if !store.acquire_editor(account, &draft_id, &editor_lease, now, now + 10_000)? {
                     return Ok(None);
                 }
-                store.draft(account, &draft_id)
+                let opened = (|| -> Outcome<_> {
+                    let draft = store
+                        .draft(account, &draft_id)?
+                        .ok_or(threadline_storage::Error::NotFound)?;
+                    let submitted =
+                        store.draft_submission_status(account, &draft_id, draft.revision)?;
+                    Ok(Some((draft, submitted)))
+                })();
+                if opened.is_err() {
+                    let _ = store.release_editor(account, &draft_id, &editor_lease);
+                }
+                opened
             },
             move |this, result, window, cx| {
                 this.pending_draft = None;
-                let draft = match result {
-                    Ok(Some(draft)) => draft,
+                let (draft, submitted) = match result {
+                    Ok(Some(opened)) => opened,
                     Ok(None) => {
                         this.status = Some("This draft has an active editor in another window.");
                         this.settle_departure(window, cx);
@@ -460,6 +476,9 @@ impl ReaderWorkspace {
                                             editor.persisted.max(serial.unwrap_or_default());
                                         if let Some(revision) = revision {
                                             editor.durable_revision = revision;
+                                            editor.submitted = editor
+                                                .submitted
+                                                .filter(|status| status.revision == revision);
                                         }
                                     }
                                     if serial.is_none_or(|latest| latest == editor.serial) {
@@ -505,7 +524,7 @@ impl ReaderWorkspace {
                         base: initial_base,
                         durable_revision: draft.revision,
                         submitting: false,
-                        submitted: None,
+                        submitted,
                         write_base,
                         issue_choices,
                         issue_draft,

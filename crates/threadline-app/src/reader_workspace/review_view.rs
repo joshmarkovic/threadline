@@ -184,7 +184,7 @@ impl ReaderWorkspace {
             let current = revision.id;
             let button = control(id.clone(), "Queue review")
                 .disabled(
-                    editor.sending || !editor.saved() || editor.submitted == Some(editor.version),
+                    editor.sending || !editor.saved() || editor.current_submission().is_some(),
                 )
                 .on_click(cx.listener(move |this, _, window, cx| {
                     this.submit_review_editor(item, current, window, cx);
@@ -193,8 +193,8 @@ impl ReaderWorkspace {
         }
         let progress = if editor.failed {
             "Review draft could not be saved. Edit to retry."
-        } else if editor.submitted == Some(editor.version) {
-            "Review queued"
+        } else if let Some(status) = editor.current_submission() {
+            super::outbox::draft_submission_label(status)
         } else if editor.saved() {
             "Review draft saved on this device"
         } else {

@@ -449,8 +449,7 @@ impl ReaderWorkspace {
             outbox_merge_queue_required: self.outbox.selected_merge_queue_required(),
             outbox_action_cancel_requested: self.outbox.cancel_requested(),
             outbox_paused: self.outbox.is_paused(),
-            active_draft_submitted: draft
-                .map(|draft| draft.submitted == Some(draft.durable_revision)),
+            active_draft_submitted: draft.map(|draft| draft.current_submission().is_some()),
         }
     }
     pub(crate) fn new(

@@ -134,6 +134,23 @@ impl State {
         }
     }
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DraftSubmissionStatus {
+    pub revision: i64,
+    pub state: State,
+    pub cancel_requested: bool,
+}
+
+impl DraftSubmissionStatus {
+    pub const fn queued(revision: i64) -> Self {
+        Self {
+            revision,
+            state: State::Queued,
+            cancel_requested: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Operation {
     pub id: String,
@@ -349,6 +366,31 @@ impl Store {
     }
     pub fn operation(&self, account: AccountId, id: &str) -> Result<Option<Operation>> {
         self.read(|db| read_operation(db, account, id))
+    }
+    /// Read the operation bound to this account and saved draft revision.
+    pub fn draft_submission_status(
+        &self,
+        account: AccountId,
+        draft: &str,
+        revision: i64,
+    ) -> Result<Option<DraftSubmissionStatus>> {
+        self.read(|db| {
+            db.query_row(
+                "SELECT state, cancel_requested FROM operations
+                 WHERE account_id=? AND draft_id=? AND draft_revision=?",
+                params![account, draft, revision],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, bool>(1)?)),
+            )
+            .optional()?
+            .map(|(state, cancel_requested)| {
+                Ok(DraftSubmissionStatus {
+                    revision,
+                    state: State::decode(&state)?,
+                    cancel_requested,
+                })
+            })
+            .transpose()
+        })
     }
     pub fn queue_page(&self, account: AccountId, after: i64, limit: u16) -> Result<Vec<QueueRow>> {
         if limit == 0 || limit > 256 {
