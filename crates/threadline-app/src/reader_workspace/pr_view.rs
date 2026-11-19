@@ -219,7 +219,8 @@ impl ReaderWorkspace {
                     .and_then(|pr| pr.diff.as_ref()?.read(cx).selected_lines())
                     .map(|selection| selection.start()),
                 change_navigation: self.pr_change_navigation,
-                retains_section_selection: pr.is_some_and(PullRequestView::retains_section_selection),
+                retains_section_selection: pr
+                    .is_some_and(PullRequestView::retains_section_selection),
                 narrow_surface: format!("{:?}", settings.narrow_surface),
                 selected_file: pr.and_then(|pr| {
                     pr.data
@@ -1798,6 +1799,8 @@ impl ReaderWorkspace {
         diff.update(cx, |state, cx| {
             let selection =
                 DiffLineRange::new(position.path().clone(), position.side(), line, line);
+            // A queued text-selection clear may still refer to this same range.
+            state.set_selected_lines(None, cx);
             state.set_selected_lines(Some(selection), cx);
             state.scroll_to_line(position.clone(), cx);
         });

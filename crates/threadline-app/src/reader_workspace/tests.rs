@@ -2244,12 +2244,45 @@ fn ui_004_existing_threads_follow_verified_source_lines_in_both_diff_modes(
         view: TabView {
             pr_reader: Some(PrTabView {
                 context_collapsed: true,
+                code_anchor: Some(ReviewAnchor {
+                    path: path.into(),
+                    side: SourceSide::Right,
+                    line: 17,
+                    original_oid: revision.head.as_str().to_owned(),
+                }),
                 ..Default::default()
             }),
             ..Default::default()
         },
     });
     let (window, reader) = setup.open(cx);
+    let selection = DiffLineRange::new(path, DiffSide::Modified, 17, 17);
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        let diff = reader.read(cx).tab_views["verified-thread-source"]
+            .pr
+            .as_ref()
+            .unwrap()
+            .diff
+            .as_ref()
+            .unwrap();
+        assert_eq!(diff.read(cx).selected_lines(), Some(selection.clone()));
+        gpui_kit::base::TextSelection::clear(window, cx);
+        window.click("pr-0-next-change", cx);
+    })
+    .unwrap();
+    until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+    cx.read(|cx| {
+        let diff = reader.read(cx).tab_views["verified-thread-source"]
+            .pr
+            .as_ref()
+            .unwrap()
+            .diff
+            .as_ref()
+            .unwrap();
+        assert_eq!(diff.read(cx).selected_lines(), Some(selection));
+        assert_eq!(diff.read(cx).selected_text(cx).trim(), "new");
+    });
     let check = |cx: &mut TestAppContext, mode| {
         cx.update_window(window, |_, window, cx| {
             window.render_frame(cx);
