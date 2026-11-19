@@ -1211,8 +1211,13 @@ async fn sync_worker_retries_an_interrupted_probe_without_another_check_now() {
 
     let floor = threadline_storage::UtcMillis::now().unwrap().0 + 1800;
     store.hold_sync_budget(account, floor).unwrap();
-    for _ in 0..3 {
-        worker.interrupt(None);
+    worker.interrupt(None);
+    for trigger in [
+        ProbeTrigger::Wake,
+        ProbeTrigger::NetworkChanged,
+        ProbeTrigger::Wake,
+    ] {
+        worker.wake(Some(trigger));
     }
     fixture.probe.hold.store(false, Ordering::Release);
     tokio::time::timeout(

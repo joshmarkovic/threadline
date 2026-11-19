@@ -29,6 +29,7 @@ const ACCEPTED_ISSUE_TITLE: &str = "Fixture accepted issue edit";
 struct WriteFixture {
     address: std::net::SocketAddr,
     stop: Arc<AtomicBool>,
+    connections: Arc<AtomicUsize>,
     sent: Arc<AtomicUsize>,
     readbacks: Arc<AtomicUsize>,
     server: Option<thread::JoinHandle<()>>,
@@ -72,6 +73,8 @@ impl WriteFixture {
         listener.set_nonblocking(true).unwrap();
         let address = listener.local_addr().unwrap();
         let stop = Arc::new(AtomicBool::new(false));
+        let connections = Arc::new(AtomicUsize::new(0));
+        let incoming = Arc::clone(&connections);
         let sent = Arc::new(AtomicUsize::new(0));
         let readbacks = Arc::new(AtomicUsize::new(0));
         let (stopping, writes, reads) = (stop.clone(), sent.clone(), readbacks.clone());
@@ -81,6 +84,7 @@ impl WriteFixture {
             while !stopping.load(Ordering::Acquire) {
                 match listener.accept() {
                     Ok((stream, _)) => {
+                        incoming.fetch_add(1, Ordering::SeqCst);
                         serve(
                             stream,
                             &writes,
@@ -101,6 +105,7 @@ impl WriteFixture {
         Self {
             address,
             stop,
+            connections,
             sent,
             readbacks,
             server: Some(server),
@@ -640,6 +645,9 @@ async fn check_merge_delivery(lose_response: bool) {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn write_dispatch_uses_durable_offline_outbox_and_stops_after_lost_response() {
+    use threadline_core::connectivity::ConnectionStatus;
+    use threadline_storage::notifications::QuietHours;
+
     const CONFIRMED: &str = "60000000-0000-4000-8000-000000000001";
     const LOST: &str = "60000000-0000-4000-8000-000000000002";
     const CANCELLED: &str = "60000000-0000-4000-8000-000000000003";
@@ -647,11 +655,29 @@ async fn write_dispatch_uses_durable_offline_outbox_and_stops_after_lost_respons
     let dir = tempfile::tempdir().unwrap();
     let store = Arc::new(Store::open_profile(dir.path()).unwrap());
     let (accounts, account, repository) = select_fixture_repository(&store, fixture.address).await;
-    store
+    let (_, settings) = store
         .update_sync_settings(account, |settings| {
             settings.controls.work_offline = true;
             settings.controls.pause_background = true;
-            settings.controls.notification_quiet = true;
+            settings.controls.pause_queued_actions = true;
+            settings.schedule.weekdays = 0;
+            settings.schedule.timezone = Some("UTC".into());
+        })
+        .unwrap();
+    assert!(
+        !settings
+            .schedule
+            .in_work_window(UtcMillis::now().unwrap().0, "UTC")
+            .unwrap()
+    );
+    store
+        .update_notification_settings(account, |settings| {
+            settings.quiet_hours = Some(QuietHours {
+                weekdays: 127,
+                start_minute: 0,
+                end_minute: 1440,
+                timezone: Some("UTC".into()),
+            });
         })
         .unwrap();
     let issue = seed_fixture_issue(&store, account, repository);
@@ -674,17 +700,63 @@ async fn write_dispatch_uses_durable_offline_outbox_and_stops_after_lost_respons
             )
             .unwrap();
     }
+    let initial_connections = fixture.connections.load(Ordering::SeqCst);
     let worker = SyncWorker::start_fixture(accounts.clone(), &tokio::runtime::Handle::current());
+    let mut updates = worker.watch();
     worker.wake(Some(ProbeTrigger::Startup));
     let state = |id| store.operation(account, id).unwrap().unwrap().state;
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::timeout(
+        Duration::from_secs(5),
+        updates.wait_for(|update| update.connection.status == ConnectionStatus::Offline),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    for trigger in [
+        ProbeTrigger::Wake,
+        ProbeTrigger::NetworkChanged,
+        ProbeTrigger::Wake,
+    ] {
+        worker.wake(Some(trigger));
+    }
     assert_eq!(state(CONFIRMED), State::Queued);
+    assert_eq!(
+        fixture.connections.load(Ordering::SeqCst),
+        initial_connections
+    );
     assert_eq!(fixture.sent.load(Ordering::SeqCst), 0);
     store.cancel_operation(account, CANCELLED).unwrap();
     store
         .update_sync_settings(account, |settings| settings.controls.work_offline = false)
         .unwrap();
     worker.wake(Some(ProbeTrigger::NetworkChanged));
+    tokio::time::timeout(
+        Duration::from_secs(5),
+        updates.wait_for(|update| update.connection.status == ConnectionStatus::Reachable),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(fixture.connections.load(Ordering::SeqCst) > initial_connections);
+    assert_eq!(fixture.sent.load(Ordering::SeqCst), 0);
+    assert_eq!(state(CONFIRMED), State::Queued);
+    let floor = UtcMillis::now().unwrap().0 + 1_800;
+    store.hold_sync_budget(account, floor).unwrap();
+    drop(worker);
+    store
+        .update_sync_settings(account, |settings| {
+            settings.controls.pause_queued_actions = false
+        })
+        .unwrap();
+    let worker = SyncWorker::start_fixture(accounts.clone(), &tokio::runtime::Handle::current());
+    for trigger in [
+        ProbeTrigger::Startup,
+        ProbeTrigger::Wake,
+        ProbeTrigger::NetworkChanged,
+        ProbeTrigger::Wake,
+    ] {
+        worker.wake(Some(trigger));
+    }
     tokio::time::timeout(Duration::from_secs(24), async {
         while state(CONFIRMED) != State::Confirmed || state(LOST) != State::OutcomeUnknown {
             tokio::time::sleep(Duration::from_millis(20)).await;
@@ -693,6 +765,17 @@ async fn write_dispatch_uses_durable_offline_outbox_and_stops_after_lost_respons
     .await
     .unwrap();
     assert_eq!(fixture.sent.load(Ordering::SeqCst), 2);
+    let sent_at = |id| {
+        let attempts = store.attempts(account, id).unwrap();
+        let sent: Vec<_> = attempts
+            .into_iter()
+            .filter_map(|attempt| attempt.sending_at)
+            .collect();
+        assert_eq!(sent.len(), 1);
+        sent[0]
+    };
+    assert!(sent_at(CONFIRMED) >= floor);
+    assert!(sent_at(LOST) >= sent_at(CONFIRMED) + 1_000);
     assert_eq!(state(CANCELLED), State::Cancelled);
     let own = store.own_write(account, CONFIRMED).unwrap().unwrap();
     assert_eq!(own.remote_id.get(), 92);
