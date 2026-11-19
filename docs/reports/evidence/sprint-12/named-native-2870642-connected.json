@@ -1,0 +1,718 @@
+{
+  "installed_version": "0.1.0-local.16",
+  "app": {
+    "source_revision": "287064229188f6cc5f5d85c86693c0f74bd5e438",
+    "optimized_e2e_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+  },
+  "connected_full_run_unchanged": "e2e-1795098785119-4744",
+  "seed": 12345,
+  "fixture_regressions_windows": {
+    "source": "9dc6a80fabe76b17f5365bc3217cecbe3051cc2c",
+    "test_filter": "access_fixture",
+    "status": "Pass",
+    "exit_code": 0,
+    "passed": 41,
+    "failed": 0,
+    "ignored": 0,
+    "executable_sha256": "418e2009fc8fcbc121f7bd18bf52b7f1a1642662a9c1da0dfe40caa0ff2c4ebd",
+    "log_sha256": "ef219f491a7efa78a5204691f6d53c2d539572dc4e22349d3f09254b3f6ed90b"
+  },
+  "runs": [
+    {
+      "run": "e2e-1795099711717-28268",
+      "case": "E2E-002",
+      "status": "Fail",
+      "exit_code": 1,
+      "child_exit_code": 1,
+      "detail": "Timed out waiting for Windows keyboard focus on the exact owned masked field. See native-driver.log.",
+      "source_revision": "8f6e8120f675c902787ac32f3098ea07d913dc68",
+      "driver_source": "8f6e8120f675c902787ac32f3098ea07d913dc68",
+      "driver_scenario": "windows-github-access.ps1",
+      "runner_sha256": "44565f896246a6644b6e757453a687e9eb80fe872ed2e211c92a7897112bbf20",
+      "runner_build": "2870642",
+      "fixture_revision": "s03-github-access-v1",
+      "window_dpi": 144,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-002",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "action_count": 3,
+      "receipt_sha256": {
+        "result.json": "93cdce618ec4a4a2367fd6601b2d9fcbd1d32aa71cef3e7a91a788c0c0163ac5",
+        "junit.xml": "d3353fad7478ea267cd88a4e2576233c6ab663f90480b4767b3f12bbb23a0f81",
+        "binary.json": "1a870b4a7fe155c3ebca0e79d6864188a4784b72cd3b0d3b6aedd44fc022e321",
+        "github-access-native.json": "315ac50b34e4d31a7149152b9155d064edcb3425e89e6b1ed461c083f315d614",
+        "github-access-trace.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "ui-observation.json": "efd35d2893e052b99572a289f9573d6ccb7f4539342f690b810522b793f9c619"
+      },
+      "loopback": {
+        "requests": 0,
+        "all_authorized": null,
+        "exact_read_write_sequence": []
+      },
+      "final_ui": {
+        "panel_open": true,
+        "fixture_route_focused": false,
+        "fixture_token_focused": true,
+        "fixture_route_entered": true,
+        "fixture_token_entered": false,
+        "reachability": "NotAttempted"
+      }
+    },
+    {
+      "run": "e2e-1795099730295-30232",
+      "case": "E2E-004",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "detail": "The native reader showed Partial discussion, restored the pending download offline and resumed it automatically after reconnecting. See native-driver.log.",
+      "source_revision": "8f6e8120f675c902787ac32f3098ea07d913dc68",
+      "driver_source": "8f6e8120f675c902787ac32f3098ea07d913dc68",
+      "driver_scenario": "windows-cached-reader.ps1",
+      "runner_sha256": "44565f896246a6644b6e757453a687e9eb80fe872ed2e211c92a7897112bbf20",
+      "runner_build": "2870642",
+      "fixture_revision": "s04-reader-v1",
+      "window_dpi": 144,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-004",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "action_count": 14,
+      "receipt_sha256": {
+        "result.json": "efc6fbe3c2a1948c7fdae6b3d22b54e31323b594acaf4ab6f8929ba96d94efdc",
+        "junit.xml": "da3ece01e5f86448806b9a08b9515c3909b040f105f77283053f27c1bdbaeda1",
+        "binary.json": "1a870b4a7fe155c3ebca0e79d6864188a4784b72cd3b0d3b6aedd44fc022e321",
+        "reader-native.json": "bf302a572b0edcd0985e963b80896906b6eca357fb6216550e35f464fcfd3510",
+        "github-access-trace.json": "5551aa1363a6aed2f0401f873ee2e259f05e0cbc9f610b34b712b39fc80c967b",
+        "ui-observation.json": "6384768cf9bfd21c8326d78b7077e44ba81efbc6b76b5987e4829c2548c15bbd"
+      },
+      "loopback": {
+        "requests": 26,
+        "all_authorized": true,
+        "exact_read_write_sequence": [
+          {
+            "phase": "reader_failure",
+            "route": "items",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "reader_failure",
+            "route": "comments_first",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "reader_failure",
+            "route": "item",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "reader_failure",
+            "route": "updated_items",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "reader_failure",
+            "route": "comments_next",
+            "fixture_authorization": true,
+            "status": 502
+          },
+          {
+            "phase": "reader_resume",
+            "route": "updated_inline_comments",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "reader_resume",
+            "route": "updated_comments",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "reader_resume",
+            "route": "comments_next",
+            "fixture_authorization": true,
+            "status": 200
+          }
+        ]
+      },
+      "final_ui": {
+        "active_number": 41,
+        "comments_coverage": "Partial",
+        "comment_fetch_state": "Failed",
+        "comment_count": 1,
+        "download_state": "Pending"
+      }
+    },
+    {
+      "run": "e2e-1795099787720-8468",
+      "case": "E2E-007",
+      "status": "Fail",
+      "exit_code": 1,
+      "child_exit_code": 1,
+      "detail": "Timed out waiting for the exact unchanged review has a confirmed native Outbox row. See native-driver.log.",
+      "source_revision": "8f6e8120f675c902787ac32f3098ea07d913dc68",
+      "driver_source": "8f6e8120f675c902787ac32f3098ea07d913dc68",
+      "driver_scenario": "windows-review-context.ps1",
+      "runner_sha256": "44565f896246a6644b6e757453a687e9eb80fe872ed2e211c92a7897112bbf20",
+      "runner_build": "2870642",
+      "fixture_revision": "s08-revision-bound-reviews-v1",
+      "window_dpi": 144,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-007",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "action_count": 26,
+      "receipt_sha256": {
+        "result.json": "1b71b5e6c22455745f07eb06d59891a9b9cd41a8adae781dbed29abed652dff2",
+        "junit.xml": "0a2f2dcfe4ad8abdcc6705e04fbc74eab01210e1f8435c3304b88e13b0fc07b8",
+        "binary.json": "1a870b4a7fe155c3ebca0e79d6864188a4784b72cd3b0d3b6aedd44fc022e321",
+        "review-draft-native.json": "d9636e37b12f2c1dc1a3b350686958b18a61b0bc2c223cdb359d54de60f112e6",
+        "github-access-trace.json": "33ab905eae576da3bdfebb6efaf59cefede44e1da3c8c7e482a1a863b75e3b29",
+        "ui-observation.json": "963d9fc6ffa299d68903417c4d3e0fa5bd4a824b035108cc0cd0b33e576c3d5d"
+      },
+      "loopback": {
+        "requests": 20,
+        "all_authorized": true,
+        "exact_read_write_sequence": [
+          {
+            "phase": "pr_load",
+            "route": "items",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "review_send",
+            "route": "review_list",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "review_send",
+            "route": "review_created",
+            "fixture_authorization": true,
+            "status": 200
+          }
+        ]
+      },
+      "final_ui": {
+        "active_number": 42,
+        "outbox": 0,
+        "outbox_visible": false,
+        "outbox_action_state": null,
+        "outbox_paused": false
+      }
+    },
+    {
+      "run": "e2e-1795099824825-45132",
+      "case": "E2E-009",
+      "status": "Fail",
+      "exit_code": 1,
+      "child_exit_code": 1,
+      "detail": "Timed out waiting for the exact visible native fixture Outbox row. See native-driver.log.",
+      "source_revision": "8f6e8120f675c902787ac32f3098ea07d913dc68",
+      "driver_source": "8f6e8120f675c902787ac32f3098ea07d913dc68",
+      "driver_scenario": "windows-merge.ps1",
+      "runner_sha256": "44565f896246a6644b6e757453a687e9eb80fe872ed2e211c92a7897112bbf20",
+      "runner_build": "2870642",
+      "fixture_revision": "s09-direct-merge-v1",
+      "window_dpi": 144,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-009",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "action_count": 26,
+      "receipt_sha256": {
+        "result.json": "0aa05acbb6b456b3d26ce326460d890c2f08973b2b5054ebb35a6ebbd0aa0179",
+        "junit.xml": "343ee73a8dd74b47a0f825cff3f70c1974673fc91b6c5dea306747bebb092094",
+        "binary.json": "1a870b4a7fe155c3ebca0e79d6864188a4784b72cd3b0d3b6aedd44fc022e321",
+        "direct-merge-native.json": "c8c504c9667ae602f3bb542c4d56e598bb8fa8ea08ac693a46cd04f796c40913",
+        "github-access-trace.json": "d942b035ff10a847773fda0405aa429a895a84790a113a1d64fc021ba4b6ce30",
+        "ui-observation.json": "265c8d5f7695fe56c2b0666267fa91b4d3be549cd4fce3c9b867c185ed72ec7b"
+      },
+      "loopback": {
+        "requests": 23,
+        "all_authorized": true,
+        "exact_read_write_sequence": [
+          {
+            "phase": "merge_prepare",
+            "route": "items",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "merge_prepare",
+            "route": "merge_policy_a",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "merge_send",
+            "route": "merge_policy_a",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "merge_send",
+            "route": "merge_put",
+            "fixture_authorization": true,
+            "status": 200
+          }
+        ]
+      },
+      "final_ui": {
+        "active_number": 42,
+        "outbox": 1,
+        "outbox_visible": true,
+        "outbox_action_state": "Waiting",
+        "outbox_paused": false
+      }
+    },
+    {
+      "run": "e2e-1795099872336-14584",
+      "case": "E2E-013",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "detail": "Windows quiet hours kept the seeded native activity in the feed while independent native synchronization controls held network requests and the queued action. Explicit checking and queue resumption were each verified against saved preferences and loopback requests. See native-driver.log.",
+      "source_revision": "9dc6a80fabe76b17f5365bc3217cecbe3051cc2c",
+      "driver_source": "9dc6a80fabe76b17f5365bc3217cecbe3051cc2c",
+      "driver_scenario": "windows-sync.ps1",
+      "runner_sha256": "0c487762256c0ead76e7c1a43819e575d185be67fd98e8bcec381d3ccf93aad1",
+      "runner_build": "9dc6a80",
+      "fixture_revision": "s11-native-notification-schedule-v1",
+      "window_dpi": 144,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-013",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "action_count": 34,
+      "receipt_sha256": {
+        "result.json": "a7bccb76fece29660b4f293231ea1ccd2b08462bbaa4c53df59c60bd99b6839c",
+        "junit.xml": "0720dcc4339448af25e18841949a5eaa73393a027c051ecb5726372e0880a78f",
+        "binary.json": "3ac860c3f9c1f510c05a8bdeed0eb027554675dd06a9f0c6de966cee15aae7a7",
+        "notification-schedule-native.json": "e3f7d91c819f6f6b15a358ec5d8d80b4a1451ac21d7822fa9d707b98d04ebd18",
+        "github-access-trace.json": "6693cb5a1c3d873cfdc68c55cf836ffe5e28675fc132d2ba8e55e1a0bb682b46"
+      },
+      "loopback": {
+        "requests": 14,
+        "all_authorized": true,
+        "exact_read_write_sequence": [
+          {
+            "phase": "sync_live",
+            "route": "updated_items",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "sync_live",
+            "route": "updated_comments",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "sync_live",
+            "route": "updated_inline_comments",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "sync_notification_send",
+            "route": "item",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "sync_notification_send",
+            "route": "comment_created",
+            "fixture_authorization": true,
+            "status": 201
+          }
+        ]
+      }
+    },
+    {
+      "run": "e2e-1795100264908-44524",
+      "case": "E2E-002",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "detail": "Native account controls verified the synthetic GitHub access and SSO journey and restored repository selection after restart. See native-driver.log.",
+      "source_revision": "5ee8e5b643d41869eb753374df23cf723aa0f8c7",
+      "driver_source": "5ee8e5b643d41869eb753374df23cf723aa0f8c7",
+      "driver_scenario": "windows-github-access.ps1",
+      "runner_sha256": "0c487762256c0ead76e7c1a43819e575d185be67fd98e8bcec381d3ccf93aad1",
+      "runner_build": "9dc6a80",
+      "fixture_revision": "s03-github-access-v1",
+      "window_dpi": 144,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-002",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "action_count": 19,
+      "receipt_sha256": {
+        "result.json": "e910434bfcb61d85882dacb9ebe789abfc3c3e048b4ba32fd8e6423183005871",
+        "junit.xml": "0aa35ee68de9087df8c637ac4052db4e7c6011228696630562673105921be6c4",
+        "binary.json": "3ac860c3f9c1f510c05a8bdeed0eb027554675dd06a9f0c6de966cee15aae7a7",
+        "github-access-native.json": "3c12d6da44b5cfcf97dc8cf3ed663c405b39a1a7032047d15843126866afa190",
+        "github-access-trace.json": "101ab5869085540598708790a910457dd5b391f6404a0361b774e28549e79847",
+        "ui-observation.json": "b9038c66ef7cf46af19acd5c4c85f1552a74225b6eba238282344e9c458d543e"
+      },
+      "loopback": {
+        "requests": 16,
+        "all_authorized": true,
+        "exact_read_write_sequence": [
+          {
+            "phase": "ready",
+            "route": "discovery",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "ready",
+            "route": "discovery",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "partial",
+            "route": "discovery",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "sso",
+            "route": "discovery",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "denied",
+            "route": "discovery",
+            "fixture_authorization": true,
+            "status": 200
+          }
+        ]
+      },
+      "final_ui": {
+        "panel_open": true,
+        "fixture_route_focused": false,
+        "fixture_token_focused": false,
+        "fixture_route_entered": true,
+        "fixture_token_entered": false,
+        "reachability": "ReceivedResponse"
+      },
+      "keyboard": {
+        "automation_id": "account-token",
+        "native_editor_focused": true,
+        "uia_focus": "not-reported"
+      }
+    },
+    {
+      "run": "e2e-1795100280107-14076",
+      "case": "E2E-007",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "detail": "Native review input survived an offline restart and confirmed the unchanged expected head. A second approval was held when provider preflight observed a different head, with original source and draft retained. See native-driver.log.",
+      "source_revision": "5ee8e5b643d41869eb753374df23cf723aa0f8c7",
+      "driver_source": "5ee8e5b643d41869eb753374df23cf723aa0f8c7",
+      "driver_scenario": "windows-review-context.ps1",
+      "runner_sha256": "0c487762256c0ead76e7c1a43819e575d185be67fd98e8bcec381d3ccf93aad1",
+      "runner_build": "9dc6a80",
+      "fixture_revision": "s08-revision-bound-reviews-v1",
+      "window_dpi": 144,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-007",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "action_count": 55,
+      "receipt_sha256": {
+        "result.json": "96f3fefde998ed9cab0e794d1365fc424764c077661689d346484b3447f06083",
+        "junit.xml": "59fc7816027a2a1093c081ec450b170bfde57a5bcaed2d808ac249d2fff2cb62",
+        "binary.json": "3ac860c3f9c1f510c05a8bdeed0eb027554675dd06a9f0c6de966cee15aae7a7",
+        "review-draft-native.json": "8e3cf8a975ad74676f146c545af4250f2d5ba36ea4b660f9700a2ab868e4b2ff",
+        "github-access-trace.json": "f69642d37231e17e27c0bbdd1814fd1a292a92cc96b9db42cdd453ba135900ee",
+        "ui-observation.json": "f328aacef8292dd92e7bf1e783dabc60101c9a4b4eb17879bb1c310c3be568cd"
+      },
+      "loopback": {
+        "requests": 30,
+        "all_authorized": true,
+        "exact_read_write_sequence": [
+          {
+            "phase": "pr_load",
+            "route": "items",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "review_send",
+            "route": "review_list",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "review_send",
+            "route": "review_created",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "review_send",
+            "route": "review_read",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "review_send",
+            "route": "review_submitted",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "review_send",
+            "route": "pull_b",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "review_send",
+            "route": "compare_b",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "review_changed",
+            "route": "pull_b",
+            "fixture_authorization": true,
+            "status": 200
+          }
+        ]
+      },
+      "final_ui": {
+        "active_number": 42,
+        "outbox": 0,
+        "outbox_visible": false,
+        "outbox_action_state": null,
+        "outbox_paused": false
+      }
+    },
+    {
+      "run": "e2e-1795100339205-45088",
+      "case": "E2E-009",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "detail": "An offline native squash intent confirmed only after exact-head submission and readback. A second offline intent was held without sending when the provider returned a changed head. See native-driver.log.",
+      "source_revision": "5ee8e5b643d41869eb753374df23cf723aa0f8c7",
+      "driver_source": "5ee8e5b643d41869eb753374df23cf723aa0f8c7",
+      "driver_scenario": "windows-merge.ps1",
+      "runner_sha256": "0c487762256c0ead76e7c1a43819e575d185be67fd98e8bcec381d3ccf93aad1",
+      "runner_build": "9dc6a80",
+      "fixture_revision": "s09-direct-merge-v1",
+      "window_dpi": 144,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-009",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "action_count": 53,
+      "receipt_sha256": {
+        "result.json": "6a7ffe1227d1a3eb1df39ac65b21dafa18372626a103e085c45f0cf2a9fde1c1",
+        "junit.xml": "7ab9e74b9416fe9f0c35d2c2a5d56f7a7265939d5e356a653fe72dc78f1f4350",
+        "binary.json": "3ac860c3f9c1f510c05a8bdeed0eb027554675dd06a9f0c6de966cee15aae7a7",
+        "direct-merge-native.json": "4d5ac15f2141735c1ad28fdb865d7505c18d369fd203454957d39ee41dd6c9f8",
+        "github-access-trace.json": "e5f07c747cff7ab4adbcc7beb86960ad4ea814d3bd839ea2ce9ac94407c7b125",
+        "ui-observation.json": "0d8afd6bda152926b280ee370a37e7817d5e58b1275ccf25cc242e81dc9872fd"
+      },
+      "loopback": {
+        "requests": 37,
+        "all_authorized": true,
+        "exact_read_write_sequence": [
+          {
+            "phase": "merge_prepare",
+            "route": "items",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "merge_prepare",
+            "route": "merge_policy_a",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "merge_send",
+            "route": "merge_policy_a",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "merge_send",
+            "route": "merge_put",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "merge_send",
+            "route": "merge_readback",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "merge_prepare",
+            "route": "pull_b",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "merge_prepare",
+            "route": "compare_b",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "merge_prepare",
+            "route": "pull_b",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "merge_prepare",
+            "route": "merge_policy_b",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "merge_wrong_head",
+            "route": "pull_b",
+            "fixture_authorization": true,
+            "status": 200
+          }
+        ]
+      },
+      "final_ui": {
+        "active_number": 43,
+        "outbox": 1,
+        "outbox_visible": false,
+        "outbox_action_state": "NeedsAttention",
+        "outbox_paused": false
+      }
+    }
+  ]
+}
