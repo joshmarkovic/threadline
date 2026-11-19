@@ -1,0 +1,122 @@
+{
+  "scope": "Local Windows packaging fixtures",
+  "first_disconnected_attempt": {
+    "probe_source": "82253d3be711fcc729b28fb84eda2815d91fe16e",
+    "bootstrap_source": "43a288a7ea1325ab29d06ad96fea6f1a5f7509e2",
+    "bootstrap_sha256": "b1c3ee8dec56588e3acad744af7bf24d022ad5a95ff40fde8d67e9fe384476e8",
+    "mode": "--offline-dir --verify-only",
+    "exit_code": 1,
+    "message": "Run setup in an interactive Windows desktop session.",
+    "log_sha256": "35ba25fdd0201ae3c6825754f938b607a744d6dc30cb9d794f8d2ab54e35350d"
+  },
+  "interrupted_http": {
+    "source_revision": "3dc5b641efbffb56231eaba1600cdfc215f5c4c3",
+    "platform": "Windows 11 x64 build 22631.7652",
+    "test_executable_sha256": "fea18f1000061c761b164da72569cfead6a703e3ca313e7d9ccd058020d335a3",
+    "test": "it_021_real_http_stages_only_approved_complete_payload_and_retains_running_install",
+    "status": "Pass",
+    "transport": "Local TCP server closed the response after four bytes of a declared 27-byte asset.",
+    "staging_entries_after_failure": 0,
+    "previous_synthetic_payload_unchanged": true,
+    "fresh_complete_http_retry_passed": true,
+    "native_log_sha256": "9fe036fcfcf207f3a56c1805223aa71701d3e0dd5b5de80704ab7a238845ceb8"
+  },
+  "package_input_architecture": {
+    "source_revision": "e5b0a4e4fa04be5666216463daa497d64a2420bc",
+    "builder_sha256": "31d5d0626a840326d2ca31400d8130cbec2a80432715c741181bb28534296e4a",
+    "host": "Linux x86_64",
+    "fixture_source": "int mainCRTStartup(void) { return 0; }",
+    "fixture_source_sha256": "895d31f02b2d082cd60f3282d9f6bbaf3d0bd8ec50c0caa2f39476856efae29f",
+    "fixture_format": "Windows PE32+ GUI, IMAGE_FILE_MACHINE_ARM64 (0xAA64)",
+    "fixture_compiler": "Clang and LLD 19, aarch64-pc-windows-msvc, timestamp zero",
+    "fixture_sha256": "28ec4f6edfa7741ffad30aa23d7144711696c97678e1df8a019539d025f55d4e",
+    "fixture_bytes": 1024,
+    "entry": "tools/windows/build-installer.sh --fixture arm64-fixture.exe setup.exe 0.1.0-local.991 991 15",
+    "nsis": "v3.11-1",
+    "exit_code": 2,
+    "message": "Package inputs must be Windows x64 PE32+.",
+    "setup_emitted": false,
+    "staging_entries_after_failure": 0,
+    "fixture_executed": false
+  },
+  "windows_matrix": {
+    "source_revision": "b0460ba16aa85c9e801cff2ff3a50b4e76c5ca1f",
+    "source_receipt_sha256": "c60c7d107e528d08ea905ea08e9340313f292d01ff1fe5ae7ab328dfa32df06e",
+    "status": "Pass",
+    "os_build": 22631,
+    "architecture": "AMD64",
+    "shell_version": "5.1.22621.7649",
+    "bootstrap_sha256": "a91980f31cf5437b2af366f1a7fffffc3cb250eb53063537248325e6eb8d93b5",
+    "fixture_manifest_sha256": "516843805500b3db8fe4114412a6415d9e8c56f52f997192970b4928c2deacb0",
+    "fixture_payload_sha256": "0d0189af3356554a462c2a60d0d59f6006b68d743f5c0cc93c530b083706f075",
+    "expected_asset_bytes": 543184,
+    "retained_fixture": {
+      "registered": true,
+      "app_sha256": "cac705787ed57ad09e84d333d88fcbed1e24e019299722f9a82449fd565da4ed",
+      "highest_build": 11,
+      "retained_database_sha256": "8e79426df74445ad86eed5451daf41ecc1df144d42a6e49b7cdb2ea7454ac5ff"
+    },
+    "cases": [
+      {
+        "case": "valid_signed_fixture",
+        "exit_code": 0,
+        "message": "Verified Threadline 1.2.3 (stable) for Windows x64.",
+        "supplied_manifest_sha256": "516843805500b3db8fe4114412a6415d9e8c56f52f997192970b4928c2deacb0",
+        "verify_only": true,
+        "asset_bytes": 543184,
+        "staging_entries_after": 0,
+        "retained_unchanged": true
+      },
+      {
+        "case": "normal_setup_requires_desktop",
+        "exit_code": 1,
+        "message": "Run setup in an interactive Windows desktop session.",
+        "supplied_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "verify_only": false,
+        "asset_bytes": 543184,
+        "staging_entries_after": 0,
+        "retained_unchanged": true
+      },
+      {
+        "case": "arm64_manifest_on_native_x64",
+        "exit_code": 1,
+        "message": "The manifest does not match the exact requested version, channel and Windows target.",
+        "supplied_manifest_sha256": "5180313e401eb43974be02be5f934edc75f07e10351a7ca01cd56a19beb29f4f",
+        "verify_only": true,
+        "asset_bytes": 543184,
+        "staging_entries_after": 0,
+        "retained_unchanged": true
+      },
+      {
+        "case": "interrupted_offline_payload",
+        "exit_code": 1,
+        "message": "The installer download was interrupted or had the wrong size.",
+        "supplied_manifest_sha256": "516843805500b3db8fe4114412a6415d9e8c56f52f997192970b4928c2deacb0",
+        "verify_only": true,
+        "asset_bytes": 271592,
+        "staging_entries_after": 0,
+        "retained_unchanged": true
+      },
+      {
+        "case": "denied_private_staging_directory",
+        "exit_code": 1,
+        "message": "Could not create a private temporary staging directory.",
+        "supplied_manifest_sha256": "516843805500b3db8fe4114412a6415d9e8c56f52f997192970b4928c2deacb0",
+        "verify_only": true,
+        "asset_bytes": 543184,
+        "staging_entries_after": 0,
+        "retained_unchanged": true
+      },
+      {
+        "case": "fresh_retry_with_intact_payload",
+        "exit_code": 0,
+        "message": "Verified Threadline 1.2.3 (stable) for Windows x64.",
+        "supplied_manifest_sha256": "516843805500b3db8fe4114412a6415d9e8c56f52f997192970b4928c2deacb0",
+        "verify_only": true,
+        "asset_bytes": 543184,
+        "staging_entries_after": 0,
+        "retained_unchanged": true
+      }
+    ]
+  }
+}

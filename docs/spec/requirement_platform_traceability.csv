@@ -329,7 +329,7 @@ GRAPH-07,linux,Linux release,10,14,14,yes,Planned,Future option: record object-c
 NOTIFY-01,windows,Windows first release,11,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Windows Notification Center opened PR 72 in the running process. ../reports/evidence/windows-11-release/registered-notification.json Local Windows feed fallback, retained draft and native registration. ../reports/sprint-11.md"
 NOTIFY-01,macos,macOS release,11,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-01,linux,Linux release,11,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
-NOTIFY-02,windows,Windows first release,05,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Durable policy, SQLite scheduler, real update feeds and native Windows control evidence. docs/reports/sprint-05.md"
+NOTIFY-02,windows,Windows first release,05,11,12,yes,Partial,Actual target evidence required; earlier-platform results do not close this row.,"Durable policy, SQLite scheduler, real update feeds and native Windows control evidence. ../reports/sprint-05.md. Unopened pull request coverage and verified production read on PR 2. ../reports/evidence/sprint-11/github-pr-activity.json"
 NOTIFY-02,macos,macOS release,05,13,13,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-02,linux,Linux release,05,14,14,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,
 NOTIFY-03,windows,Windows first release,11,11,12,yes,Planned,Actual target evidence required; earlier-platform results do not close this row.,

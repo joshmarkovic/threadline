@@ -1,0 +1,113 @@
+{
+  "platform": "Windows 11 x64 build 22631.7652",
+  "local_package": "0.1.0-local.11",
+  "product_source": "8da02ce3720542ee6ac99b0eb186af29c05554b4",
+  "app_sha256": "cac705787ed57ad09e84d333d88fcbed1e24e019299722f9a82449fd565da4ed",
+  "setup_bytes": 11045509,
+  "setup_sha256": "bbcb2b3c12193df8aa6215053be948437f0351b3ebc3f4cd8294df7b89a846b4",
+  "installation": {
+    "exitCode": 0,
+    "installedBuild": 11,
+    "shortcutMatches": true,
+    "registeredLocationMatches": true,
+    "localDataPresent": false,
+    "source_sha256": "46245e7b69fde19e9ccc1e0ff9eb8a61dd7151ac6f28d294a138725495576254"
+  },
+  "cases": [
+    {
+      "run": "e2e-1795048545050-28256",
+      "case": "E2E-020",
+      "source_revision": "6ea3e4338d7263c7793f201836aeb5e768c1d172",
+      "source_dirty": false,
+      "seed": 12345,
+      "status": "Pass",
+      "exit_code": 0,
+      "native_sha256": "f16f7e0ae6ad3e7877a178f7da801c6781ac27292a93f73c2800a6f2763e85e8",
+      "result_sha256": "91e71aa6ebc1e1f967a187c9dd9e57e8e953660e187f25c5f2bbc1bd12e6d88c",
+      "observed": {
+        "markdown_initial": "Open cached image",
+        "markdown_after": "Image unavailable. Retry",
+        "selected_file": "second.txt",
+        "diff_mode": "Split",
+        "orderly_quit": true,
+        "synthetic_profile_archived": true,
+        "dependency_names": 393,
+        "imported_libraries": 39,
+        "observations": [
+          {
+            "phase": "Native Markdown with parsed image attachment",
+            "module_count": 72,
+            "descendants": 0,
+            "browser_matches": []
+          },
+          {
+            "phase": "Native selected comparison file and diff toolbar",
+            "module_count": 72,
+            "descendants": 0,
+            "browser_matches": []
+          },
+          {
+            "phase": "Native split diff after the persisted action",
+            "module_count": 72,
+            "descendants": 0,
+            "browser_matches": []
+          }
+        ],
+        "build_receipt_sha256": "debb5f4a8df9ffe1b559f7bb5759d52938efdf8dc792c940d7b1d5353826790c"
+      }
+    },
+    {
+      "run": "e2e-1795048573137-41128",
+      "case": "E2E-018",
+      "source_revision": "6ea3e4338d7263c7793f201836aeb5e768c1d172",
+      "source_dirty": false,
+      "seed": 12345,
+      "status": "Pass",
+      "exit_code": 0,
+      "native_sha256": "1a0b79bcbcf51e78d881bc71242d074d218392d150d391790bc17dac47a9b7dd",
+      "result_sha256": "5a1a6196043da4cd9825b2861646a20f92a8e3fa711edb84ce64e0c52eeb3388",
+      "observed": {
+        "source_events": 37,
+        "feed_count": 37,
+        "registration_feed_only": 37,
+        "group_count": 0,
+        "outcome": null,
+        "activated": false,
+        "pending_opens": 0,
+        "selected_issue": 41,
+        "read_count": 1,
+        "snoozed_targets": 1,
+        "draft_preserved": true,
+        "draft_tab_preserved": true,
+        "synthetic_profile_archived": true
+      }
+    },
+    {
+      "run": "e2e-1795048606013-42424",
+      "case": "E2E-012",
+      "source_revision": "6ea3e4338d7263c7793f201836aeb5e768c1d172",
+      "source_dirty": false,
+      "seed": 12345,
+      "status": "Blocked",
+      "exit_code": 78,
+      "native_sha256": "ac9c28d52386106388cfa423e6836ba6a2108b42c878338d0f15cf473e29a0b3",
+      "result_sha256": "82ae902d869e2769ee76f5416bda370b69ba4aedcebd9ad0c38eb526b50db2a1",
+      "observed": {
+        "source_events": 37,
+        "feed_count": 37,
+        "registration_feed_only": 0,
+        "group_count": 1,
+        "outcome": "delivered",
+        "activated": false,
+        "pending_opens": 0,
+        "selected_issue": 41,
+        "read_count": 0,
+        "snoozed_targets": 0,
+        "draft_preserved": true,
+        "draft_tab_preserved": true,
+        "synthetic_profile_archived": true
+      },
+      "driver_detail": "Windows did not grant focus to the fixture window."
+    }
+  ]
+}

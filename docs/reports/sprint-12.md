@@ -27,7 +27,7 @@ Installed local build 10 opened the retained schema 12 fixture and migrated it t
 
 ## Windows release gates
 
-PKG-001 through PKG-006 and PKG-009 still require applicable release evidence. Outstanding checks include the published one-to-three-command path on a clean supported Windows user, release signature and independent trust, the exact shipping artifact's offline smoke, and wrong-architecture rejection. The local channel uses its own identity and seeded profile. The full Windows lifecycle, native E2E and release acceptance matrix remains open. macOS and Linux packaging have separate release gates. [Windows package scenarios](../spec/test_platform_traceability.csv) · [Acceptance criteria](../spec/acceptance_platform_traceability.csv) · [Sprint requirements](../spec/sprints/sprint_12_release_verification.md)
+PKG-001 through PKG-006 and PKG-009 still require applicable release evidence. Outstanding checks include the published one-to-three-command path for a clean supported Windows user, release signature and independent trust, and offline smoke on the exact shipping artifact. Local architecture checks cover an incompatible manifest on Windows x64 and a Windows ARM64 application presented to the package builder. The full Windows release matrix remains open. macOS and Linux packaging have separate release gates. [Windows package scenarios](../spec/test_platform_traceability.csv) · [Acceptance criteria](../spec/acceptance_platform_traceability.csv) · [Sprint requirements](../spec/sprints/sprint_12_release_verification.md)
 
 The native Windows publisher helper accepted the independent Microsoft signer pin for a valid Windows SDK executable and rejected a different publisher pin for the same bytes. The successful fixture was Microsoft's SDK tool. Threadline's own signing and publication remain pending. [Publisher verification receipt](evidence/sprint-12/windows-publisher-verification.json)
 
@@ -41,6 +41,10 @@ Local build 8 exited 16 while staging notification registration. Its installed-a
 
 The Windows metadata finalizer wrote a fixture manifest after verifying the independently pinned Microsoft-signed executable. It refused an unsigned setup and refused to overwrite the existing manifest. [Metadata finalizer observations](evidence/sprint-12/bootstrap-windows.json)
 
+Six bootstrap checks passed on Windows 11 x64 with local build 11 installed. In a disconnected session, artifact verification accepted the complete signed Microsoft fixture, refused an independently pinned ARM64 manifest and a half-length payload, and reported a real denied write to its test-owned staging directory. A fresh retry passed after the driver restored access. Normal setup refused to run without an interactive desktop. Every check left the staging directory empty and preserved the installed binary, registry state and archived database. The earlier verifier had required a desktop even for verification. [Six outcomes and earlier refusal](evidence/sprint-12/bootstrap-faults.json) · [Windows fault driver](../../tools/windows/test-bootstrap-faults.ps1)
+
+A separate native Windows test closed a loopback HTTP response after four of 27 bytes. The bootstrap discarded the partial transfer, preserved the previous fixture and staged a fresh complete response. On Linux, the normal package builder rejected a real ARM64 Windows application before emitting an installer. The test did not execute on ARM hardware. [Native transfer and ARM64 package input](evidence/sprint-12/bootstrap-faults.json)
+
 ## Installed native runtime
 
 E2E-020 passed on Windows 11 x64 build 22631.7652. Clean runner `1bf7e77` launched the normal installed executable from local package 9. Through the window's native controls, it opened an offline Markdown image attachment, observed the unavailable-image state, selected cached PR file `second.txt`, and switched the diff to split mode. The saved workspace corroborated the file and view. The app quit normally. [Native actions, persisted state and artifact identities](evidence/sprint-12/installed-runtime.json)
@@ -48,6 +52,8 @@ E2E-020 passed on Windows 11 x64 build 22631.7652. Clean runner `1bf7e77` launch
 The matched build contained 393 unique Windows dependency names and imported 39 libraries from its PE executable. The three process observations each found 72 loaded modules, zero descendants and zero recognized browser components. These observations cover the installed local artifact and the sampled UI states. The exact published package remains pending. [Inventory inputs and counts](evidence/sprint-12/installed-runtime.json) · [Canonical runner and fixture](../../tools/native/README.md)
 
 E2E-020 also passed on installed local build 10. Its build contained 393 dependency names and 39 PE imports. Each of the three native Markdown and diff observations again recorded 72 modules, zero child processes and zero browser matches. [Build 10 runtime and artifact identities](evidence/sprint-12/installed-build-10.json)
+
+Local build 11 from `8da02ce` installed successfully and passed E2E-020 again. The native Markdown and split diff journey recorded 72 modules, zero child processes and zero browser matches in each sampled state. The same executable passed the unregistered-sender fallback. Windows retained its notification group after exit, and the physical click remained blocked by the desktop focus guard. [Build 11 setup, runtime and notification results](evidence/sprint-12/installed-build-11.json)
 
 ## Cached reader performance
 
