@@ -139,13 +139,30 @@ function Enter-FixtureAccountForm([IntPtr]$Window, [switch]$LoopbackTokenAction)
             Assert-OwnedMaskedFixtureField $Window
             if ([ThreadlineWinInput]::GetForegroundWindow() -ne $Window) { Set-WindowFocus $Window }
             [ThreadlineWinInput]::TargetWindow = $Window
+            $form = Wait-Account 'focus in the owned native credential form' {
+                param($account)
+                $account.panel_open -and $account.fixture_route_entered -and
+                    ($account.fixture_route_focused -or $account.fixture_token_focused)
+            }
+            $focused = $form.account_access
+            if (!$focused.panel_open -or !$focused.fixture_route_entered -or
+                (!$focused.fixture_route_focused -and !$focused.fixture_token_focused)) {
+                Stop-Blocked 'The owned credential form changed before keyboard focus navigation.'
+            }
+            if (!$focused.fixture_token_focused) {
+                [ThreadlineWinInput]::Chord(@(0x09))
+                Add-Evidence 'Move focus from the verified repository field to the masked field' ([ordered]@{
+                    automation_id = 'account-token'; input = 'Guarded Tab'
+                })
+            }
+        } else {
+            Click-AccountControl $Window 'account-token'
         }
-        Click-AccountControl $Window 'account-token'
         $null = Wait-Account 'focus in the masked native token field' {
             param($account) $account.panel_open -and $account.fixture_token_focused
         }
         $syntheticPat = 'threadline-test-fixture'
-        if ($script:UseOwnedUiAutomation) { Assert-OwnedMaskedFixtureField $Window }
+        if ($script:UseOwnedUiAutomation) { Assert-OwnedMaskedFixtureField $Window -RequireFocus }
         [ThreadlineWinInput]::ReplaceFixtureText($Window, [uint32]$script:app.Id, $syntheticPat)
     }
     $null = Wait-Account 'the exact synthetic credential entered into the masked native form' {

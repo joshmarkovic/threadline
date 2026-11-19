@@ -2152,7 +2152,8 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
     .unwrap();
     wait_receipt("fixture_route_entered", cx);
     assert_eq!(read_account().unwrap()["fixture_token_entered"], false);
-    click("account-token", cx);
+    cx.update_window(window, |_, window, cx| window.press("tab", cx))
+        .unwrap();
     wait_receipt("fixture_token_focused", cx);
     cx.update_window(window, |_, window, cx| {
         window.press("secondary-a", cx);

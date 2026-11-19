@@ -151,7 +151,7 @@ function Set-OwnedFixtureRepository([IntPtr]$Window) {
     return $true
 }
 
-function Assert-OwnedMaskedFixtureField([IntPtr]$Window) {
+function Assert-OwnedMaskedFixtureField([IntPtr]$Window, [switch]$RequireFocus) {
     $element = Find-OwnedFixtureControl $Window 'account-token'
     if ($null -eq $element -or !$element.Current.IsPassword) {
         Stop-Blocked 'The exact masked fixture field is unavailable in the owned accessibility tree.'
@@ -159,5 +159,15 @@ function Assert-OwnedMaskedFixtureField([IntPtr]$Window) {
     $pattern = $null
     if ($element.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) {
         throw 'Unexpected readable ValuePattern for the masked fixture credential.'
+    }
+    if ($RequireFocus) {
+        Wait-For 'Windows keyboard focus on the exact owned masked field' {
+            $current = Find-OwnedFixtureControl $Window 'account-token'
+            try {
+                $null -ne $current -and $current.Current.IsPassword -and $current.Current.HasKeyboardFocus
+            } catch [Windows.Automation.ElementNotAvailableException] {
+                $false
+            }
+        }
     }
 }
