@@ -164,6 +164,13 @@ function Invoke-PaneLifecycleProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Reader 'one cached result on the archive item' {
         param($reader) $reader.search_results -eq 1 -and $reader.first_search_item -eq $archive.item
     }
+    Click-AccountControl $Window 'reader-tab-0-0'
+    $null = Wait-PaneLayout 'the verified left origin for opening the archive result in the other pane' {
+        param($layout, $panes, $reader)
+        $reader.focused_pane -eq 0 -and $reader.active_item -eq $fixture.discussion_item -and
+            $panes.Count -eq 2 -and $panes[0].tab -ceq $leftOrder[0] -and
+            $reader.search_results -eq 1 -and $reader.first_search_item -eq $archive.item
+    }
     Click-AccountControl $Window 'reader-beside-0'
     $beside = Wait-PaneLayout 'open the archive beside the original tabs without replacing them' {
         param($layout, $panes, $reader)
