@@ -233,5 +233,108 @@
     "status": 200
   },
   "request_count": 13,
-  "scope": "Normal Windows native controls and isolated loopback transport. The case checked independent subviews, the exact comparison path, a partial review page and the anchored draft. Distinct nonzero scroll offsets have separate coverage and were outside this run."
+  "scope": "Normal Windows native controls and isolated loopback transport. The original v1 case checked independent subviews, the exact comparison path, a partial review page and the anchored draft. The v2 follow-up below adds independent nonzero reading positions.",
+  "v2": {
+    "fixture_revision": "s06-shared-pr-panes-v2",
+    "host": "Windows 11 Enterprise x64 build 22631 at 96 DPI",
+    "configured_application_window_dip": [1320, 820],
+    "app_version": "0.1.0",
+    "run": "e2e-1795062843392-25108",
+    "app_runner_and_driver_revision": "79ce930c928a82097e8e66dc057d13b01977725a",
+    "status": "Pass",
+    "exit_code": 0,
+    "native_actions": 32,
+    "binary_sha256": "53b9db822077fa7011576745ad41a43f2e6823cb11e6367985a9e4a8a79c4799",
+    "binary_bytes": 45126656,
+    "started_at_unix_ms": 1795062843390,
+    "finished_at_unix_ms": 1795062920340,
+    "provider_requests": 13,
+    "matching_shared_review_requests": 1,
+    "shared_review_status_code": 200,
+    "both_tabs": {
+      "pr_number": 42,
+      "item": 1,
+      "revision_id": 1,
+      "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "provider_draft_after_release": true,
+      "unsent_review": {
+        "id": "review-1",
+        "version": 4,
+        "single_editor_owner": true,
+        "anchor_path": "src/first.rs",
+        "anchor_side": "Right",
+        "anchor_line": 1
+      }
+    },
+    "conversation": {
+      "pane": 0,
+      "input": "Owned HWND WM_MOUSEWHEEL",
+      "viewport": "reader-conversation-0",
+      "viewport_height_dip": 23,
+      "offset_before_movement": 0,
+      "offset_during_hold": 78,
+      "offset_after_release": 78,
+      "review_coverage_after_release": "Partial",
+      "review_rows_after_release": 1
+    },
+    "files": {
+      "pane": 1,
+      "input": "Owned HWND WM_MOUSEWHEEL",
+      "reading_viewport": "PR body in the Files context",
+      "viewport": "pr-1-context-content",
+      "viewport_height_dip": 122,
+      "offset_before_movement": 0,
+      "offset_during_hold": 156,
+      "offset_after_release": 156,
+      "retained_diff_mode": "Split",
+      "retained_code_anchor": {
+        "path": "src/first.rs",
+        "side": "Right",
+        "line": 1
+      }
+    },
+    "sha256": {
+      "result.json": "a45bad15aa11c94092567d03cc41a9fe5b89dca981cc0ac0088a38f88ca5a5f3",
+      "pr-native.json": "720f1724a9682c7a93fe8701070dc8407c1610e5697eea63727772dfe7c6f36b",
+      "github-access-trace.json": "108913b8c43d7160d44328d011691bef4387aa0371e5a9382e4d37071ac0c0bf",
+      "binary.json": "fbe9d17817379cb455bdcedfb66d8f6f03ab87ebed349c078e2d9dde3adc998c",
+      "ui-observation.json": "5f3229f18308e6c715dd3dd2872ecb6dcbac870b71ff44b631b124e7e8e20ca3"
+    },
+    "earlier_attempts": [
+      {
+        "run": "e2e-1795061154708-43524",
+        "app_runner_and_driver_revision": "c0e49579a930aa6690b3351f985308832ebf193b",
+        "status": "Fail",
+        "exit_code": 1,
+        "native_actions": 24,
+        "last_files_context_offset": 78,
+        "detail": "The first movement scrolled the Files context geometry marker outside its viewport.",
+        "result_sha256": "da83448b6e5e7128fb70cff9f66295761670c85b9fcf603f905ecdf84f59533d",
+        "native_sha256": "84fa415968fb3da75fbf0f5a5dae7f6bc61733ed6f1c1b0d9d3078787c590afa"
+      },
+      {
+        "run": "e2e-1795061630667-42520",
+        "app_runner_and_driver_revision": "401c4c67a4729671672e73a4a96128ea6203ea61",
+        "status": "Fail",
+        "exit_code": 1,
+        "native_actions": 26,
+        "last_files_context_offset": 156,
+        "detail": "Both Files movements succeeded with the fixed marker. The ordinary Conversation viewport had no visible bounds in the default window.",
+        "result_sha256": "d442e6f647fc612b2aeadcf7a8a08324beb5b4dc7c80b0dd56a2013385b955ae",
+        "native_sha256": "b3e332012daf13f45fdb853a28567bc0fce581b12c496af7095ac9d7ae76382e"
+      },
+      {
+        "run": "e2e-1795061814332-27008",
+        "app_and_runner_revision": "401c4c67a4729671672e73a4a96128ea6203ea61",
+        "driver_revision": "fb5bbf01aa5e8909333bf23e485d940453d3f237",
+        "status": "Fail",
+        "exit_code": 1,
+        "native_actions": 26,
+        "last_files_context_offset": 156,
+        "detail": "The driver targeted the formal review records. They use a separate viewport and did not move the observed ordinary discussion offset. The product correction then gave the ordinary discussion and review records separate usable space.",
+        "result_sha256": "d063a1e79474945618ccb7e198f9b6950f2bd8307f35ea008dbc847fd930caed",
+        "native_sha256": "87772a82e372475e6b7bc5bf20e2377116eab734322375db44cf7e2c841724ff"
+      }
+    ]
+  }
 }
