@@ -658,6 +658,34 @@ fn it_016_capped_comparison_keeps_all_returned_files_and_the_api_limit_after_res
     }
     assert_eq!(count, cap);
     assert!(!reopened.pr_download(&rev).unwrap().unwrap().fully_cached());
+    let claim = reopened.claim_pr_download(account, 102).unwrap().unwrap();
+    assert_eq!(claim.revision, rev);
+    let new_head = reopened
+        .record_pr_revision(account, item, &rev.base, &oid('d'), None, &header, 103)
+        .unwrap();
+    let old = reopened.pr_download(&rev).unwrap().unwrap();
+    assert_eq!(old.state, PrDownloadState::Partial);
+    assert_eq!(old.generation, claim.attempt.generation);
+    assert!(
+        reopened
+            .check_pr_download(&rev, claim.attempt, 104)
+            .is_err()
+    );
+    assert!(reopened.pr_download(&new_head).unwrap().is_none());
+    assert!(reopened.next_pr_download_due(account).unwrap().is_none());
+    let previous = reopened.previous_pr_download(&new_head).unwrap().unwrap();
+    assert_eq!(previous.head, rev.head);
+    assert_eq!(previous.state, PrDownloadState::Partial);
+    reopened.clear_cache(account).unwrap();
+    let old_files = reopened.pr_page(&rev, family, None, 1).unwrap();
+    assert!(old_files.api_capped && old_files.state.coverage == Coverage::Partial);
+    assert!(matches!(
+        old_files.rows[0].1,
+        PrRecord::File {
+            patch: PatchEvidence::Binary,
+            ..
+        }
+    ));
 }
 
 #[test]

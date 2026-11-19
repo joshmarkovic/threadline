@@ -490,6 +490,17 @@ impl ReaderWorkspace {
             )
         });
         let mut controls = div().flex().items_center().gap_2().flex_wrap();
+        if let Some(previous) = &pr.data.previous_download {
+            controls = controls.child(pr_status(
+                format!("pr-{pane}-previous-download"),
+                format!(
+                    "Previous head {} · Offline pin {:?}",
+                    &previous.head.as_str()[..12],
+                    previous.state,
+                ),
+                palette,
+            ));
+        }
         if let Some(job) = &pr.data.download {
             let complete = job
                 .families

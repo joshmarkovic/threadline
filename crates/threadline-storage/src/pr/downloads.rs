@@ -9,6 +9,24 @@ pub enum PrDownloadState {
     Cancelled,
 }
 
+impl PrDownloadState {
+    fn read(state: &str) -> Result<Self> {
+        match state {
+            "pending" => Ok(Self::Pending),
+            "active" => Ok(Self::Active),
+            "complete" => Ok(Self::Complete),
+            "partial" => Ok(Self::Partial),
+            "cancelled" => Ok(Self::Cancelled),
+            _ => Err(Error::Corrupt),
+        }
+    }
+}
+
+pub struct PreviousPrDownload {
+    pub head: CommitOid,
+    pub state: PrDownloadState,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PrDownloadAttempt {
     pub generation: i64,
@@ -120,14 +138,7 @@ fn status(db: &Connection, rev: &PrRevision) -> Result<Option<PrDownload>> {
             params![rev.id, rev.account, rev.repository],
             |r| r.get::<_, bool>(0),
         )?;
-    let state = match state.as_str() {
-        "pending" => PrDownloadState::Pending,
-        "active" => PrDownloadState::Active,
-        "complete" => PrDownloadState::Complete,
-        "partial" => PrDownloadState::Partial,
-        "cancelled" => PrDownloadState::Cancelled,
-        _ => return Err(Error::Corrupt),
-    };
+    let state = PrDownloadState::read(&state)?;
     let mut job = PrDownload {
         generation,
         state,
@@ -191,6 +202,33 @@ pub(crate) fn require_pr_download_attempt(
 }
 
 impl Store {
+    pub fn previous_pr_download(
+        &self,
+        revision: &PrRevision,
+    ) -> Result<Option<PreviousPrDownload>> {
+        self.read(|db| {
+            let tx = db.unchecked_transaction()?;
+            validate_revision(&tx, revision)?;
+            let prior = tx.query_row(
+                "SELECT r.head_oid,d.state FROM pr_downloads d
+                 JOIN pr_revisions r ON r.id=d.revision_id JOIN pr_revisions current ON current.id=?1
+                 WHERE r.account_id=current.account_id AND r.item_id=current.item_id
+                 AND r.repository_id=current.repository_id AND d.state<>'cancelled'
+                 AND (r.updated_at<current.updated_at OR (r.updated_at=current.updated_at AND r.id>current.id))
+                 ORDER BY d.requested_at DESC,r.id LIMIT 1",
+                [revision.id],
+                |row| Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?)),
+            ).optional()?;
+            prior.map(|(head, state)| {
+                let state = match PrDownloadState::read(&state)? {
+                    PrDownloadState::Pending | PrDownloadState::Active => PrDownloadState::Partial,
+                    saved => saved,
+                };
+                Ok(PreviousPrDownload { head: CommitOid::parse(&head)?, state })
+            }).transpose()
+        })
+    }
+
     pub fn next_pr_download_due(&self, account: AccountId) -> Result<Option<i64>> {
         self.read(|db| Ok(next_download(db, account)?.map(|job| job.due)))
     }
