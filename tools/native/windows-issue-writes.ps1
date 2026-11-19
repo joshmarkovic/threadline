@@ -33,7 +33,11 @@ function Type-WriteFixtureField([IntPtr]$Window, [string]$Id, [string]$Value) {
                 'This cancelled issue draft stays in the same profile.',
                 'Threadline S07 explicitly queued comment.',
                 'Threadline S07 unsent local draft.',
-                'Threadline S07 accepted comment with a lost response.'
+                'Threadline S07 accepted comment with a lost response.',
+                'Threadline dependency original comment.',
+                'Threadline dependency revised comment.',
+                'Threadline dependency comment with a lost response.',
+                'Threadline dependency edit that must stay held.'
             )) { 'Local Markdown draft' }
         }
     }
@@ -237,4 +241,81 @@ function Invoke-IssueWriteSurfaceProof([IntPtr]$Window) {
     })
     Stop-ThroughUi
     $script:report.detail = 'The owned native controls, Ctrl+N, existing issue draft and actual ordinary comment did not expose an issue-creation path.'
+}
+
+function Queue-CommentDependencyPair([IntPtr]$Window, [long]$Item, [string]$Original, [string]$Revised) {
+    Click-AccountControl $Window 'reader-draft-comment-0'
+    Type-WriteFixtureField $Window 'reader-draft-input-0' $Original
+    Wait-WriteFixtureDraft $Item $Original
+    Queue-WriteFixtureDraft $Window $Item 1
+
+    Wait-For 'the native follow-up edit control on the first queued comment' {
+        Invoke-OwnedFixtureControl $Window 'reader-edit-pending-comment-0-0' $null 'Draft a follow-up edit'
+    }
+    Wait-WriteFixtureDraft $Item $Original
+    Type-WriteFixtureField $Window 'reader-draft-input-0' $Revised
+    Wait-WriteFixtureDraft $Item $Revised
+    Queue-WriteFixtureDraft $Window $Item 2
+}
+
+function Invoke-CommentDependencyProof([IntPtr]$Window, [string]$Profile) {
+    $item = Open-WriteFixtureIssue $Window
+    Set-WriteFixtureOffline $Window $true
+    Set-AccessPhase 'comment-dependency-offline'
+    Queue-CommentDependencyPair $Window $item 'Threadline dependency original comment.' 'Threadline dependency revised comment.'
+    $queued = Restart-Reader $Profile
+    $null = Wait-Reader 'both ordered comment actions restored before networking' {
+        param($reader) $reader.offline -and $reader.active_item -eq $item -and $reader.outbox -eq 2
+    }
+    Add-Evidence 'Save one ordinary comment and its explicit edit, then restore both offline in a new process' ([ordered]@{
+        item = $item; pending = 2; original_projection_used = $true
+    })
+
+    Set-AccessPhase 'comment-dependency-create'
+    Set-WriteFixtureOffline $queued $false
+    $null = Wait-Reader 'confirmed predecessor and one remaining dependent while mutation pacing is active' {
+        param($reader) !$reader.offline -and $reader.active_item -eq $item -and $reader.outbox -eq 1
+    }
+    Click-AccountControl $queued 'reader-outbox'
+    Click-AccountControl $queued 'reader-outbox-filter-history'
+    Inspect-WriteFixtureAction $queued 0 'Confirmed' 'Comment'
+    Add-Evidence 'Observe confirmed original receipt with its dependent still pending before quitting' ([ordered]@{
+        item = $item; pending = 1; predecessor_confirmed = $true
+    })
+
+    $resumed = Restart-Reader $Profile -FixturePhaseAfterQuit 'comment-dependency-resume'
+    Wait-For 'the resumed edit confirms the same single cached comment' {
+        $state = Read-Observation
+        if ($null -eq $state) { return $false }
+        $property = $state.PSObject.Properties['cached_reader']
+        if ($null -eq $property -or $null -eq $property.Value) { return $false }
+        $reader = $property.Value
+        $reader.active_item -eq $item -and $reader.cached_content_ready -and
+            $reader.comment_count -eq 1 -and $reader.outbox -eq 0
+    } 45000 100
+    Add-Evidence 'Confirm the dependent edit after restart with one cached comment and no pending actions' ([ordered]@{
+        item = $item; cached_comments = 1; pending = 0
+    })
+
+    Set-WriteFixtureOffline $resumed $true
+    Set-AccessPhase 'comment-dependency-offline'
+    Queue-CommentDependencyPair $resumed $item 'Threadline dependency comment with a lost response.' 'Threadline dependency edit that must stay held.'
+    Set-AccessPhase 'comment-dependency-lost'
+    Set-WriteFixtureOffline $resumed $false
+    Click-AccountControl $resumed 'reader-outbox'
+    Click-AccountControl $resumed 'reader-outbox-filter-attention'
+    Wait-For 'the exact original comment with an uncertain response' {
+        $label = 'Comment ' + [char]0x00b7 + ' Outcome unknown'
+        Invoke-OwnedFixtureControl $resumed 'reader-outbox-action-0' $null $label
+    }
+    $null = Wait-Reader 'the lost-response predecessor stays uncertain and preserves its held dependent' {
+        param($reader) $reader.outbox_visible -and $reader.outbox_action_state -ceq 'OutcomeUnknown' -and $reader.outbox -eq 2
+    }
+    Click-AccountControl $resumed 'reader-outbox-filter-pending'
+    Inspect-WriteFixtureAction $resumed 0 'Queued' 'Comment'
+    Stop-ThroughUi
+    Add-Evidence 'Preserve the uncertain predecessor and the separately visible queued edit without a second mutation' ([ordered]@{
+        item = $item; uncertain = 1; held_dependent = 1
+    })
+    $script:report.detail = 'Native controls queued the comment and its dependent edit offline. The confirmed predecessor survived a separate process restart. The worker used the exact returned comment identity once. A distinct lost predecessor held its edit without replay.'
 }

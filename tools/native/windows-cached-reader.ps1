@@ -38,8 +38,9 @@ function Initialize-ReaderProfile([string]$Profile, [string]$Scale) {
     Add-Evidence 'Seed the isolated profile with the application and bundled SQLite' $receipt
 }
 
-function Restart-Reader([string]$Profile, [hashtable]$Startup, [switch]$SeedQuietEvent, [switch]$Backlog) {
+function Restart-Reader([string]$Profile, [hashtable]$Startup, [switch]$SeedQuietEvent, [switch]$Backlog, [string]$FixturePhaseAfterQuit) {
     Stop-ThroughUi
+    if ($FixturePhaseAfterQuit) { Set-AccessPhase $FixturePhaseAfterQuit }
     $script:app.Dispose()
     $script:app = $null
     $before = Get-IsolatedSqlite $Profile
@@ -63,7 +64,13 @@ function Restart-Reader([string]$Profile, [hashtable]$Startup, [switch]$SeedQuie
             $seeder.Dispose()
         }
     }
-    $observationName = if ($Backlog) { 'reader-backlog-observation.json' } else { 'reader-restart-observation.json' }
+    $observationName = if ($Backlog) {
+        'reader-backlog-observation.json'
+    } elseif ($FixturePhaseAfterQuit) {
+        'reader-dependent-restart-observation.json'
+    } else {
+        'reader-restart-observation.json'
+    }
     $script:reportFile = Join-Path $script:ReportDir $observationName
     if ($Startup) {
         $launchBegin = [Diagnostics.Stopwatch]::GetTimestamp()

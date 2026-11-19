@@ -16,6 +16,7 @@ use serde_json::{Value, json};
 
 mod activity;
 mod backlog;
+mod comment_dependency;
 mod concurrent;
 mod history;
 mod lifecycle;
@@ -107,6 +108,10 @@ enum Phase {
     ActivityOffline,
     ActivityCatchup,
     ActivityReplay,
+    CommentDependencyOffline,
+    CommentDependencyCreate,
+    CommentDependencyResume,
+    CommentDependencyLost,
 }
 
 impl Phase {
@@ -162,6 +167,10 @@ impl Phase {
             "activity-offline" => Ok(Self::ActivityOffline),
             "activity-catchup" => Ok(Self::ActivityCatchup),
             "activity-replay" => Ok(Self::ActivityReplay),
+            "comment-dependency-offline" => Ok(Self::CommentDependencyOffline),
+            "comment-dependency-create" => Ok(Self::CommentDependencyCreate),
+            "comment-dependency-resume" => Ok(Self::CommentDependencyResume),
+            "comment-dependency-lost" => Ok(Self::CommentDependencyLost),
             _ => Err(io::Error::other("invalid access fixture phase")),
         }
     }
@@ -234,6 +243,10 @@ enum Route {
     ActivityBaselineTip,
     ActivityMovedTip,
     ActivityUnwatched,
+    DependencyCommentCreated,
+    DependencyCommentRead,
+    DependencyCommentEdited,
+    DependencyCommentLost,
     Unexpected,
 }
 
@@ -260,6 +273,7 @@ pub enum TraceCheck {
     ConcurrentReader,
     NativeLifecycle,
     NativeActivity,
+    CommentDependency,
     ReaderResume,
     SyncJourney,
     NotificationSchedule,
@@ -320,6 +334,7 @@ impl AccessFixture {
             TraceCheck::ConcurrentReader => concurrent::trace(&records),
             TraceCheck::NativeLifecycle => lifecycle::trace(&records),
             TraceCheck::NativeActivity => activity::trace(&records),
+            TraceCheck::CommentDependency => comment_dependency::trace(&records),
             TraceCheck::ReaderResume => complete_reader_resume(&records),
             TraceCheck::SyncJourney => complete_sync_journey(&records),
             TraceCheck::NotificationSchedule => complete_notification_schedule(&records),
@@ -544,7 +559,10 @@ fn answer(
     }
     if authorized
         && ((phase == Phase::SyncTransport && route == Route::User)
-            || route == Route::CommentReplyLost)
+            || matches!(
+                route,
+                Route::CommentReplyLost | Route::DependencyCommentLost
+            ))
     {
         return Ok(RequestEvidence {
             phase,
@@ -607,6 +625,13 @@ fn answer(
     if route == Route::CommentCreated && reply.status == 201 {
         socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:4101:07\r\n")?;
     }
+    if route == Route::DependencyCommentCreated && reply.status == 201 {
+        socket
+            .write_all(b"X-GitHub-Request-Id: SYNTHETIC:4101:08:CREATE\r\nRetry-After: 25\r\n")?;
+    }
+    if route == Route::DependencyCommentEdited && reply.status == 200 {
+        socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:4101:08:EDIT\r\n")?;
+    }
     if route == Route::QueuedThreadReply && reply.status == 201 {
         socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:772:08\r\n")?;
     }
@@ -668,6 +693,10 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         (Some("PUT"), Some(path), Some("HTTP/1.1")) => Some(path.to_owned()),
         _ => None,
     };
+    let patch_path = match request {
+        (Some("PATCH"), Some(path), Some("HTTP/1.1")) => Some(path.to_owned()),
+        _ => None,
+    };
     let mut route = match request {
         (Some("GET"), Some(target), Some("HTTP/1.1")) if phase == Phase::BacklogConcurrent => {
             concurrent::get(target)
@@ -709,6 +738,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         ) => Route::OpenPullIndex,
         (Some("POST"), Some("/graphql"), Some("HTTP/1.1")) => Route::Graphql,
         (Some("GET"), Some(target), Some("HTTP/1.1")) => review_decisions::get(phase, target)
+            .or_else(|| comment_dependency::get(phase, target))
             .or_else(|| activity::read_route(phase, target))
             .or_else(|| lifecycle::read_route(phase, target))
             .or_else(|| backlog::read_route(phase, target))
@@ -748,7 +778,15 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
     if phase == Phase::BacklogConcurrent && !is_get {
         return Ok((Route::Unexpected, authorized, None));
     }
-    if let Some(put_path) = put_path {
+    if let Some(patch_path) = patch_path {
+        let mut body = vec![0; content_length];
+        reader.read_exact(&mut body)?;
+        route = serde_json::from_slice::<Value>(&body)
+            .ok()
+            .map_or(Route::Unexpected, |body| {
+                comment_dependency::patch(phase, &patch_path, &body)
+            });
+    } else if let Some(put_path) = put_path {
         let mut body = vec![0; content_length];
         reader.read_exact(&mut body)?;
         route = serde_json::from_slice::<Value>(&body)
@@ -763,6 +801,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         if route != Route::Graphql {
             route = payload.as_ref().map_or(Route::Unexpected, |body| {
                 lifecycle::post(phase, &post_path, body)
+                    .or_else(|| comment_dependency::post(phase, &post_path, body))
                     .or_else(|| review_threads::post(phase, &post_path, body))
                     .or_else(|| review_decisions::post(phase, &post_path, body))
                     .or_else(|| backlog::post(phase, &post_path, body))
@@ -841,6 +880,9 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
         return response;
     }
     if let Some(response) = activity::response(phase, route) {
+        return response;
+    }
+    if let Some(response) = comment_dependency::response(phase, route) {
         return response;
     }
     if matches!(route, Route::UpdatedInlineComments | Route::OpenPullIndex) {

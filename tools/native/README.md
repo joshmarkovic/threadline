@@ -114,6 +114,8 @@ Pass `--artifact <setup-path>` with `cargo xtask test e2e --suite full` to recor
 
 ## Windows restart and interrupted writes
 
+Run `cargo xtask test e2e --suite full --case S08-COMMENT-DEPENDENCY --binary <e2e-binary>` to check a queued ordinary comment and its dependent edit. The loopback provider paces writes after accepting the first comment. The driver quits after observing its confirmation and lets the new process apply the dependent edit to the returned comment ID. A second chain loses its create response and keeps that edit pending. The test requires the exact network sequence and one cached comment.
+
 Run `cargo xtask test e2e --suite full --case S12-NATIVE-LIFECYCLE --binary <optimized-e2e-binary> --seed 12345` from a Windows user session with Credential Manager available. The case uses a new temporary private workspace, the loopback provider and a unique synthetic protected credential. It uses the normal account, synchronization and Outbox controls. The runner terminates only the app process it launched, after the fixture received the exact known comment and while its response is held.
 
 Allow about three minutes for the normal dispatch lease to expire. The driver checks the restored workspace before an authenticated startup response and compares the closed database before and after interruption and normal sign-out. It records one uncertain request, retained dependents and draft, and the unchanged prior delivery receipt. It removes only its synthetic Credential Manager entry. The prior delivery is seed data. Review installed notification delivery and the separate disk-fault checks in the sprint reports.

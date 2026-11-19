@@ -356,6 +356,11 @@ fn it_011_pending_comment_edit_uses_confirmed_predecessor_identity_and_updates_o
         104,
     )
     .unwrap();
+    drop(db);
+    let db = Store::open_profile(dir.path()).unwrap();
+    let preserved = db.receipts(a, &original).unwrap();
+    assert_eq!(preserved.len(), 1);
+    assert_eq!(preserved[0].remote_id, "377");
     assert!(db.claim_write(a, 1_100, 1_500).unwrap().is_none());
     let a2 = db.claim_write(a, 1_102, 1_500).unwrap().unwrap();
     assert_eq!(a2.comment_id, Some(id(377)));

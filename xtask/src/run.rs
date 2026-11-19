@@ -608,7 +608,9 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
             return vec![crate::activity::run(id, options, root, dir)];
         }
         Some(id) => {
-            let mode = if id == "S11-NATIVE-ACTIVITY" {
+            let mode = if id == "S08-COMMENT-DEPENDENCY" {
+                Some(NativeMode::WindowsIssueWrites)
+            } else if id == "S11-NATIVE-ACTIVITY" {
                 Some(NativeMode::WindowsNativeActivity)
             } else if id == "S12-NATIVE-LIFECYCLE" {
                 Some(NativeMode::WindowsNativeLifecycle)
@@ -885,6 +887,9 @@ fn native_driver(
         NativeMode::WindowsCredentialBoundary => Some("CredentialBoundary"),
         NativeMode::WindowsNativeLifecycle => Some("NativeLifecycle"),
         NativeMode::WindowsNativeActivity => Some("NativeActivity"),
+        NativeMode::WindowsIssueWrites if id == "S08-COMMENT-DEPENDENCY" => {
+            Some("CommentDependency")
+        }
         NativeMode::WindowsIssueWrites => Some("Writes"),
         NativeMode::WindowsWriteSurface => Some("WriteSurface"),
         _ => None,
@@ -995,6 +1000,9 @@ fn native_driver(
         NativeMode::WindowsCredentialBoundary => "credential-boundary-native.json",
         NativeMode::WindowsNativeLifecycle => "native-lifecycle.json",
         NativeMode::WindowsNativeActivity => "native-activity.json",
+        NativeMode::WindowsIssueWrites if id == "S08-COMMENT-DEPENDENCY" => {
+            "comment-dependency-native.json"
+        }
         NativeMode::WindowsIssueWrites | NativeMode::WindowsWriteSurface => "writes-native.json",
     };
     let details = fs::read(dir.join(driver_report))
@@ -1073,6 +1081,9 @@ fn native_driver(
             (Status::Pass, NativeMode::WindowsCredentialBoundary) => TraceCheck::CredentialBoundary,
             (Status::Pass, NativeMode::WindowsNativeLifecycle) => TraceCheck::NativeLifecycle,
             (Status::Pass, NativeMode::WindowsNativeActivity) => TraceCheck::NativeActivity,
+            (Status::Pass, NativeMode::WindowsIssueWrites) if id == "S08-COMMENT-DEPENDENCY" => {
+                TraceCheck::CommentDependency
+            }
             (Status::Pass, NativeMode::WindowsIssueWrites) => TraceCheck::WritesWithLoss,
             (Status::Pass, NativeMode::WindowsWriteSurface) => TraceCheck::WriteSurface,
             _ => TraceCheck::Observe,

@@ -69,7 +69,9 @@ function Set-AccessPhase([string]$Phase) {
         'credential-ready', 'credential-offline', 'credential-other', 'credential-return',
         'lifecycle-offline', 'lifecycle-ready', 'lifecycle-delay', 'lifecycle-crash',
         'lifecycle-recovery', 'lifecycle-signed-out', 'activity-baseline', 'activity-fresh',
-        'activity-offline', 'activity-catchup', 'activity-replay')) {
+        'activity-offline', 'activity-catchup', 'activity-replay',
+        'comment-dependency-offline', 'comment-dependency-create', 'comment-dependency-resume',
+        'comment-dependency-lost')) {
         throw 'Unknown access fixture phase.'
     }
     try {
