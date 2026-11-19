@@ -33,15 +33,25 @@ function Invoke-PrOfflinePinProof([IntPtr]$Window, [string]$Profile) {
             $pr.files_coverage -ceq 'Partial' -and $pr.files_on_page -eq 20
     }
     $revision = $initial.cached_reader.pull_request.revision_id
+    Add-Evidence 'Read the native API limit on the original comparison' @{ item=$item; revision=$revision; files_on_page=20; coverage='Partial' }
     $fileStates = @(
         @{ name = 'binary.dat'; path = 'src/binary.dat'; label = 'Binary file. No text patch is available.' }
         @{ name = 'truncated.rs'; path = 'src/truncated.rs'; label = 'Partial patch. GitHub did not supply every changed line.' }
         @{ name = 'unavailable.rs'; path = 'src/unavailable.rs'; label = 'GitHub did not supply a text patch for this file.' }
     )
+    $maximized = $false
     for ($index = 0; $index -lt $fileStates.Count; $index++) {
         $file = $fileStates[$index]
+        $id = "pr-0-file-$index"
+        $snapshot = Read-Observation
+        if (!$maximized -and ($null -eq $snapshot -or !$snapshot.bounds.PSObject.Properties[$id])) {
+            Click-AccountControl $Window 'reader-maximize-pane'
+            $maximized = $true
+            Add-Evidence 'Reveal an off-screen changed file with the ordinary Maximize pane control' @{ path=$file.path; revision=$revision }
+        }
+        $null = Wait-AccountControl $id
         Wait-For 'select the exact fixture file' {
-            Invoke-OwnedFixtureControl $Window "pr-0-file-$index" $null $file.name
+            Invoke-OwnedFixtureControl $Window $id $null $file.name
         }
         $null = Wait-PrReader 'the selected file is bound to the same comparison' {
             param($pr, $reader) $reader.active_item -eq $item -and $pr.revision_id -eq $revision -and $pr.selected_file -ceq $file.path
@@ -62,6 +72,7 @@ function Invoke-PrOfflinePinProof([IntPtr]$Window, [string]$Profile) {
     Click-AccountControl $Window 'pr-0-download'
     $null = Wait-FixturePrPin 'Pending' $item
 
+    if ($maximized) { Click-AccountControl $Window 'reader-maximize-pane' }
     Click-AccountControl $Window 'reader-browse'
     Activate-FixturePr $Window 'reader-result-' 43 'Second fixture pull request' -Result
     $second = Wait-Reader 'the independent PR remains active before reconnecting' {

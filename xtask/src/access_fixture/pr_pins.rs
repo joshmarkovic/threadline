@@ -91,7 +91,7 @@ pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
             }])
         }
         Route::PrPinChecks => json!({"total_count":0,"check_runs":[]}),
-        Route::PrPinStatuses => json!([]),
+        Route::PrPinStatuses | Route::UpdatedItems | Route::UpdatedComments => json!([]),
         Route::PrPinReviews | Route::PrPinThreads => {
             let connection = if route == Route::PrPinReviews {
                 "reviews"
