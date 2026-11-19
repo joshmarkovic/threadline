@@ -1,4 +1,5 @@
 use super::*;
+use crate::access::AccessProfile;
 use crate::pr::{PrDownloadAttempt, PrRevision, require_pr_download_attempt};
 use crate::resources::ResourceError;
 use crate::resources::{
@@ -35,6 +36,11 @@ pub struct DiscussionPage {
     pub metadata: Vec<CommentMetadata>,
     pub next: Option<String>,
     pub state: ResourceState,
+}
+
+enum Download<'a> {
+    Issue(&'a IssueDownloadClaim, &'a AccessProfile),
+    Pr(&'a PrRevision, PrDownloadAttempt),
 }
 
 impl Store {
@@ -74,7 +80,25 @@ impl Store {
             expected,
             page,
             terminal_error,
-            Some((revision, attempt)),
+            Some(Download::Pr(revision, attempt)),
+        )
+    }
+
+    pub fn commit_issue_download_discussion(
+        &self,
+        claim: &IssueDownloadClaim,
+        profile: &AccessProfile,
+        expected: &ResourceProgress,
+        page: DiscussionInputPage<'_>,
+        terminal_error: Option<ResourceError>,
+    ) -> Result<Option<ResourceProgress>> {
+        self.commit_comments(
+            claim.account,
+            claim.item,
+            expected,
+            page,
+            terminal_error,
+            Some(Download::Issue(claim, profile)),
         )
     }
 
@@ -85,7 +109,7 @@ impl Store {
         expected: &ResourceProgress,
         page: DiscussionInputPage<'_>,
         terminal_error: Option<ResourceError>,
-        download: Option<(&PrRevision, PrDownloadAttempt)>,
+        download: Option<Download<'_>>,
     ) -> Result<Option<ResourceProgress>> {
         if page.comments.len() > 100 {
             return Err(Error::InvalidInput(
@@ -98,8 +122,12 @@ impl Store {
             family: ResourceFamily::Comments,
         };
         self.write(|tx| {
-            if let Some((revision, attempt)) = download {
-                require_pr_download_attempt(tx, revision, attempt, None, page.fetched_at_ms)?;
+            match download {
+                Some(Download::Pr(revision, attempt)) => {
+                    require_pr_download_attempt(tx, revision, attempt, None, page.fetched_at_ms)?;
+                }
+                Some(Download::Issue(claim, profile)) => claim.require(tx, profile, page.fetched_at_ms)?,
+                None => {}
             }
             let state = state_in(tx, key)?;
             let rid = expected.resource_id;

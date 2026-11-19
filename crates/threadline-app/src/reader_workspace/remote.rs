@@ -312,63 +312,26 @@ impl ReaderWorkspace {
     pub(super) fn resume_download(
         &mut self,
         tab: Tab,
-        download: IssueDownload,
+        generation: i64,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.can_fetch() || self.downloads.contains_key(&tab.item) {
-            return;
-        }
-        let item = tab.item;
-        let generation = download.generation;
-        let cancel = self.network.child_token();
-        self.downloads.insert(item, cancel.clone());
-        let store = Arc::clone(&self.store);
-        self.remote(
+        let Some(account) = self.account else { return };
+        self.launch(
             window,
             cx,
-            move |service, account, _| async move {
-                let mut contacted = false;
-                store.start_issue_download(account, item, generation)?;
-                if download.metadata.coverage != threadline_storage::resources::Coverage::Complete
-                    || download.body.coverage != threadline_storage::resources::Coverage::Complete
-                {
-                    service.fetch_item(account, item, &cancel).await?;
-                    contacted = true;
-                }
-                for _ in 0..50 {
-                    let current = store
-                        .issue_download(account, item)?
-                        .ok_or(threadline_storage::Error::NotFound)?;
-                    if cancel.is_cancelled() || current.generation != generation {
-                        return Err(ReaderError::Cancelled);
-                    }
-                    if current.completed_families() == 3 {
-                        store.finish_issue_download(account, item, generation)?;
-                        return Ok((true, contacted));
-                    }
-                    let page = service.fetch_comments(account, item, &cancel).await?;
-                    contacted |= page.contacted;
-                    if !page.has_more {
-                        let current = store
-                            .issue_download(account, item)?
-                            .ok_or(threadline_storage::Error::NotFound)?;
-                        if current.completed_families() == 3 {
-                            store.finish_issue_download(account, item, generation)?;
-                            return Ok((true, contacted));
-                        }
-                        return Ok((false, contacted));
-                    }
-                }
-                Ok((false, contacted))
+            move |store| {
+                store.retry_issue_download(account, tab.item, generation, now_ms())?;
+                Ok(tab)
             },
-            move |this, result, window, cx| {
-                this.downloads.remove(&item);
-                if result == Some(false) {
-                    this.status =
-                        Some("This offline download is partial. Resume for additional pages.");
+            |this, result, window, cx| match result {
+                Ok(tab) => {
+                    if let Some(worker) = &this.sync_worker {
+                        worker.wake(None);
+                    }
+                    this.load_tab(tab, window, cx);
                 }
-                this.load_tab(tab, window, cx);
+                Err(_) => this.status = Some("The offline download could not be retried."),
             },
         );
     }

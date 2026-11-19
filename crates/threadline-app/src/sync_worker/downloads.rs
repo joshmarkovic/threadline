@@ -1,7 +1,42 @@
 use super::*;
+use threadline_storage::{
+    ItemId, pr::PrDownloadClaim, reader::IssueDownloadClaim, resources::ResourceError,
+};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum DownloadKey {
+    Issue(AccountId, ItemId),
+    PullRequest(i64),
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum DownloadKind {
+    Issue,
+    PullRequest,
+}
+
+enum Claim {
+    Issue(IssueDownloadClaim),
+    PullRequest(PrDownloadClaim),
+}
+
+impl Claim {
+    fn identity(&self) -> (DownloadKey, i64) {
+        match self {
+            Self::Issue(claim) => (
+                DownloadKey::Issue(claim.account, claim.item),
+                claim.generation,
+            ),
+            Self::PullRequest(claim) => (
+                DownloadKey::PullRequest(claim.revision.id),
+                claim.attempt.generation,
+            ),
+        }
+    }
+}
 
 pub(super) struct ActiveDownload {
-    pub(super) revision: i64,
+    pub(super) key: DownloadKey,
     pub(super) generation: i64,
     pub(super) cancel: Cancellation,
 }
@@ -11,13 +46,23 @@ pub(super) async fn start(
     store: &Arc<Store>,
     reader: &ReaderService,
     account: AccountId,
+    kind: DownloadKind,
     scope_generation: u64,
     now: i64,
 ) -> bool {
-    let Ok(Some(claim)) = blocking(store, move |store| store.claim_pr_download(account, now)).await
+    let Ok(Some(claim)) = blocking(store, move |store| match kind {
+        DownloadKind::Issue => store
+            .claim_issue_download(account, now)
+            .map(|claim| claim.map(Claim::Issue)),
+        DownloadKind::PullRequest => store
+            .claim_pr_download(account, now)
+            .map(|claim| claim.map(Claim::PullRequest)),
+    })
+    .await
     else {
         return false;
     };
+    let (key, generation) = claim.identity();
     let cancel = core.shutdown.child_token();
     {
         let mut scope = core.scope.lock().expect("sync scope");
@@ -25,8 +70,8 @@ pub(super) async fn start(
             cancel.cancel();
         }
         scope.download = Some(ActiveDownload {
-            revision: claim.revision.id,
-            generation: claim.attempt.generation,
+            key,
+            generation,
             cancel: cancel.clone(),
         });
     }
@@ -47,13 +92,23 @@ pub(super) async fn start(
         let result = if cancel.is_cancelled() {
             Err(ReaderError::Cancelled)
         } else {
-            reader
-                .run_claimed_pr_download(&claim, &cancel, publish)
-                .await
+            match &claim {
+                Claim::Issue(claim) => reader.run_issue_download_step(claim, &cancel).await,
+                Claim::PullRequest(claim) => reader
+                    .run_claimed_pr_download(claim, &cancel, publish)
+                    .await
+                    .map(|_| true),
+            }
         };
         if let Some(observed) = observed {
             let (reachability, reason) = match &result {
-                Ok(_) => (Reachability::ReceivedResponse, None),
+                Ok(true) => (Reachability::ReceivedResponse, None),
+                Ok(false) => (Reachability::NotAttempted, None),
+                Err(ReaderError::IncompleteIssueDownload) => (Reachability::ReceivedResponse, None),
+                Err(ReaderError::IncompleteAccess) => (
+                    Reachability::ReceivedResponse,
+                    Some(AccessKind::SsoRequired),
+                ),
                 Err(error) => (
                     error.reachability(),
                     match error {
@@ -64,12 +119,33 @@ pub(super) async fn start(
             };
             core.record(observed, reachability, reason);
         }
-        if result.is_err() {
-            let backoff = if cancel.is_cancelled() { 0 } else { 30_000 };
-            let due = UtcMillis::now()
-                .map_or(now, |at| at.0)
-                .saturating_add(backoff);
-            let _ = blocking(&store, move |store| store.defer_pr_download(&claim, due)).await;
+        if let Err(error) = result {
+            let now = UtcMillis::now().map_or(now, |at| at.0);
+            let interrupted = cancel.is_cancelled()
+                || matches!(error, ReaderError::Offline | ReaderError::Cancelled);
+            let _ = blocking(&store, move |store| match claim {
+                Claim::PullRequest(claim) => {
+                    let due = now.saturating_add(if interrupted { 0 } else { 30_000 });
+                    store.defer_pr_download(&claim, due)
+                }
+                Claim::Issue(claim) => {
+                    let scope_changed = matches!(error, ReaderError::ScopeChanged);
+                    let reason =
+                        (!interrupted && !scope_changed).then(|| error.resource_error(false));
+                    let due = match reason {
+                        Some(
+                            ResourceError::Forbidden
+                            | ResourceError::NotFound
+                            | ResourceError::InvalidResponse,
+                        ) => None,
+                        Some(_) => Some(now.saturating_add(30_000)),
+                        None if scope_changed => Some(now.saturating_add(1_000)),
+                        None => Some(now),
+                    };
+                    store.defer_issue_download(&claim, due, reason)
+                }
+            })
+            .await;
         }
         core.scope.lock().expect("sync scope").download = None;
         publish();

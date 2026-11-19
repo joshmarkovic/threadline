@@ -236,37 +236,31 @@ impl ReaderWorkspace {
         cx: &mut Context<Self>,
     ) {
         let Some(account) = self.account else { return };
-        if job.is_some_and(|(_, state)| {
-            matches!(state, DownloadState::Pending | DownloadState::Active)
-        }) && let Some(cancel) = self.downloads.get(&tab.item)
-        {
-            cancel.cancel();
-        }
         self.launch(
             window,
             cx,
             move |store| {
-                if let Some((generation, DownloadState::Pending | DownloadState::Active)) = job {
-                    store.cancel_issue_download(account, tab.item, generation)?;
-                } else {
-                    let requested = store.request_issue_download(account, tab.item, now_ms())?;
-                    if requested.state == DownloadState::Pending
-                        && requested.completed_families() == 3
+                let cancelled =
+                    if let Some((generation, DownloadState::Pending | DownloadState::Active)) = job
                     {
-                        store.start_issue_download(account, tab.item, requested.generation)?;
-                        store.finish_issue_download(account, tab.item, requested.generation)?;
-                    }
-                }
-                Ok((store.issue_download(account, tab.item)?, tab))
+                        store
+                            .cancel_issue_download(account, tab.item, generation)?
+                            .then_some(generation)
+                    } else {
+                        store.request_issue_download(account, tab.item, now_ms())?;
+                        None
+                    };
+                Ok((cancelled, tab))
             },
-            |this, result, window, cx| match result {
-                Ok((download, tab)) => {
-                    this.load_tab(tab.clone(), window, cx);
-                    if let Some(download) =
-                        download.filter(|job| job.state == DownloadState::Pending)
-                    {
-                        this.resume_download(tab, download, window, cx);
+            move |this, result, window, cx| match result {
+                Ok((cancelled, tab)) => {
+                    if let Some(worker) = this.sync_worker.as_ref() {
+                        if let Some(generation) = cancelled {
+                            worker.cancel_issue_download(account, tab.item, generation);
+                        }
+                        worker.wake(None);
                     }
+                    this.load_tab(tab, window, cx);
                 }
                 Err(_) => this.status = Some("The offline download request could not be changed."),
             },
@@ -1304,26 +1298,43 @@ impl ReaderWorkspace {
                     self.observed_control(name, button, false)
                 }
             }));
-        if let Some((_, state)) = job {
+        if let Some(download) = &view.data.download {
+            let state = download.state;
+            let detail = match download.last_error {
+                Some(ResourceError::Unauthorized | ResourceError::Forbidden) => {
+                    " · GitHub access is limited"
+                }
+                Some(ResourceError::NotFound | ResourceError::ConfirmedDeletion) => {
+                    " · Issue unavailable on GitHub"
+                }
+                Some(ResourceError::RateLimited) => " · Waiting for GitHub's rate limit",
+                Some(ResourceError::InvalidResponse) => {
+                    " · GitHub did not provide all issue content"
+                }
+                Some(ResourceError::CursorExpired) => " · GitHub page cursor expired",
+                Some(ResourceError::Transport | ResourceError::Unknown) => {
+                    " · Download interrupted"
+                }
+                None => "",
+            };
             toolbar = toolbar.child(div().text_xs().text_color(palette.muted).child(format!(
-                "Offline download · {state:?} · issue metadata, body and discussion"
+                "Offline download · {state:?} · {}/3 resources{detail}",
+                download.completed_families()
             )));
-            if self.can_fetch()
-                && matches!(state, DownloadState::Pending | DownloadState::Active)
-                && !self.downloads.contains_key(&tab.item)
-                && let Some(download) = view.data.download.clone()
+            if self.can_fetch() && state == DownloadState::Pending && download.last_error.is_some()
             {
                 let tab = tab.clone();
+                let generation = download.generation;
                 toolbar = toolbar.child(
                     self.observed_control(
                         format!("reader-resume-download-{pane}"),
                         control(
                             format!("reader-resume-download-{pane}"),
-                            "Resume offline download",
+                            "Retry offline download",
                         )
                         .on_click(cx.listener(
                             move |this, _, window, cx| {
-                                this.resume_download(tab.clone(), download.clone(), window, cx)
+                                this.resume_download(tab.clone(), generation, window, cx)
                             },
                         )),
                         false,

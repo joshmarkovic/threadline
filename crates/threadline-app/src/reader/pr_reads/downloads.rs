@@ -33,7 +33,12 @@ impl ReaderService {
                 .ok_or(ReaderError::ScopeChanged)?;
             if current.conversation.coverage != Coverage::Complete {
                 let page = self
-                    .fetch_comments_for(rev.account, rev.pr, Some((rev, attempt)), cancel)
+                    .fetch_comments_for(
+                        rev.account,
+                        rev.pr,
+                        Some(DiscussionDownload::Pr(rev, attempt)),
+                        cancel,
+                    )
                     .await?;
                 if page.contacted {
                     publish_progress();

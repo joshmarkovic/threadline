@@ -299,11 +299,7 @@ fn comments_reindex_on_retry_update_and_cleanup_and_the_offline_pin_is_cancellab
         .request_issue_download(f.account, f.long_discussion, 1)
         .unwrap();
     assert_eq!(stale.state, DownloadState::Pending);
-    assert!(
-        store
-            .start_issue_download(f.account, f.long_discussion, stale.generation)
-            .is_err()
-    );
+    assert!(store.claim_issue_download(f.account, 1).unwrap().is_none());
     assert!(
         store
             .cancel_issue_download(f.account, f.long_discussion, stale.generation)
@@ -311,8 +307,8 @@ fn comments_reindex_on_retry_update_and_cleanup_and_the_offline_pin_is_cancellab
     );
     assert!(
         store
-            .start_issue_download(f.account, f.long_discussion, stale.generation)
-            .is_err()
+            .retry_issue_download(f.account, f.long_discussion, stale.generation, 2)
+            .is_ok_and(|retried| !retried)
     );
     assert!(
         store
@@ -343,12 +339,11 @@ fn comments_reindex_on_retry_update_and_cleanup_and_the_offline_pin_is_cancellab
             )
             .unwrap();
     }
-    store
-        .start_issue_download(f.account, f.long_discussion, job.generation)
+    let completed = store
+        .request_issue_download(f.account, f.long_discussion, 5)
         .unwrap();
-    store
-        .finish_issue_download(f.account, f.long_discussion, job.generation)
-        .unwrap();
+    assert_eq!(completed.generation, job.generation);
+    assert_eq!(completed.state, DownloadState::Complete);
     let scope = ReaderScope::Selected;
     assert_eq!(
         store

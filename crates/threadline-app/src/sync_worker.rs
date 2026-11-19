@@ -154,6 +154,19 @@ impl SyncWorker {
     }
 
     pub(crate) fn cancel_pr_download(&self, revision: i64, generation: i64) {
+        self.cancel_download(downloads::DownloadKey::PullRequest(revision), generation);
+    }
+
+    pub(crate) fn cancel_issue_download(
+        &self,
+        account: AccountId,
+        item: threadline_storage::ItemId,
+        generation: i64,
+    ) {
+        self.cancel_download(downloads::DownloadKey::Issue(account, item), generation);
+    }
+
+    fn cancel_download(&self, key: downloads::DownloadKey, generation: i64) {
         if let Some(download) = self
             .core
             .scope
@@ -161,7 +174,7 @@ impl SyncWorker {
             .expect("sync scope")
             .download
             .as_ref()
-            && download.revision == revision
+            && download.key == key
             && download.generation == generation
         {
             download.cancel.cancel();
@@ -273,7 +286,7 @@ struct Local {
     next_recovery: Option<i64>,
     next_read: Option<i64>,
     next_write: Option<i64>,
-    next_download: Option<i64>,
+    next_download: Option<(i64, downloads::DownloadKind)>,
 }
 
 impl Local {
@@ -322,7 +335,13 @@ impl Local {
                 None
             },
             next_download: if network {
-                store.next_pr_download_due(account)?
+                let issue = store
+                    .next_issue_download_due(account)?
+                    .map(|due| (due, downloads::DownloadKind::Issue));
+                let pr = store
+                    .next_pr_download_due(account)?
+                    .map(|due| (due, downloads::DownloadKind::PullRequest));
+                issue.into_iter().chain(pr).min_by_key(|&(due, _)| due)
             } else {
                 None
             },
@@ -489,7 +508,7 @@ async fn run(
             let write_allowed = status != ConnectionStatus::Unreachable;
             let download_idle = core.scope.lock().expect("sync scope").download.is_none();
             if write_allowed
-                && let Some(due) = local.next_download
+                && let Some((due, kind)) = local.next_download
                 && download_idle
             {
                 let due = due.max(local.status.budget_not_before_ms.unwrap_or(now));
@@ -499,6 +518,7 @@ async fn run(
                         &store,
                         &download_reader,
                         local.account,
+                        kind,
                         generation,
                         now,
                     )

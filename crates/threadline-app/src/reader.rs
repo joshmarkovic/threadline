@@ -19,9 +19,9 @@ use threadline_storage::{
     Store, UtcMillis,
     access::{AccessProfile, AccessState},
     reader::{
-        DiscussionComment, DiscussionInputPage, IssuePresentation, LinkedItem, ListFacets,
-        ListSummary, ReactionCounts, RepositoryListPage, TimelineEntry, TimelineInputPage,
-        repository_list_key,
+        DiscussionComment, DiscussionInputPage, IssueDownloadClaim, IssuePresentation, LinkedItem,
+        ListFacets, ListSummary, ReactionCounts, RepositoryListPage, TimelineEntry,
+        TimelineInputPage, repository_list_key,
     },
     resources::{
         Coverage, ResourceError, ResourceFamily, ResourceKey, ResourceProgress, ResourceTarget,
@@ -35,6 +35,7 @@ use crate::sync_worker::{blocking, hold};
 
 mod history;
 pub(crate) use history::{history_entry, history_page_number};
+mod issue_downloads;
 pub(crate) mod pr_reads;
 pub(crate) use pr_reads::PrSourceRequest;
 mod merge_policy;
@@ -50,6 +51,7 @@ pub(crate) enum ReaderError {
     Cancelled,
     InvalidIdentity,
     IncompleteAccess,
+    IncompleteIssueDownload,
     SourceUnavailable,
     BadCursor,
     Remote(AccessError),
@@ -77,6 +79,9 @@ impl fmt::Display for ReaderError {
                 f.write_str("The item does not match the selected repository.")
             }
             Self::IncompleteAccess => f.write_str("GitHub withheld some content because of SSO."),
+            Self::IncompleteIssueDownload => {
+                f.write_str("GitHub did not provide all issue content.")
+            }
             Self::SourceUnavailable => f.write_str("This source range cannot be previewed."),
             Self::BadCursor => {
                 f.write_str("The saved page cursor is invalid. Retry to restart the download.")
@@ -138,7 +143,7 @@ impl ReaderError {
                         && matches!(error.http_status, Some(410 | 422)))
     }
 
-    fn resource_error(&self, has_continuation: bool) -> ResourceError {
+    pub(crate) fn resource_error(&self, has_continuation: bool) -> ResourceError {
         if self.cursor_expired(has_continuation) {
             return ResourceError::CursorExpired;
         }
@@ -166,7 +171,7 @@ impl ReaderError {
                 AccessKind::Cancelled => ResourceError::Unknown,
                 _ => ResourceError::InvalidResponse,
             },
-            Self::InvalidIdentity => ResourceError::InvalidResponse,
+            Self::InvalidIdentity | Self::IncompleteIssueDownload => ResourceError::InvalidResponse,
             _ => ResourceError::Unknown,
         }
     }
@@ -177,6 +182,15 @@ pub(crate) struct PageStatus {
     pub(crate) has_more: bool,
     pub(crate) complete: bool,
     pub(crate) contacted: bool,
+}
+
+#[derive(Clone, Copy)]
+enum DiscussionDownload<'a> {
+    Issue(&'a IssueDownloadClaim),
+    Pr(
+        &'a threadline_storage::pr::PrRevision,
+        threadline_storage::pr::PrDownloadAttempt,
+    ),
 }
 
 pub(crate) struct FetchedImage {
@@ -328,10 +342,7 @@ impl ReaderService {
         &self,
         account: AccountId,
         item: ItemId,
-        download: Option<(
-            &threadline_storage::pr::PrRevision,
-            threadline_storage::pr::PrDownloadAttempt,
-        )>,
+        download: Option<DiscussionDownload<'_>>,
         cancel: &Cancellation,
     ) -> Result<PageStatus, ReaderError> {
         let locator = self
@@ -345,14 +356,27 @@ impl ReaderService {
             target: ResourceTarget::Item(item),
             family: ResourceFamily::Comments,
         };
-        let Some(progress) = self.progress(key)? else {
+        let progress = match download {
+            Some(DiscussionDownload::Issue(claim)) => self
+                .store
+                .issue_download_discussion_progress(claim, &scope.profile, UtcMillis::now()?.0)?,
+            _ => self.progress(key)?,
+        };
+        let Some(progress) = progress else {
             return Ok(PageStatus::complete());
         };
-        let result = async {
+        let result: Result<PageStatus, ReaderError> = async {
             let binding = self.binding(&scope, cancel).await?;
             self.admit(account, cancel).await?;
-            if let Some((revision, attempt)) = download {
-                self.check_pr_download(revision, Some(attempt))?;
+            match download {
+                Some(DiscussionDownload::Pr(revision, attempt)) => {
+                    self.check_pr_download(revision, Some(attempt))?;
+                }
+                Some(DiscussionDownload::Issue(claim)) => {
+                    self.store
+                        .issue_download_step(claim, &scope.profile, UtcMillis::now()?.0)?;
+                }
+                None => {}
             }
             let page = self
                 .response(
@@ -400,25 +424,38 @@ impl ReaderService {
                 completed_validators: None,
                 fetched_at_ms: observed_at,
             };
-            if let Some((revision, attempt)) = download {
-                self.store.commit_pr_download_discussion(
-                    revision,
-                    attempt,
-                    &progress,
-                    comments,
-                    page.sso_limited.then_some(ResourceError::Forbidden),
-                )?;
-            } else if page.sso_limited {
-                self.store.commit_discussion_partial(
-                    account,
-                    item,
-                    &progress,
-                    comments,
-                    ResourceError::Forbidden,
-                )?;
-            } else {
-                self.store
-                    .commit_discussion_page(account, item, &progress, comments)?;
+            match download {
+                Some(DiscussionDownload::Pr(revision, attempt)) => {
+                    self.store.commit_pr_download_discussion(
+                        revision,
+                        attempt,
+                        &progress,
+                        comments,
+                        page.sso_limited.then_some(ResourceError::Forbidden),
+                    )?;
+                }
+                Some(DiscussionDownload::Issue(claim)) => {
+                    self.store.commit_issue_download_discussion(
+                        claim,
+                        &scope.profile,
+                        &progress,
+                        comments,
+                        page.sso_limited.then_some(ResourceError::Forbidden),
+                    )?;
+                }
+                None if page.sso_limited => {
+                    self.store.commit_discussion_partial(
+                        account,
+                        item,
+                        &progress,
+                        comments,
+                        ResourceError::Forbidden,
+                    )?;
+                }
+                None => {
+                    self.store
+                        .commit_discussion_page(account, item, &progress, comments)?;
+                }
             }
             if !authors.is_empty() {
                 self.store.record_comment_authors(
@@ -431,10 +468,25 @@ impl ReaderService {
             Ok(PageStatus::from_next(page.next_page, page.sso_limited))
         }
         .await;
-        if result.is_err()
-            && let Some((revision, attempt)) = download
-        {
-            self.check_pr_download(revision, Some(attempt))?;
+        if let Err(error) = &result {
+            match download {
+                Some(DiscussionDownload::Pr(revision, attempt)) => {
+                    self.check_pr_download(revision, Some(attempt))?;
+                }
+                Some(DiscussionDownload::Issue(claim)) => {
+                    if !cancel.is_cancelled() {
+                        let _ = self.store.record_issue_download_discussion_error(
+                            claim,
+                            &scope.profile,
+                            &progress,
+                            error.resource_error(progress.cursor.is_some()),
+                            UtcMillis::now()?.0,
+                        );
+                    }
+                    return result;
+                }
+                None => {}
+            }
         }
         self.record_error(key, &progress, result)
     }

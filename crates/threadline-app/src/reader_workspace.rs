@@ -183,7 +183,6 @@ pub(crate) struct ReaderWorkspace {
     remote_generation: u64,
     remote_error: Option<String>,
     images: HashMap<media::ImageKey, media::ImageState>,
-    downloads: HashMap<ItemId, Cancellation>,
     pr_reads: std::collections::HashSet<pr_view::PrReadKey>,
     merge_views: HashMap<String, merge_view::MergeView>,
     account: Option<AccountId>,
@@ -639,7 +638,6 @@ impl ReaderWorkspace {
             remote_generation: 0,
             remote_error: None,
             images: HashMap::new(),
-            downloads: HashMap::new(),
             pr_reads: std::collections::HashSet::new(),
             merge_views: HashMap::new(),
             account: None,
@@ -823,7 +821,6 @@ impl ReaderWorkspace {
             self.remote_search = None;
             self.remote_error = None;
             self.images.clear();
-            self.downloads.clear();
             self.pr_reads.clear();
             self.merge_views.clear();
             self.release_drafts();

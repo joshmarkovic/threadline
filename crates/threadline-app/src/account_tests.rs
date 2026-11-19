@@ -11,6 +11,9 @@ use std::{
 
 use super::*;
 
+#[path = "account_tests/issue_downloads.rs"]
+mod issue_downloads;
+
 struct Simulator {
     address: SocketAddr,
     sso: Arc<AtomicBool>,

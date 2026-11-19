@@ -24,7 +24,7 @@ type Result<T> = std::result::Result<T, &'static str>;
 const DATABASE: &str = "threadline.sqlite3";
 const APPLICATION_ID: u32 = 0x5448_5244;
 // Review credential references and backup discovery before raising this ceiling.
-const LAST_REVIEWED_SCHEMA: u32 = 17;
+const LAST_REVIEWED_SCHEMA: u32 = 18;
 const BUSY: &str =
     "Close Threadline and other programs using its database, then preview removal again.";
 const UNRECOGNIZED: &str =
