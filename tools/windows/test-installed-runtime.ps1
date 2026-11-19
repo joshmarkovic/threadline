@@ -4,10 +4,12 @@ param(
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-fA-F]{64}$')][string]$AppSha256,
     [Parameter(Mandatory)][string]$FixtureTool,
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-fA-F]{64}$')][string]$FixtureSha256,
-    [Parameter(Mandatory)][string]$ReportDir
+    [Parameter(Mandatory)][string]$ReportDir,
+    [ValidateNotNullOrEmpty()][string]$ExpectedDisplayTimezone
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if ($ExpectedDisplayTimezone -and $Case -cne 'S06-INSTALLED-SELECTION') { throw 'Use the offline installed selection fixture to read the saved display preference.' }
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 . (Join-Path $PSScriptRoot 'installed-controls.ps1')
 
@@ -32,6 +34,7 @@ $report = [ordered]@{case=$Case;status='Fail';app_sha256=$AppSha256.ToLowerInvar
 $owned = $false
 $child = $null
 $activityProxy = $null
+$preferencePin = $null
 $blocked = $false
 function Stop-Blocked([string]$Message) { $script:blocked = $true; throw $Message }
 function Assert-RuntimePath([string]$Path) {
@@ -120,6 +123,14 @@ try {
         $report.draft_anchor = 'Unverified'
         . (Join-Path $PSScriptRoot 'installed-pr-selection.ps1')
         . (Join-Path $PSScriptRoot 'installed-activity-network.ps1')
+        if ($ExpectedDisplayTimezone) {
+            $preferenceFile = Join-Path $local 'Threadline\Config\display-timezone'
+            Assert-RuntimePath $preferenceFile
+            if ([IO.File]::ReadAllText($preferenceFile).Trim() -cne $ExpectedDisplayTimezone) {
+                Stop-Blocked 'The named choice does not match the existing user preference.'
+            }
+            $preferencePin = (Get-FileHash -LiteralPath $preferenceFile).Hash
+        }
         Initialize-SelectionObservation
         $empty = Read-Fixture inspect-runtime-selection
         if ($empty.drafts -ne 0 -or $null -ne $empty.source_selection) { throw 'The selection fixture contains a pre-existing draft or anchor.' }
@@ -131,6 +142,19 @@ try {
     $report.process_id = $child.Id
     $initial = Wait-Control 'reader-attachment-0' 'Open cached image'
     $report.markdown_initial = $initial.Current.Name
+    if ($preferencePin) {
+        Invoke-Control 'account-open'
+        $expected = 'Display time zone ' + [char]0xb7 + ' ' + $ExpectedDisplayTimezone
+        $label = Wait-Control 'display-timezone-effective' $expected
+        $field = Wait-Control 'display-timezone' 'Display time zone'
+        $value = $null
+        if (!$field.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern, [ref]$value) -or
+            $value.Current.Value -cne $ExpectedDisplayTimezone) { throw 'The installed time zone field did not show the explicit saved choice.' }
+        $report.installed_display_timezone = [ordered]@{status='Pass';effective_label=$label.Current.Name
+            explicit_field_matched=$true;preference_sha256=$preferencePin.ToLowerInvariant()}
+        Invoke-Control 'account-close'
+        $null = Wait-Control 'reader-attachment-0' 'Open cached image'
+    }
     Read-Inventory 'Native Markdown with parsed image attachment'
     Invoke-Control 'reader-attachment-0'
     $missing = Wait-Control 'reader-attachment-0' 'Image unavailable. Retry'
@@ -191,6 +215,11 @@ try {
         }
     }
     if ($owned -and !$report.synthetic_profile_archived) { $report.status = 'Fail'; $report.cleanup_detail='The fixture could not be archived.' }
+    if ($preferencePin) {
+        try { $report.display_preference_unchanged = (Get-FileHash -LiteralPath $preferenceFile).Hash -ceq $preferencePin }
+        catch { $report.display_preference_unchanged = $false }
+        if (!$report.display_preference_unchanged) { $report.status = 'Fail'; $report.preference_error = 'The existing display preference changed or could not be verified.' }
+    }
     $report | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $destination -Encoding UTF8
     Write-Output $report.status
 }
