@@ -501,7 +501,9 @@ impl ReaderWorkspace {
             .child(self.observed_control(
                 "reader-outbox-open",
                 super::view::control("reader-outbox-open", "Open item").on_click(cx.listener(
-                    move |this, _, window, cx| this.open(target, None, false, false, window, cx),
+                    move |this, _, window, cx| {
+                        this.open(target, None, OpenTab::CurrentPane, window, cx)
+                    },
                 )),
                 false,
             ));

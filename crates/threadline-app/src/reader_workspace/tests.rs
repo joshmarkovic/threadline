@@ -150,7 +150,7 @@ fn cached_navigation_shows_an_existing_tab_immediately_and_saves_both_open_and_s
                     .as_ref()
                     .is_some_and(|item| item.id == next))
             );
-            reader.open(next, None, false, false, window, cx);
+            reader.open(next, None, OpenTab::CurrentPane, window, cx);
             assert!(reader.layout_busy);
         });
     })
@@ -661,6 +661,201 @@ fn fixture_seed() -> u64 {
         .ok()
         .and_then(|seed| seed.parse().ok())
         .unwrap_or(12345)
+}
+
+#[gpui_kit::test]
+fn ui_002_reused_duplicates_follow_activation_after_reorder_history_and_account_switch(
+    cx: &mut TestAppContext,
+) {
+    let setup = ReaderHarness::seeded();
+    let account = setup.fixture.account;
+    let item = setup.fixture.long_discussion;
+    let other = setup.fixture.reviewed_pr;
+    let draft = format!("comment-{}", item.0);
+    setup
+        .store
+        .create_draft(
+            account,
+            &draft,
+            item,
+            DraftKind::Comment,
+            &threadline_storage::queue::DraftContent {
+                body: "Preserve the original shared draft.".into(),
+                base: String::new(),
+                anchor: String::new(),
+            },
+        )
+        .unwrap();
+    let tab = |id: &str, item, draft| Tab {
+        id: id.into(),
+        item,
+        view: TabView {
+            draft,
+            navigation: Some(id.into()),
+            ..Default::default()
+        },
+    };
+    let mut layout = Workspace {
+        focused_pane: 0,
+        proportions: vec![0.5, 0.5],
+        panes: vec![
+            Pane {
+                active: Some(2),
+                tabs: vec![
+                    tab("unrelated", other, None),
+                    tab("recent", item, Some(draft.clone())),
+                    tab("rightmost", item, Some(draft.clone())),
+                ],
+            },
+            Pane {
+                active: Some(0),
+                tabs: vec![tab("opposite-pane", item, Some(draft.clone()))],
+            },
+        ],
+    };
+    setup.store.save_workspace(account, &layout).unwrap();
+    let alternate = setup.store.ensure_account("github.com", 43).unwrap();
+    let alternate_repo = setup
+        .store
+        .ensure_repository(alternate, 72, "fixture", "separate")
+        .unwrap();
+    let alternate_item = setup
+        .store
+        .ingest(
+            alternate,
+            ItemLocator {
+                repository: alternate_repo,
+                number: 1,
+            },
+            ItemUpdate {
+                representation: ItemRepresentation::Issue(IssueRecord {
+                    id: 1.try_into().unwrap(),
+                    node_id: None,
+                    classification: IssueClassification::Issue,
+                }),
+                remote_updated_at: UtcMillis(1),
+                title: Change::Value("Separate account issue".into()),
+                body: Change::Missing,
+                closed: Change::Missing,
+            },
+        )
+        .unwrap();
+    layout = Workspace {
+        focused_pane: 0,
+        proportions: vec![1.],
+        panes: vec![Pane {
+            active: Some(0),
+            tabs: vec![tab("recent", alternate_item, None)],
+        }],
+    };
+    setup.store.save_workspace(alternate, &layout).unwrap();
+
+    let (window, reader) = setup.open_at(cx, size(px(1700.), px(1000.)));
+    let wait_active = |cx: &mut TestAppContext, target: &str| {
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let view = reader.read(cx);
+                !view.layout_busy && view.active_tab().is_some_and(|tab| tab.id == target)
+            })
+        })
+    };
+    let open_item = |cx: &mut TestAppContext, item| {
+        cx.update_window(window, |_, window, cx| {
+            reader.update(cx, |reader, cx| {
+                reader.open(item, None, OpenTab::CurrentPane, window, cx)
+            })
+        })
+        .unwrap()
+    };
+    click(cx, window, "reader-tab-0-1");
+    wait_active(cx, "recent");
+    click(cx, window, "reader-reorder-tab");
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).layout.panes[0].active == Some(0))
+    });
+    open_item(cx, other);
+    wait_active(cx, "unrelated");
+    open_item(cx, item);
+    wait_active(cx, "recent");
+    click(cx, window, "reader-back");
+    wait_active(cx, "unrelated");
+    click(cx, window, "reader-forward");
+    wait_active(cx, "recent");
+
+    let navigate_url = |cx: &mut TestAppContext, raw: &str| {
+        cx.update_window(window, |_, window, cx| {
+            reader.update(cx, |reader, cx| reader.navigate_url(raw, window, cx))
+        })
+        .unwrap();
+    };
+    let number = |item| {
+        setup
+            .store
+            .item(account, item)
+            .unwrap()
+            .unwrap()
+            .locator
+            .number
+    };
+    let issue_url = format!("https://github.com/fixture/relay/issues/{}", number(item));
+    let pr_url = format!("https://github.com/fixture/relay/pull/{}", number(other));
+    click(cx, window, "reader-tab-1-0");
+    wait_active(cx, "opposite-pane");
+    navigate_url(cx, &pr_url);
+    wait_active(cx, "unrelated");
+    navigate_url(cx, &issue_url);
+    wait_active(cx, "recent");
+
+    for profile in [alternate, account] {
+        cx.update_window(window, |_, window, cx| {
+            reader.update(cx, |reader, cx| {
+                reader.set_account(
+                    ReaderAccount {
+                        account: Some(profile),
+                        profile: None,
+                        offline: true,
+                        reachability: Reachability::NotAttempted,
+                        repositories: setup.store.github_repository_views(profile).unwrap(),
+                    },
+                    window,
+                    cx,
+                );
+            })
+        })
+        .unwrap();
+        wait_active(cx, "recent");
+        cx.read(|cx| {
+            let workspace = reader.read(cx);
+            assert!(workspace.back.is_empty() && workspace.forward.is_empty());
+            if profile == alternate {
+                assert_eq!(workspace.active_tab().unwrap().item, alternate_item);
+                assert!(workspace.drafts.is_empty());
+            }
+        });
+    }
+    open_item(cx, other);
+    wait_active(cx, "unrelated");
+    open_item(cx, item);
+    wait_active(cx, "recent");
+    let saved = setup.store.workspace(account).unwrap().unwrap();
+    assert_eq!(saved.focused_pane, 0);
+    assert_eq!(saved.panes[0].tabs[0].id, "recent");
+    assert_eq!(saved.panes[0].tabs[2].id, "rightmost");
+    assert_eq!(saved.panes[1].tabs[0].id, "opposite-pane");
+    assert_eq!(
+        saved.panes[0].tabs[0].view.draft.as_deref(),
+        Some(draft.as_str())
+    );
+    assert_eq!(
+        setup
+            .store
+            .draft(account, &draft)
+            .unwrap()
+            .unwrap()
+            .content
+            .body,
+        "Preserve the original shared draft."
+    );
 }
 
 #[gpui_kit::test]
@@ -1933,7 +2128,7 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
     if !review {
         cx.update_window(window, |_, window, cx| {
             reader.update(cx, |reader, cx| {
-                reader.open(issue_ids[0].0, None, false, false, window, cx);
+                reader.open(issue_ids[0].0, None, OpenTab::CurrentPane, window, cx);
             });
         })
         .unwrap();

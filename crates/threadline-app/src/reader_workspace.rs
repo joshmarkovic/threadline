@@ -280,6 +280,14 @@ struct ItemData {
     download: Option<IssueDownload>,
 }
 
+#[derive(Clone, Copy)]
+enum OpenTab {
+    CurrentPane,
+    Beside,
+    DuplicateBeside,
+    Activation,
+}
+
 impl ItemData {
     fn read(
         store: &Store,
@@ -894,8 +902,9 @@ impl ReaderWorkspace {
                     |this, result, window, cx| {
                         this.layout_busy = false;
                         match result {
-                            Ok(Some((layout, maximized, summaries))) => {
+                            Ok(Some((mut layout, maximized, summaries))) => {
                                 this.ensure_focus_handles(layout.panes.len(), window, cx);
+                                layout.record_focused_tab_activation();
                                 this.layout = layout;
                                 this.tab_summaries = summaries;
                                 this.maximized = maximized.is_some();
@@ -1476,7 +1485,7 @@ impl ReaderWorkspace {
 
     fn save_layout_with_tab(
         &mut self,
-        layout: Workspace,
+        mut layout: Workspace,
         target: Option<Tab>,
         show_cached: bool,
         recent: Option<ItemId>,
@@ -1488,6 +1497,7 @@ impl ReaderWorkspace {
             return;
         }
         self.layout_busy = true;
+        layout.record_focused_tab_activation();
         let remaining: HashSet<_> = layout
             .panes
             .iter()
@@ -1636,8 +1646,7 @@ impl ReaderWorkspace {
         &mut self,
         item: ItemId,
         anchor: Option<String>,
-        beside: bool,
-        duplicate: bool,
+        mode: OpenTab,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -1647,7 +1656,12 @@ impl ReaderWorkspace {
         let current = self.active_tab().map(|tab| tab.item);
         self.capture_scroll();
         let mut layout = self.layout.clone();
-        let index = if beside {
+        let activation = matches!(mode, OpenTab::Activation)
+            .then(|| layout.activation_tab(item))
+            .flatten();
+        let index = if let Some((pane, _)) = activation {
+            pane
+        } else if matches!(mode, OpenTab::Beside | OpenTab::DuplicateBeside) {
             if layout.panes.len() == 1 {
                 layout.panes.push(Pane {
                     active: None,
@@ -1660,12 +1674,12 @@ impl ReaderWorkspace {
             layout.focused_pane
         };
         let pane = &mut layout.panes[index];
-        let existing = if duplicate {
+        let existing = if matches!(mode, OpenTab::DuplicateBeside) {
             None
         } else {
-            pane.active
-                .filter(|i| pane.tabs[*i].item == item)
-                .or_else(|| pane.tabs.iter().rposition(|tab| tab.item == item))
+            activation
+                .map(|(_, tab)| tab)
+                .or_else(|| pane.matching_tab(item))
         };
         let tab = if let Some(existing) = existing {
             pane.active = Some(existing);
@@ -1681,6 +1695,12 @@ impl ReaderWorkspace {
         };
         let preserve_view = anchor.is_none();
         if let Some(anchor) = anchor {
+            if anchor.starts_with("thread:") {
+                tab.view
+                    .pr_reader
+                    .get_or_insert_with(Default::default)
+                    .section = threadline_storage::pr::PrSection::Conversation;
+            }
             tab.view.scroll_anchor = Some(anchor);
             tab.view.scroll_offset = 0;
             self.tab_views.remove(&tab.id);
@@ -1724,18 +1744,14 @@ impl ReaderWorkspace {
         self.capture_scroll();
         let mut layout = self.layout.clone();
         let pane = &mut layout.panes[layout.focused_pane];
-        let index = pane
-            .tabs
-            .iter()
-            .rposition(|tab| tab.item == item)
-            .unwrap_or_else(|| {
-                pane.tabs.push(Tab {
-                    id: view_id(),
-                    item,
-                    view: TabView::default(),
-                });
-                pane.tabs.len() - 1
+        let index = pane.matching_tab(item).unwrap_or_else(|| {
+            pane.tabs.push(Tab {
+                id: view_id(),
+                item,
+                view: TabView::default(),
             });
+            pane.tabs.len() - 1
+        });
         pane.active = Some(index);
         self.surface = Surface::Browse;
         self.save_layout(layout, window, cx);

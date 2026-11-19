@@ -496,6 +496,7 @@ fn previous_workspace(item: ItemId) -> Workspace {
                         navigation: Some("conversation".into()),
                         draft: Some("edit-1".into()),
                         context: None,
+                        last_activated: None,
                     },
                 }],
             },

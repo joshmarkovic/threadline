@@ -250,7 +250,7 @@ impl ReaderWorkspace {
             |this, result, window, cx| {
                 if let Ok(item) = result {
                     this.refresh_tab_summaries(window, cx);
-                    this.open(item, None, false, false, window, cx)
+                    this.open(item, None, OpenTab::CurrentPane, window, cx)
                 } else {
                     this.status = Some("GitHub’s item could not be opened in this repository.")
                 }
@@ -384,7 +384,7 @@ impl ReaderWorkspace {
         let Some(account) = self.account else { return };
         self.launch(window,cx,move |store| store.resolve_downloaded_route(account,&route,number,Some(kind)),
             |this,result,window,cx|match result {
-                Ok(Some(item))=>this.open(item,None,false,false,window,cx),
+                Ok(Some(item))=>this.open(item,None,OpenTab::Activation,window,cx),
                 Ok(None)=>this.status=Some("This issue or pull request has not been downloaded for this account. The link remains available."),
                 Err(_)=>this.status=Some("The link could not be looked up in the local profile."),
             });

@@ -126,10 +126,10 @@ fn cached_reader_filters_search_anchors_counts_and_tab_reopen_survive_an_offline
         store.reopen_last_tab(f.account, None).unwrap().unwrap(),
         removed
     );
-    assert_eq!(
-        store.workspace(f.account).unwrap().unwrap().panes[0].tabs[2],
-        removed
-    );
+    let mut restored = store.workspace(f.account).unwrap().unwrap().panes[0].tabs[2].clone();
+    assert!(restored.view.last_activated > removed.view.last_activated);
+    restored.view.last_activated = removed.view.last_activated;
+    assert_eq!(restored, removed);
     assert!(store.reopen_last_tab(f.account, None).unwrap().is_none());
     let other = store.ensure_account("github.com", 771199).unwrap();
     assert!(

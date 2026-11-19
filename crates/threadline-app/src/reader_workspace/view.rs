@@ -890,7 +890,7 @@ impl ReaderWorkspace {
                             move |this, _, window, cx| {
                                 #[cfg(feature = "e2e")]
                                 this.performance.start(performance::Action::Open(item.0));
-                                this.open(item, anchor.clone(), false, false, window, cx)
+                                this.open(item, anchor.clone(), OpenTab::CurrentPane, window, cx)
                             },
                         )),
                         false,
@@ -907,7 +907,7 @@ impl ReaderWorkspace {
                         format!("reader-beside-{index}"),
                         control(format!("reader-beside-{index}"), "Open beside").on_click(
                             cx.listener(move |this, _, window, cx| {
-                                this.open(item, beside_anchor.clone(), true, false, window, cx)
+                                this.open(item, beside_anchor.clone(), OpenTab::Beside, window, cx)
                             }),
                         ),
                         false,
@@ -1220,7 +1220,7 @@ impl ReaderWorkspace {
                         let label=format!("{}/{} #{}",linked.owner,linked.repository,linked.number);
                         match target {
                             Some(item)=>control(format!("reader-timeline-link-{pane}-{position}"),label)
-                                .on_click(cx.listener(move|this,_,window,cx|this.open(item,None,false,false,window,cx)))
+                                .on_click(cx.listener(move|this,_,window,cx|this.open(item,None,OpenTab::CurrentPane,window,cx)))
                                 .into_any_element(),
                             None=>div().text_xs().text_color(palette.muted)
                                 .child(format!("Related item {label} · verification unavailable in the local cache"))
@@ -1628,7 +1628,7 @@ impl ReaderWorkspace {
                             .get(this.layout.focused_pane)
                             .and_then(|pane| pane.active.and_then(|i| pane.tabs.get(i)))
                         {
-                            this.open(tab.item, None, true, true, window, cx);
+                            this.open(tab.item, None, OpenTab::DuplicateBeside, window, cx);
                         }
                     },
                 )),

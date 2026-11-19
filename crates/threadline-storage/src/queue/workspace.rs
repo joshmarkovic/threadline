@@ -18,6 +18,8 @@ pub struct TabView {
     pub navigation: Option<String>,
     pub draft: Option<String>,
     pub context: Option<PrContext>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_activated: Option<u64>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Pane {
@@ -29,6 +31,60 @@ pub struct Workspace {
     pub focused_pane: usize,
     pub proportions: Vec<f64>,
     pub panes: Vec<Pane>,
+}
+
+impl Pane {
+    /// Keep an active match, otherwise reuse the matching tab most recently activated.
+    pub fn matching_tab(&self, item: ItemId) -> Option<usize> {
+        self.active
+            .filter(|index| self.tabs.get(*index).is_some_and(|tab| tab.item == item))
+            .or_else(|| {
+                self.tabs
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, tab)| tab.item == item)
+                    .max_by_key(|(_, tab)| tab.view.last_activated)
+                    .map(|(index, _)| index)
+            })
+    }
+}
+
+impl Workspace {
+    /// Route an external activation to the focused pane first, then to the newest matching view.
+    pub fn activation_tab(&self, item: ItemId) -> Option<(usize, usize)> {
+        if let Some(tab) = self.panes.get(self.focused_pane)?.matching_tab(item) {
+            return Some((self.focused_pane, tab));
+        }
+        self.panes
+            .iter()
+            .enumerate()
+            .filter_map(|(pane, current)| current.matching_tab(item).map(|tab| (pane, tab)))
+            .max_by_key(|&(pane, tab)| self.panes[pane].tabs[tab].view.last_activated)
+    }
+
+    pub fn record_focused_tab_activation(&mut self) {
+        let Some((active, pane)) = self
+            .panes
+            .get(self.focused_pane)
+            .and_then(|pane| pane.active.map(|index| (index, pane)))
+        else {
+            return;
+        };
+        let Some(focused) = pane.tabs.get(active) else {
+            return;
+        };
+        let latest = self
+            .panes
+            .iter()
+            .flat_map(|pane| &pane.tabs)
+            .filter_map(|tab| tab.view.last_activated)
+            .max();
+        if focused.view.last_activated.is_none() || focused.view.last_activated != latest {
+            self.panes[self.focused_pane].tabs[active]
+                .view
+                .last_activated = Some(latest.unwrap_or_default().saturating_add(1));
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -341,6 +397,7 @@ impl Store {
         pane.tabs.insert(index, tab.clone());
         pane.active = Some(index);
         ws.focused_pane = position;
+        ws.record_focused_tab_activation();
         write_workspace(tx, account, &ws, &[])?;
         Ok(Some(tab))
     })

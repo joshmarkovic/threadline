@@ -1123,7 +1123,7 @@ impl ReaderWorkspace {
                                 if this.layout_busy {
                                     this.activity.pending_open = None;
                                 } else {
-                                    this.open_notification_item(item, thread, window, cx);
+                                    this.open(item, thread, OpenTab::Activation, window, cx);
                                 },
                             _ => {
                                 this.show_activity(false, window, cx);
@@ -1147,51 +1147,5 @@ impl ReaderWorkspace {
                 }
             }
         }
-    }
-
-    fn open_notification_item(
-        &mut self,
-        item: ItemId,
-        anchor: Option<String>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        if self.layout_busy {
-            return;
-        }
-        let existing = self
-            .layout
-            .panes
-            .iter()
-            .enumerate()
-            .find_map(|(pane, current)| {
-                current
-                    .tabs
-                    .iter()
-                    .position(|tab| tab.item == item)
-                    .map(|tab| (pane, tab))
-            });
-        let Some((pane, index)) = existing else {
-            self.open(item, anchor, false, false, window, cx);
-            return;
-        };
-        self.capture_scroll();
-        let mut layout = self.layout.clone();
-        let tab = &mut layout.panes[pane].tabs[index];
-        if let Some(anchor) = anchor {
-            if anchor.starts_with("thread:") {
-                tab.view
-                    .pr_reader
-                    .get_or_insert_with(Default::default)
-                    .section = threadline_storage::pr::PrSection::Conversation;
-            }
-            tab.view.scroll_anchor = Some(anchor);
-            tab.view.scroll_offset = 0;
-            self.tab_views.remove(&tab.id);
-        }
-        layout.focused_pane = pane;
-        layout.panes[pane].active = Some(index);
-        self.surface = Surface::Browse;
-        self.save_layout(layout, window, cx);
     }
 }
