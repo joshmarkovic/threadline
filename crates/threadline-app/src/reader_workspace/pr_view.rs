@@ -74,6 +74,7 @@ pub(crate) struct PrObservation {
     selected_file: Option<String>,
     revision_id: Option<i64>,
     head: Option<String>,
+    merge_base: Option<String>,
     merged: Option<bool>,
     linked_issue: Option<i64>,
     verified_targets: usize,
@@ -195,6 +196,9 @@ impl ReaderWorkspace {
                 }),
                 revision_id: pr.map(|pr| pr.data.revision.id),
                 head: pr.map(|pr| pr.data.revision.head.as_str().to_owned()),
+                merge_base: pr
+                    .and_then(|pr| pr.data.revision.merge_base.as_ref())
+                    .map(|oid| oid.as_str().to_owned()),
                 merged: cached.data.item.as_ref().and_then(|item| {
                     match &item.pull_request.as_ref()?.fields.merged {
                         Change::Value(value) => Some(*value),
@@ -1372,6 +1376,7 @@ impl ReaderWorkspace {
             .child(
                 div()
                     .id(format!("pr-{pane}-comparison-mode"))
+                    .accessibility_id(format!("pr-{pane}-comparison-mode"))
                     .role(Role::Status)
                     .aria_label(comparison.clone())
                     .text_xs()

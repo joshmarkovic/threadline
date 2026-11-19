@@ -7,8 +7,29 @@ function Wait-History([string]$Description, [scriptblock]$HistoryPredicate) {
 }
 
 function Wait-OwnedHistoryLabel([IntPtr]$Window, [string]$Id, [string]$Name) {
-    Wait-For "the owned visible history label '$Name'" {
-        $null -ne (Find-OwnedFixtureControl $Window $Id $Name -AllowDisabled)
+    try {
+        Wait-For "the owned visible history label '$Name'" {
+            $null -ne (Find-OwnedFixtureControl $Window $Id $Name -AllowDisabled)
+        }
+    } catch {
+        if ($_.Exception.Message -notlike 'Timed out waiting*') { throw }
+        $failure = $_
+        $observed = [ordered]@{ automation_id = $Id; visible = $false; returned_name = $null; control_type = $null }
+        try {
+            $node = Find-OwnedFixtureControl $Window $Id -AllowDisabled
+            if ($null -ne $node) {
+                $observed.visible = $true
+                $current = $node.Current
+                if ($current.Name -cmatch '^(Pull request comparison|Parent [0-9]+ of |Direct comparison|Showing saved tip |The remote reference was removed|Branch main deleted|Not downloaded)') {
+                    $observed.returned_name = $current.Name
+                }
+                if ($current.ControlType -is [Windows.Automation.ControlType]) {
+                    $observed.control_type = $current.ControlType.ProgrammaticName
+                }
+            }
+        } catch {}
+        Add-Evidence 'Inspect only the expected owned comparison status control' $observed
+        throw $failure
     }
 }
 
@@ -33,6 +54,9 @@ function Invoke-HistoryProof([IntPtr]$Window, [string]$Profile) {
     $pr = Open-FixturePr $Window 0 42 'First fixture pull request' $head 'src/first.rs'
     $prItem = $pr.cached_reader.active_item
     Click-AccountControl $Window 'reader-maximize-pane'
+    $null = Wait-PrReader 'the immutable PR comparison has the provider merge base' {
+        param($pr) $pr.head -ceq $head -and $pr.merge_base -ceq $secondParent
+    }
     Wait-OwnedHistoryLabel $Window 'pr-0-comparison-mode' "Pull request comparison${separator}merge base $secondParent${arrow}head $head"
     $draft = Enter-FixtureAnchoredReview $Window $head 'src/first.rs' -AlreadyMaximized
     Wait-HistoryUnsubmittedDraft $draft $head $prItem

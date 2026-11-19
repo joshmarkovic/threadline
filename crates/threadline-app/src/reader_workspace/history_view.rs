@@ -799,6 +799,7 @@ impl ReaderWorkspace {
                 refs = refs.child(
                     div()
                         .id(format!("history-ref-deleted-{index}"))
+                        .accessibility_id(format!("history-ref-deleted-{index}"))
                         .role(Role::Status)
                         .aria_label(format!("{} deleted", ref_name(&entry.reference)))
                         .text_xs()
@@ -848,6 +849,7 @@ impl ReaderWorkspace {
             refs = refs.child(
                 div()
                     .id("history-inspected-ref-status")
+                    .accessibility_id("history-inspected-ref-status")
                     .role(Role::Status)
                     .aria_label(description.clone())
                     .text_xs()
@@ -1102,6 +1104,7 @@ impl ReaderWorkspace {
             .child(
                 div()
                     .id("history-comparison-mode")
+                    .accessibility_id("history-comparison-mode")
                     .role(Role::Status)
                     .aria_label(summary.clone())
                     .text_sm()
@@ -1110,6 +1113,7 @@ impl ReaderWorkspace {
             .child(
                 div()
                     .id("history-comparison-coverage")
+                    .accessibility_id("history-comparison-coverage")
                     .role(Role::Status)
                     .aria_label(coverage_label(page.coverage))
                     .child(coverage_label(page.coverage)),
