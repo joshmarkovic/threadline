@@ -1,0 +1,1041 @@
+{
+  "run": "e2e-1795072033441-12992",
+  "source_revision": "287064229188f6cc5f5d85c86693c0f74bd5e438",
+  "source_dirty": false,
+  "package_version": "0.1.0",
+  "package_version_source": "checkout-app-manifest",
+  "cargo_lock_sha256": "ba1fa2481ba47ebb082dae4aff8bf1a099cea5775b4196b096aeb3bb094d4efb",
+  "seed": 12345,
+  "host": {
+    "os": "windows",
+    "architecture": "x86_64",
+    "version": "Microsoft Windows [Version 10.0.22631.7652]",
+    "display_session": "Windows desktop availability is checked by native driver"
+  },
+  "lane": "e2e",
+  "suite": "full",
+  "fixture_revision": "mixed",
+  "status": "Fail",
+  "exit_code": 1,
+  "command": {
+    "program": "xtask",
+    "argv": [
+      "test",
+      "e2e",
+      "--suite",
+      "full",
+      "--binary",
+      "<binary-path>",
+      "--seed",
+      "12345",
+      "--report-dir",
+      "<report-dir>",
+      "--local-fixture",
+      "<local-fixture-path>",
+      "--artifact",
+      "<artifact-path>"
+    ],
+    "redacted": true
+  },
+  "started_at_unix_ms": 1795072033440,
+  "finished_at_unix_ms": 1795073592310,
+  "outcomes": {
+    "Blocked": 8,
+    "Fail": 1,
+    "Pass": 12
+  },
+  "runner_sha256": "44565f896246a6644b6e757453a687e9eb80fe872ed2e211c92a7897112bbf20",
+  "receipt_sha256": {
+    "result.json": "37d62dcba6233c3258dc2d19820955000d48e7281e3b27c3659f4160fc2cdeac",
+    "junit.xml": "d143053c435fe0bd860bbfe5c0e319f5fdabc89f36483d55d1537549533d4c8c"
+  },
+  "driver_source": "287064229188f6cc5f5d85c86693c0f74bd5e438",
+  "driver_sha256": {
+    "windows-smoke.ps1": "3002bdfeb9ce97bc4a3140cebbc67bd6a571fdb985ee4b65f424f5a060802e48",
+    "test-installed-runtime.ps1": "e7b7f1847d6be9ac72cdee1e544475b4ac69639ebf1a19976077211987b67e0d",
+    "test-installed-activity.ps1": "033231aeb84d031994b8078bf6e7978b14f9298e52e81b1d5b7be69a0e098090"
+  },
+  "optimized_e2e": {
+    "source_revision": "287064229188f6cc5f5d85c86693c0f74bd5e438",
+    "sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861",
+    "size_bytes": 46057984,
+    "evidence_class": "test-build native process"
+  },
+  "installed_local_16": {
+    "source_revision": "287064229188f6cc5f5d85c86693c0f74bd5e438",
+    "profile": "release",
+    "target": "x86_64-pc-windows-msvc",
+    "e2e_feature": false,
+    "package_build": 16,
+    "schema": 18,
+    "channel": "unsigned local fixture",
+    "setup_sha256": "33d87decae67321a0586e642753d21bc38e8839cfff0792ec36599a8c34ca985",
+    "setup_bytes": 11147864,
+    "app_sha256": "427f00141263d1fe5a123731cc3676c4fbf480e7c8761a7adf38c00a991e4085",
+    "bootstrap_sha256": "32470a2620c9f35d52f83aa7f8cc6dac9281f6e4f646e70f4922e6993a4601e9",
+    "package_version": "0.1.0-local.16",
+    "build_receipt_sha256": "eb1bd3769a3c6f38f82494543072de6263ca2e31ea2e2e3ffdc397ba4cbc4b0e",
+    "runtime_module_inventory_sha256": "e919415fede28dfccde21f9d18f1687485fa34775b0e7d09b348a189469db2fc",
+    "runtime_receipts": [
+      {
+        "receipt": "windows-installed-runtime/runtime-build.json",
+        "receipt_sha256": "b808816fa6ce996d9ccf0b0b8bf8d35e6b215c3c7d23fecb0a47295adb92e750",
+        "source_commit": "287064229188f6cc5f5d85c86693c0f74bd5e438",
+        "app_sha256": "427f00141263d1fe5a123731cc3676c4fbf480e7c8761a7adf38c00a991e4085",
+        "package_version": null
+      }
+    ]
+  },
+  "cases": [
+    {
+      "case": "E2E-001",
+      "status": "Blocked",
+      "detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible. See native-driver.log.",
+      "evidence": "native.json",
+      "requirement_ids": [
+        "FND-01",
+        "FND-02",
+        "TEST-04",
+        "PORT-03"
+      ],
+      "acceptance_ids": [
+        "AC-84",
+        "AC-91"
+      ],
+      "child_exit_code": 78,
+      "fixture_revision": "s01-feasibility-v1",
+      "receipt_sha256": "2629c5360d28f439bdf9859cb5ecd849e94a9cc34475d0237b5cd94ee058f6ca",
+      "native": {
+        "status": "Blocked",
+        "detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible.",
+        "dpi": 96,
+        "actions": 1,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "S01-WINDOWS-SHELL",
+      "status": "Blocked",
+      "detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible. See native-driver.log.",
+      "evidence": "windows-shell/platform-native.json",
+      "requirement_ids": [
+        "PORT-05",
+        "NOTIFY-01",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-86"
+      ],
+      "child_exit_code": 78,
+      "fixture_revision": "s01-feasibility-v1",
+      "receipt_sha256": "7b6db41db36e88d8a81a2d789b1691abd1e26f33fb23cb707ca8bd32abbacfff",
+      "native": {
+        "status": "Blocked",
+        "detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible.",
+        "dpi": 96,
+        "actions": 1,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "S01-WINDOWS-TOAST",
+      "status": "Blocked",
+      "detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible. See native-driver.log.",
+      "evidence": "windows-toast/toast-native.json",
+      "requirement_ids": [
+        "FND-02",
+        "PORT-05",
+        "NOTIFY-01",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-33",
+        "AC-86"
+      ],
+      "child_exit_code": 78,
+      "fixture_revision": "s01-feasibility-v1",
+      "receipt_sha256": "f328954db0591f9ab3af1e87c273eeca19399e837620b2f18d1830c19268de07",
+      "native": {
+        "status": "Blocked",
+        "detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible.",
+        "dpi": 96,
+        "actions": 4,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "E2E-002",
+      "status": "Blocked",
+      "detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible. See native-driver.log.",
+      "evidence": "windows-github-access/github-access-native.json",
+      "requirement_ids": [
+        "AUTH-01",
+        "AUTH-03",
+        "AUTH-04",
+        "AUTH-05",
+        "TEST-04",
+        "PORT-04"
+      ],
+      "acceptance_ids": [
+        "AC-01",
+        "AC-02",
+        "AC-03",
+        "AC-85"
+      ],
+      "child_exit_code": 78,
+      "fixture_revision": "s03-github-access-v1",
+      "receipt_sha256": "7b1fbc4cf1b3cd1fb0a211455494b806c9e7afc1496d84f03c6f366e73867c25",
+      "native": {
+        "status": "Blocked",
+        "detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible.",
+        "dpi": 96,
+        "actions": 3,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "E2E-003",
+      "status": "Blocked",
+      "detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible. See native-driver.log.",
+      "evidence": "windows-reader-offline/reader-native.json",
+      "requirement_ids": [
+        "OFFLINE-01",
+        "CACHE-01",
+        "WORKSPACE-08",
+        "WORKSPACE-09",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-06",
+        "AC-46",
+        "AC-56",
+        "AC-91"
+      ],
+      "child_exit_code": 78,
+      "fixture_revision": "s04-reader-v1",
+      "receipt_sha256": "9aa3fa5b252516a14e8ecb8b98661d3627471ef4dc673f7af9de2b5ad827ff7b",
+      "native": {
+        "status": "Blocked",
+        "detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible.",
+        "dpi": 96,
+        "actions": 2,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "E2E-004",
+      "status": "Pass",
+      "detail": "The native reader showed Partial discussion, restored the pending download offline and resumed it automatically after reconnecting. See native-driver.log.",
+      "evidence": "windows-reader-resume/reader-native.json",
+      "requirement_ids": [
+        "CACHE-04",
+        "CACHE-05",
+        "OFFLINE-03",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-04",
+        "AC-07",
+        "AC-08",
+        "AC-70"
+      ],
+      "child_exit_code": 0,
+      "fixture_revision": "s04-reader-v1",
+      "receipt_sha256": "4f9a933eeb90e1eadef29b052d1e3b58e3cbd8c320af122e656bd49a62168452",
+      "native": {
+        "status": "Pass",
+        "detail": "The native reader showed Partial discussion, restored the pending download offline and resumed it automatically after reconnecting.",
+        "dpi": 96,
+        "actions": 14,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "S05-WINDOWS-SYNC",
+      "status": "Pass",
+      "detail": "Native synchronization settings survived restart and distinguished HTTP, throttling and transport outcomes. See native-driver.log.",
+      "evidence": "windows-sync/sync-native.json",
+      "requirement_ids": [
+        "SYNC-01",
+        "SYNC-04",
+        "SYNC-08",
+        "CONNECT-01",
+        "CONNECT-02",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-11",
+        "AC-12",
+        "AC-57"
+      ],
+      "child_exit_code": 0,
+      "fixture_revision": "s05-sync-v1",
+      "receipt_sha256": "758d954e7bce0247256a6787b13ab9dadbc05eba7d10c753ccfe099d8a8c91fb",
+      "native": {
+        "status": "Pass",
+        "detail": "Native synchronization settings survived restart and distinguished HTTP, throttling and transport outcomes.",
+        "dpi": 96,
+        "actions": 20,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "E2E-013",
+      "status": "Pass",
+      "detail": "Windows quiet hours kept the seeded native activity in the feed while independent native synchronization controls held network requests and the queued action. Explicit checking and queue resumption were each verified against saved preferences and loopback requests. See native-driver.log.",
+      "evidence": "windows-notification-schedule/notification-schedule-native.json",
+      "requirement_ids": [
+        "SYNC-04",
+        "NOTIFY-11",
+        "OUTBOX-04",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-30",
+        "AC-41",
+        "AC-69"
+      ],
+      "child_exit_code": 0,
+      "fixture_revision": "s11-native-notification-schedule-v1",
+      "receipt_sha256": "c0eccbe288828fdee89c3079e5acb5d7f168e4169a451dabd399111c5b7370fe",
+      "native": {
+        "status": "Pass",
+        "detail": "Windows quiet hours kept the seeded native activity in the feed while independent native synchronization controls held network requests and the queued action. Explicit checking and queue resumption were each verified against saved preferences and loopback requests.",
+        "dpi": 96,
+        "actions": 34,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "E2E-005",
+      "status": "Pass",
+      "detail": "Native tabs preserved their own provider revision and code state while a verified linked issue response was delayed across the tab switch. See native-driver.log.",
+      "evidence": "windows-pr/pr-native.json",
+      "requirement_ids": [
+        "PR-05",
+        "PR-06",
+        "PR-07",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-05",
+        "AC-79",
+        "AC-80"
+      ],
+      "child_exit_code": 0,
+      "fixture_revision": "s06-pr-reading-v1",
+      "receipt_sha256": "7ec8916ac663175beb49da17b960bfea5aa3aa6140a084a417cf26314514bd00",
+      "native": {
+        "status": "Pass",
+        "detail": "Native tabs preserved their own provider revision and code state while a verified linked issue response was delayed across the tab switch.",
+        "dpi": 96,
+        "actions": 27,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "E2E-007",
+      "status": "Pass",
+      "detail": "Native review input survived an offline restart and confirmed the unchanged expected head. A second approval was held when provider preflight observed a different head, with original source and draft retained. See native-driver.log.",
+      "evidence": "windows-review-draft/review-draft-native.json",
+      "requirement_ids": [
+        "REVIEW-01",
+        "REVIEW-02",
+        "REVIEW-03",
+        "REVIEW-04",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-16",
+        "AC-17",
+        "AC-18",
+        "AC-65"
+      ],
+      "child_exit_code": 0,
+      "fixture_revision": "s08-revision-bound-reviews-v1",
+      "receipt_sha256": "0adea84d3478da1075a8816687204088795375c050f8d48af431e1f9bc34111d",
+      "native": {
+        "status": "Pass",
+        "detail": "Native review input survived an offline restart and confirmed the unchanged expected head. A second approval was held when provider preflight observed a different head, with original source and draft retained.",
+        "dpi": 96,
+        "actions": 55,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "E2E-011",
+      "status": "Pass",
+      "detail": "Native history verified the three comparison labels and preserved cached commits, the selected divergent file and an unsent anchored PR draft through branch movement, deletion and an offline restart. See native-driver.log.",
+      "evidence": "windows-history/history-native.json",
+      "requirement_ids": [
+        "GRAPH-01",
+        "GRAPH-02",
+        "GRAPH-03",
+        "GRAPH-04",
+        "DIFF-03",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-24",
+        "AC-25",
+        "AC-26"
+      ],
+      "child_exit_code": 0,
+      "fixture_revision": "s10-history-endpoints-v3",
+      "receipt_sha256": "500ea9d3ce0a54d849017954c6166cf06bc3e0257cabe3a0c2166b05b8c2c8cc",
+      "native": {
+        "status": "Pass",
+        "detail": "Native history verified the three comparison labels and preserved cached commits, the selected divergent file and an unsent anchored PR draft through branch movement, deletion and an offline restart.",
+        "dpi": 96,
+        "actions": 47,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "E2E-010",
+      "status": "Pass",
+      "detail": "Sign-out and offline restart retained the original scoped action. Wrong-user renewal was rejected, another account could not see or send it, and the original verified account renewed and confirmed it once. See native-driver.log.",
+      "evidence": "windows-credential-boundary/credential-boundary-native.json",
+      "requirement_ids": [
+        "AUTH-11",
+        "CACHE-13",
+        "OUTBOX-09",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-67",
+        "AC-72",
+        "AC-73",
+        "AC-74"
+      ],
+      "child_exit_code": 0,
+      "fixture_revision": "s09-credential-boundary-v1",
+      "receipt_sha256": "d95915f1c4b973358ebd178bd31c15633548c82e2ea42ddd7b8a39051a83a3e1",
+      "native": {
+        "status": "Pass",
+        "detail": "Sign-out and offline restart retained the original scoped action. Wrong-user renewal was rejected, another account could not see or send it, and the original verified account renewed and confirmed it once.",
+        "dpi": 96,
+        "actions": 51,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "E2E-009",
+      "status": "Pass",
+      "detail": "An offline native squash intent confirmed only after exact-head submission and readback. A second offline intent was held without sending when the provider returned a changed head. See native-driver.log.",
+      "evidence": "windows-direct-merge/direct-merge-native.json",
+      "requirement_ids": [
+        "MERGE-01",
+        "MERGE-02",
+        "MERGE-03",
+        "MERGE-04",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-19",
+        "AC-20",
+        "AC-66",
+        "AC-77"
+      ],
+      "child_exit_code": 0,
+      "fixture_revision": "s09-direct-merge-v1",
+      "receipt_sha256": "b96c8f7e85db117017037255d9f5e88eb85869659f420922955cd4d8c638d88a",
+      "native": {
+        "status": "Pass",
+        "detail": "An offline native squash intent confirmed only after exact-head submission and readback. A second offline intent was held without sending when the provider returned a changed head.",
+        "dpi": 96,
+        "actions": 53,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "E2E-008",
+      "status": "Pass",
+      "detail": "The real Windows review draft retained its source line, code comparison and original head through verified issue switches, app layout changes and a separate offline restart. See native-driver.log.",
+      "evidence": "windows-review-context/review-context-native.json",
+      "requirement_ids": [
+        "PR-05",
+        "PR-07",
+        "WORKSPACE-05",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-78",
+        "AC-91"
+      ],
+      "child_exit_code": 0,
+      "fixture_revision": "s08-revision-bound-reviews-v1",
+      "receipt_sha256": "4f72d4734760e25f467e4ded00f76f12a01cef899356b6bfb9dac00ca7815db1",
+      "native": {
+        "status": "Pass",
+        "detail": "The real Windows review draft retained its source line, code comparison and original head through verified issue switches, app layout changes and a separate offline restart.",
+        "dpi": 96,
+        "actions": 40,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "E2E-014",
+      "status": "Fail",
+      "detail": "At least one Section 16 large-workspace budget failed. See native-driver.log.",
+      "evidence": "windows-large-workspace/large-workspace-native.json",
+      "requirement_ids": [
+        "CACHE-01",
+        "OFFLINE-01",
+        "OUTBOX-03",
+        "UX-02",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-35",
+        "AC-48",
+        "AC-56",
+        "AC-68",
+        "AC-71"
+      ],
+      "child_exit_code": 1,
+      "fixture_revision": "s12-large-workspace-v2",
+      "receipt_sha256": "52ea60dd3796330d87a747c5fd81dc007abc50fca360b31f47f6c7a582aee8ce",
+      "native": {
+        "status": "Fail",
+        "detail": "At least one Section 16 large-workspace budget failed.",
+        "dpi": 96,
+        "actions": 117,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "E2E-015",
+      "status": "Blocked",
+      "detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible. See native-driver.log.",
+      "evidence": "windows-accessibility/accessibility-native.json",
+      "requirement_ids": [
+        "WORKSPACE-12",
+        "UX-01",
+        "TEST-04",
+        "PORT-06"
+      ],
+      "acceptance_ids": [
+        "AC-38",
+        "AC-49"
+      ],
+      "child_exit_code": 78,
+      "fixture_revision": "s01-feasibility-v1",
+      "receipt_sha256": "cb34142f62d1b7d55a9b4f1783b36c76589efc1766b5d94ee5a85d914bafed16",
+      "native": {
+        "status": "Blocked",
+        "detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible.",
+        "dpi": 96,
+        "actions": 2,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "E2E-006",
+      "status": "Pass",
+      "detail": "The native editor restored two offline actions, cancelled the unsent issue edit and completed the retained ordinary comment after reconnect. A second ordinary comment lost its server response and retained an uncertain outcome after cancellation. See native-driver.log.",
+      "evidence": "windows-writes/writes-native.json",
+      "requirement_ids": [
+        "OFFLINE-02",
+        "ISSUE-03",
+        "ISSUE-04",
+        "OUTBOX-03",
+        "OUTBOX-07",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-13",
+        "AC-58",
+        "AC-59",
+        "AC-60",
+        "AC-61"
+      ],
+      "child_exit_code": 0,
+      "fixture_revision": "s07-write-engine-v1",
+      "receipt_sha256": "48438a67dfda73165a4e9b9070f462760934580146de9efa3600a8beca2539c4",
+      "native": {
+        "status": "Pass",
+        "detail": "The native editor restored two offline actions, cancelled the unsent issue edit and completed the retained ordinary comment after reconnect. A second ordinary comment lost its server response and retained an uncertain outcome after cancellation.",
+        "dpi": 96,
+        "actions": 39,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "E2E-019",
+      "status": "Blocked",
+      "detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible. See native-driver.log.",
+      "evidence": "windows-write-surface/writes-native.json",
+      "requirement_ids": [
+        "ISSUE-06",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-82"
+      ],
+      "child_exit_code": 78,
+      "fixture_revision": "s07-write-engine-v1",
+      "receipt_sha256": "881efefc905e2ca0fc58c435d36414476b8b3f91ad74265b4231bd249afc904c",
+      "native": {
+        "status": "Blocked",
+        "detail": "Windows prevented focus. Run the driver from the unlocked interactive desktop with Threadline visible.",
+        "dpi": 96,
+        "actions": 6,
+        "binary_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861"
+      },
+      "application": "optimized_e2e"
+    },
+    {
+      "case": "E2E-012",
+      "status": "Blocked",
+      "detail": "An installed window or OS delivery prerequisite was unavailable. See the native receipt.",
+      "evidence": "windows-activity-cold/installed-activity.json",
+      "requirement_ids": [
+        "NOTIFY-01",
+        "NOTIFY-18",
+        "WORKSPACE-11",
+        "TEST-04",
+        "PORT-05"
+      ],
+      "acceptance_ids": [
+        "AC-33",
+        "AC-47",
+        "AC-86"
+      ],
+      "child_exit_code": 78,
+      "fixture_revision": "threadline-s11-installed-fixture-v1",
+      "receipt_sha256": "12c98ca7fed84df911a17ccf2b46214e05323e1b1a1d9835451551b099807ed9",
+      "native": {
+        "status": "Blocked",
+        "detail": "Windows did not grant focus to the fixture window.",
+        "actions": 2,
+        "app_sha256": "427f00141263d1fe5a123731cc3676c4fbf480e7c8761a7adf38c00a991e4085",
+        "fixture_sha256": "809c0d9b643e4189210a64784548ce3d962592adcab7ba529a7b896366d57d68",
+        "synthetic_profile_archived": true
+      },
+      "application": "installed_local_16"
+    },
+    {
+      "case": "E2E-018",
+      "status": "Pass",
+      "detail": "The installed Windows case completed with matching native and durable-state evidence.",
+      "evidence": "windows-activity-fallback/installed-activity.json",
+      "requirement_ids": [
+        "NOTIFY-01",
+        "NOTIFY-06",
+        "NOTIFY-19",
+        "TEST-04",
+        "PORT-05"
+      ],
+      "acceptance_ids": [
+        "AC-86"
+      ],
+      "child_exit_code": 0,
+      "fixture_revision": "threadline-s11-installed-fixture-v1",
+      "receipt_sha256": "e5bfef3fb96cdda313f093655690b392a426fbd2945a184990c28e7f02f912d5",
+      "native": {
+        "status": "Pass",
+        "actions": 3,
+        "app_sha256": "427f00141263d1fe5a123731cc3676c4fbf480e7c8761a7adf38c00a991e4085",
+        "fixture_sha256": "809c0d9b643e4189210a64784548ce3d962592adcab7ba529a7b896366d57d68",
+        "synthetic_profile_archived": true
+      },
+      "application": "installed_local_16"
+    },
+    {
+      "case": "E2E-020",
+      "status": "Pass",
+      "detail": "The installed Windows case completed with matching native and durable-state evidence.",
+      "evidence": "windows-installed-runtime/installed-runtime.json",
+      "requirement_ids": [
+        "FND-01",
+        "TEST-04",
+        "PORT-03"
+      ],
+      "acceptance_ids": [
+        "AC-37"
+      ],
+      "child_exit_code": 0,
+      "fixture_revision": "threadline-s12-installed-runtime-v1",
+      "receipt_sha256": "f0f08aa3c7812573ff4c9f06f08649b4fadd5de56a702d6eb819e1cd8d37142b",
+      "native": {
+        "status": "Pass",
+        "app_sha256": "427f00141263d1fe5a123731cc3676c4fbf480e7c8761a7adf38c00a991e4085",
+        "fixture_sha256": "809c0d9b643e4189210a64784548ce3d962592adcab7ba529a7b896366d57d68",
+        "synthetic_profile_archived": true
+      },
+      "application": "installed_local_16"
+    }
+  ],
+  "large_workspace": {
+    "status": "Fail",
+    "detail": "At least one Section 16 large-workspace budget failed.",
+    "dpi": 96,
+    "driver": "Windows PowerShell / owned UI Automation and guarded Win32 SendInput",
+    "machine": {
+      "manufacturer": "Microsoft Corporation",
+      "model": "Virtual Machine",
+      "ram_bytes": 34358562816,
+      "processors": [
+        {
+          "Name": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+          "NumberOfCores": 4,
+          "NumberOfLogicalProcessors": 8
+        }
+      ],
+      "graphics": [
+        {
+          "Name": "Microsoft Hyper-V Video",
+          "DriverVersion": "10.0.22621.1"
+        }
+      ],
+      "storage": [
+        {
+          "Model": "Microsoft Virtual Disk",
+          "InterfaceType": "SCSI",
+          "MediaType": "Fixed hard disk media"
+        }
+      ],
+      "display": {
+        "width": 2560,
+        "height": 1600
+      }
+    },
+    "timing": "Verified native UI Automation or owned Win32 activation to useful app observation. Query entry verified before timing. Polling requested at 5 ms.",
+    "offline_checks_passed": true,
+    "backlog_checks_passed": true,
+    "action_count": 117,
+    "fixture": {
+      "fixture_revision": "s12-large-workspace-v2",
+      "items": 50000,
+      "comments": 250000,
+      "open_tabs": 20,
+      "outbox_count": 1000,
+      "typed_outbox_count": 12,
+      "unresolved_outbox": 901
+    },
+    "runtime": {
+      "initial_offline_start_ms": 10410.457,
+      "initial_offline_start_timing": {
+        "status": "Correlated",
+        "process_start_call_ms": 8777.1599,
+        "app_ready_ms": 1464.5759,
+        "app_milestones_ms": {
+          "options_parsed": 0.1043,
+          "platform_ready": 11.0021,
+          "profile_opening": 11.2467,
+          "profile_opened": 16.8352,
+          "application_construction_started": 16.877,
+          "application_constructed": 139.9817,
+          "application_callback_entered": 1334.7909,
+          "components_initialized": 1338.1506000000002,
+          "application_activation_requested": 1338.1877,
+          "toolkit_ready": 1338.1879,
+          "window_created": 1386.0079999999998,
+          "window_observed_active_at_paint": 1390.9064,
+          "account_loaded": 1446.6014999999998,
+          "layout_loaded": 1451.0267,
+          "active_panes_hydrated": 1475.2872
+        },
+        "launch_to_cached_panes_paint_ms": 10345.4806,
+        "app_start_to_cached_panes_paint_ms": 1534.4984,
+        "paint_to_verified_receipt_ms": 68.0415
+      },
+      "initial_offline_peak_working_set_bytes": 77725696,
+      "warm_start_ms": 24254.5806,
+      "warm_start_timing": {
+        "status": "Correlated",
+        "process_start_call_ms": 11003.7381,
+        "app_ready_ms": 13085.8648,
+        "app_milestones_ms": {
+          "options_parsed": 0.1146,
+          "platform_ready": 10.3766,
+          "profile_opening": 10.5945,
+          "profile_opened": 17.1786,
+          "application_construction_started": 17.2211,
+          "application_constructed": 141.1955,
+          "application_callback_entered": 10851.744,
+          "components_initialized": 10855.1304,
+          "application_activation_requested": 10855.1777,
+          "toolkit_ready": 10855.178600000001,
+          "window_created": 10906.2832,
+          "window_observed_active_at_paint": 10911.8567,
+          "account_loaded": 13078.4231,
+          "layout_loaded": 13091.8926,
+          "active_panes_hydrated": 13145.749199999998
+        },
+        "launch_to_cached_panes_paint_ms": 24229.1518,
+        "app_start_to_cached_panes_paint_ms": 13206.1273,
+        "paint_to_verified_receipt_ms": 27.2303
+      },
+      "warm_process_id": 31104,
+      "idle_frames": {
+        "pid": 31104,
+        "settle_ms": 2000,
+        "sample_ms": 3000,
+        "draws_per_second": [
+          0,
+          0,
+          0
+        ],
+        "presents_per_second": [
+          0,
+          0,
+          0
+        ]
+      },
+      "idle_working_set_bytes": 94924800,
+      "peak_working_set_bytes": 103813120,
+      "gpu_memory": {
+        "idle": {
+          "dedicated_bytes": 0,
+          "shared_bytes": 0
+        },
+        "after_actions": {
+          "dedicated_bytes": 0,
+          "shared_bytes": 0
+        },
+        "after_drain": {
+          "dedicated_bytes": 0,
+          "shared_bytes": 0
+        }
+      },
+      "package": {
+        "bytes": 11147864,
+        "sha256": "33d87decae67321a0586e642753d21bc38e8839cfff0792ec36599a8c34ca985"
+      }
+    },
+    "backlog": {
+      "process_id": 31716,
+      "held_action": 2,
+      "confirmed": 9,
+      "cached_navigation_ms": 2079.1554,
+      "cancellation_ms": 2378.0748000000003,
+      "overlap_working_set_bytes": 103301120,
+      "unresolved_after": 890
+    },
+    "budgets": {
+      "warm_start_ms": {
+        "value": 24254.5806,
+        "limit": 2000,
+        "status": "Fail"
+      },
+      "idle_redraw": {
+        "status": "Pass"
+      },
+      "idle_working_set_bytes": {
+        "value": 94924800,
+        "limit": 209715200,
+        "status": "Pass"
+      },
+      "cached_open": {
+        "sample_count": 20,
+        "p95_ms": 2125.6005,
+        "limit_ms": 100,
+        "status": "Fail"
+      },
+      "local_search": {
+        "sample_count": 20,
+        "p95_ms": 2105.6803,
+        "limit_ms": 200,
+        "status": "Fail"
+      },
+      "cached_tab_switch": {
+        "sample_count": 20,
+        "p95_ms": 2090.556,
+        "limit_ms": 100,
+        "status": "Fail"
+      },
+      "peak_working_set_bytes": {
+        "value": 103813120,
+        "limit": 471859200,
+        "status": "Pass"
+      },
+      "gpu_memory_bytes": {
+        "value": 0,
+        "sample_count": 3,
+        "limit": 268435456,
+        "status": "Pass"
+      },
+      "package_bytes": {
+        "value": 11147864,
+        "limit": 52428800,
+        "status": "Pass"
+      }
+    },
+    "attribution": {
+      "cached_open": {
+        "sample_count": 20,
+        "correlated_count": 20,
+        "input_methods": [
+          "UIA InvokePattern"
+        ],
+        "input_call_p95_ms": 2015.4484,
+        "handler_to_useful_paint_p95_ms": 69.2647,
+        "input_to_useful_paint_p95_ms": 2078.558
+      },
+      "local_search": {
+        "sample_count": 20,
+        "correlated_count": 20,
+        "input_methods": [
+          "UIA InvokePattern"
+        ],
+        "input_call_p95_ms": 2013.4717,
+        "handler_to_useful_paint_p95_ms": 53.6878,
+        "input_to_useful_paint_p95_ms": 2064.3109
+      },
+      "cached_tab_switch": {
+        "sample_count": 20,
+        "correlated_count": 20,
+        "input_methods": [
+          "UIA InvokePattern"
+        ],
+        "input_call_p95_ms": 2015.4496,
+        "handler_to_useful_paint_p95_ms": 31.4026,
+        "input_to_useful_paint_p95_ms": 2042.2342999999998
+      }
+    },
+    "http_count": 39,
+    "all_http_authenticated": true,
+    "accepted_comment_indices": [
+      2,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ],
+    "initial_startup_ms": 1464.5759,
+    "initial_startup_milestones_ms": {
+      "options_parsed": 0.1043,
+      "platform_ready": 11.0021,
+      "profile_opening": 11.2467,
+      "profile_opened": 16.8352,
+      "application_construction_started": 16.877,
+      "application_constructed": 139.9817,
+      "application_callback_entered": 1334.7909,
+      "components_initialized": 1338.1506000000002,
+      "application_activation_requested": 1338.1877,
+      "toolkit_ready": 1338.1879,
+      "window_created": 1386.0079999999998,
+      "window_observed_active_at_paint": 1390.9064,
+      "account_loaded": 1446.6014999999998,
+      "layout_loaded": 1451.0267,
+      "active_panes_hydrated": 1475.2872
+    },
+    "warm_startup_ms": 13085.8648,
+    "warm_startup_milestones_ms": {
+      "options_parsed": 0.1146,
+      "platform_ready": 10.3766,
+      "profile_opening": 10.5945,
+      "profile_opened": 17.1786,
+      "application_construction_started": 17.2211,
+      "application_constructed": 141.1955,
+      "application_callback_entered": 10851.744,
+      "components_initialized": 10855.1304,
+      "application_activation_requested": 10855.1777,
+      "toolkit_ready": 10855.178600000001,
+      "window_created": 10906.2832,
+      "window_observed_active_at_paint": 10911.8567,
+      "account_loaded": 13078.4231,
+      "layout_loaded": 13091.8926,
+      "active_panes_hydrated": 13145.749199999998
+    },
+    "package_size_measured_in_full_suite": true,
+    "receipt_sha256": {
+      "binary.json": "1a870b4a7fe155c3ebca0e79d6864188a4784b72cd3b0d3b6aedd44fc022e321",
+      "large-workspace-native.json": "52ea60dd3796330d87a747c5fd81dc007abc50fca360b31f47f6c7a582aee8ce",
+      "github-access-trace.json": "1e37734e26eecf3788fb89f6f4258aee00796a33da78836488ca96d5d1e3f464",
+      "reader-fixture.json": "ea8659ca92f3dd0c2e6c7c9fe577b75639ffabe3ee16ae976a110103a1a5be3c",
+      "reader-restart-observation.json": "1a6476ccb09b66a6e3ad8e5590f74db6dbe0c8f30716ad543bd951a95d614fc9",
+      "reader-restart-observation.idle.json": "c0f4468eace11ff5dcea52d6f65dbd72482cd8f3ab49e940aced9efa4a0ce180",
+      "reader-backlog-observation.json": "5174053c1a2126a59b375860f2180ee61e9be4712246d39466a0d90e26a551f4",
+      "ui-observation.json": "a8159cebfb75bf6394d2662a15f6ff0628f8681f857f5cb8ebb4d1d262c94d26"
+    }
+  },
+  "case_details": {
+    "write_journey": {
+      "request_trace_sha256": "8105fa50da0bafb024c633f162d3fc0346fa9edb4e8ad91fa73b2a830752491c",
+      "request_count": 23,
+      "verified_fixture_authorization": true,
+      "http_outcomes": [
+        {
+          "status": 0,
+          "count": 1
+        },
+        {
+          "status": 200,
+          "count": 21
+        },
+        {
+          "status": 201,
+          "count": 1
+        }
+      ]
+    },
+    "installed_cold_activity": {
+      "fixture": "threadline-s11-installed-fixture-v1",
+      "event_count": 37,
+      "feed_count": 37,
+      "latest_feed_id": 37,
+      "os_feed_only": 0,
+      "registration_feed_only": 0,
+      "adapter_feed_only": 0,
+      "snoozed_targets": 0,
+      "read_count": 0,
+      "group_count": 1,
+      "outcome": "delivered",
+      "activated": false,
+      "pending_opens": 0,
+      "selected_issue": 41,
+      "draft_preserved": true,
+      "draft_tab_preserved": true,
+      "source_events": 37
+    },
+    "installed_feed_fallback": {
+      "fixture": "threadline-s11-installed-fixture-v1",
+      "event_count": 37,
+      "feed_count": 37,
+      "latest_feed_id": 37,
+      "os_feed_only": 0,
+      "registration_feed_only": 37,
+      "adapter_feed_only": 0,
+      "snoozed_targets": 1,
+      "read_count": 1,
+      "group_count": 0,
+      "outcome": null,
+      "activated": false,
+      "pending_opens": 0,
+      "selected_issue": 41,
+      "draft_preserved": true,
+      "draft_tab_preserved": true,
+      "source_events": 37
+    },
+    "installed_offline_runtime": {
+      "offline": true,
+      "orderly_quit": true,
+      "selected_file": "second.txt",
+      "diff_mode": "Split"
+    }
+  }
+}

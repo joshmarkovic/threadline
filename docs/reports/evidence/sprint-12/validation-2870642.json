@@ -1,0 +1,805 @@
+{
+  "source_revision": "287064229188f6cc5f5d85c86693c0f74bd5e438",
+  "source_dirty": false,
+  "linux_canonical_lanes": [
+    {
+      "lane": "unit",
+      "run": "unit-1795071453005-2784879",
+      "status": "Pass",
+      "exit_code": 0,
+      "named_cases": 23,
+      "passed_test_executions": 155,
+      "cases": [
+        {
+          "case": "UT-002",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-005",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-006",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-007",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-011",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "UT-012",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "UT-008",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "UT-013",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-014",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-015",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-016",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-017",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-018",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-019",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-021",
+          "status": "Pass",
+          "passed": 80
+        },
+        {
+          "case": "S01-CORE",
+          "status": "Pass",
+          "passed": 19
+        },
+        {
+          "case": "S01-DIFF-FIXTURE",
+          "status": "Pass",
+          "passed": 32
+        },
+        {
+          "case": "UT-001",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-003",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-004",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-009",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-010",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-020",
+          "status": "Pass",
+          "passed": 1
+        }
+      ],
+      "raw_result_sha256": "d876add3254cf6f1d1a406d56dae8009de69a5a59c736185d675adc9cc91f296",
+      "raw_junit_sha256": "301c45dc818f0264695916bf07de27801e64064b91eb2a3a7db0a4e603588378"
+    },
+    {
+      "lane": "integration",
+      "run": "integration-1795071631981-2789896",
+      "status": "Pass",
+      "exit_code": 0,
+      "named_cases": 36,
+      "passed_test_executions": 159,
+      "cases": [
+        {
+          "case": "IT-021",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "IT-018",
+          "status": "Pass",
+          "passed": 11
+        },
+        {
+          "case": "IT-019",
+          "status": "Pass",
+          "passed": 4
+        },
+        {
+          "case": "IT-006",
+          "status": "Pass",
+          "passed": 10
+        },
+        {
+          "case": "IT-007",
+          "status": "Pass",
+          "passed": 4
+        },
+        {
+          "case": "S10-HISTORY-HTTP",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "S10-HISTORY-MONITOR",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "S05-FEED-HTTP",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "S05-SYNC-WORKER",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "IT-008",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "IT-009",
+          "status": "Pass",
+          "passed": 6
+        },
+        {
+          "case": "IT-010",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "IT-011",
+          "status": "Pass",
+          "passed": 6
+        },
+        {
+          "case": "IT-013",
+          "status": "Pass",
+          "passed": 5
+        },
+        {
+          "case": "IT-012",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "S07-WRITE-WORKER",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "IT-014",
+          "status": "Pass",
+          "passed": 5
+        },
+        {
+          "case": "IT-015",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "IT-016",
+          "status": "Pass",
+          "passed": 5
+        },
+        {
+          "case": "IT-017",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "IT-003",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "S01-SIMULATOR",
+          "status": "Pass",
+          "passed": 5
+        },
+        {
+          "case": "S01-PLATFORM",
+          "status": "Pass",
+          "passed": 5
+        },
+        {
+          "case": "IT-001",
+          "status": "Pass",
+          "passed": 8
+        },
+        {
+          "case": "IT-002",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "S02-RESOURCE-CONTRACTS",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "S02-DURABILITY",
+          "status": "Pass",
+          "passed": 11
+        },
+        {
+          "case": "S02-DISK-FULL",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "S02-FIXTURES",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "IT-004",
+          "status": "Pass",
+          "passed": 5
+        },
+        {
+          "case": "IT-005",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "S03-ACCOUNT-PROFILES",
+          "status": "Pass",
+          "passed": 12
+        },
+        {
+          "case": "S03-ACCESS-STORAGE",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "S04-READ-TRANSPORT",
+          "status": "Pass",
+          "passed": 8
+        },
+        {
+          "case": "S04-CACHED-STORE",
+          "status": "Pass",
+          "passed": 11
+        },
+        {
+          "case": "S04-READ-SERVICE",
+          "status": "Pass",
+          "passed": 1
+        }
+      ],
+      "raw_result_sha256": "e985c487038892ae48753e37682554fd2a9a5228a3185a531f826cbbd80ecfb1",
+      "raw_junit_sha256": "b06b83aa5d3eca84ad6a2a09db8a3a63191f41de0c709560ec49b48fc62e11f6"
+    },
+    {
+      "lane": "ui",
+      "run": "ui-1795072176484-2804075",
+      "status": "Pass",
+      "exit_code": 0,
+      "named_cases": 9,
+      "passed_test_executions": 30,
+      "cases": [
+        {
+          "case": "UI-004",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "S01-GPUI",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "UI-001",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UI-002",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "UI-003",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UI-006",
+          "status": "Pass",
+          "passed": 5
+        },
+        {
+          "case": "UI-005",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "UI-008",
+          "status": "Pass",
+          "passed": 8
+        },
+        {
+          "case": "UI-007",
+          "status": "Pass",
+          "passed": 4
+        }
+      ],
+      "raw_result_sha256": "5661c8b9341512e9a477738b7aebeabd75066bcf047a9e651248d66ba819f0de",
+      "raw_junit_sha256": "11c72b7841d7eb750199e6f548806851a6963448497f57534f60e62b19bef1b6"
+    }
+  ],
+  "linux_numeric_exits": {
+    "fmt": "0",
+    "clippy": "0",
+    "unit": "0",
+    "integration": "0",
+    "ui": "0"
+  },
+  "clippy": {
+    "linux": {
+      "status": "Pass",
+      "raw_log_sha256": "6cf02089cc7fa98077122bdc1c3b94ebcd3567172e49f02d37500b44310cc255"
+    },
+    "win": {
+      "status": "Pass",
+      "raw_log_sha256": "51eb0b96f8d2a02b232b36c9b62e578fed84b544feef20aa71d372ba60cfe820"
+    }
+  },
+  "clippy_scope": "Locked, offline workspace, all targets with threadline-app/e2e and warnings denied.",
+  "normal_release_compile": {
+    "status": "Pass",
+    "warnings": 0,
+    "raw_build_log_sha256": "fa949445632e6f66f3a9e5d7ed39980587ed1b300f73e89a7a1f5248447c7d0e"
+  },
+  "windows": {
+    "source": "2870642",
+    "expected_executables": 33,
+    "exit_zero": 33,
+    "default_totals": {
+      "passed": 343,
+      "failed": 0,
+      "ignored": 3
+    },
+    "explicit_generated_credentials": [
+      {
+        "case": "native_synthetic_protected_store_round_trip",
+        "exit_code": 0,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.16,
+        "failed_tests": [],
+        "raw_log_sha256": "f43b6081ec9c7ca7fc3cfef467432cfcf77bce4e0fa938db1cb777262c90f2ff"
+      },
+      {
+        "case": "it_019_explicit_removal_deletes_only_the_generated_profile_credential",
+        "exit_code": 0,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.38,
+        "failed_tests": [],
+        "raw_log_sha256": "a2868c846e8a93e9b87f9c77295acb2daf9e3c0e71cbdbb3080ca6ad933be06d"
+      }
+    ],
+    "raw_numeric_exits_sha256": "bd1530ee516f210e6ea4599a97271c86cfc24cd15f18cc1495cf1bfc7867c984",
+    "raw_opt_in_exits_sha256": "d641aa7410bda78fdc492b3923738fcb998923282e06b27ae06ed4d1b65e0f22",
+    "raw_staged_binary_pins_sha256": "a7a3caf72c2d689704c305c02fcd8fe9c66bb988f03e1e291ead9674eec8e3af",
+    "exact_binary_results": [
+      {
+        "executable": "access-c232fee6c62e98b2.exe",
+        "sha256": "983f9edd40c570c9199a69e16a706d66c01f66ee5ed1353ddf36f45afd038ba2",
+        "exit_code": 0,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.5,
+        "failed_tests": [],
+        "raw_log_sha256": "950995e87b41dba9297dc8562935528b104b8c8fb212186186221ca1ea1e6fd2"
+      },
+      {
+        "executable": "bootstrap_command-4e9e8862c55f6ef7.exe",
+        "sha256": "6d9a22b6d59ac268994e407721abae84b253680767e82360b866cab2f49ba7d4",
+        "exit_code": 0,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.9,
+        "failed_tests": [],
+        "raw_log_sha256": "dc637a3628a2a4061a2443e6cf8f10b4765e05f96c21e8e7e7e5a43b610fb0a7"
+      },
+      {
+        "executable": "durability-ca8978b3e078a106.exe",
+        "sha256": "8892469ace4d6ea1112514e66c5542a42d8f226d124ede387918721fd9005211",
+        "exit_code": 0,
+        "passed": 11,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 3.63,
+        "failed_tests": [],
+        "raw_log_sha256": "20bccfa421d60c54e7b968ba7e8fdb07eea06d130390ad17a2a7c08d83b8175a"
+      },
+      {
+        "executable": "feasibility_ui-8736860a719ade94.exe",
+        "sha256": "15717f0a0a79a6020e133097b7a5bba88fb73668737d16d641f2043dd3dc1935",
+        "exit_code": 0,
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 4.13,
+        "failed_tests": [],
+        "raw_log_sha256": "af92015cdee75c7df4800b375d090c765d5ee0bbb67d5fbe085f93d7de4fa37c"
+      },
+      {
+        "executable": "fixtures-41187b4f488e65ee.exe",
+        "sha256": "81e6cf67f762097a29078cc46eb7f88636e7951ad47d8257aec954e6e83d36e9",
+        "exit_code": 0,
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 93.63,
+        "failed_tests": [],
+        "raw_log_sha256": "e1e5f86483bc9d2719ad20ec05e3f7d233d99e95ddd7d4c4eba7af179f8f032c"
+      },
+      {
+        "executable": "foundation-37b0b2910121efed.exe",
+        "sha256": "9c3b111537ac069b8714b9d86637f9428e3350e672752fc9a43f822e2f62e8e0",
+        "exit_code": 0,
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.03,
+        "failed_tests": [],
+        "raw_log_sha256": "7c51dda40f1bc6df9113d9fffec7b628cfd9dc30aba4b9c5af2e0003795064b4"
+      },
+      {
+        "executable": "github_access-dd6dd39f611bd863.exe",
+        "sha256": "fda012e0aeed351a8743245a9034bba142bd908d1e1a08d0714f3d218f0144c4",
+        "exit_code": 0,
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.07,
+        "failed_tests": [],
+        "raw_log_sha256": "f4558d9e454b586fb8826b346d8b54aff9769cbeb7ffb959db0bd86f31be30e0"
+      },
+      {
+        "executable": "github_history-e0482e2eca26b115.exe",
+        "sha256": "d997180c3fd7fa95ec325982fbde059c9f94f94a0c1b067676afdb35279764a6",
+        "exit_code": 0,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.03,
+        "failed_tests": [],
+        "raw_log_sha256": "0d51e502e9339ba02b3117c7c694b3c178dd79d14d987414df0998b2c24aa3aa"
+      },
+      {
+        "executable": "github_merge-b7dea7e485900c8e.exe",
+        "sha256": "d19dd36cb4d5ee3a3c06c1816356e8e2cd09199bcf5611bae5138f9e9f9f881a",
+        "exit_code": 0,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.01,
+        "failed_tests": [],
+        "raw_log_sha256": "42976cc05fa8773c062922539b411419f26871451e75e23df8bc8f22a9bf335c"
+      },
+      {
+        "executable": "github_pr-01fd841eab67e778.exe",
+        "sha256": "5d17b30dd557987f1e8d4bffa9e734b882d826aa8bfe68d9f4a76f6e6cf62bf1",
+        "exit_code": 0,
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.05,
+        "failed_tests": [],
+        "raw_log_sha256": "5a93592a81e88bf710550d53658e37b799267a45699f77d665c12b043373871d"
+      },
+      {
+        "executable": "github_reader-318e5c0aed1727c5.exe",
+        "sha256": "6a30e0e06534be0329f8a173825ed83b8de8807bf7a36db5acc418a86c0bf8a6",
+        "exit_code": 0,
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.05,
+        "failed_tests": [],
+        "raw_log_sha256": "b08cd7a52c0012f5382c7486b87a51cce089094b40b9eb57addd80482055da8b"
+      },
+      {
+        "executable": "github_review_writes-23e03e434c6eef7d.exe",
+        "sha256": "52fc2ffb84b39ee8c40bd9a754a39f2e5dab9b1a67cae5c6baab42f53da527c4",
+        "exit_code": 0,
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.03,
+        "failed_tests": [],
+        "raw_log_sha256": "8fb87ab50f7a2a096b7fa0353a54f9a114ac355f10c75a63d78caf632377c8c6"
+      },
+      {
+        "executable": "github_writes-c4e43d33750781a7.exe",
+        "sha256": "ff325b0a96b3d17e98df726f747b3cf4486cbe5786a427f59986d68eab76561c",
+        "exit_code": 0,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.02,
+        "failed_tests": [],
+        "raw_log_sha256": "3a84107984ae75cbb586d3c1a1f17809184b61e65c8a58d6c2713ee27f5bb8e8"
+      },
+      {
+        "executable": "history-aebfa2f6c335da81.exe",
+        "sha256": "22fc3b5949e6991a238747dcf98a57fd6937e02768b021a31f5438c14eae7c00",
+        "exit_code": 0,
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 1.11,
+        "failed_tests": [],
+        "raw_log_sha256": "ebc3608ab6c2ade87688f564c249df6d18abe32e92e5af9bd79f68981eeca47b"
+      },
+      {
+        "executable": "history_monitor-39d2733ebacf7add.exe",
+        "sha256": "fb6b65714ef5be18c4dd9505954b68dc1d7c7621c002a3916bfd9efdcac7e21e",
+        "exit_code": 0,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.78,
+        "failed_tests": [],
+        "raw_log_sha256": "d292fdf14d96a63fd482d72eecab99dab0906cf897d1e1b1260eb8225a74651b"
+      },
+      {
+        "executable": "identity-aff3883a2bfa7481.exe",
+        "sha256": "827ba712b4f2b09af616cead00637b1003d65bfacfaad2d2312ec414ee12ed36",
+        "exit_code": 0,
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 1.93,
+        "failed_tests": [],
+        "raw_log_sha256": "ba0fb226fa0785d0d639513bcd1cb6d2952a73fc23a9fe017499d2319010f370"
+      },
+      {
+        "executable": "issue_downloads-15f743db92569beb.exe",
+        "sha256": "e060c0225479f286c9b49d8192fb33e3de9a27d77448ffb6b551124a04812cbc",
+        "exit_code": 0,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.78,
+        "failed_tests": [],
+        "raw_log_sha256": "5844eabd504284edf0c8cb6b640f097f23f080d132347c1acb61d03ea3d2c570"
+      },
+      {
+        "executable": "merges-9a8fef78ca6d87a8.exe",
+        "sha256": "c2147ff764b03bb99f3486344ee4ad5cb118c1a986363c90433da997ce846dcb",
+        "exit_code": 0,
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 1.61,
+        "failed_tests": [],
+        "raw_log_sha256": "c4ce40e55ca68f977ec7623ebeb9f947d8b5deec30657684bbac8045f8a7c7d3"
+      },
+      {
+        "executable": "notifications-b1965cbd087da146.exe",
+        "sha256": "7633d8a220ad908bb468d53925dab970327af5ea65918432c52311f7007635cd",
+        "exit_code": 0,
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.98,
+        "failed_tests": [],
+        "raw_log_sha256": "6e36c16b64c9232b91dac04d1790bef12d229a904339f12d78025947f3561468"
+      },
+      {
+        "executable": "pr-ede0b484083a25c5.exe",
+        "sha256": "727ff0481eb605c6afd052d2c6e971228f199c38605025d0d2caebdc377ff3c9",
+        "exit_code": 0,
+        "passed": 9,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 2.12,
+        "failed_tests": [],
+        "raw_log_sha256": "16987f383b11c1f4b458900ff35a503d2827889965da729af7e32ec937e37218"
+      },
+      {
+        "executable": "reader-84ee2c21592db6ed.exe",
+        "sha256": "2a25c45d81db6eb2d053f951450f764e291288b73a44e643ea4c8b72624a4d2b",
+        "exit_code": 0,
+        "passed": 11,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 55.96,
+        "failed_tests": [],
+        "raw_log_sha256": "633b2a9e493124e7ff659a45c930d74ee8597605335e063e3d26d4d95e8413cd"
+      },
+      {
+        "executable": "resources-02b077ad5e973572.exe",
+        "sha256": "ee26b190f0974266b72c161a00e7cb6345e1c224eb8d708fc54d0cfdd84ef6cd",
+        "exit_code": 0,
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 1.04,
+        "failed_tests": [],
+        "raw_log_sha256": "0fb6fcf934d47871a536d9b777d83887ac3b905ad74b8cb595ab6790a34e1aba"
+      },
+      {
+        "executable": "reviews-afa933d7336c0786.exe",
+        "sha256": "a1ef5f27abfcc64cb4e93cf4ac8dd72dfd479959b85fff1fbea22a6583fd0d84",
+        "exit_code": 0,
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 1.51,
+        "failed_tests": [],
+        "raw_log_sha256": "35befef9686d4788dd023e7f2811990af458ee273525d414c9133861fa60ccdf"
+      },
+      {
+        "executable": "sync-79a76ddcb44649ae.exe",
+        "sha256": "dbc7011857fdbfc88960698e6a34be20b95db913bb3e17f3bda885d1beb9ec01",
+        "exit_code": 0,
+        "passed": 13,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 2.9,
+        "failed_tests": [],
+        "raw_log_sha256": "e2335af118aa96efc9910b955a368de0db9a8223ac1cf77a2d3843358bad9bed"
+      },
+      {
+        "executable": "threadline-9720e395cc6767bf.exe",
+        "sha256": "d8b8ba94a4904a574b5af80cbdfa4d01f12b2627c0653f9c92591a5a0a36e60d",
+        "exit_code": 0,
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.61,
+        "failed_tests": [],
+        "raw_log_sha256": "418d4f888f2c737fb8388a679abe7a25db3a731928efc77e7c1f4ec5b52ce9a6"
+      },
+      {
+        "executable": "threadline_app-8f3782b0a7b9d1f1.exe",
+        "sha256": "7cd2beae05d7a9a550bc3cae5d4f52fa5c86719aad370281c8b5b51290d9868f",
+        "exit_code": 0,
+        "passed": 75,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 325.56,
+        "failed_tests": [],
+        "raw_log_sha256": "99e75b642f7c95fd9ecc20ce804b83f4e8644d832f500a756b47e83907938312"
+      },
+      {
+        "executable": "threadline_core-b41efcea136d4807.exe",
+        "sha256": "e355caa4508837103a8a232d4f5aab9e7f7ac736a29342b2ec02cee8af85dd44",
+        "exit_code": 0,
+        "passed": 19,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.02,
+        "failed_tests": [],
+        "raw_log_sha256": "8b4cb2c8b851b2863fa955dee0faade229bc51068591b02eef9b99926d46890b"
+      },
+      {
+        "executable": "threadline_installer-a5f0bf3910f3ad96.exe",
+        "sha256": "904632743e8f1ca929cee7844fb08827941d7bd048b2cb0f70df94ba0fab1c83",
+        "exit_code": 0,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.11,
+        "failed_tests": [],
+        "raw_log_sha256": "9fe036fcfcf207f3a56c1805223aa71701d3e0dd5b5de80704ab7a238845ceb8"
+      },
+      {
+        "executable": "threadline_installer-df285c4ad8a79f07.exe",
+        "sha256": "41d5c007c617cd1dc533213806fad51bf4f3b75cb3a0fb5db4ab709f5665e2af",
+        "exit_code": 0,
+        "passed": 4,
+        "failed": 0,
+        "ignored": 1,
+        "seconds": 1.33,
+        "failed_tests": [],
+        "raw_log_sha256": "577e887e1fb00853522f48f12ccd0d7a329bf6e02309698334cf36413ed15ae7"
+      },
+      {
+        "executable": "threadline_platform-9d8f8df79deaf9f3.exe",
+        "sha256": "144b51feef51f48d44a4d70d00a33d61b21575ac14c09386e6ec5fc63ea24c8c",
+        "exit_code": 0,
+        "passed": 9,
+        "failed": 0,
+        "ignored": 2,
+        "seconds": 0.02,
+        "failed_tests": [],
+        "raw_log_sha256": "a77953dcf2879adf7d136da03b9438398020f51200c5512ac06acc8a0fc234c7"
+      },
+      {
+        "executable": "threadline_storage-02e9d249567f1630.exe",
+        "sha256": "61701622f354b0f03b4c8f09c2e6cf7000d35c2d7983623b428cf857cd05ac20",
+        "exit_code": 0,
+        "passed": 18,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 2.08,
+        "failed_tests": [],
+        "raw_log_sha256": "3391da4b7cf39857703309ffc12275d558685bb72a29eb844c1c82d8216ff4f0"
+      },
+      {
+        "executable": "writes-48d204f9b461499c.exe",
+        "sha256": "9991142bbd74d42cdd5706984fc458d8bfd79c00ac8304b184e1588fa51bffa5",
+        "exit_code": 0,
+        "passed": 13,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 3.25,
+        "failed_tests": [],
+        "raw_log_sha256": "6604e67a1fdbe301ce1ace373fd283d5c90a29ea2f5cb33ec62dd5c234236421"
+      },
+      {
+        "executable": "xtask-3c9f62fddad76bc7.exe",
+        "sha256": "fab3a93dafdf74896ff2f77e4e38d4c4dacef79acd115e9e5e9be4b49d90d2c9",
+        "exit_code": 0,
+        "passed": 79,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 5.36,
+        "failed_tests": [],
+        "raw_log_sha256": "65879dc399a96901df925028da1bcb805d565c4ad1369bad9c45ec1f78f8114e"
+      }
+    ]
+  }
+}

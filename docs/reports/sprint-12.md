@@ -125,6 +125,8 @@ In Threadline, the Windows AccessKit provider sends an accessibility action to G
 
 ## Local regression suites
 
+At `2870642`, all 33 native Windows x64 test executables exited 0. They passed 343 tests with three ignored by default. The two opt-in checks covering synthetic protected credentials also passed. Linux passed 155 unit, 159 integration and 30 UI test executions across 23, 36 and 9 named cases respectively. Formatting and strict Clippy passed, including Clippy for the Windows target. [Exact executables, case results and log hashes](evidence/sprint-12/validation-2870642.json)
+
 The build 15 source `c8f2412` passed 148 unit tests across 23 cases, 155 integration tests across 36 cases and 27 UI tests across nine cases on Linux. All 33 test executables exited 0 on Windows 11, with 333 passes and three ignored in the default runs. Both opt-in credential checks passed separately. The Windows GPUI run included the sidebar paint tests at three modeled scales. Formatting and E2E-enabled strict Clippy passed. The ordinary release build emitted one warning about a History field used only for observation. Revision `cbcffed` removed that duplication. [Numeric exits, test counts and binary identities](evidence/sprint-12/validation-c8f2412.json)
 
 The selected build 14 revision passed 138 unit tests across 23 cases, 152 integration tests across 36 cases and 21 UI tests across nine cases on Linux. Formatting and strict Linux and Windows-target Clippy checks passed. On Windows 11 x64 all 32 native test executables exited 0, with 312 passes and three ignored entries. Both explicit generated-credential tests passed separately. [Clean `1668ccc` results, binary hashes and numeric exits](evidence/sprint-12/validation-1668ccc.json)
@@ -160,6 +162,12 @@ The earlier Windows run on `3dc5b64` recorded 238 passes, two failures and two i
 A separate Windows test delivered modeled suspend and resume messages to its own hidden platform window. The broker emitted one normal resume event. Physical sleep still needs target evidence. [Native resume receipt](evidence/sprint-12/local-suite-validation.json)
 
 ## Full native Windows suite
+
+### First full suite with installed local build 16
+
+The first full Windows run on clean `2870642` recorded 12 passes, eight blocked cases and one failure at 96 DPI. The installed app delivered 37 fixture events as one group, then the foreground guard stopped the physical cold-activation check. Feed fallback and offline installed-runtime inspection passed. [Individual outcomes, installed executable and driver hashes](evidence/sprint-12/full-native-2870642-installed16.json)
+
+The large-workspace case failed its 2,000 ms warm-start budget at 24,254.58 ms. Across 20 samples per action, external p95 was 2,125.60 ms for opening a cached item, 2,105.68 ms for search and 2,090.56 ms for switching tabs. The respective limits were 100, 200 and 100 ms. The application finished constructing at 141.20 ms and entered its startup callback at 10,851.74 ms. The recorded interval includes toolkit initialization. No individual display or graphics call was timed. Idle redraw, memory and the 11,147,864-byte setup met their limits. [Action samples and startup milestones](evidence/sprint-12/full-native-2870642-installed16.json)
 
 ### Full suite with installed local build 15
 
