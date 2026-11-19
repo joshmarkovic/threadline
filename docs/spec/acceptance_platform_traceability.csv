@@ -44,22 +44,22 @@ AC-14,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-15,windows,07,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Existing-issue writes, cancellation, recovery and scoped LIVE-002. docs/reports/sprint-07.md"
 AC-15,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-15,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-16,windows,08,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-16,windows,08,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,E2E-007 submitted one restored inline note. Windows SQLite retained multiple multiline anchors across restart. A native multisubmission is open. ../reports/sprint-08.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-16,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-16,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-17,windows,08,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-17,windows,08,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,E2E-007 retained the original draft when a changed head held approval. Windows SQLite verified both immutable and explicitly changed anchors. ../reports/sprint-08.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-17,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-17,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-18,windows,08,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-18,windows,08,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows IT-013 rejected the wrong reviewer and stale revision. E2E-007 submitted a comment and held approval on changed code. Successful approval and request-changes attribution remain open. ../reports/sprint-08.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-18,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-18,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-19,windows,09,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-19,windows,09,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,E2E-009 submitted only the unchanged exact head and kept the second changed-head intent held without a PUT. ../reports/sprint-09.md
 AC-19,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-19,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-20,windows,09,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-20,windows,09,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows IT-014 retained an uncertain merge for exact readback without replay or false attribution. E2E-009 distinguished its queued intent from the authoritative merged display. ../reports/sprint-09.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-20,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-20,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-21,windows,08,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-21,windows,08,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows E2E-005 and E2E-008 exercised the split diff and immutable source anchors. Identical inline placement in both display modes remains open. ../reports/sprint-06.md ../reports/sprint-08.md
 AC-21,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-21,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-22,windows,06,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
@@ -77,49 +77,49 @@ AC-25,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-26,windows,10,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,E2E-011 proved labeled second-parent and exact two-commit comparisons. Core and SQLite separately verified PR merge-base semantics. A native comparison of all three labels remains open. docs/reports/sprint-10.md
 AC-26,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-26,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-27,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-27,windows,11,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows verified bounded issue-comment feed updates and local notification policy separately. The end-to-end alert for a newly commented unopened item remains open. ../reports/sprint-05.md ../reports/sprint-11.md
 AC-27,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-27,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-28,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-28,windows,11,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows IT-018 suppressed initial historical inline activity in SQLite. A fresh old-PR download through the native reader remains open. ../reports/sprint-11.md
 AC-28,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-28,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-29,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-29,windows,11,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows UI-007 edited per-actor rules and repository overrides. Windows UT-014 verified actor precedence. Native bot suppression with human replies and retained PR content remains open. ../reports/sprint-11.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-29,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-29,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-30,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-30,windows,11,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Windows UT-014 exercised category, actor and mention precedence. Windows IT-018 rechecked snooze and quiet rules before delivery. E2E-013 checked persisted quiet routing. ../reports/sprint-11.md"
 AC-30,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-30,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-31,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-31,windows,11,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows IT-018 grouped correlated review activity and suppressed a repeat after restart. A native grouped review banner remains open. ../reports/sprint-11.md
 AC-31,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-31,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-32,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-32,windows,11,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows IT-018 verified durable offline catch-up grouping. A native long-offline reconnect with a visible grouped delivery remains open. ../reports/sprint-11.md
 AC-32,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-32,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-33,windows,11,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Sprint 01 verified a warm shell activation into PR 72. Installed local build 10 verified cold and warm registered callbacks into cached issue 42. The cold shell click remains blocked. ../reports/evidence/sprint-11/registered-callback.json
 AC-33,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-33,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-34,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-34,windows,11,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows IT-018 recorded one delivery for an inline comment with a direct mention across overlapping observations. ../reports/sprint-11.md
 AC-34,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-34,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-35,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/evidence/windows-virtualized-measure/measurements.json. The Windows 11 cross-build exceeded the scroll budget. ../reports/evidence/windows-hosted-replay/measurements.json. The hosted Windows Server release build also exceeded the scroll budget. The canonical Windows 11 release-build benchmark at 144 DPI exceeded 20 ms on both surfaces. ../reports/evidence/windows-11-release/native-gui-measurements.json
+AC-35,windows,12,12,yes,Fail,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows cached open/search/tab p95 and warm useful-workspace startup exceeded their budgets. Concurrent backlog and complete GPU evidence remain open. Earlier scrolling failures remain recorded under the accepted phase decision. ../reports/sprint-12.md ../reports/evidence/windows-11-release/native-gui-measurements.json
 AC-35,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-35,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-36,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-36,windows,12,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Local packages installed and launched the normal native app. Separate Windows login and installed callback fixtures passed. The exact clean release package journey remains open. ../reports/sprint-12.md ../reports/sprint-03.md ../reports/sprint-11.md
 AC-36,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-36,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-37,windows,12,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,E2E-020 passed on the installed local package. Exact published artifact verification is pending. ../reports/evidence/sprint-12/installed-runtime.json
 AC-37,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-37,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-38,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-38,windows,12,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Owned Windows InvokePattern passed in E2E-015 before foreground input was blocked at 96 DPI. Earlier 144-DPI native keyboard and clipboard and independent draft restart are recorded. The combined native input, Unicode and signed manual checks remain open. ../reports/evidence/sprint-12/windows-traceability.json ../reports/sprint-01.md ../reports/sprint-04.md"
 AC-38,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-38,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-39,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-39,windows,11,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows app tests fetched only selected monitored refs. Native configured grouped delivery and baseline suppression for branch commits remain open. ../reports/sprint-10.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-39,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-39,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-40,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-40,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-40,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-41,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-41,windows,11,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Windows UT-014 exercised direct-mention precedence, and E2E-013 checked quiet routing. The full native desktop scenario remains open. ../reports/sprint-11.md"
 AC-41,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-41,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-42,windows,04,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows restored two populated panes. UI-002 exercises independent tabs and draft ownership. docs/reports/sprint-04.md
@@ -131,19 +131,19 @@ AC-43,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-44,windows,06,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
 AC-44,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-44,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-45,windows,09,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-45,windows,09,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Windows native editor, review and merge cases and GPUI UI-002/004/005 covered stable targets and shared drafts. The immediate focus-change sequence for all three action kinds remains open. ../reports/sprint-04.md ../reports/sprint-07.md ../reports/sprint-08.md ../reports/sprint-09.md ../reports/evidence/sprint-12/windows-traceability.json"
 AC-45,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-45,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-46,windows,04,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"E2E-003 restored the same reader item, two panes, 20 tabs and the exact draft in a fresh process while signed out and offline. docs/reports/evidence/sprint-04/windows-cached-restart.json"
 AC-46,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-46,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-47,windows,11,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-47,windows,11,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Windows E2E-010 verified profile isolation. Windows UI-007 navigated to an exact downloaded comment, and the installed fixture preserved an unrelated draft on notification Open. Combined search/activation with concurrent editable panes remains open. ../reports/sprint-09.md ../reports/sprint-11.md ../reports/evidence/sprint-12/windows-traceability.json"
 AC-47,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-47,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-48,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-48,windows,12,12,yes,Fail,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows preserved the two-pane twenty-tab layout and a surviving shared fetch subscriber. The measured native tab-switch p95 exceeded budget. The concurrent backlog run remains open. ../reports/sprint-12.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-48,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-48,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-49,windows,04,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,UI-008 exercises keyboard controls and editor identity. Full external focus/accessibility evidence remains open. docs/reports/sprint-04.md
+AC-49,windows,04,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows UI-008 covered keyboard pane and editor commands. E2E-015 invoked an owned accessible control before the foreground guard stopped external keyboard input. ../reports/evidence/sprint-12/windows-traceability.json ../reports/sprint-04.md
 AC-49,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-49,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-50,windows,02,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"../reports/sprint-02.md Shared namespace, distinct provider IDs, concurrent ingestion and verified transfers in actual SQLite."
@@ -155,7 +155,7 @@ AC-51,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-52,windows,06,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
 AC-52,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-52,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-53,windows,09,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-53,windows,09,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows IT-003 verified deduplicated comment indexing. E2E-019 exercised native existing-issue commands and ordinary comments. The complete mixed issue/PR anchor and search scenario remains open. ../reports/sprint-07.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-53,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-53,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-54,windows,05,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Real loopback and SQLite tests find older changed issues and comments through bounded update feeds. Both native repository feeds returned HTTP 200. docs/reports/sprint-05.md
@@ -164,61 +164,61 @@ AC-54,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-55,windows,02,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"../reports/sprint-02.md Shared namespace, distinct provider IDs, concurrent ingestion and verified transfers in actual SQLite."
 AC-55,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-55,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-56,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-56,windows,12,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Installed offline workspace and local native reader, PR, history, and activity journeys exercised separate cached surfaces. The complete all-resource cold start remains open. ../reports/sprint-12.md ../reports/sprint-04.md ../reports/sprint-08.md ../reports/sprint-10.md ../reports/sprint-11.md"
 AC-56,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-56,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-57,windows,05,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Native Check now distinguished HTTP 503 and HTTP 429 from transport loss. Core tests covered stale and cancelled responses. Actual sleep and network changes stay open. docs/reports/sprint-05.md
 AC-57,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-57,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-58,windows,07,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-58,windows,07,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,E2E-006 restored both queued operations and dispatched one comment after reconnect. The native issue edit was cancelled. SQLite checked confirmed issue field updates separately. ../reports/sprint-07.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-58,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-58,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-59,windows,07,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-59,windows,07,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,E2E-006 restored a separate unsubmitted draft and resumed only the eligible submitted comment. Windows IT-008 verified duplicate editors reused the same queued operation. ../reports/sprint-07.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-59,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-59,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-60,windows,07,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-60,windows,07,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,E2E-006 preserved two queued originals on restart and cancelled the issue edit with no dispatch. Windows IT-010 resolved a cancel/send race with one durable winner. ../reports/sprint-07.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-60,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-60,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-61,windows,07,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-61,windows,07,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,E2E-006 retained an uncertain outcome after response loss and cancellation. Windows IT-009 reconciled a proven accepted identity and prevented replay. ../reports/sprint-07.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-61,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-61,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-62,windows,09,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Existing-issue writes, cancellation, recovery and scoped LIVE-002. docs/reports/sprint-07.md"
 AC-62,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-62,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-63,windows,08,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-63,windows,08,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Native IT-011 covered durable review predecessor receipts, cancellation holds and ordered comment edits. Loopback review verified exact dispatch and lost response. The complete review/thread plus edit fault sequence remains open. ../reports/sprint-08.md ../reports/evidence/sprint-12/windows-traceability.json"
 AC-63,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-63,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-64,windows,07,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Existing-issue writes, cancellation, recovery and scoped LIVE-002. docs/reports/sprint-07.md"
 AC-64,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-64,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-65,windows,08,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-65,windows,08,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,E2E-007 restored and submitted an unchanged inline review and held changed-head approval. Windows IT-013 exercised thread scope. Native request-changes and queued thread journeys remain open. ../reports/sprint-08.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-65,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-65,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-66,windows,09,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-66,windows,09,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,E2E-009 confirmed a revalidated offline merge and held a changed head. Windows IT-014 verified unknown outcome and the required-queue hold. Native cancelled merge and full policy trace remain open. ../reports/sprint-09.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-66,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-66,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-67,windows,09,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Existing-issue writes, cancellation, recovery and scoped LIVE-002. docs/reports/sprint-07.md"
+AC-67,windows,09,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,E2E-010 rejected another user and isolated original submitted work through sign-out and credential renewal. Repository deselection for each action kind remains open. ../reports/sprint-09.md
 AC-67,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-67,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-68,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-68,windows,12,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Native Windows SQLite covered stale backup, cancellation, dependency recovery and disk exhaustion. Local setup and E2E-010 retained representative profile data. Combined mixed-data failure and recovery remain open. ../reports/sprint-07.md ../reports/sprint-09.md ../reports/sprint-12.md ../reports/evidence/sprint-12/windows-traceability.json"
 AC-68,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-68,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-69,windows,07,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Existing-issue writes, cancellation, recovery and scoped LIVE-002. docs/reports/sprint-07.md"
+AC-69,windows,07,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"E2E-013 verified quiet settings across restart, zero offline requests, paused writes, and one eligible write while reads stayed paused. Physical sleep and work-hours pacing remain open. ../reports/sprint-11.md ../reports/sprint-12.md"
 AC-69,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-69,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-70,windows,06,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
 AC-70,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-70,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-71,windows,09,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-71,windows,09,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Windows native cases displayed issue, comment, review and merge entries. SQLite verified page and inspect access. A single four-kind native inspection and parent/dependent cancellation remains open. ../reports/sprint-07.md ../reports/sprint-08.md ../reports/sprint-09.md ../reports/evidence/sprint-12/windows-traceability.json"
 AC-71,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-71,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-72,windows,09,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-72,windows,09,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,E2E-010 retained a private queued comment and rejected wrong-user renewal. The simulated token and separate Credential Manager result do not cover real PAT/SSO or every queued action kind. ../reports/sprint-09.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-72,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-72,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-73,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-73,windows,12,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"E2E-003/010/013 and the installed local workspace verified distinct parts of restore, no offline requests and separate durable preferences. One mixed profile retaining its protected credential across delayed startup and lifecycle boundaries remains open. ../reports/sprint-04.md ../reports/sprint-09.md ../reports/sprint-11.md ../reports/sprint-12.md ../reports/evidence/sprint-12/windows-traceability.json"
 AC-73,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-73,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-74,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-74,windows,12,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"E2E-010 exercised signed-out restart, wrong-user rejection and separate account boundaries with a queued comment. Credential Manager restart and cleanup passed separately. Combined private issue/review/merge and in-flight recovery remains open. ../reports/sprint-09.md ../reports/evidence/sprint-12/windows-traceability.json"
 AC-74,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-74,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-75,windows,06,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
@@ -227,22 +227,22 @@ AC-75,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-76,windows,06,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Revision-bound reader, independent PR resource coverage, source mapping and scoped references. Windows native E2E-005 stopped before the two-tab sequence. docs/reports/sprint-06.md"
 AC-76,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-76,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-77,windows,09,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-77,windows,09,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Native Windows merge tests exercised both required-queue holds and forbade automatic retargeting. The full external native error journey and request inventory remain open. ../reports/sprint-09.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-77,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-77,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-78,windows,08,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-78,windows,08,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"E2E-008 verified layout resize/collapse, issue/body switches, source anchor and offline draft. UI-004 covered selection across context changes. Independent scroll positions and the complete narrow/dual-pane restart matrix remain open. ../reports/sprint-08.md ../reports/evidence/sprint-12/windows-traceability.json"
 AC-78,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-78,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-79,windows,06,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Parser and scoped target checks passed in core and SQLite. E2E-005 verified a real fixture issue through the native reader. Additional reference conditions stay in the scenario matrix. docs/reports/sprint-06.md"
 AC-79,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-79,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-80,windows,06,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"E2E-005 passed two tabs with a delayed linked issue. Earlier storage tests cover body changes and scoped proofs. Other unavailable and offline states have separate coverage. docs/reports/sprint-06.md"
+AC-80,windows,06,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"E2E-005 verified the delayed response remained with the originating PR, restored verified issues and preserved the split diff. The full body-revision and failure matrix remains open. ../reports/sprint-06.md"
 AC-80,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-80,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-81,windows,09,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-81,windows,09,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows UT-018 and UI-005 verified known/partial counts and the merge Outbox badge. Multi-digit circular badge geometry and coverage styling need native visual review. ../reports/sprint-04.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-81,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-81,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-82,windows,07,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Existing-issue writes, cancellation, recovery and scoped LIVE-002. docs/reports/sprint-07.md"
+AC-82,windows,07,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"E2E-019 exercised Ctrl+N, inspected native controls and confirmed an ordinary comment with no create-issue request. Windows UI-006 inventoried existing-item commands. The complete PR creation exclusion and failure inventory remain open. ../reports/sprint-07.md ../reports/evidence/sprint-12/windows-traceability.json"
 AC-82,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-82,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-83,windows,01,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/sprint-01.md#hosted-build-and-core-tests
@@ -251,7 +251,7 @@ AC-83,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-84,windows,01,12,yes,Pass,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/evidence/windows-virtualized-e2e/native.json. Native Windows 11 workspace passed at 96 and 144 DPI. ../reports/evidence/windows-11-release/native.json. Hosted Windows Server passed at 96 and 144 DPI. ../reports/evidence/windows-hosted/e2e/result.json. ../reports/evidence/windows-hosted-high-dpi/native.json
 AC-84,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"../reports/evidence/macos-native-window/macos-window-probe.json. Early on-screen window and AppKit Quit passed. Full target input, focus, clipboard and splitter proof remains due."
 AC-84,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/evidence/linux-virtualized-e2e/native.json. Early instrumented smoke passed on isolated Debian Xvfb. Full Ubuntu GNOME desktop proof remains due.
-AC-85,windows,03,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-85,windows,03,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Windows Credential Manager stored and retrieved distinct synthetic keys across processes and cleaned them up. E2E-010 tested same-user repair against loopback separately. Actual unavailable/locked storage and Unicode paths remain open. ../reports/sprint-03.md ../reports/sprint-09.md ../reports/evidence/sprint-12/windows-traceability.json
 AC-85,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-85,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-86,windows,11,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Installed local build 10 verified native delivery and all four callback paths. The cold shell click and exact published package remain open. ../reports/evidence/sprint-11/registered-callback.json
@@ -269,30 +269,30 @@ AC-89,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implem
 AC-90,windows,03,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/sprint-02.md Real SQLite subset passed. Authenticated HTTP has its own Sprint 03 checks.
 AC-90,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-90,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-91,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-91,windows,12,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Windows native cases separately cover cached startup, search observations, linked PR context, drafts, offline queue and reconciliation, notification callback and restart. The combined end-to-end release journey remains open. ../reports/sprint-12.md"
 AC-91,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-91,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-92,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-92,windows,12,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Windows E2E-006 and native SQLite exercised response loss, cancellation race, dispatch recovery, disk exhaustion and stale revisions. A combined complete native fault journey remains open. ../reports/sprint-07.md ../reports/sprint-08.md ../reports/sprint-09.md ../reports/evidence/sprint-12/windows-traceability.json"
 AC-92,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-92,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-93,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
+AC-93,windows,12,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"The Windows ledger connects the recorded test, native and local setup results. Exact release, authorized provider and human signoff omissions remain explicit. ../reports/sprint-12.md"
 AC-93,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-93,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-94,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"../reports/sprint-12.md. Local per-user install, installed launch and tab activation passed. Published command check awaits publication."
+AC-94,windows,12,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Local per-user installation and launch passed. Publication is pending, so the exact clean-machine command cannot be exercised. ../reports/sprint-12.md"
 AC-94,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-94,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-95,windows,12,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"../reports/sprint-12.md. Wrong fixture publisher, tampered files and local downgrade refusals were exercised. Native development bootstrap accepted Microsoft-signed fixture bytes and rejected an unsigned setup and incorrect manifest pin. ../reports/evidence/sprint-12/bootstrap-windows.json"
 AC-95,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-95,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-96,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/sprint-12.md. Local repair and staged upgrade succeeded.
+AC-96,windows,12,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Local repair and staged upgrade retained nine ordered profile projections and rejected a running-app lock and staged-write failure. The fixture had no sync preferences and used only credential metadata. Full retained-state release recovery remains open. ../reports/sprint-12.md
 AC-96,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-96,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-97,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/sprint-12.md. The installed predecessor migrated the retained seeded schema to its successor.
+AC-97,windows,12,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,"Local staging faults, locked file, unsigned/tampered setup and incompatible downgrade had explicit failures. Real denied permission, interrupted download, wrong architecture and missing prerequisite remain separate checks. ../reports/sprint-12.md"
 AC-97,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-97,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-98,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/sprint-12.md. Local uninstall removed app integration and retained the database byte for byte.
+AC-98,windows,12,12,yes,Partial,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Local uninstall removed the app and registration and retained the exact database across reinstall. The separate explicit data and protected-credential cleanup journey remains open. ../reports/sprint-12.md
 AC-98,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-98,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
-AC-99,windows,12,12,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,../reports/sprint-12.md. Local packaging proof is available. Windows publication remains pending.
+AC-99,windows,12,12,yes,Blocked,Repeat with actual target evidence; earlier implementation owner remains unchanged.,Local packages and instructions were verified for the local lane. Publication was left pending by the user. ../reports/sprint-12.md
 AC-99,macos,13,13,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
 AC-99,linux,14,14,yes,Not run,Repeat with actual target evidence; earlier implementation owner remains unchanged.,
