@@ -71,6 +71,44 @@ pub enum ReviewIntent {
         resolved: bool,
     },
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SubmittedReview {
+    pub revision_id: i64,
+    pub head: crate::resources::CommitOid,
+    pub intent: ReviewIntent,
+}
+
+impl Store {
+    /// Read an immutable review submission even if its downloaded PR data was cleared.
+    pub fn submitted_review(
+        &self,
+        account: AccountId,
+        id: &str,
+    ) -> Result<Option<SubmittedReview>> {
+        self.read(|db| {
+            let revision_id = db
+                .query_row(
+                    "SELECT revision_id FROM review_intents WHERE account_id=? AND operation_id=?",
+                    params![account, id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            revision_id
+                .map(|revision_id| {
+                    let operation =
+                        queue::read_operation(db, account, id)?.ok_or(Error::Corrupt)?;
+                    Ok(SubmittedReview {
+                        revision_id,
+                        head: crate::resources::CommitOid::parse(&operation.snapshot.base)?,
+                        intent: decode(&operation.snapshot.payload)?,
+                    })
+                })
+                .transpose()
+        })
+    }
+}
+
 impl ReviewIntent {
     fn kind(&self) -> ActionKind {
         match self {

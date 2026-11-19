@@ -8,7 +8,10 @@ use gpui_kit::{
 };
 use std::num::NonZeroU64;
 use threadline_storage::{
+    merges::{MergeMethod, SubmittedMerge},
+    pr::SourceSide,
     queue::{ActionKind, Attempt, CancelResult, DraftSubmissionStatus, Operation, Receipt, State},
+    reviews::{ReviewEvent, ReviewIntent, SubmittedReview},
     writes::{IssueChanges, WriteConflict, WriteIntent},
 };
 
@@ -77,6 +80,9 @@ impl OutboxState {
 struct Inspection {
     operation: Operation,
     intent: Option<WriteIntent>,
+    review: Option<SubmittedReview>,
+    merge: Option<SubmittedMerge>,
+    pending_dependents: i64,
     attempts: Vec<Attempt>,
     receipts: Vec<Receipt>,
     conflict: Option<WriteConflict>,
@@ -93,9 +99,23 @@ impl Inspection {
             .into_iter()
             .find(|repository| repository.id == operation.original_repository)
             .map(|repository| format!("{}/{}", repository.owner, repository.name));
+        let review = match operation.kind {
+            ActionKind::Review | ActionKind::Reply | ActionKind::ResolveThread => {
+                store.submitted_review(account, id)?
+            }
+            _ => None,
+        };
+        let merge = if operation.kind == ActionKind::Merge {
+            store.submitted_merge(account, id)?
+        } else {
+            None
+        };
         Ok(Some(Self {
             operation,
             intent: store.write_intent(account, id)?,
+            review,
+            merge,
+            pending_dependents: store.pending_dependents_count(account, id)?,
             attempts: store.attempts(account, id)?,
             receipts: store.receipts(account, id)?,
             conflict: store.write_conflict(account, id)?,
@@ -512,7 +532,7 @@ impl ReaderWorkspace {
             .p_2()
             .border_1()
             .border_color(palette.border)
-            .child(div().text_sm().child(title))
+            .child(outbox_text("reader-outbox-target", title.clone(), title))
             .child(
                 div()
                     .text_sm()
@@ -531,11 +551,15 @@ impl ReaderWorkspace {
                     .child(format!("Submitted draft revision {revision}"))
             }))
             .children((!operation.dependencies.is_empty()).then(|| {
-                div()
-                    .text_sm()
-                    .child(format!("Depends on {}", operation.dependencies.join(", ")))
+                let summary = format!("Depends on {}", operation.dependencies.join(", "));
+                outbox_text("reader-outbox-dependencies", summary.clone(), summary)
+            }))
+            .children(dependent_impact(detail.pending_dependents).map(|impact| {
+                outbox_text("reader-outbox-dependent-impact", impact.clone(), impact)
             }))
             .children(detail.intent.as_ref().map(intent_element))
+            .children(detail.review.as_ref().map(review_intent_element))
+            .children(detail.merge.as_ref().map(merge_intent_element))
             .children(
                 detail
                     .conflict
@@ -801,6 +825,94 @@ fn intent_element(intent: &WriteIntent) -> impl Element {
     outbox_text("reader-outbox-intent", preview.replace('\n', ". "), preview)
 }
 
+fn dependent_impact(count: i64) -> Option<String> {
+    match count {
+        0 => None,
+        1 => Some("1 saved action needs this action to be confirmed before it can send.".into()),
+        _ => Some(format!(
+            "{count} saved actions need this action to be confirmed before they can send."
+        )),
+    }
+}
+
+fn review_intent_element(submission: &SubmittedReview) -> impl Element {
+    let mut lines = vec![format!(
+        "Original PR revision {} · Head {}",
+        submission.revision_id,
+        submission.head.as_str()
+    )];
+    match &submission.intent {
+        ReviewIntent::Review(review) => {
+            lines.push(
+                match review.event {
+                    ReviewEvent::Comment => "Comment review",
+                    ReviewEvent::Approve => "Approve",
+                    ReviewEvent::RequestChanges => "Request changes",
+                }
+                .into(),
+            );
+            if !review.summary.is_empty() {
+                lines.push(review.summary.clone());
+            }
+            for comment in &review.comments {
+                let anchor = &comment.anchor;
+                let side = match anchor.side {
+                    SourceSide::Left => "Left",
+                    SourceSide::Right => "Right",
+                };
+                let range = if anchor.first_line == anchor.last_line {
+                    format!("line {}", anchor.first_line)
+                } else {
+                    format!("lines {}–{}", anchor.first_line, anchor.last_line)
+                };
+                lines.push(format!(
+                    "{} · {side} {range} · Source {}",
+                    anchor.source_path, anchor.source_oid
+                ));
+                lines.push(comment.body.clone());
+            }
+        }
+        ReviewIntent::Reply {
+            thread_id,
+            root_comment_id,
+            body,
+        } => {
+            lines.push(format!(
+                "Reply to thread {thread_id} · Comment {root_comment_id}"
+            ));
+            lines.push(body.clone());
+        }
+        ReviewIntent::SetThreadResolved {
+            thread_id,
+            resolved,
+        } => {
+            let action = if *resolved { "Resolve" } else { "Reopen" };
+            lines.push(format!("{action} thread {thread_id}"));
+        }
+    }
+    outbox_text("reader-outbox-intent", lines.join(". "), lines.join("\n"))
+}
+
+fn merge_intent_element(submission: &SubmittedMerge) -> impl Element {
+    let method = match submission.method {
+        MergeMethod::Merge => "Merge commit",
+        MergeMethod::Squash => "Squash and merge",
+        MergeMethod::Rebase => "Rebase and merge",
+    };
+    let mut lines = vec![
+        method.to_owned(),
+        format!(
+            "Original PR revision {} · Head {}",
+            submission.revision_id,
+            submission.head.as_str()
+        ),
+    ];
+    if let Some(base) = &submission.base_ref {
+        lines.push(format!("Target branch {base}"));
+    }
+    outbox_text("reader-outbox-intent", lines.join(". "), lines.join("\n"))
+}
+
 fn conflict_value(id: &'static str, field: &str, value: &str) -> impl Element {
     let presentation = format!("{field} · {value}");
     outbox_text(id, presentation.clone(), presentation)
@@ -818,9 +930,70 @@ fn outbox_text(id: &'static str, label: String, text: String) -> impl Element {
 
 #[cfg(test)]
 mod tests {
-    use super::{DraftStatusLookup, conflict_value, intent_element};
+    use super::{
+        DraftStatusLookup, Inspection, conflict_value, dependent_impact, intent_element,
+        merge_intent_element, review_intent_element,
+    };
     use gpui_kit::{Element, Role, accesskit::Node};
-    use threadline_storage::writes::{FieldEdit, IssueChanges, WriteIntent};
+    use threadline_storage::{
+        Store,
+        fixtures::{LIFECYCLE_ACTIONS, populate_native_offline_outbox},
+        writes::{FieldEdit, IssueChanges, WriteIntent},
+    };
+
+    #[test]
+    fn mixed_outbox_inspection_publishes_saved_review_anchor_merge_method_and_cancel_impact() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = Store::open_profile(directory.path()).unwrap();
+        let fixture = populate_native_offline_outbox(
+            &store,
+            12345,
+            "0123456789abcdef0123456789abcdef",
+            1_700_000_050_000,
+            || Ok(()),
+        )
+        .unwrap();
+        let [parent, _, review, merge] = LIFECYCLE_ACTIONS;
+        store.clear_cache(fixture.account).unwrap();
+        store.cancel_operation(fixture.account, parent).unwrap();
+        let load = |id| {
+            Inspection::read(&store, fixture.account, id)
+                .unwrap()
+                .unwrap()
+        };
+        let review = load(review);
+        let merge = load(merge);
+        assert_eq!(
+            dependent_impact(load(parent).pending_dependents).as_deref(),
+            Some("3 saved actions need this action to be confirmed before they can send.")
+        );
+        assert_eq!(review.operation.dependencies, [parent]);
+        assert_eq!(merge.operation.dependencies, [parent]);
+        fn check(element: impl Element, head: &str, parts: &[&str]) {
+            let mut node = Node::new(element.a11y_role().unwrap());
+            element.write_a11y_info(&mut node);
+            assert_eq!(node.author_id(), Some("reader-outbox-intent"));
+            let name = node.label().unwrap();
+            assert!(name.contains(&format!("Head {head}")));
+            for part in parts {
+                assert!(name.contains(part), "Missing {part} in {name}");
+            }
+        }
+        check(
+            review_intent_element(review.review.as_ref().unwrap()),
+            fixture.head.as_str(),
+            &[
+                "Request changes",
+                "src/relay_00.rs · Right line 1",
+                "held inline note.",
+            ],
+        );
+        check(
+            merge_intent_element(merge.merge.as_ref().unwrap()),
+            fixture.head.as_str(),
+            &["Squash and merge", "Target branch main"],
+        );
+    }
 
     #[test]
     fn issue_conflict_nodes_publish_their_native_author_ids_and_names() {

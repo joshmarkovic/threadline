@@ -1668,7 +1668,11 @@ impl ReaderWorkspace {
                     cache.downloaded_summaries,cache.discussion_records,cache.content_bytes,cache.offline_pins))))
                 .children(self.repositories.iter().filter(|repo|repo.selected).map(|repo|div().text_sm().child(
                     format!("{}/{} · {} cached items · {} cached text bytes",repo.owner,repo.name,repo.cached_items,repo.cached_text_bytes))))
-                .child(div().text_sm().child("Clearing removes unpinned downloads from this account. Offline pins, drafts, saved tabs, and Outbox dependencies are retained."))
+                .child({
+                    let explanation = "Clearing removes unpinned downloads from this account. Offline pins, drafts, saved tabs, and Outbox dependencies are retained.";
+                    div().id("reader-storage-policy").accessibility_id("reader-storage-policy").role(Role::Group).text_sm()
+                        .aria_label(explanation).child(explanation)
+                })
                 .child(control("reader-clear-cache","Clear unpinned downloads")
                     .on_click(cx.listener(|this,_,window,cx|this.clean_downloads(window,cx))))
                 .into_any_element(),
@@ -1793,7 +1797,9 @@ impl Render for ReaderWorkspace {
             .children(self.status.map(|status| {
                 div()
                     .id("reader-status")
+                    .accessibility_id("reader-status")
                     .role(Role::Status)
+                    .aria_label(status)
                     .p_2()
                     .text_sm()
                     .child(status)

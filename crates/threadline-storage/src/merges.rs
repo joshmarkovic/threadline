@@ -114,6 +114,13 @@ pub struct MergeStatus {
     pub state: queue::State,
     pub reason: Option<String>,
 }
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SubmittedMerge {
+    pub revision_id: i64,
+    pub head: CommitOid,
+    pub method: MergeMethod,
+    pub base_ref: Option<String>,
+}
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MergeObservation {
     pub actor: NonZeroU64,
@@ -277,6 +284,33 @@ fn finish(tx: &Transaction<'_>, c: &Claim, state: &str, reason: &str, due: i64) 
 impl Store {
     pub fn merge_policy(&self, rev: &PrRevision) -> Result<Option<CachedMergePolicy>> {
         self.read(|db| cached(db, rev))
+    }
+
+    /// Read an immutable merge submission even if its downloaded PR data was cleared.
+    pub fn submitted_merge(&self, account: AccountId, id: &str) -> Result<Option<SubmittedMerge>> {
+        self.read(|db| {
+            let revision_id = db
+                .query_row(
+                    "SELECT revision_id FROM merge_intents WHERE account_id=? AND operation_id=?",
+                    params![account, id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            revision_id
+                .map(|revision_id| {
+                    let operation =
+                        queue::read_operation(db, account, id)?.ok_or(Error::Corrupt)?;
+                    let (method, base_ref) =
+                        decode::<StoredIntent>(&operation.snapshot.payload)?.parts();
+                    Ok(SubmittedMerge {
+                        revision_id,
+                        head: CommitOid::parse(&operation.snapshot.base)?,
+                        method,
+                        base_ref,
+                    })
+                })
+                .transpose()
+        })
     }
 
     pub fn merge_statuses(&self, account: AccountId, pr: ItemId) -> Result<Vec<MergeStatus>> {

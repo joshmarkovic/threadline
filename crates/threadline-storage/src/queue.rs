@@ -435,6 +435,20 @@ impl Store {
             Ok(q.query_map(params![account,id],|r|r.get(0))?.collect::<rusqlite::Result<_>>()?)
         })
     }
+    /// Count saved actions that still need confirmation of this prerequisite to send.
+    pub fn pending_dependents_count(&self, account: AccountId, id: &str) -> Result<i64> {
+        self.read(|db| {
+            Ok(db.query_row(
+                "SELECT count(*) FROM operation_dependencies d
+                 JOIN operations child ON child.account_id=d.account_id AND child.id=d.dependent
+                 JOIN operations parent ON parent.account_id=d.account_id AND parent.id=d.predecessor
+                 WHERE d.account_id=? AND d.predecessor=? AND parent.state<>'confirmed'
+                     AND child.state NOT IN ('confirmed','cancelled')",
+                params![account, id],
+                |row| row.get(0),
+            )?)
+        })
+    }
     pub fn projections(&self, account: AccountId, item: ItemId) -> Result<Vec<Projection>> {
         self.read(|db|{
             let mut q=db.prepare("SELECT id,state,projection FROM operations WHERE account_id=? AND item_id=? AND state NOT IN ('confirmed','cancelled') ORDER BY sequence")?;

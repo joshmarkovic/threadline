@@ -19,6 +19,7 @@ use crate::{
 use std::num::NonZeroU64;
 
 pub const LIFECYCLE_REVISION: &str = "s12-native-lifecycle-v2";
+pub const OFFLINE_OUTBOX_REVISION: &str = "s12-offline-mixed-outbox-v1";
 pub const LIFECYCLE_ALT_USER: u64 = 42;
 pub const LIFECYCLE_EVENT: &str = "lifecycle-delivered-once";
 pub const LIFECYCLE_COMMENT: &str = "Threadline lifecycle submitted comment.";
@@ -115,6 +116,27 @@ pub fn populate_native_lifecycle(
     seed: u64,
     credential_key: &str,
     now: i64,
+    install_credential: impl FnOnce() -> Result<()>,
+) -> Result<Fixture> {
+    populate_lifecycle(store, seed, credential_key, now, false, install_credential)
+}
+
+pub fn populate_native_offline_outbox(
+    store: &Store,
+    seed: u64,
+    credential_key: &str,
+    now: i64,
+    install_credential: impl FnOnce() -> Result<()>,
+) -> Result<Fixture> {
+    populate_lifecycle(store, seed, credential_key, now, true, install_credential)
+}
+
+fn populate_lifecycle(
+    store: &Store,
+    seed: u64,
+    credential_key: &str,
+    now: i64,
+    inspect_inline_submission: bool,
     install_credential: impl FnOnce() -> Result<()>,
 ) -> Result<Fixture> {
     if credential_key.len() != 32 || !credential_key.bytes().all(|byte| byte.is_ascii_hexdigit()) {
@@ -302,10 +324,10 @@ pub fn populate_native_lifecycle(
         diff_mode: PrDiffMode::Split,
         selected_path: Some(anchor.path.clone()),
         code_anchor: Some(crate::pr::ReviewAnchor {
-            path: anchor.path,
+            path: anchor.path.clone(),
             side: anchor.side,
             line: 3,
-            original_oid: anchor.source_oid,
+            original_oid: anchor.source_oid.clone(),
         }),
         ..PrTabView::default()
     });
@@ -342,6 +364,15 @@ pub fn populate_native_lifecycle(
             },
         )?;
     }
+    let comments = if inspect_inline_submission {
+        vec![DraftInline {
+            key: "lifecycle-submitted-line".into(),
+            body: "Threadline lifecycle held inline note.".into(),
+            anchor,
+        }]
+    } else {
+        Vec::new()
+    };
     store.submit_review(
         &rev,
         ReviewSubmission {
@@ -349,7 +380,7 @@ pub fn populate_native_lifecycle(
             intent: &ReviewIntent::Review(ReviewDraft {
                 event: ReviewEvent::RequestChanges,
                 summary: "Threadline lifecycle held review.".into(),
-                comments: Vec::new(),
+                comments,
             }),
             draft: None,
             dependencies: &LIFECYCLE_ACTIONS[0..1],
@@ -410,6 +441,9 @@ pub fn populate_native_lifecycle(
     )?;
     store.update_sync_settings(account, |settings| settings.controls.work_offline = true)?;
     let mut seeded = fixture;
+    if inspect_inline_submission {
+        seeded.revision = OFFLINE_OUTBOX_REVISION;
+    }
     seeded.outbox_count = LIFECYCLE_ACTIONS.len();
     seeded.typed_outbox_count = LIFECYCLE_ACTIONS.len();
     Ok(seeded)
@@ -565,6 +599,7 @@ pub fn lifecycle_checkpoint(store: &Store, stage: &str) -> Result<serde_json::Va
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::queue;
 
     #[test]
     fn native_lifecycle_fixture_has_mixed_durable_work_and_one_delivered_event() {
@@ -590,5 +625,95 @@ mod tests {
             serde_json::json!(["Queued", "Queued", "Queued", "Queued"])
         );
         assert!(populate_native_lifecycle(&store, 12345, key, FIXTURE_TIME_MS, || Ok(())).is_err());
+    }
+
+    #[test]
+    fn offline_cache_clear_preserves_inspectable_intents_and_the_cancelled_prerequisite() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = Store::open_profile(directory.path()).unwrap();
+        let fixture = populate_native_offline_outbox(
+            &store,
+            12345,
+            "0123456789abcdef0123456789abcdef",
+            FIXTURE_TIME_MS + 50_000,
+            || Ok(()),
+        )
+        .unwrap();
+        let account = fixture.account;
+        let [parent, issue, review, merge] = LIFECYCLE_ACTIONS;
+        let saved_review = store.submitted_review(account, review).unwrap().unwrap();
+        let ReviewIntent::Review(payload) = &saved_review.intent else {
+            panic!("Expected the exact anchored review");
+        };
+        assert_eq!(payload.event, ReviewEvent::RequestChanges);
+        assert_eq!(payload.comments[0].anchor.source_path, "src/relay_00.rs");
+        assert_eq!(payload.comments[0].anchor.first_line, 1);
+        assert_eq!(saved_review.head, fixture.head);
+        let saved_merge = store.submitted_merge(account, merge).unwrap().unwrap();
+        assert_eq!(saved_merge.method, MergeMethod::Squash);
+        assert_eq!(saved_merge.head, fixture.head);
+        let draft_id = review_draft_id(fixture.reviewed_pr);
+        let unsent_review = store.review_draft(account, &draft_id).unwrap().unwrap();
+        assert_ne!(
+            unsent_review.draft.comments[0].body,
+            payload.comments[0].body
+        );
+        assert_eq!(store.pending_dependents_count(account, parent).unwrap(), 3);
+        let alternate = store
+            .ensure_account("github.com", LIFECYCLE_ALT_USER)
+            .unwrap();
+        assert!(store.submitted_review(alternate, review).unwrap().is_none());
+        assert!(store.submitted_merge(alternate, merge).unwrap().is_none());
+        assert_eq!(
+            store.pending_dependents_count(alternate, parent).unwrap(),
+            0
+        );
+
+        store.clear_cache(account).unwrap();
+        assert!(
+            store
+                .discussion_page(account, fixture.long_discussion, None, 10)
+                .unwrap()
+                .records
+                .is_empty()
+        );
+        assert_eq!(
+            store.cancel_operation(account, parent).unwrap(),
+            queue::CancelResult::Cancelled
+        );
+        drop(store);
+
+        let reopened = Store::open_profile(directory.path()).unwrap();
+        assert_eq!(
+            reopened.pending_dependents_count(account, parent).unwrap(),
+            3
+        );
+        assert_eq!(
+            reopened.review_draft(account, &draft_id).unwrap(),
+            Some(unsent_review)
+        );
+        assert_eq!(
+            reopened.submitted_review(account, review).unwrap(),
+            Some(saved_review)
+        );
+        assert_eq!(
+            reopened.submitted_merge(account, merge).unwrap(),
+            Some(saved_merge)
+        );
+        assert!(matches!(
+            reopened.write_intent(account, issue).unwrap(),
+            Some(WriteIntent::EditIssue(_))
+        ));
+        assert_eq!(
+            reopened.write_intent(account, parent).unwrap(),
+            Some(WriteIntent::CreateComment {
+                body: LIFECYCLE_COMMENT.into()
+            })
+        );
+        for id in [issue, review, merge] {
+            let child = reopened.operation(account, id).unwrap().unwrap();
+            assert_eq!(child.state, queue::State::Queued);
+            assert_eq!(child.dependencies, [parent]);
+        }
     }
 }
