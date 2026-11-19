@@ -196,6 +196,12 @@ function Invoke-SharedPrPanesProof([IntPtr]$Window) {
     Wait-For 'open the same downloaded pull request beside its original view' {
         Invoke-OwnedFixtureControl $Window 'reader-duplicate-tab' $null 'Duplicate view beside'
     }
+    $null = Wait-Reader 'the duplicate added a second pane to the layout' {
+        param($reader) $reader.pane_count -eq 2 -and ($reader.tab_counts -join ',') -ceq '1,1'
+    }
+    Wait-For 'restore both panes after entering the review in a maximized pane' {
+        Invoke-OwnedFixtureControl $Window 'reader-maximize-pane' $null 'Restore panes'
+    }
     $null = Wait-SharedPrPanes 'two distinct pane tabs displaying the same immutable pull request' $item {
         param($left, $right) $left.view.review_draft.id -ceq $draft -and $right.view.review_draft.id -ceq $draft
     }
@@ -211,7 +217,7 @@ function Invoke-SharedPrPanesProof([IntPtr]$Window) {
         param($left, $right, $reader)
         $left.view.section -ceq 'Conversation' -and $right.view.section -ceq 'Conversation' -and
             $left.provider_draft -eq $false -and $right.provider_draft -eq $false -and
-            $left.review_rows -eq 0 -and $right.review_rows -eq 0 -and
+            [int]$left.review_rows -eq 0 -and [int]$right.review_rows -eq 0 -and
             $left.review_coverage -cne 'Complete' -and $right.review_coverage -cne 'Complete' -and $reader.pending_pr_reads -eq 0
     }
     $tabs = @($baseline.cached_reader.shared_pr_panes.tab)
@@ -230,7 +236,7 @@ function Invoke-SharedPrPanesProof([IntPtr]$Window) {
             $left.tab -ceq $tabs[0] -and $right.tab -ceq $tabs[1] -and $left.view.revision_id -eq $revision -and
                 $left.view.section -ceq 'Conversation' -and $right.view.section -ceq 'Files' -and
                 $right.view.selected_file -ceq $path -and $right.view.diff_mode -ceq 'Split' -and
-                $left.review_rows -eq 0 -and $reader.pending_pr_reads -eq 1
+                [int]$left.review_rows -eq 0 -and $reader.pending_pr_reads -eq 1
         }
     } finally {
         Set-AccessPhase 'pr-shared-release'
