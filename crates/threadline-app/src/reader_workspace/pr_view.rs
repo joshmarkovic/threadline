@@ -1676,7 +1676,10 @@ impl ReaderWorkspace {
                 self.edit_pr_tab(tab, |view| view.context_collapsed = collapsed, window, cx)
             }
             Command::Surface(surface) => {
-                self.edit_pr_tab(tab, |view| view.narrow_surface = surface, window, cx)
+                self.edit_pr_tab(tab, |view| view.narrow_surface = surface, window, cx);
+                if surface == NarrowSurface::Code {
+                    self.restore_pr_line_selection(tab, cx);
+                }
             }
             Command::Resize(delta) => self.resize_pr_context(tab, delta, window, cx),
             Command::File(path) => self.edit_pr_tab(
@@ -1800,16 +1803,7 @@ impl ReaderWorkspace {
             .flat_map(|pane| &pane.tabs)
             .find(|saved| saved.id == tab.id && saved.item == tab.item)?;
         let anchor = saved.view.pr_reader.as_ref()?.code_anchor.as_ref()?;
-        if anchor.path != path {
-            return None;
-        }
-        let (side, oid) = match anchor.side {
-            SourceSide::Left => (DiffSide::Original, revision.merge_base.as_ref()),
-            SourceSide::Right => (DiffSide::Modified, Some(&revision.head)),
-        };
-        let line = anchor.line as usize;
-        oid.filter(|oid| oid.as_str() == anchor.original_oid)
-            .map(|_| DiffLineRange::new(anchor.path.clone(), side, line, line))
+        source_selection(anchor, path, revision)
     }
 
     fn resize_pr_context(

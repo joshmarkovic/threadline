@@ -181,6 +181,7 @@ impl ReaderWorkspace {
         };
         if self.layout.focused_pane == pane && self.layout.panes[pane].active == Some(tab) {
             self.focus[pane].focus(window, cx);
+            self.restore_pr_line_selection(&self.layout.panes[pane].tabs[tab], cx);
             return;
         }
         self.capture_scroll();
@@ -188,6 +189,7 @@ impl ReaderWorkspace {
         layout.focused_pane = pane;
         layout.panes[pane].active = Some(tab);
         let target = layout.panes[pane].tabs[tab].clone();
+        self.restore_pr_line_selection(&target, cx);
         self.save_layout_with_tab(layout, Some(target), true, None, window, cx);
         self.focus[pane].focus(window, cx);
     }

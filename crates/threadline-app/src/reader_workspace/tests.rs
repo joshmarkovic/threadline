@@ -2079,14 +2079,19 @@ fn default_shared_pr_panes_keep_conversation_and_cached_thread_actions_reachable
 fn ui_001_pr_context_changes_keep_the_immutable_native_diff_and_each_tabs_state(
     cx: &mut TestAppContext,
 ) {
-    exercise_pr_context(cx, false);
+    exercise_pr_context(cx, PrContextJourney::Browse);
 }
 
 #[gpui_kit::test]
 fn ui_004_anchored_review_draft_survives_pr_context_changes_and_queues_the_original_head(
     cx: &mut TestAppContext,
 ) {
-    exercise_pr_context(cx, true);
+    exercise_pr_context(cx, PrContextJourney::Submit);
+}
+
+#[gpui_kit::test]
+fn ui_004_narrow_pr_layout_restores_context_positions_and_original_review(cx: &mut TestAppContext) {
+    exercise_pr_context(cx, PrContextJourney::RestoreLayout);
 }
 
 #[gpui_kit::test]
@@ -2290,7 +2295,296 @@ fn ui_004_existing_threads_follow_verified_source_lines_in_both_diff_modes(
     check(cx, DiffMode::Split);
 }
 
-fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum PrContextJourney {
+    Browse,
+    Submit,
+    RestoreLayout,
+}
+
+fn verify_narrow_pr_layout_restart(
+    cx: &mut TestAppContext,
+    setup: &ReaderHarness,
+    window: gpui_kit::AnyWindowHandle,
+    reader: &Entity<ReaderWorkspace>,
+    tab: &Tab,
+    original_review: threadline_storage::reviews::SavedReviewDraft,
+) {
+    use gpui_kit::component::diff::DiffMode;
+    use gpui_kit::{
+        Focusable, Modifiers, PlatformInput, ScrollDelta, ScrollEvent, ScrollSource, TouchPhase,
+    };
+    use threadline_storage::pr::{NarrowSurface, PrContextMode, PrSection};
+
+    let store = &setup.store;
+    let account = setup.fixture.account;
+    let item = tab.item;
+    let settings = |cx: &gpui_kit::App, reader: &Entity<ReaderWorkspace>| {
+        pr::tab_settings(&reader.read(cx).layout.panes[0].tabs[0])
+    };
+    let ready = |cx: &mut TestAppContext| {
+        until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+    };
+    let pick = |cx: &mut TestAppContext, id| {
+        click(cx, window, id);
+        ready(cx);
+    };
+    let selected = cx.read(|cx| settings(cx, reader).code_anchor).unwrap();
+    let linked = cx
+        .read(|cx| reader.read(cx).layout.panes[0].tabs[0].view.context.clone())
+        .unwrap();
+    assert!(linked.selected_issue.is_some());
+    let queue = store.queue_page(account, 0, 100).unwrap();
+    let draft_id = format!("review-{}", item.0);
+    assert!((linked.ratio - 0.37).abs() < 0.001);
+    pick(cx, "pr-0-context-collapse");
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.try_find("pr-0-context-body").is_none());
+        assert!(window.try_find("pr-0-next-change").is_some());
+        assert_eq!(settings(cx, reader).code_anchor.as_ref(), Some(&selected));
+    })
+    .unwrap();
+    pick(cx, "pr-0-context-collapse");
+    pick(cx, "reader-duplicate-tab");
+    until(cx, |cx| cx.read(|cx| reader.read(cx).tab_views.len() == 2));
+    pick(cx, "pr-1-conversation");
+    pick(cx, "reader-tab-0-0");
+    let other = store
+        .resolve(
+            account,
+            ItemLocator {
+                repository: setup.fixture.repository,
+                number: 6,
+            },
+        )
+        .unwrap()
+        .unwrap();
+    cx.update_window(window, |_, window, cx| {
+        reader.update(cx, |reader, cx| {
+            reader.open(other, None, OpenTab::Beside, window, cx)
+        });
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let state = reader.read(cx);
+            !state.layout_busy
+                && state
+                    .active_tab()
+                    .is_some_and(|tab| tab.item == other && state.tab_views.contains_key(&tab.id))
+        })
+    });
+    let narrow = size(px(1220.), px(1450.));
+    cx.simulate_window_resize(window, narrow);
+    pick(cx, "reader-tab-0-0");
+    pick(cx, "pr-0-show-context");
+    pick(cx, "pr-0-context-body");
+    let scroll = |cx: &mut TestAppContext, lines| {
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            assert!(window.try_find("pr-0-show-code").is_some());
+            assert!(window.try_find("pr-0-next-change").is_none());
+            let pr = reader.read(cx).tab_views[&tab.id].pr.as_ref().unwrap();
+            let bounds = match settings(cx, reader).context_mode {
+                PrContextMode::Body => pr.context_scroll.bounds(),
+                PrContextMode::Issue => pr.issue_scroll.bounds(),
+            };
+            assert!(bounds.size.height > px(0.) && bounds.size.width > px(0.));
+            window.dispatch_event(
+                PlatformInput::Scroll(ScrollEvent {
+                    position: bounds.center(),
+                    delta: ScrollDelta::Lines(Point::new(0., lines)),
+                    modifiers: Modifiers::default(),
+                    touch_phase: TouchPhase::Moved,
+                    source: ScrollSource::Pointer,
+                }),
+                cx,
+            );
+        })
+        .unwrap();
+    };
+    scroll(cx, -5.);
+    pick(cx, "pr-0-context-issue");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            reader.read(cx).tab_views[&tab.id]
+                .pr
+                .as_ref()
+                .unwrap()
+                .data
+                .linked
+                .as_ref()
+                .is_some_and(|issue| Some(issue.item.id) == linked.selected_issue)
+        })
+    });
+    scroll(cx, -13.);
+    pick(cx, "pr-0-show-code");
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.try_find("pr-0-context-body").is_none());
+        let diff = reader.read(cx).tab_views[&tab.id]
+            .pr
+            .as_ref()
+            .unwrap()
+            .diff
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            diff.read(cx).selected_lines().unwrap().start(),
+            selected.line as usize
+        );
+        assert!(window.try_find("pr-0-review-toggle-editor").is_some());
+    })
+    .unwrap();
+    let offsets = cx.read(|cx| {
+        let recipe = settings(cx, reader);
+        assert!(recipe.context_scroll > 0 && recipe.issue_scroll > recipe.context_scroll);
+        (recipe.context_scroll, recipe.issue_scroll)
+    });
+    pick(cx, "pr-0-show-context");
+    pick(cx, "reader-tab-1-0");
+    cx.read(|cx| {
+        let state = reader.read(cx);
+        assert_eq!(state.active_tab().unwrap().item, item);
+        assert_eq!(
+            pr::tab_settings(state.active_tab().unwrap()).section,
+            PrSection::Conversation
+        );
+        assert_eq!(settings(cx, reader).context_mode, PrContextMode::Issue);
+    });
+    pick(cx, "reader-tab-1-1");
+
+    let (departed, wait) = std::sync::mpsc::channel();
+    cx.update_window(window, |_, window, cx| {
+        reader.update(cx, |reader, cx| {
+            reader.request_departure(
+                true,
+                move |window, _| {
+                    window.remove_window();
+                    departed.send(()).unwrap();
+                },
+                window,
+                cx,
+            );
+        });
+    })
+    .unwrap();
+    until(cx, |_| wait.try_recv().is_ok());
+    let on_disk = Store::open(&setup._directory.path().join("s04-ui.sqlite")).unwrap();
+    let saved = on_disk.reader_layout(account).unwrap().unwrap().0;
+    assert_eq!(saved.panes.len(), 2);
+    assert_eq!(saved.panes[1].tabs.len(), 2);
+    assert_eq!(saved.focused_pane, 1);
+    let restored_tab = &saved.panes[0].tabs[0];
+    assert_eq!(restored_tab.id, tab.id);
+    assert_eq!(restored_tab.view.context.as_ref(), Some(&linked));
+    let recipe = pr::tab_settings(restored_tab);
+    assert_eq!((recipe.context_scroll, recipe.issue_scroll), offsets);
+    assert_eq!(
+        (recipe.context_mode, recipe.narrow_surface),
+        (PrContextMode::Issue, NarrowSurface::Context)
+    );
+    assert_eq!(recipe.code_anchor.as_ref(), Some(&selected));
+    assert_eq!(
+        on_disk.review_draft(account, &draft_id).unwrap(),
+        Some(original_review.clone())
+    );
+
+    let (window, reader) = setup.open_at(cx, narrow);
+    let positioned = |cx: &mut TestAppContext, mode, offset| {
+        cx.update_window(window, |_, window, cx| {
+            window.simulate_next_frame(cx);
+            window.render_frame(cx);
+            let state = reader.read(cx);
+            let pr = state.tab_views[&tab.id].pr.as_ref().unwrap();
+            let handle = match mode {
+                PrContextMode::Body => &pr.context_scroll,
+                PrContextMode::Issue => &pr.issue_scroll,
+            };
+            assert!(handle.bounds().size.height > px(0.));
+            assert_eq!((-handle.offset().y.as_f32()) as u32, offset);
+            assert_eq!(settings(cx, &reader).context_mode, mode);
+        })
+        .unwrap();
+    };
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).tab_views.contains_key(&tab.id))
+    });
+    cx.update_window(window, |_, window, cx| {
+        window.simulate_next_frame(cx);
+        window.render_frame(cx);
+        let state = reader.read(cx);
+        assert!(state.offline);
+        assert_eq!(state.active_tab().unwrap().item, other);
+        let original = state.tab_views[&tab.id].pr.as_ref().unwrap();
+        let diff = original.diff.as_ref().unwrap();
+        assert_eq!(
+            diff.read(cx).selected_lines().map(|line| line.start()),
+            Some(selected.line as usize)
+        );
+        assert!(!diff.read(cx).focus_handle(cx).is_focused(window));
+        if let Some(editor) = state.review_editors.get(&item) {
+            assert!(!editor.summary.focus_handle(cx).is_focused(window));
+        }
+        assert!(window.try_find("pr-0-context-body").is_some());
+        assert!(window.try_find("pr-0-next-change").is_none());
+    })
+    .unwrap();
+    positioned(cx, PrContextMode::Issue, offsets.1);
+    click(cx, window, "pr-0-context-body");
+    until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+    positioned(cx, PrContextMode::Body, offsets.0);
+    click(cx, window, "pr-0-context-issue");
+    until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+    positioned(cx, PrContextMode::Issue, offsets.1);
+    click(cx, window, "pr-0-show-code");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let state = reader.read(cx);
+            !state.layout_busy && state.review_editors.contains_key(&item)
+        })
+    });
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        let state = reader.read(cx);
+        let pr = state.tab_views[&tab.id].pr.as_ref().unwrap();
+        let diff = pr.diff.as_ref().unwrap();
+        assert_eq!(diff.read(cx).mode(), DiffMode::Split);
+        assert_eq!(
+            diff.read(cx)
+                .selected_lines()
+                .map(|line| (line.path().to_string(), line.start())),
+            Some((selected.path.clone(), selected.line as usize)),
+            "restore the persisted source selection in the real diff component"
+        );
+        assert!(!diff.read(cx).focus_handle(cx).is_focused(window));
+        assert_eq!(pr.data.revision.head.as_str(), selected.original_oid);
+        assert_eq!(state.review_editors[&item].tab_id, tab.id);
+        assert_eq!(state.review_editors[&item].id(), draft_id);
+    })
+    .unwrap();
+    click(cx, window, "pr-0-review-toggle-editor");
+    click(cx, window, "pr-0-review-toggle-editor");
+    cx.update_window(window, |_, window, cx| {
+        window.simulate_next_frame(cx);
+        window.render_frame(cx);
+        assert!(
+            reader.read(cx).review_editors[&item]
+                .summary
+                .focus_handle(cx)
+                .is_focused(window)
+        );
+    })
+    .unwrap();
+    assert_eq!(
+        store.review_draft(account, &draft_id).unwrap(),
+        Some(original_review)
+    );
+    assert_eq!(store.queue_page(account, 0, 100).unwrap(), queue);
+}
+
+fn exercise_pr_context(cx: &mut TestAppContext, journey: PrContextJourney) {
     use gpui_kit::component::diff::{DiffLineRange, DiffMode, DiffSide};
     use std::num::NonZeroU64;
     use threadline_storage::{
@@ -2300,6 +2594,18 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
             ReferenceObservation, SourceSide, Verification,
         },
         resources::{CommitOid, WalkMode},
+    };
+    let review = journey != PrContextJourney::Browse;
+    let restore = journey == PrContextJourney::RestoreLayout;
+    let layout_body = |intro: &str| {
+        if restore {
+            format!(
+                "{intro}\n\n{}",
+                "A downloaded section for returning to a reading position.\n\n".repeat(75)
+            )
+        } else {
+            intro.into()
+        }
     };
     let setup = ReaderHarness::seeded();
     let store = &setup.store;
@@ -2320,10 +2626,9 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
                 }),
                 remote_updated_at: UtcMillis(stamp),
                 title: Change::Value("Offline review fixture".into()),
-                body: Change::Value(
-                    "Review introduction\n\nFixes #101. Resolves #102. Closes #103. Fixed #104."
-                        .into(),
-                ),
+                body: Change::Value(layout_body(
+                    "Review introduction\n\nFixes #101. Resolves #102. Closes #103. Fixed #104.",
+                )),
                 closed: Change::Value(false),
             },
         )
@@ -2344,7 +2649,9 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
                         }),
                         remote_updated_at: UtcMillis(stamp),
                         title: Change::Value(format!("Linked fixture {number}")),
-                        body: Change::Value(format!("**Cached issue {number} body**")),
+                        body: Change::Value(layout_body(&format!(
+                            "**Cached issue {number} body**"
+                        ))),
                         closed: Change::Value(false),
                     },
                 )
@@ -2484,6 +2791,25 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
     } else {
         setup.open(cx)
     };
+    if restore {
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            let pr_body = reader.read(cx).tab_views[&tab.id]
+                .pr
+                .as_ref()
+                .unwrap()
+                .context_scroll
+                .bounds()
+                .size
+                .width
+                .as_f32();
+            let width = window.find("reader-pane-0").bounds().size.width.as_f32();
+            assert!((0.30..=0.35).contains(&(pr_body / width)));
+            let original = reader.read(cx).active_tab().unwrap();
+            assert_eq!(pr::tab_settings(original).context_mode, PrContextMode::Body);
+        })
+        .unwrap();
+    }
     let reload = |cx: &mut TestAppContext| {
         cx.update_window(window, |_, window, cx| {
             reader.update(cx, |reader, cx| reader.reload_pr(pr, window, cx));
@@ -2635,16 +2961,18 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
             saved.draft.comments[1].anchor.source_oid,
             revision.head.as_str()
         );
-        cx.update_window(window, |_, _, cx| {
-            diff.update(cx, |state, cx| {
-                state.set_selected_lines(
-                    Some(DiffLineRange::new(filenames[1], DiffSide::Modified, 21, 21)),
-                    cx,
-                );
-            });
-            assert!(diff.read(cx).selected_text(cx).contains("new line"));
-        })
-        .unwrap();
+        if !restore {
+            cx.update_window(window, |_, _, cx| {
+                diff.update(cx, |state, cx| {
+                    state.set_selected_lines(
+                        Some(DiffLineRange::new(filenames[1], DiffSide::Modified, 21, 21)),
+                        cx,
+                    );
+                });
+                assert!(diff.read(cx).selected_text(cx).contains("new line"));
+            })
+            .unwrap();
+        }
         click(cx, window, "pr-0-context-more");
         until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
         Some(saved)
@@ -2685,6 +3013,17 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
         );
     })
     .unwrap();
+    if restore {
+        verify_narrow_pr_layout_restart(
+            cx,
+            &setup,
+            window,
+            &reader,
+            &tab,
+            original_review.unwrap(),
+        );
+        return;
+    }
     if !review {
         // A completed check for a different candidate refreshes the picker without selecting it.
         verify(3);

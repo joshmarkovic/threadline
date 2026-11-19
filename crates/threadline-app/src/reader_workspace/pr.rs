@@ -1,6 +1,6 @@
 use super::*;
 use gpui_kit::component::diff::{
-    DiffFile, DiffLinePosition, DiffMode, DiffParseOptions, DiffSide, DiffState,
+    DiffFile, DiffLinePosition, DiffLineRange, DiffMode, DiffParseOptions, DiffSide, DiffState,
 };
 use threadline_storage::{
     pr::{
@@ -522,25 +522,36 @@ fn new_diff(
 ) -> Entity<DiffState> {
     let diff =
         cx.new(|cx| DiffState::new([patch.clone()], cx).with_mode(diff_mode(recipe.diff_mode)));
-    if let Some(anchor) = recipe
+    if let Some(selection) = recipe
         .code_anchor
         .as_ref()
-        .filter(|anchor| anchor.path == selected.summary.path)
+        .and_then(|anchor| source_selection(anchor, &selected.summary.path, revision))
     {
-        let (side, oid) = match anchor.side {
-            SourceSide::Left => (DiffSide::Original, revision.merge_base.as_ref()),
-            SourceSide::Right => (DiffSide::Modified, Some(&revision.head)),
-        };
-        if oid.is_some_and(|oid| oid.as_str() == anchor.original_oid) {
-            diff.update(cx, |state, cx| {
-                state.scroll_to_line(
-                    DiffLinePosition::new(patch.path().clone(), side, anchor.line as usize),
-                    cx,
-                )
-            });
-        }
+        let position = DiffLinePosition::new(
+            selection.path().clone(),
+            selection.side(),
+            selection.start(),
+        );
+        diff.update(cx, |state, cx| {
+            state.scroll_to_line(position, cx);
+            state.set_selected_lines(Some(selection), cx);
+        });
     }
     diff
+}
+
+pub(super) fn source_selection(
+    anchor: &ReviewAnchor,
+    path: &str,
+    revision: &PrRevision,
+) -> Option<DiffLineRange> {
+    let (side, oid) = match anchor.side {
+        SourceSide::Left => (DiffSide::Original, revision.merge_base.as_ref()),
+        SourceSide::Right => (DiffSide::Modified, Some(&revision.head)),
+    };
+    let line = usize::try_from(anchor.line).ok()?;
+    (anchor.path == path && line > 0 && oid.is_some_and(|oid| oid.as_str() == anchor.original_oid))
+        .then(|| DiffLineRange::new(anchor.path.clone(), side, line, line))
 }
 
 pub(super) fn diff_mode(mode: PrDiffMode) -> DiffMode {
@@ -564,6 +575,44 @@ pub(super) fn tab_settings(tab: &Tab) -> PrTabView {
 }
 
 impl ReaderWorkspace {
+    pub(super) fn restore_pr_line_selection(&self, tab: &Tab, cx: &mut Context<Self>) {
+        let Some(recipe) = tab
+            .view
+            .pr_reader
+            .as_ref()
+            .filter(|view| view.section == PrSection::Files)
+        else {
+            return;
+        };
+        let Some(pr) = self
+            .tab_views
+            .get(&tab.id)
+            .and_then(|view| view.pr.as_ref())
+            .filter(|pr| pr.data.revision.pr == tab.item)
+        else {
+            return;
+        };
+        let Some(diff) = pr
+            .diff
+            .as_ref()
+            .filter(|diff| diff.read(cx).selected_lines().is_none())
+        else {
+            return;
+        };
+        let Some(file) = diff.read(cx).files().first() else {
+            return;
+        };
+        if let Some(selection) = recipe
+            .code_anchor
+            .as_ref()
+            .and_then(|anchor| source_selection(anchor, file.path(), &pr.data.revision))
+        {
+            diff.update(cx, |state, cx| {
+                state.set_selected_lines(Some(selection), cx)
+            });
+        }
+    }
+
     pub(super) fn edit_pr_tab(
         &mut self,
         tab: &Tab,
