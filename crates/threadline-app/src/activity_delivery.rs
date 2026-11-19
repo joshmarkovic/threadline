@@ -17,6 +17,12 @@ enum DeliveryTarget {
     Capture(crate::activity_fixture::Capture),
 }
 
+#[cfg(all(test, feature = "e2e"))]
+pub(crate) fn deliver_to_test_capture(store: &Store, output: &tempfile::NamedTempFile) {
+    let target = DeliveryTarget::Capture(crate::activity_fixture::Capture::for_test(output));
+    deliver(store, &target, &AtomicBool::new(false)).unwrap();
+}
+
 impl DeliveryTarget {
     fn availability(&self) -> PopupAvailability {
         use threadline_platform::ActivityPermission;

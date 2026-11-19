@@ -56,6 +56,11 @@ fn owned(root: &Path) -> bool {
 pub(crate) struct Capture(PathBuf);
 
 impl Capture {
+    #[cfg(test)]
+    pub(crate) fn for_test(output: &tempfile::NamedTempFile) -> Self {
+        Self(output.path().to_path_buf())
+    }
+
     pub(crate) fn open() -> Option<Self> {
         if !std::env::args_os().any(|argument| argument == "--e2e-report") {
             return None;
