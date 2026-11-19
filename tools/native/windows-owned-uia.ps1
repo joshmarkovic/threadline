@@ -13,6 +13,16 @@ function Test-OwnedAutomationProperties($Properties, [string]$Id, [int]$Owner, [
         $Properties.BoundingRectangle.Width -gt 0 -and $Properties.BoundingRectangle.Height -gt 0
 }
 
+function Test-OwnedFixtureEditProperties($Properties) {
+    $type = $Properties.PSObject.Properties['ControlType']
+    $password = $Properties.PSObject.Properties['IsPassword']
+    if ($null -eq $type -or $null -eq $password -or $password.Value -isnot [bool] -or $password.Value) {
+        return $false
+    }
+    $kind = $type.Value
+    return $kind -is [Windows.Automation.ControlType] -and $kind.Id -eq [Windows.Automation.ControlType]::Edit.Id
+}
+
 function Get-OwnedFixtureActivation($Element, [string]$Id) {
     $pattern = $null
     if ($Element.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
@@ -28,9 +38,9 @@ function Get-OwnedFixtureActivation($Element, [string]$Id) {
 function Select-UniqueOwnedFixtureControl($Controls, [string]$Id, [int]$Owner, [string]$ExpectedName, [switch]$Edit, [switch]$AllowDisabled) {
     $match = $null
     foreach ($control in $Controls) {
-        if (!(Test-OwnedAutomationProperties $control.Current $Id $Owner $ExpectedName -AllowDisabled:$AllowDisabled)) { continue }
-        if ($Edit -and ($control.Current.IsPassword -or
-            $control.Current.ControlType.Id -ne [Windows.Automation.ControlType]::Edit.Id)) { continue }
+        $properties = $control.Current
+        if (!(Test-OwnedAutomationProperties $properties $Id $Owner $ExpectedName -AllowDisabled:$AllowDisabled)) { continue }
+        if ($Edit -and !(Test-OwnedFixtureEditProperties $properties)) { continue }
         if (!$Edit -and !$AllowDisabled -and $ExpectedName -and $null -eq (Get-OwnedFixtureActivation $control $Id)) { continue }
         if ($null -ne $match) {
             Stop-Blocked 'The owned accessibility tree returned multiple eligible controls for the exact identity.'
@@ -104,7 +114,7 @@ function Get-OwnedFixtureEditPattern([IntPtr]$Window, [string]$Id, [string]$Name
         $properties = $element.Current
         $pattern = $null
         if (!(Test-OwnedAutomationProperties $properties $Id $script:app.Id $Name) -or
-            $properties.IsPassword -or $properties.ControlType.Id -ne [Windows.Automation.ControlType]::Edit.Id -or
+            !(Test-OwnedFixtureEditProperties $properties) -or
             !$element.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern, [ref]$pattern) -or
             $pattern.Current.IsReadOnly) {
             return $null

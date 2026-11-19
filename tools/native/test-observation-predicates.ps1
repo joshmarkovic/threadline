@@ -145,6 +145,28 @@ if (Test-OwnedAutomationProperties $control 'reader-tab-0-0' 41) {
     throw 'The accessibility guard accepted an offscreen native control.'
 }
 
+Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+$editKind = [Windows.Automation.ControlType]::Edit
+function New-OwnedEdit($Kind, [bool]$Password) {
+    [pscustomobject]@{ Current = [pscustomobject]@{
+        ProcessId = 41; AutomationId = 'reader-draft-input-0'; Name = 'Local Markdown draft'
+        IsOffscreen = $false; IsEnabled = $true; IsPassword = $Password; ControlType = $Kind
+        BoundingRectangle = @{ Width = 80; Height = 24 }
+    } }
+}
+$rejectedEdits = @(
+    (New-OwnedEdit $null $false)
+    (New-OwnedEdit ([Windows.Automation.AutomationElement]::NotSupported) $false)
+    (New-OwnedEdit ([pscustomobject]@{ Id = $editKind.Id }) $false)
+    (New-OwnedEdit ([Windows.Automation.ControlType]::Custom) $false)
+    (New-OwnedEdit $editKind $true)
+)
+$validEdit = New-OwnedEdit $editKind $false
+if ($null -ne (Select-UniqueOwnedFixtureControl $rejectedEdits 'reader-draft-input-0' 41 'Local Markdown draft' -Edit) -or
+    (Select-UniqueOwnedFixtureControl ($rejectedEdits + $validEdit) 'reader-draft-input-0' 41 'Local Markdown draft' -Edit) -ne $validEdit) {
+    throw 'The edit selector did not wait for the exact owned non-password UI Automation Edit type.'
+}
+
 $resultA = "Pull request fixture-org/private #42 $([char]0x00b7) First fixture pull request"
 $resultB = "Pull request fixture-org/private #43 $([char]0x00b7) Second fixture pull request"
 function Get-OwnedFixtureActivation($Element, [string]$Id) { return $Element.Activation }
