@@ -1,0 +1,56 @@
+{
+  "criterion": "AC-69",
+  "scope": "Isolated account, real SQLite, production application worker, loopback HTTP.",
+  "source_revision": "287064229188f6cc5f5d85c86693c0f74bd5e438",
+  "windows_x64": {
+    "exit_code": 0,
+    "passed": 2,
+    "failed": 0,
+    "tests": [
+      "accounts::tests::sync_worker_retries_an_interrupted_probe_without_another_check_now",
+      "accounts::write_tests::write_dispatch_uses_durable_offline_outbox_and_stops_after_lost_response"
+    ],
+    "seconds": 16.09,
+    "executable_sha256": "eb923148c8b073009cc417a760d873ff70c66727b1c715892ed0184cad52b6d3",
+    "raw_log_sha256": "dcf54c5e31b3cdbd2b764838b5be7c4cf71727796de0bb358a845b1c284dc0c7"
+  },
+  "linux_x64": {
+    "source_base": "de2072350c6607aeb4655751bb31654e6d30a586",
+    "source_patch_sha256": "e2d000e8219e631b05f6f7b0e1d68c4557e9d4ee6eee98e40d3086399a0b7292",
+    "tests": [
+      {
+        "test": "accounts::tests::sync_worker_retries_an_interrupted_probe_without_another_check_now",
+        "seconds": 4.46,
+        "raw_log_sha256": "f3e2a12da1c2e63f6539171ac1e3ff9dca263438c96fd986376b10c97a07337a"
+      },
+      {
+        "test": "accounts::write_tests::write_dispatch_uses_durable_offline_outbox_and_stops_after_lost_response",
+        "seconds": 11.97,
+        "raw_log_sha256": "19305064da30f38f9c02f0353aedd4fb030af8f48237389a6a314f88899b8fe1"
+      }
+    ]
+  },
+  "configuration": {
+    "work_days_per_week": 0,
+    "quiet_days_per_week": 7,
+    "quiet_minutes_per_day": 1440,
+    "timezone": "UTC",
+    "pause_background_refresh": true
+  },
+  "checked": {
+    "work_offline_before_reconnect": "No additional accepted TCP connection and no mutation.",
+    "queued_actions_paused_after_reconnect": "Worker reached GitHub fixture and both submitted comments remained queued.",
+    "queued_actions_resumed": "The worker restarted outside work hours during quiet hours, with background refresh still paused.",
+    "server_floor_ms": 1800,
+    "minimum_time_between_mutation_reservations_ms": 1000,
+    "comment_posts": 2,
+    "attempts_per_dispatched_operation": 1,
+    "first_comment": "Confirmed as comment 92.",
+    "second_comment": "Lost response and outcome unknown through worker restart. No repeat POST.",
+    "cancelled_before_dispatch": "No request.",
+    "interrupted_probe": "One interrupted request and one completed request after the original floor despite repeated wake and network-change inputs."
+  },
+  "windows_power_message_evidence": "../sprint-12/local-suite-validation.json",
+  "windows_native_control_evidence": "../sprint-11/native-schedule.json",
+  "remaining": "Physical host suspend/resume and real network adapter transitions were not exercised."
+}
