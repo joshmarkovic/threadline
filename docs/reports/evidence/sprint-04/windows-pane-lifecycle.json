@@ -1,0 +1,89 @@
+{
+  "scenario": "S12-PANE-LIFECYCLE",
+  "status": "Pass",
+  "scope": "Separate-process Windows native test build with an isolated downloaded fixture",
+  "host": {
+    "os": "Windows 11 Enterprise",
+    "build": "10.0.22631.7652",
+    "architecture": "x86_64",
+    "dpi": 96
+  },
+  "app_and_runner_revision": "b3ec4778d573d010ed9e48fc04c5443bcef7d625",
+  "driver_revision": "10f021a5692d523904f9ae592c184dd87db30b72",
+  "app_version": "0.1.0",
+  "binary_sha256": "794e5e42ba7699330117311a42e4a0da58c7370ebb7178307ef19f2a83c1a799",
+  "binary_bytes": 45684224,
+  "cargo_lock_sha256": "ba1fa2481ba47ebb082dae4aff8bf1a099cea5775b4196b096aeb3bb094d4efb",
+  "command": "cargo xtask test e2e --suite full --case S12-PANE-LIFECYCLE --binary <binary-path> --seed 12345 --report-dir <report-dir>",
+  "fixture_revision": "s12-pane-positions-v1",
+  "seed": 12345,
+  "run_directory": "e2e-1795064159537-44932",
+  "started_at_unix_ms": 1795064159537,
+  "finished_at_unix_ms": 1795064229349,
+  "exit_code": 0,
+  "native_actions": 25,
+  "provider_requests_while_offline": 0,
+  "original_tabs_per_pane": [10, 10],
+  "tabs_after_open_beside": [10, 11],
+  "tabs_after_moving_saved_archive_tab": [9, 11],
+  "tabs_after_closing_other_pane_and_restart": [11],
+  "window_size_physical_pixels": {
+    "before": [1336, 859],
+    "narrowed": [940, 859],
+    "restored": [1336, 859],
+    "input": "Owned HWND SetWindowPos"
+  },
+  "archive_view": {
+    "repository": 2,
+    "item": 2,
+    "tab": "fixture-tab-1",
+    "selected_comment": "00000000000000050009",
+    "offset_after_move": 78,
+    "offset_after_latest_movement_before_close": 156,
+    "offset_after_reopen_close_other_pane_and_restart": 156,
+    "unsent_draft_sha256": "6d81ea22bda4aba055dfeb96c7aeb52fe8fa9e948aa2f9faa5b224c53a550058",
+    "original_pid": 35308,
+    "restart_pid": 45860,
+    "restored_active_index": 10,
+    "tab_order_and_title_digests_unchanged_after_restart": true
+  },
+  "proof": [
+    "The native accessibility tree exposed the exact inactive archive title and the original inactive PR title with its Draft marker.",
+    "Both original tab strips survived Open beside, maximizing and restoring a pane, and narrowing and restoring the outer window.",
+    "Normal commands reordered the archive tab, moved it between panes, reopened its latest anchored reading position, and closed the other pane.",
+    "The new offline process reopened the same database and all 11 remaining tabs in order with the original unsent draft and no new queue entry."
+  ],
+  "sha256": {
+    "result.json": "f6de4f9f75d5d92989beceba400755a7bdefd5077a1796b18e0a02bf8b1f17b7",
+    "reader-native.json": "ffc6acc9b37ef4b3731c9001e6fd572cb7baa0d97f0d7e83262c5ab3fcb68e9d",
+    "github-access-trace.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "reader-fixture.json": "0672705f26f05a8ff2b4c40a19ba30afd2e2645df26ab1c294d40c8d365ba2c1",
+    "binary.json": "e09fc2a19c57512534e3151272c900446cfadcf703e5ef143ec152c00f3316c9",
+    "reader-restart-observation.json": "6db0f67c9fd0c7ce104790473a498aa0d431269b912794019af347a6062e0dfd",
+    "ui-observation.json": "6c7172a5f8dc2e1073ba93aa756f928403536bb335f063ca486660f94a49910d"
+  },
+  "earlier_attempts": [
+    {
+      "run": "e2e-1795063627673-32484",
+      "app_runner_and_driver_revision": "a062a187a10b65e37481233fbe6b16e2dd632c9f",
+      "binary_sha256": "0262a2f571a36108599b577a8b43aa9b68c756cf4971c8729de59de6351b29b5",
+      "status": "Fail",
+      "exit_code": 1,
+      "native_actions": 5,
+      "detail": "The right pane had focus. Open beside reused the existing matching archive tab in the left pane. The driver had not selected the required origin.",
+      "result_sha256": "112c8e83857f71fe377b5e6b4050a30cf4f54c3d2ae58153b73fb5f80637fc84",
+      "native_sha256": "4a295dea7868ef78947341f713948ae6f1f7b5c5a4e369b44a88358197924c12"
+    },
+    {
+      "run": "e2e-1795063873761-23404",
+      "app_and_runner_revision": "b3ec4778d573d010ed9e48fc04c5443bcef7d625",
+      "driver_revision": "bed8f418a83f37bf8a5ae7a43ba1885dbb519b97",
+      "status": "Fail",
+      "exit_code": 1,
+      "native_actions": 6,
+      "detail": "Open beside succeeded with ten and eleven tabs. The inactive PR was visible and had the expected title digest. The driver's exact name omitted its saved Draft marker.",
+      "result_sha256": "7cbc01d36c752ed6b3457773e5d7522f49226376406c29a9773f34e1cdd3955b",
+      "native_sha256": "7aed011306e503f8389e5fd7b506e1f662193e42ada013697f4219be3a192edd"
+    }
+  ]
+}
