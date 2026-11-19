@@ -14,7 +14,7 @@ pub(crate) use windows::Restart;
 pub fn configured() -> bool {
     #[cfg(windows)]
     {
-        windows::publisher().is_some() && matches!(crate::windows_host::installed(), Ok(Some(_)))
+        matches!(windows::verified_install(), Ok(Some(_)))
     }
     #[cfg(not(windows))]
     false

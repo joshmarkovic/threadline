@@ -50,6 +50,8 @@ The independent configuration contains `current_sha256`, `predecessor` and `stag
 | 18 | If build 18 failed when launched from PowerShell 7, use build 19 or later. The setup details identify the check that failed. Verify that Windows PowerShell 5.1 can load its built-in modules and, for a staged-file error, read the executable. |
 | 19 | Setup kept staging files after a rollback was interrupted. Release open files and rerun the same setup |
 | 20 | Windows could not verify the approved publisher. Obtain the trusted signed package |
+| 21 | Setup could not confirm the update handoff or wait for Threadline to close. Reopen Threadline and retry |
+| 22 | Setup installed the update and could not reopen Threadline. Launch it from the Start menu |
 | 21–22 | Windows could not verify the staged shortcut or snapshot, or an existing shortcut or sender has a different target. Inspect the named entry and rerun the matching setup |
 | 23–24 | Windows denied access to the current user's Start menu, registry or staging folder. Check permissions and organization policy |
 | 25–27 | Windows Shell could not save the shortcut (25), staging file access failed (26), or the installed .NET Framework could not run the helper (27). See setup details |
@@ -98,10 +100,17 @@ For a schema change, the runner seeds with the predecessor binary and checks bot
 
 ## Stage a signed Windows release
 
-Publication remains pending. For a release with approved publisher configuration, build the verifier with the same pinned Rust toolchain and Windows SDK as the app.
+For an approved release, build the Windows app with the trusted publisher fingerprint from the reviewed signer configuration. The app uses that compiled fingerprint to verify its own installed executable before accessing the private release credential. Windows verifies the downloaded installer against the same fingerprint before Threadline offers a restart.
 
 ```sh
+export THREADLINE_RELEASE_PUBLISHER_SHA256="$(jq -er '.publisher_certificate_sha256 | select(test("^[0-9a-fA-F]{64}$"))' /private/windows-signer.json)"
+cargo build --locked --release --target x86_64-pc-windows-msvc -p threadline-app --bin threadline
 cargo build --locked --release --target x86_64-pc-windows-msvc -p threadline-platform --example verify_windows_publisher
+```
+
+Sign the resulting `threadline.exe` with the approved Authenticode identity and record its signed digest. Stage the installer with that signed app and the compiled verifier. The example uses version 0.1.0 and package build 1.
+
+```sh
 tools/windows/build-installer.sh --release-stage /private/windows-signer.json /build/verify_windows_publisher.exe /build/threadline-signed.exe /output/Threadline-unsigned.exe 0.1.0 1 10
 ```
 
@@ -114,6 +123,13 @@ Staging writes a setup and a `publication_pending` manifest. The release environ
 The native `threadline-installer` bootstrap uses the exact version and channel requested by the user. Release engineering sets `THREADLINE_RELEASE_DIRECTORY` to the reviewed HTTPS directory ending in `/` and `THREADLINE_RELEASE_PUBLISHER_SHA256` to the approved Windows publisher leaf fingerprint when building it. A development build without these settings reports that publication is pending. The bootstrap and setup require Windows 11 x64, an interactive desktop and Direct3D feature level 10.1 or above.
 
 After signing the staged setup, run `finalize-release-metadata.ps1` in Windows PowerShell with the signed installer, staged metadata, their independently recorded digests, the approved publisher pin and a new output directory. The script verifies the signed setup with Windows and writes the public metadata fields to `threadline-windows-x64.json`. It prints the digest of those exact manifest bytes. Distribute that digest through the trusted release announcement. The setup and manifest belong in the same versioned directory, `v<VERSION>/`. Sign and distribute the bootstrap under the approved publisher as well.
+
+For startup updates, publish the approved stable release as `v<VERSION>` in `joshmarkovic/threadline` and mark it as the latest release. Upload these two assets with their final bytes.
+
+- `threadline-windows-x64.json` from the metadata finalizer. The packaging recipe records `restart_protocol: 1` in the staged metadata and the finalizer copies it to the manifest.
+- The signed setup executable, for example `ThreadlineSetup.exe`. Its exact, case-sensitive filename and GitHub download URL must match the manifest's `artifact_url`, such as `https://github.com/joshmarkovic/threadline/releases/download/v0.1.0/ThreadlineSetup.exe`.
+
+Verify that GitHub reports an uploaded state, byte size, and `sha256:` digest for both assets. Increment both the stable semantic version and the package build. The build must also exceed the profile's recorded high-water mark. Only registered, publisher-verified release installations check GitHub. The local test installer has its own registration and install directory.
 
 The following PowerShell command is a template for a future release. It assumes the user has obtained the publisher-verified, prebuilt bootstrap and trusted manifest digest. No public release endpoint or signed Threadline setup is available yet.
 

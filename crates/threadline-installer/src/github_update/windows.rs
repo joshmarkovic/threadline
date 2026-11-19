@@ -121,18 +121,25 @@ impl Restart {
     }
 }
 
-pub(super) async fn check(token: Option<&str>) -> Result<Option<Staged>> {
+pub(super) fn verified_install() -> Result<Option<(Installed, &'static str)>> {
     let Some(publisher) = publisher() else {
         return Ok(None);
     };
     let Some(current) = windows_host::installed()? else {
         return Ok(None);
     };
-    let host = windows_host::detect()?;
-    host.check()?;
     let exe = std::env::current_exe().map_err(|_| "Could not locate the installed release.")?;
     verify(&exe, pin(publisher)?)
         .map_err(|_| "Windows could not verify the installed release publisher.")?;
+    Ok(Some((current, publisher)))
+}
+
+pub(super) async fn check(token: Option<&str>) -> Result<Option<Staged>> {
+    let Some((current, publisher)) = verified_install()? else {
+        return Ok(None);
+    };
+    let host = windows_host::detect()?;
+    host.check()?;
     let (cache, mut directories) = cache()?;
     let Some(mut staged) = Github::new(publisher)?
         .stage(&current, &host, &cache, token)
