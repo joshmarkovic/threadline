@@ -103,7 +103,15 @@ impl Store {
             }
             let state = state_in(tx, key)?;
             let rid = expected.resource_id;
-            tx.execute("DELETE FROM reader_comment_staging WHERE resource_id=? AND generation!=?", params![rid, expected.generation])?;
+            if expected.cursor.is_none() {
+                tx.execute("DELETE FROM reader_comment_staging WHERE resource_id=?", [rid])?;
+            }
+            // A continuation gets a new request generation, but still belongs to the same walk.
+            let staging_generation: i64 = tx.query_row(
+                "SELECT coalesce(min(generation),?2) FROM reader_comment_staging WHERE resource_id=?1",
+                params![rid, expected.generation],
+                |row| row.get(0),
+            )?;
             let mut records = Vec::with_capacity(page.comments.len());
             for comment in page.comments {
                 if comment.provider_id == 0 || comment.updated_at_ms < comment.created_at_ms {
@@ -114,7 +122,8 @@ impl Store {
                     .query_row("SELECT m.updated_at,r.body,m.node_id,m.author,m.created_at FROM reader_comment_metadata m JOIN cached_resource_records r USING(resource_id,record_key)
                      WHERE m.resource_id=?1 AND m.record_key=?2
                      UNION ALL SELECT m.updated_at,p.body,m.node_id,m.author,m.created_at FROM reader_comment_staging m JOIN cached_resource_pending p USING(resource_id,record_key)
-                     WHERE m.resource_id=?1 AND m.record_key=?2 AND m.generation=?3 ORDER BY 1 DESC LIMIT 1", params![rid, id, expected.generation], |r| {
+                     WHERE m.resource_id=?1 AND m.record_key=?2 AND m.generation=?3 ORDER BY 1 DESC LIMIT 1",
+                     params![rid, id, staging_generation], |r| {
                         Ok(DiscussionComment {
                             provider_id: comment.provider_id,
                             updated_at_ms: r.get(0)?,
@@ -129,11 +138,12 @@ impl Store {
                     .filter(|p| p.updated_at_ms >= comment.updated_at_ms)
                     .unwrap_or(comment);
                 tx.execute(
-                    "INSERT INTO reader_comment_staging(resource_id,generation,record_key,node_id,author,created_at,updated_at) VALUES(?,?,?,?,?,?,?)
-                ON CONFLICT(resource_id,generation,record_key) DO UPDATE SET node_id=excluded.node_id,author=excluded.author,created_at=excluded.created_at,updated_at=excluded.updated_at",
+                    "INSERT INTO reader_comment_staging(resource_id,generation,record_key,node_id,author,created_at,updated_at)
+                     VALUES(?,?,?,?,?,?,?) ON CONFLICT(resource_id,generation,record_key) DO UPDATE
+                     SET node_id=excluded.node_id,author=excluded.author,created_at=excluded.created_at,updated_at=excluded.updated_at",
                     params![
                         rid,
-                        expected.generation,
+                        staging_generation,
                         id,
                         comment.node_id,
                         comment.author,
@@ -145,6 +155,19 @@ impl Store {
                     key: id,
                     body: comment.body,
                 });
+            }
+            if page.next_cursor.is_none() && expected.cursor.is_some() {
+                // Preserve metadata already published by earlier builds for saved partial pages.
+                tx.execute(
+                    "INSERT INTO reader_comment_staging(resource_id,generation,record_key,node_id,author,created_at,updated_at)
+                     SELECT m.resource_id,?2,m.record_key,m.node_id,m.author,m.created_at,m.updated_at
+                     FROM reader_comment_metadata m
+                     JOIN cached_resource_pending p USING(resource_id,record_key)
+                     JOIN cached_resource_records visible USING(resource_id,record_key)
+                     WHERE m.resource_id=?1 AND p.body=visible.body
+                     ON CONFLICT(resource_id,generation,record_key) DO NOTHING",
+                    params![rid, staging_generation],
+                )?;
             }
             let next = commit_page_in(
                 tx,
@@ -159,10 +182,22 @@ impl Store {
                 terminal_error,
             )?;
             if next.is_none() || state.coverage != Coverage::Complete {
-                tx.execute("INSERT INTO reader_comment_metadata(resource_id,record_key,node_id,author,created_at,updated_at)
-                SELECT s.resource_id,s.record_key,s.node_id,s.author,s.created_at,s.updated_at FROM reader_comment_staging s
-                JOIN cached_resource_records r USING(resource_id,record_key) WHERE s.resource_id=? AND s.generation=?
-                ON CONFLICT(resource_id,record_key) DO UPDATE SET node_id=excluded.node_id,author=excluded.author,created_at=excluded.created_at,updated_at=excluded.updated_at", params![rid, expected.generation])?;
+                let current_keys = next.as_ref().map(|_| {
+                    let keys = records.iter().map(|record| &record.key).collect::<Vec<_>>();
+                    serde_json::json!(keys).to_string()
+                });
+                tx.execute(
+                    "INSERT INTO reader_comment_metadata(resource_id,record_key,node_id,author,created_at,updated_at)
+                     SELECT s.resource_id,s.record_key,s.node_id,s.author,s.created_at,s.updated_at
+                     FROM reader_comment_staging s JOIN cached_resource_records r USING(resource_id,record_key)
+                     WHERE s.resource_id=?1 AND s.generation=?2 AND s.record_key IN (
+                        SELECT record_key FROM reader_comment_staging WHERE resource_id=?1 AND generation=?2 AND ?3 IS NULL
+                        UNION ALL SELECT value FROM json_each(?3)
+                     )
+                     ON CONFLICT(resource_id,record_key) DO UPDATE SET
+                     node_id=excluded.node_id,author=excluded.author,created_at=excluded.created_at,updated_at=excluded.updated_at",
+                    params![rid, staging_generation, current_keys],
+                )?;
             }
             if next.is_none() {
                 tx.execute("DELETE FROM reader_comment_staging WHERE resource_id=?", [rid])?;

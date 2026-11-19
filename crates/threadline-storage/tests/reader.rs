@@ -450,7 +450,7 @@ fn typed_discussion_and_timeline_preserve_metadata_partial_and_anchors() {
     let walk = store
         .start_resource_fetch(key(ResourceFamily::Comments), WalkMode::Full)
         .unwrap();
-    let next = store
+    let first_checkpoint = store
         .commit_discussion_page(
             f.account,
             f.long_discussion,
@@ -473,6 +473,47 @@ fn typed_discussion_and_timeline_preserve_metadata_partial_and_anchors() {
             .len(),
         13
     );
+    drop(store);
+    let store = Store::open_profile(dir.path()).unwrap();
+    let next = store
+        .resume_resource_fetch(key(ResourceFamily::Comments))
+        .unwrap()
+        .unwrap();
+    assert_eq!(next.cursor, first_checkpoint.cursor);
+    let unrelated = ResourceKey {
+        target: ResourceTarget::Item(f.reviewed_pr),
+        ..key(ResourceFamily::Comments)
+    };
+    let unrelated_progress = store
+        .start_resource_fetch(unrelated, WalkMode::Full)
+        .unwrap();
+    store
+        .commit_discussion_page(
+            f.account,
+            f.reviewed_pr,
+            &unrelated_progress,
+            DiscussionInputPage {
+                comments: vec![typed(90, "independent thread", 4, 12)],
+                next_cursor: Some("2"),
+                completed_validators: None,
+                fetched_at_ms: 20,
+            },
+        )
+        .unwrap();
+    assert!(matches!(
+        store.commit_discussion_page(
+            f.account,
+            f.long_discussion,
+            &first_checkpoint,
+            DiscussionInputPage {
+                comments: vec![typed(90, "stale replacement", 2, 30)],
+                next_cursor: None,
+                completed_validators: None,
+                fetched_at_ms: 20,
+            },
+        ),
+        Err(Error::Conflict(_))
+    ));
     store
         .commit_discussion_page(
             f.account,
@@ -499,6 +540,32 @@ fn typed_discussion_and_timeline_preserve_metadata_partial_and_anchors() {
         .discussion_page_at(f.account, f.long_discussion, anchor, 1)
         .unwrap();
     assert_eq!(matched.metadata[0].node_id.as_deref(), Some("node-90"));
+    assert_eq!(matched.metadata[0].author.as_deref(), Some("reader"));
+    assert_eq!(matched.metadata[0].created_at_ms, 2);
+    assert_eq!(matched.metadata[0].updated_at_ms, 10);
+    assert_eq!(matched.records[0].body, "fresh token");
+    let separate = store.resume_resource_fetch(unrelated).unwrap().unwrap();
+    assert_eq!(separate.cursor.as_deref(), Some("2"));
+    store
+        .commit_discussion_page(
+            f.account,
+            f.reviewed_pr,
+            &separate,
+            DiscussionInputPage {
+                comments: Vec::new(),
+                next_cursor: None,
+                completed_validators: None,
+                fetched_at_ms: 21,
+            },
+        )
+        .unwrap();
+    let other = store
+        .discussion_page(f.account, f.reviewed_pr, None, 5)
+        .unwrap();
+    assert_eq!(other.records.len(), 1);
+    assert_eq!(other.records[0].body, "independent thread");
+    assert_eq!(other.metadata[0].created_at_ms, 4);
+    assert_eq!(other.metadata[0].updated_at_ms, 12);
     assert!(matches!(
         store.discussion_page_at(f.account, f.long_discussion, "removed", 8),
         Err(Error::NotFound)
