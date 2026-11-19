@@ -1,0 +1,237 @@
+{
+  "scenario": "S06-SHARED-PR-PANES",
+  "fixture_revision": "s06-shared-pr-panes-v1",
+  "windows_version": "Microsoft Windows [Version 10.0.22631.7652]",
+  "seed": 12345,
+  "command": {
+    "program": "xtask",
+    "argv": [
+      "test",
+      "e2e",
+      "--suite",
+      "full",
+      "--case",
+      "S06-SHARED-PR-PANES",
+      "--binary",
+      "<binary-path>",
+      "--seed",
+      "12345",
+      "--report-dir",
+      "<report-dir>"
+    ],
+    "redacted": true
+  },
+  "attempts": [
+    {
+      "run": "e2e-1795056678312-30880",
+      "status": "Fail",
+      "exit_code": 1,
+      "app_source": "174f3102b31c8f8c8475f8771cdd571579ed5d62",
+      "runner_source": "174f3102b31c8f8c8475f8771cdd571579ed5d62",
+      "driver_source": "174f3102b31c8f8c8475f8771cdd571579ed5d62",
+      "checkout_dirty": false,
+      "cached_binary_sha256": "8955aca57f948389db85a2ddb412a470cddf83d768f24aefb618e7304d1ebdc1",
+      "dpi": 96,
+      "actions": 16,
+      "elapsed_ms": 53230,
+      "detail": "Timed out waiting for two distinct pane tabs displaying the same immutable pull request.",
+      "note": "The driver kept the fixture layout maximized after duplicating the tab. The two-pane wait correctly failed.",
+      "source_sha256": {
+        "result.json": "7def2e16a7c9021a90cfbdaaa9ba7a2c4f59eeda7c837fd75a47f095991b8d17",
+        "pr-native.json": "505820161bd34af32f09402ea7d0132e427d24b936f8caf25e5aba41e1a1ca58",
+        "github-access-trace.json": "ae6a6a1891fb0df1b158dec1e295398795673c22d1cc38fd898a3064eab59de4",
+        "binary.json": "779fc4dd8f99cd918fe1d08ef152fc43c020bac72145a9915514767da3ba4029"
+      }
+    },
+    {
+      "run": "e2e-1795056885001-44432",
+      "status": "Fail",
+      "exit_code": 1,
+      "app_source": "174f3102b31c8f8c8475f8771cdd571579ed5d62",
+      "runner_source": "174f3102b31c8f8c8475f8771cdd571579ed5d62",
+      "driver_source": "e2991db220fe1baa153769c85f4e3793bc2ecd01",
+      "checkout_dirty": false,
+      "cached_binary_sha256": "8955aca57f948389db85a2ddb412a470cddf83d768f24aefb618e7304d1ebdc1",
+      "dpi": 96,
+      "actions": 19,
+      "elapsed_ms": 53375,
+      "detail": "Timed out waiting for account control pr-1-diff-split.",
+      "note": "The driver restored both panes but the narrow Files view could not expose its split-mode control.",
+      "source_sha256": {
+        "result.json": "143b7af9b1cc6b2d37fb77032b97b52cce9673a1f3bcc4d4d746fa8ecf3745c7",
+        "pr-native.json": "922fd9153174d98611027f1f15b75b2cb585ef76a1a5481d9791af6d58823fed",
+        "github-access-trace.json": "ae6a6a1891fb0df1b158dec1e295398795673c22d1cc38fd898a3064eab59de4",
+        "binary.json": "779fc4dd8f99cd918fe1d08ef152fc43c020bac72145a9915514767da3ba4029"
+      }
+    },
+    {
+      "run": "e2e-1795057097387-42444",
+      "status": "Pass",
+      "exit_code": 0,
+      "app_source": "174f3102b31c8f8c8475f8771cdd571579ed5d62",
+      "runner_source": "174f3102b31c8f8c8475f8771cdd571579ed5d62",
+      "driver_source": "96af3cc71a863acad9d57b747a7269f7fa6427b4",
+      "checkout_dirty": false,
+      "cached_binary_sha256": "8955aca57f948389db85a2ddb412a470cddf83d768f24aefb618e7304d1ebdc1",
+      "dpi": 96,
+      "actions": 27,
+      "elapsed_ms": 59567,
+      "detail": "Two native tabs displayed Conversation and Files for the same pull request during a held shared review refresh. The same provider revision and draft remained bound, Files kept its split path, and the Conversation showed one partial review page.",
+      "note": "The driver configured the right pane while maximized and restored both views before measuring the shared refresh.",
+      "source_sha256": {
+        "result.json": "f53959117d7f35b5b07ee6e469e6bb103f8fa71e8dc3090efa95dd32a8aef11d",
+        "pr-native.json": "763769f8cefbbbf17549f5a089f5f5a51923700b91ae8aebeac87dda1f0c5fae",
+        "github-access-trace.json": "1bc4213084503988696e49c3f8006c70c47a55abc68751ad91951491802a1ff4",
+        "binary.json": "779fc4dd8f99cd918fe1d08ef152fc43c020bac72145a9915514767da3ba4029"
+      }
+    }
+  ],
+  "held": [
+    {
+      "pane": 0,
+      "tab": "view-45104-1795057114121-0",
+      "item": 1,
+      "revision": 1,
+      "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "section": "Conversation",
+      "provider_draft": false,
+      "review_coverage": "Missing",
+      "review_rows": 0,
+      "selected_file": null,
+      "diff_mode": "Split",
+      "draft": {
+        "id": "review-1",
+        "revision": 4,
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "owner_tab": true,
+        "collapsed": true,
+        "event": "Comment",
+        "saved": true,
+        "queued": false,
+        "summary_nonempty": true,
+        "anchors": [
+          {
+            "path": "src/first.rs",
+            "side": "Right",
+            "first_line": 1,
+            "last_line": 1,
+            "source_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "comment_nonempty": true
+          }
+        ]
+      }
+    },
+    {
+      "pane": 1,
+      "tab": "view-45104-1795057137356-3",
+      "item": 1,
+      "revision": 1,
+      "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "section": "Files",
+      "provider_draft": true,
+      "review_coverage": null,
+      "review_rows": null,
+      "selected_file": "src/first.rs",
+      "diff_mode": "Split",
+      "draft": {
+        "id": "review-1",
+        "revision": 4,
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "owner_tab": false,
+        "collapsed": true,
+        "event": "Comment",
+        "saved": true,
+        "queued": false,
+        "summary_nonempty": true,
+        "anchors": [
+          {
+            "path": "src/first.rs",
+            "side": "Right",
+            "first_line": 1,
+            "last_line": 1,
+            "source_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "comment_nonempty": true
+          }
+        ]
+      }
+    }
+  ],
+  "released": [
+    {
+      "pane": 0,
+      "tab": "view-45104-1795057114121-0",
+      "item": 1,
+      "revision": 1,
+      "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "section": "Conversation",
+      "provider_draft": true,
+      "review_coverage": "Partial",
+      "review_rows": 1,
+      "selected_file": null,
+      "diff_mode": "Split",
+      "draft": {
+        "id": "review-1",
+        "revision": 4,
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "owner_tab": true,
+        "collapsed": true,
+        "event": "Comment",
+        "saved": true,
+        "queued": false,
+        "summary_nonempty": true,
+        "anchors": [
+          {
+            "path": "src/first.rs",
+            "side": "Right",
+            "first_line": 1,
+            "last_line": 1,
+            "source_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "comment_nonempty": true
+          }
+        ]
+      }
+    },
+    {
+      "pane": 1,
+      "tab": "view-45104-1795057137356-3",
+      "item": 1,
+      "revision": 1,
+      "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "section": "Files",
+      "provider_draft": true,
+      "review_coverage": null,
+      "review_rows": null,
+      "selected_file": "src/first.rs",
+      "diff_mode": "Split",
+      "draft": {
+        "id": "review-1",
+        "revision": 4,
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "owner_tab": false,
+        "collapsed": true,
+        "event": "Comment",
+        "saved": true,
+        "queued": false,
+        "summary_nonempty": true,
+        "anchors": [
+          {
+            "path": "src/first.rs",
+            "side": "Right",
+            "first_line": 1,
+            "last_line": 1,
+            "source_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "comment_nonempty": true
+          }
+        ]
+      }
+    }
+  ],
+  "shared_request": {
+    "phase": "pr_shared_hold",
+    "route": "shared_pr_review",
+    "fixture_authorization": true,
+    "status": 200
+  },
+  "request_count": 13,
+  "scope": "Normal Windows native controls and isolated loopback transport. The case checked independent subviews, the exact comparison path, a partial review page and the anchored draft. Distinct nonzero scroll offsets have separate coverage and were outside this run."
+}
