@@ -3,7 +3,7 @@ use std::{
     net::{SocketAddr, TcpListener, TcpStream},
     sync::{
         Arc,
-        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicI64, AtomicU64, AtomicUsize, Ordering},
     },
     thread,
     time::Duration,
@@ -25,7 +25,17 @@ struct Simulator {
     history_branch_phase: Arc<AtomicUsize>,
     check_arrived: Arc<AtomicBool>,
     hold_check_response: Arc<AtomicBool>,
+    probe: Arc<ProbeHold>,
     worker: Option<thread::JoinHandle<()>>,
+}
+
+#[derive(Default)]
+struct ProbeHold {
+    hold: AtomicBool,
+    arrived: AtomicBool,
+    rejected: AtomicBool,
+    requests: AtomicUsize,
+    latest_request_at_ms: AtomicI64,
 }
 
 impl Simulator {
@@ -50,6 +60,8 @@ impl Simulator {
         let hold_check_response = Arc::new(AtomicBool::new(false));
         let (server_check_arrived, server_check_hold) =
             (check_arrived.clone(), hold_check_response.clone());
+        let probe = Arc::new(ProbeHold::default());
+        let server_probe = probe.clone();
         let (server_sso, server_stop, server_requests, server_repository) = (
             sso.clone(),
             stop.clone(),
@@ -75,6 +87,7 @@ impl Simulator {
                             }),
                             &server_check_arrived,
                             &server_check_hold,
+                            &server_probe,
                         ) {
                             server_user_requests.fetch_add(1, Ordering::Relaxed);
                         }
@@ -97,6 +110,7 @@ impl Simulator {
             history_branch_phase,
             check_arrived,
             hold_check_response,
+            probe,
             worker: Some(worker),
         }
     }
@@ -122,6 +136,7 @@ fn respond(
     reader: Option<(SocketAddr, bool, &AtomicUsize)>,
     check_arrived: &AtomicBool,
     hold_check_response: &AtomicBool,
+    probe: &ProbeHold,
 ) -> bool {
     // Windows can inherit the nonblocking listener mode on an accepted socket.
     stream.set_nonblocking(false).unwrap();
@@ -148,6 +163,24 @@ fn respond(
             .lines()
             .any(|line| line.eq_ignore_ascii_case("authorization: Bearer threadline-test-fixture"))
     );
+    let authentication = target == "/user";
+    if authentication {
+        probe.latest_request_at_ms.store(
+            threadline_storage::UtcMillis::now().unwrap().0,
+            Ordering::Release,
+        );
+        probe.requests.fetch_add(1, Ordering::Release);
+    }
+    let interrupted_probe = authentication && probe.hold.load(Ordering::Acquire);
+    if interrupted_probe {
+        probe.arrived.store(true, Ordering::Release);
+        for _ in 0..500 {
+            if !probe.hold.load(Ordering::Acquire) {
+                break;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+    }
     let repo = format!(
         r#"{{"id":{repository_id},"node_id":"synthetic-private-repo","name":"private","owner":{{"login":"fixture-org"}},"private":true,"permissions":{{"pull":true,"push":false,"admin":false}}}}"#
     );
@@ -190,6 +223,8 @@ fn respond(
         reply
     } else {
         match target.as_str() {
+        "/user" if probe.rejected.load(Ordering::Acquire) =>
+            ("401 Unauthorized", String::new(), r#"{"message":"Bad fixture credentials"}"#.into()),
         "/user" => ("200 OK",String::new(),r#"{"id":101,"login":"fixture-user"}"#.to_owned()),
         "/repos/fixture-org/private" if sso => ("403 Forbidden",
             "X-GitHub-SSO: required; url=https://github.com/orgs/fixture-org/sso?authorization_request=synthetic-request\r\n".into(),
@@ -201,8 +236,20 @@ fn respond(
         _ => panic!("unexpected local fixture route"),
     }
     };
-    write!(stream,"HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n{extra}\r\n{body}",body.len()).unwrap();
-    stream.flush().unwrap();
+    let written = write!(stream,"HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n{extra}\r\n{body}",body.len())
+        .and_then(|()| stream.flush());
+    if !interrupted_probe
+        || written.as_ref().is_err_and(|error| {
+            !matches!(
+                error.kind(),
+                std::io::ErrorKind::BrokenPipe
+                    | std::io::ErrorKind::ConnectionReset
+                    | std::io::ErrorKind::ConnectionAborted
+            )
+        })
+    {
+        written.unwrap();
+    }
     target == "/user"
 }
 
@@ -981,6 +1028,100 @@ async fn pr_download_resumes_after_a_leased_http_response_arrives_too_late() {
         .unwrap();
     assert_eq!(checks.state.coverage, Coverage::Complete);
     assert_eq!(checks.rows.len(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn sync_worker_retries_an_interrupted_probe_without_another_check_now() {
+    use crate::sync_worker::SyncWorker;
+    use threadline_core::connectivity::{ConnectionStatus, ProbeTrigger};
+
+    let fixture = Simulator::start();
+    let directory = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open_profile(directory.path()).unwrap());
+    let service = AccountService {
+        store: Arc::clone(&store),
+        credentials: Arc::new(FixtureVault::default()),
+        github: GitHubClient::loopback(fixture.address).unwrap(),
+        fixture: true,
+    };
+    let connected = service
+        .execute(
+            AccountCommand::Connect {
+                repository: "fixture-org/private".into(),
+                pat: Pat::from_input("threadline-test-fixture".into()),
+                renew: None,
+            },
+            &Cancellation::new(),
+        )
+        .await;
+    assert!(connected.github_error.is_none());
+    let account = connected.view.active.unwrap();
+    store
+        .update_sync_settings(account, |settings| {
+            settings.controls.pause_background = true;
+            settings.controls.work_offline = true;
+        })
+        .unwrap();
+    let initial = fixture.probe.requests.load(Ordering::Acquire);
+    let worker = SyncWorker::start_fixture(service, &tokio::runtime::Handle::current());
+    let mut state = worker.watch();
+    worker.wake(Some(ProbeTrigger::Startup));
+    tokio::time::timeout(
+        Duration::from_secs(5),
+        state.wait_for(|update| update.connection.status == ConnectionStatus::Offline),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(fixture.probe.requests.load(Ordering::Acquire), initial);
+    fixture.probe.hold.store(true, Ordering::Release);
+    store
+        .update_sync_settings(account, |settings| settings.controls.work_offline = false)
+        .unwrap();
+    worker.interrupt(Some(ProbeTrigger::NetworkChanged));
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !fixture.probe.arrived.load(Ordering::Acquire) {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+
+    let floor = threadline_storage::UtcMillis::now().unwrap().0 + 1800;
+    store.hold_sync_budget(account, floor).unwrap();
+    for _ in 0..3 {
+        worker.interrupt(None);
+    }
+    fixture.probe.hold.store(false, Ordering::Release);
+    tokio::time::timeout(
+        Duration::from_secs(5),
+        state.wait_for(|update| {
+            update.connection.status == ConnectionStatus::Reachable
+                && update.connection.reason.is_none()
+        }),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(fixture.probe.requests.load(Ordering::Acquire), initial + 2);
+    assert!(fixture.probe.latest_request_at_ms.load(Ordering::Acquire) >= floor);
+    fixture.probe.rejected.store(true, Ordering::Release);
+    worker.wake(Some(ProbeTrigger::CheckNow));
+    tokio::time::timeout(
+        Duration::from_secs(5),
+        state.wait_for(|update| {
+            update.connection.status == ConnectionStatus::Reachable
+                && update.connection.reason == Some(AccessKind::Unauthorized)
+        }),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    for _ in 0..3 {
+        worker.wake(None);
+    }
+    tokio::time::sleep(Duration::from_millis(1150)).await;
+    assert_eq!(fixture.probe.requests.load(Ordering::Acquire), initial + 3);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

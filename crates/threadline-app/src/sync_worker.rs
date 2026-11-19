@@ -506,7 +506,7 @@ async fn run(
                             digest = digest.wrapping_add(u64::from(changed));
                         }
                     }
-                    if attempted != ProbeResult::Deferred {
+                    if !matches!(attempted, ProbeResult::Deferred | ProbeResult::Interrupted) {
                         requested = None;
                     }
                     if attempted == ProbeResult::Unavailable {
@@ -609,6 +609,7 @@ enum ProbeResult {
     Attempted,
     UnavailableResponse,
     Deferred,
+    Interrupted,
     Unavailable,
 }
 
@@ -623,7 +624,7 @@ async fn probe(
 ) -> ProbeResult {
     if cancel.is_cancelled() {
         core.record(id, Reachability::NotAttempted, Some(AccessKind::Cancelled));
-        return ProbeResult::Unavailable;
+        return ProbeResult::Interrupted;
     }
     let account = profile.account;
     let admitted = blocking(store, move |store| {
@@ -644,7 +645,7 @@ async fn probe(
     let result = accounts.reader_session_with_guidance(profile, cancel).await;
     if cancel.is_cancelled() {
         core.record(id, Reachability::NotAttempted, Some(AccessKind::Cancelled));
-        return ProbeResult::Unavailable;
+        return ProbeResult::Interrupted;
     }
     match result {
         Ok((session, rate)) => {
