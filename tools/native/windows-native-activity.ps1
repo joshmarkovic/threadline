@@ -17,7 +17,7 @@ function Read-NativeActivityFixture([string]$Profile, [string]$Stage, [string]$N
 
 function Initialize-NativeActivity([string]$Profile, [string]$Receipt) {
     $seeded = Read-NativeActivityFixture $Profile 'seed' $Receipt
-    if ($seeded.fixture_revision -cne 's11-native-activity-v2' -or @($seeded.feed).Count -ne 0 -or
+    if ($seeded.fixture_revision -cne 's11-native-activity-v3' -or @($seeded.feed).Count -ne 0 -or
         $seeded.delivered_groups -ne 0 -or $seeded.opened_tabs -ne 0) {
         throw 'The initial repository fixture contained current delivery, activity, or opened-item state.'
     }
@@ -60,6 +60,26 @@ function Start-NativeActivitySync([IntPtr]$Window, [string]$Phase) {
     }
 }
 
+function Wait-NativeActivityDelivery([string]$Profile, [string]$Stage, [string]$Description, [int]$Timeout) {
+    try {
+        Wait-For $Description { @((Read-NativeActivityCapture $Profile)).Count -ge 2 } $Timeout 200
+    } catch {
+        $failure = $_
+        try {
+            $observed = Read-NativeActivityFixture $Profile 'inspect' "native-activity-$Stage-timeout.json"
+            Add-Evidence 'Inspect the durable fixture activity after the delivery wait' ([ordered]@{
+                stage = $Stage
+                feed_count = @($observed.feed).Count
+                suppressed = $observed.suppressed
+                delivered_groups = $observed.delivered_groups
+                capture_count = @((Read-NativeActivityCapture $Profile)).Count
+            })
+        } finally {
+            throw $failure
+        }
+    }
+}
+
 function Invoke-NativeActivityProof([IntPtr]$Window, [string]$Profile) {
     Start-NativeActivitySync $Window 'activity-baseline'
     Wait-For 'the bounded background activity baseline' {
@@ -85,24 +105,7 @@ function Invoke-NativeActivityProof([IntPtr]$Window, [string]$Profile) {
     Add-Evidence 'Download the old pull request and retain a zero-alert baseline' $baseline
 
     Set-AccessPhase 'activity-fresh'
-    try {
-        Wait-For 'the native activity worker groups the human review and emits the unopened issue alert' {
-            @((Read-NativeActivityCapture $Profile)).Count -ge 2
-        } 70000 200
-    } catch {
-        $failure = $_
-        try {
-            $observed = Read-NativeActivityFixture $Profile 'inspect' 'native-activity-fresh-timeout.json'
-            Add-Evidence 'Inspect the durable fixture activity after the delivery wait' ([ordered]@{
-                feed_count = @($observed.feed).Count
-                suppressed = $observed.suppressed
-                delivered_groups = $observed.delivered_groups
-                capture_count = @((Read-NativeActivityCapture $Profile)).Count
-            })
-        } finally {
-            throw $failure
-        }
-    }
+    Wait-NativeActivityDelivery $Profile 'fresh' 'the native activity worker groups the human review and emits the unopened issue alert' 70000
     $fresh = Read-NativeActivityFixture $Profile 'inspect' 'native-activity-fresh.json'
     $grouped = @(Read-NativeActivityCapture $Profile)
     $issue = @($fresh.feed | Where-Object { $_.key -cmatch '^github:comments:6101:comment_created:' })
@@ -140,9 +143,7 @@ function Invoke-NativeActivityProof([IntPtr]$Window, [string]$Profile) {
     Initialize-NativeActivity $catchupProfile 'native-activity-catchup-seeded.json'
     $catchup = Start-NativeActivityWindow $catchupProfile 'native-activity-catchup-observation.json'
     Start-NativeActivitySync $catchup 'activity-catchup'
-    Wait-For 'one catch-up digest and the separately watched branch comparison' {
-        @((Read-NativeActivityCapture $catchupProfile)).Count -ge 2
-    } 60000 200
+    Wait-NativeActivityDelivery $catchupProfile 'catchup' 'one catch-up digest and the separately watched branch comparison' 60000
     $catchupResult = Read-NativeActivityFixture $catchupProfile 'inspect' 'native-activity-catchup.json'
     $catchupGroups = @(Read-NativeActivityCapture $catchupProfile)
     $merge = @($catchupResult.feed | Where-Object { $_.kind -ceq 'pr_merged' })
