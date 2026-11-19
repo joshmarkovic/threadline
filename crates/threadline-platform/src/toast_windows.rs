@@ -562,7 +562,6 @@ fn corroborate_unknown_sender(app_id: &str, key: &str) -> Result<(), PlatformErr
             Ok(true) => return Ok(()),
             Ok(false) => (),
             Err(error) if error.code() == windows::core::HRESULT::from_win32(ERROR_NOT_FOUND.0) => {
-                ()
             }
             Err(error) => {
                 return Err(native_error(
