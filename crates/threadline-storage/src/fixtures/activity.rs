@@ -12,7 +12,7 @@ use crate::{
 };
 use std::num::NonZeroU64;
 
-pub const ACTIVITY_FIXTURE_REVISION: &str = "s11-native-activity-v1";
+pub const ACTIVITY_FIXTURE_REVISION: &str = "s11-native-activity-v2";
 pub const WATCH_BASE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 pub fn prepare_native_activity(store: &Store, now: i64) -> Result<()> {
@@ -105,6 +105,11 @@ pub fn prepare_native_activity(store: &Store, now: i64) -> Result<()> {
     store.schedule_selected_activity(account, old)?;
     store.write(|db| {
         db.execute(
+            "INSERT INTO activity_baselines (repository_id,stream_key,checkpoint,observed_at_ms)
+             VALUES (?1,'comments',?2,?3)",
+            params![repository, old.to_string(), old],
+        )?;
+        db.execute(
             "UPDATE scheduled_reads SET watermark=?2, last_success=?2 WHERE account_id=?1",
             params![account, old],
         )?;
@@ -178,6 +183,12 @@ pub fn inspect_native_activity(store: &Store) -> Result<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        notifications::{EventActor, PopupAvailability},
+        reader::DiscussionComment,
+        resources::{ResourceFamily, Validators},
+        sync::{ObservationPage, ObservedComment, ReadCompletion},
+    };
 
     #[test]
     fn native_activity_fixture_seeds_only_predecessors() {
@@ -216,5 +227,73 @@ mod tests {
         assert_eq!(receipt["delivered_groups"], 0);
         assert_eq!(receipt["opened_tabs"], 0);
         assert_eq!(receipt["feed"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn activity_fixture_saved_monitoring_baseline_accepts_an_older_offline_comment() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open_profile(dir.path()).unwrap();
+        let now = 1_700_000_000_000;
+        prepare_native_activity(&store, now).unwrap();
+        let account = store.active_github_account().unwrap().unwrap();
+        store
+            .update_sync_settings(account, |state| state.controls.work_offline = false)
+            .unwrap();
+        let since_offline = now - 20 * 60_000;
+        let mut claim = None;
+        let mut clock = now;
+        for _ in 0..20 {
+            let next = store.claim_sync_read(account, clock).unwrap().unwrap();
+            if next.target.family == ResourceFamily::Comments && next.target.item.is_none() {
+                claim = Some(next);
+                break;
+            }
+            store
+                .finish_sync_read(
+                    &next,
+                    ReadCompletion::Fetched(Validators::default()),
+                    clock,
+                    "UTC",
+                )
+                .unwrap();
+            clock += 1_000;
+        }
+        store
+            .commit_observed_page(
+                &claim.unwrap(),
+                ObservationPage {
+                    items: Vec::new(),
+                    comments: vec![ObservedComment {
+                        number: 44,
+                        comment: DiscussionComment {
+                            provider_id: 6102,
+                            node_id: None,
+                            author: Some("fixture-human".into()),
+                            created_at_ms: since_offline,
+                            updated_at_ms: since_offline,
+                            body: "Received while offline".into(),
+                        },
+                        actor: EventActor {
+                            user_id: NonZeroU64::new(92),
+                            ..Default::default()
+                        },
+                    }],
+                    next_cursor: None,
+                    validators: Validators::default(),
+                },
+                clock,
+                "UTC",
+            )
+            .unwrap();
+        store
+            .process_notification_events(account, clock, "UTC", PopupAvailability::Enabled, 20)
+            .unwrap();
+        let receipt = inspect_native_activity(&store).unwrap();
+        assert_eq!(receipt["feed"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            receipt["feed"][0]["key"],
+            format!("github:comments:6102:comment_created:{since_offline}")
+        );
+        assert_eq!(receipt["opened_tabs"], 0);
     }
 }

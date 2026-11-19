@@ -17,7 +17,7 @@ function Read-NativeActivityFixture([string]$Profile, [string]$Stage, [string]$N
 
 function Initialize-NativeActivity([string]$Profile, [string]$Receipt) {
     $seeded = Read-NativeActivityFixture $Profile 'seed' $Receipt
-    if ($seeded.fixture_revision -cne 's11-native-activity-v1' -or @($seeded.feed).Count -ne 0 -or
+    if ($seeded.fixture_revision -cne 's11-native-activity-v2' -or @($seeded.feed).Count -ne 0 -or
         $seeded.delivered_groups -ne 0 -or $seeded.opened_tabs -ne 0) {
         throw 'The initial repository fixture contained current delivery, activity, or opened-item state.'
     }
@@ -85,9 +85,24 @@ function Invoke-NativeActivityProof([IntPtr]$Window, [string]$Profile) {
     Add-Evidence 'Download the old pull request and retain a zero-alert baseline' $baseline
 
     Set-AccessPhase 'activity-fresh'
-    Wait-For 'the native activity worker groups the human review and emits the unopened issue alert' {
-        @((Read-NativeActivityCapture $Profile)).Count -ge 2
-    } 55000 200
+    try {
+        Wait-For 'the native activity worker groups the human review and emits the unopened issue alert' {
+            @((Read-NativeActivityCapture $Profile)).Count -ge 2
+        } 70000 200
+    } catch {
+        $failure = $_
+        try {
+            $observed = Read-NativeActivityFixture $Profile 'inspect' 'native-activity-fresh-timeout.json'
+            Add-Evidence 'Inspect the durable fixture activity after the delivery wait' ([ordered]@{
+                feed_count = @($observed.feed).Count
+                suppressed = $observed.suppressed
+                delivered_groups = $observed.delivered_groups
+                capture_count = @((Read-NativeActivityCapture $Profile)).Count
+            })
+        } finally {
+            throw $failure
+        }
+    }
     $fresh = Read-NativeActivityFixture $Profile 'inspect' 'native-activity-fresh.json'
     $grouped = @(Read-NativeActivityCapture $Profile)
     $issue = @($fresh.feed | Where-Object { $_.key -cmatch '^github:comments:6101:comment_created:' })

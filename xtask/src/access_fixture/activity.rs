@@ -25,6 +25,13 @@ fn date(minutes: i64) -> String {
         .to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
+fn fresh_date() -> String {
+    static CLOCK: OnceLock<DateTime<Utc>> = OnceLock::new();
+    CLOCK
+        .get_or_init(Utc::now)
+        .to_rfc3339_opts(SecondsFormat::Millis, true)
+}
+
 pub(super) fn read_route(phase: Phase, target: &str) -> Option<Route> {
     if !active(phase) {
         return None;
@@ -158,7 +165,8 @@ pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
     let fresh = matches!(phase, Phase::ActivityFresh);
     let catchup = matches!(phase, Phase::ActivityCatchup | Phase::ActivityReplay);
     let old = date(240);
-    let recent = date(0);
+    // The driver enters this phase only after the first real observation walks commit.
+    let recent = if fresh { fresh_date() } else { date(0) };
     let delayed = date(20);
     let reply = |body| {
         Some(Response {
@@ -274,6 +282,31 @@ pub(super) fn trace(records: &[RequestEvidence]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn new_fixture_events_have_stable_timestamps_after_the_monitoring_baseline() {
+        let phase = Phase::ActivityBaseline;
+        let baseline = response(phase, Route::UpdatedItems).unwrap();
+        let baseline = baseline.body[0]["updated_at"].as_str().unwrap();
+        let cutoff = Utc::now();
+        let phase = Phase::ActivityFresh;
+        let ordinary = response(phase, Route::UpdatedComments).unwrap();
+        let inline = response(phase, Route::UpdatedInlineComments).unwrap();
+        let timeline = response(phase, Route::PullActivityA).unwrap();
+        let rows = &timeline.body["data"]["repository"]["pullRequest"]["timelineItems"]["nodes"];
+        let occurred = ordinary.body[0]["created_at"].as_str().unwrap();
+        let ms = |stamp: &str| {
+            DateTime::parse_from_rfc3339(stamp)
+                .unwrap()
+                .timestamp_millis()
+        };
+        assert!(ms(occurred) >= cutoff.timestamp_millis());
+        assert!(ms(occurred) >= ms(baseline));
+        assert_eq!(inline.body[0]["created_at"], occurred);
+        assert_eq!(rows[1]["submittedAt"], occurred);
+        let retry = response(phase, Route::UpdatedComments).unwrap();
+        assert_eq!(retry.body, ordinary.body);
+    }
 
     #[test]
     fn activity_fixture_accepts_the_monitored_check_and_old_pr_download_paths() {
