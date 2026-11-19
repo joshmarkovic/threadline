@@ -197,5 +197,46 @@
       "evidence": "canonical-local-install.json",
       "proof": "Staged local upgrade and repair retained seeded durable state under the local package lane."
     }
-  ]
+  ],
+  "editor_submit": {
+    "case": "UI-006",
+    "selected_test": "reader_workspace::tests::ui_006_failed_enqueue_keeps_the_saved_comment_and_reports_the_failure",
+    "failure": "A second SQLite connection held a write reservation on the generated fixture database. The normal Queue comment action reported failure and the saved input was still editable.",
+    "rollback": "No operation or local pending projection was added. The stored draft matched the input. After release, retry created exactly one queued comment. A normal functional scroll and pending-row click opened the bound follow-up editor.",
+    "portable": {
+      "source_base": "cb49699",
+      "source_patch_sha256": "c0d59f46cfab42b31b4caca20feb530d30e228a91e058362d54a305768353dba",
+      "host": "WSL Linux x64",
+      "binary_sha256": "7cfbe333f22f0810dbad7ba886fce0761ab966fd42bd73e4be536fe5e0991d5d",
+      "log_sha256": "18b5e58567c8224f356ec25092ad20d003c4fffc5b38745195a99a00d4db5a57",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "threadline-app",
+        "--features",
+        "e2e",
+        "--lib",
+        "ui_006_failed_enqueue"
+      ],
+      "status": "Pass",
+      "test_count": 1,
+      "runtime_seconds": 15.57
+    },
+    "windows": {
+      "source_revision": "1375feb00b434069474bd3f53e3023648c979a33",
+      "host": "Windows 11 Enterprise x64, build 22631.7652",
+      "binary_sha256": "4d1b6be13a35388a9ee040027a47a470f3b4c09619ea2302339cea9d5ebe6c44",
+      "log_sha256": "da7cc7e9ea88044b9f855b53cb887a035193b7315e14f9d83c9f68b29890127f",
+      "test_binary_argv": [
+        "--exact",
+        "reader_workspace::tests::ui_006_failed_enqueue_keeps_the_saved_comment_and_reports_the_failure"
+      ],
+      "status": "Pass",
+      "test_count": 1,
+      "exit_code": 0,
+      "runtime_seconds": 15.02
+    }
+  }
 }
