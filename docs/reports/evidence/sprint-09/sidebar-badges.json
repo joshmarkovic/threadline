@@ -1,0 +1,157 @@
+{
+  "scenario": "AC-81",
+  "paint_regression": {
+    "fix": "601c07aade38e7f19670ddb6a94c05a7d55588c4",
+    "original_single_digit": {
+      "expected": [
+        23,
+        23
+      ],
+      "clipped": [
+        23,
+        22
+      ]
+    },
+    "designed_colors": {
+      "circle": "#173e70",
+      "digits": "#ffffff",
+      "contrast_ratio": 10.72
+    },
+    "generated_positive_totals": [
+      7,
+      42,
+      901
+    ],
+    "simulated_scale_factors": [
+      1,
+      1.5,
+      2
+    ],
+    "geometry": [
+      "Full painted quad inside content mask",
+      "Four full-radius corners",
+      "Same right edge across all three controls",
+      "Centered digits without overlapping the rail label"
+    ],
+    "zero_and_unknown": [
+      "Known zero",
+      "Partial zero",
+      "Count pending"
+    ],
+    "test_filter": "ui_005_sidebar_",
+    "linux_gpui": {
+      "passed": 2,
+      "failed": 0,
+      "log_sha256": "61dd5cf98867c4c552a6210bc46fc574da9597f13adda34b4eaa6adeff5d5831"
+    }
+  },
+  "windows_fixture_runs": [
+    {
+      "raw_directory": "sidebar-c8f2412.UdTOWr",
+      "app_revision": "c8f241294e2420a827cd09e006ba1b0e8ab05dd1",
+      "driver": "cdc3a330c8ba48d576bd1b83e28bec0e51ee3385",
+      "app_sha256": "915f528d63723235dbda434a5fe214edb67c7efdb4a96cd29ef9931c84194c1a",
+      "status": "Fail",
+      "detail": "Timed out waiting for the signed-out offline archive and its known Outbox total.",
+      "os": "Microsoft Windows 11 Enterprise",
+      "os_version": "10.0.22631",
+      "architecture": "AMD64",
+      "hwnd_dpi": 96,
+      "app_scale": 1,
+      "fixture": {
+        "revision": "s04-reader-v1",
+        "seed": 12345,
+        "items": 50000,
+        "comments": 250000,
+        "open_tabs": 20,
+        "unresolved_outbox": 900
+      },
+      "cached_reader_observed": false,
+      "source_sha256": {
+        "sidebar-badges-native.json": "a2af4d505a0d142fc39b1fa529b1467e1814d07efb1cfb0ee89b9ccda6dc7ea0",
+        "reader-fixture.json": "3eaf392876dd69f664ea0c6cb06da4bd2ec48c23b7b6a85d8de776d8c032422d",
+        "ui-observation.json": "5fc9cc2d4860c92929f9eef3ba42cdb529aefb1241e5ad5d0d77388d9afee4cc"
+      },
+      "exit_code": 1
+    },
+    {
+      "raw_directory": "sidebar-loopback-c8f2412.DUjo0j",
+      "app_revision": "c8f241294e2420a827cd09e006ba1b0e8ab05dd1",
+      "driver": {
+        "base": "cdc3a330c8ba48d576bd1b83e28bec0e51ee3385",
+        "applied_patch_sha256": "042a321b5e15bc001ca3579f163fb0ccad3360368a0a8a8c26a7425844ca0666",
+        "revision": "660d828effe8fd9cee8399a2db42830bf1047eb0",
+        "executed_as": "isolated checkout with the same patched PowerShell driver"
+      },
+      "app_sha256": "915f528d63723235dbda434a5fe214edb67c7efdb4a96cd29ef9931c84194c1a",
+      "status": "Blocked",
+      "detail": "PrintWindow did not expose the expected badge color from the owned GPU client.",
+      "os": "Microsoft Windows 11 Enterprise",
+      "os_version": "10.0.22631",
+      "architecture": "AMD64",
+      "hwnd_dpi": 96,
+      "app_scale": 1,
+      "fixture": {
+        "revision": "s04-reader-v1",
+        "seed": 12345,
+        "items": 50000,
+        "comments": 250000,
+        "open_tabs": 20,
+        "unresolved_outbox": 900
+      },
+      "cached_reader_observed": true,
+      "sidebar": {
+        "dpi": 96,
+        "scale": 1,
+        "rows": [
+          {
+            "id": "reader-review",
+            "total": 5555,
+            "coverage": "complete cached count",
+            "blue": 0,
+            "white_digits": 0,
+            "width_px": 0,
+            "height_px": 0,
+            "right_px": 0,
+            "right_inset_px": 208,
+            "digit_offset_x_px": 0,
+            "digit_offset_y_px": 0
+          },
+          {
+            "id": "reader-assigned",
+            "total": 7142,
+            "coverage": "complete cached count",
+            "blue": 0,
+            "white_digits": 0,
+            "width_px": 0,
+            "height_px": 0,
+            "right_px": 0,
+            "right_inset_px": 208,
+            "digit_offset_x_px": 0,
+            "digit_offset_y_px": 0
+          },
+          {
+            "id": "reader-outbox",
+            "total": 900,
+            "coverage": "complete cached count",
+            "blue": 0,
+            "white_digits": 0,
+            "width_px": 0,
+            "height_px": 0,
+            "right_px": 0,
+            "right_inset_px": 208,
+            "digit_offset_x_px": 0,
+            "digit_offset_y_px": 0
+          }
+        ]
+      },
+      "source_sha256": {
+        "sidebar-badges-native.json": "575ff06afeb38464db92dda16ac87163416c15dafc02fc23af6a56cf1aa0898e",
+        "reader-fixture.json": "3eaf392876dd69f664ea0c6cb06da4bd2ec48c23b7b6a85d8de776d8c032422d",
+        "ui-observation.json": "52180da759a1f154b1c57d707dd60aa0fea04462576ad232ecfa4a0893dd73e9"
+      },
+      "exit_code": 78
+    }
+  ],
+  "saved_pixel_images": 0
+}

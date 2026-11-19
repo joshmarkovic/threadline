@@ -19,3 +19,7 @@ LIVE-004 passed for the designated disposable pull request 3. The authorized cli
 For the passing E2E-010 run, a fixture-only accessibility action filled the masked field with the fixed synthetic credential. The normal account form performed access checks, replacement, sign-out and account switching. The normal Outbox worker performed the final send. The 34 local provider requests included no offline traffic. The guarded physical typing attempt is recorded separately. [Native account and request observations](evidence/sprint-09/native-verification.json)
 
 The native commands used `cargo xtask test e2e --suite full --case <case> --binary <binary-path> --seed 12345 --report-dir <report-dir>`. These runs used the local synthetic GitHub provider. [Native Windows receipts](evidence/sprint-09/native-verification.json) · [Sprint requirements](../spec/sprints/sprint_09_merge_workflows.md)
+
+### Sidebar count badges
+
+A small rail button clipped one physical pixel from a 23-pixel badge at 100% scale. The row now fits its full circle. GPUI paint tests checked aligned circles and centered digits for 7, 42 and 901 at modeled 100%, 150% and 200% scale, plus zero and unknown counts. The Windows 11 reader at 96 DPI exposed 5,555 review requests, 7,142 assigned items and 900 unresolved Outbox actions in the signed-out offline fixture. The owned-window capture returned no badge-colored pixels, so displayed geometry on a real high-DPI desktop remains open. [Paint tests and both native attempts](evidence/sprint-09/sidebar-badges.json)
