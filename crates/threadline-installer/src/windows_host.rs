@@ -1,5 +1,5 @@
 use std::{mem::size_of, path::Path};
-use threadline_installer::Platform;
+use threadline_installer::{LaunchEnvironment, Platform};
 use threadline_platform::{NativePaths, PathResolver};
 use windows::Win32::{
     Foundation::HMODULE,
@@ -37,6 +37,20 @@ pub(super) fn detect() -> Result<Platform, &'static str> {
     {
         return Err("Windows could not report its native platform and build.");
     }
+    let paths = NativePaths
+        .application_paths()
+        .map_err(|_| "Windows could not locate the application data directory.")?;
+    let profile_schema = schema_of(&paths.data.join("threadline.sqlite3"))?;
+    Ok(Platform {
+        native_x64: native == IMAGE_FILE_MACHINE_AMD64,
+        workstation: version.wProductType == 1,
+        build: version.dwBuildNumber,
+        highest_build: highest_build()?,
+        profile_schema,
+    })
+}
+
+pub(super) fn require_launch_ready() -> Result<(), &'static str> {
     let desk = unsafe { OpenInputDesktop(0, 0, DESKTOP_READOBJECTS) };
     let desktop = !desk.is_null();
     if desktop {
@@ -65,19 +79,7 @@ pub(super) fn detect() -> Result<Platform, &'static str> {
             }
             .is_ok()
         });
-    let paths = NativePaths
-        .application_paths()
-        .map_err(|_| "Windows could not locate the application data directory.")?;
-    let profile_schema = schema_of(&paths.data.join("threadline.sqlite3"))?;
-    Ok(Platform {
-        native_x64: native == IMAGE_FILE_MACHINE_AMD64,
-        workstation: version.wProductType == 1,
-        build: version.dwBuildNumber,
-        graphics,
-        desktop,
-        highest_build: highest_build()?,
-        profile_schema,
-    })
+    LaunchEnvironment { graphics, desktop }.check()
 }
 fn schema_of(path: &Path) -> Result<Option<u32>, &'static str> {
     match std::fs::metadata(path) {

@@ -6,7 +6,8 @@ param(
     [Parameter(Mandatory=$true)][ValidatePattern('^[0-9A-Fa-f]{64}$')][string]$ManifestSha256,
     [Parameter(Mandatory=$true)][string]$RetainedFixture,
     [Parameter(Mandatory=$true)][ValidatePattern('^[0-9A-Fa-f]{64}$')][string]$RetainedSha256,
-    [Parameter(Mandatory=$true)][string]$Report
+    [Parameter(Mandatory=$true)][string]$Report,
+    [switch]$ExpectDisconnected
 )
 
 Set-StrictMode -Version Latest
@@ -65,7 +66,7 @@ $currentManifest = Join-Path $offline $manifestName
 $candidate = Join-Path $offline $leaf
 $cases = New-Object 'System.Collections.Generic.List[object]'
 
-function Verify-Case([string]$Name, [int]$Exit, [string]$Expected) {
+function Verify-Case([string]$Name, [int]$Exit, [string]$Expected, [switch]$InstallPreflight) {
     $info = New-Object Diagnostics.ProcessStartInfo
     $info.FileName = $Bootstrap
     $info.UseShellExecute = $false
@@ -76,7 +77,12 @@ function Verify-Case([string]$Name, [int]$Exit, [string]$Expected) {
     $info.EnvironmentVariables['TEMP'] = $stage
     $info.WorkingDirectory = $work
     $pin = Digest $currentManifest
-    $info.Arguments = '--version "{0}" --channel "{1}" --manifest-sha256 {2} --offline-dir "{3}" --verify-only' -f $manifest.version,$manifest.channel,$pin,$offline
+    if ($InstallPreflight) {
+        $pin = '0' * 64
+        if ($pin -eq (Digest $currentManifest)) { throw 'The guard pin must differ from the actual manifest.' }
+    }
+    $info.Arguments = '--version "{0}" --channel "{1}" --manifest-sha256 {2} --offline-dir "{3}"' -f $manifest.version,$manifest.channel,$pin,$offline
+    if (-not $InstallPreflight) { $info.Arguments += ' --verify-only' }
     $process = [Diagnostics.Process]::Start($info)
     try {
         $stdout = $process.StandardOutput.ReadToEndAsync()
@@ -89,7 +95,7 @@ function Verify-Case([string]$Name, [int]$Exit, [string]$Expected) {
         $unchanged = ((Installed-Fixture | ConvertTo-Json -Compress) -ceq ($before | ConvertTo-Json -Compress))
         $left = @(Get-ChildItem -LiteralPath $stage -Force).Count
         if (-not $unchanged -or $left -ne 0) { throw 'A bootstrap case changed the installed fixture or left staging files.' }
-        $cases.Add([ordered]@{case=$Name;exit_code=$process.ExitCode;message=$message;manifest_sha256=$pin;
+        $cases.Add([ordered]@{case=$Name;exit_code=$process.ExitCode;message=$message;supplied_manifest_sha256=$pin;verify_only=(-not $InstallPreflight);
             asset_bytes=(Get-Item -LiteralPath $candidate).Length;staging_entries_after=$left;retained_unchanged=$unchanged})
     } finally { $process.Dispose() }
 }
@@ -98,6 +104,9 @@ try {
     Copy-Item -LiteralPath $sourceManifest -Destination $currentManifest
     Copy-Item -LiteralPath $signed -Destination $candidate
     Verify-Case 'valid_signed_fixture' 0 'Verified Threadline'
+    if ($ExpectDisconnected) {
+        Verify-Case 'normal_setup_requires_desktop' 1 'Run setup in an interactive Windows desktop session.' -InstallPreflight
+    }
 
     $wrong = Get-Content -LiteralPath $currentManifest -Raw | ConvertFrom-Json
     $wrong.target = 'aarch64-pc-windows-msvc'
@@ -127,7 +136,7 @@ try {
 
     $receipt = [ordered]@{status='Pass';os_build=[Environment]::OSVersion.Version.Build;architecture=$env:PROCESSOR_ARCHITECTURE;
         shell_version=$PSVersionTable.PSVersion.ToString();bootstrap_sha256=$BootstrapSha256;fixture_manifest_sha256=$ManifestSha256;
-        fixture_payload_sha256=$manifest.sha256;expected_asset_bytes=$manifest.size;retained_fixture=$before;verify_only=$true;cases=$cases}
+        fixture_payload_sha256=$manifest.sha256;expected_asset_bytes=$manifest.size;retained_fixture=$before;cases=$cases}
     [IO.File]::WriteAllText($Report, ($receipt | ConvertTo-Json -Depth 7), $utf8)
 } finally {
     if (Test-Path -LiteralPath $work) { Remove-Item -LiteralPath $work -Recurse -Force }

@@ -68,8 +68,6 @@ pub struct Platform {
     pub native_x64: bool,
     pub workstation: bool,
     pub build: u32,
-    pub graphics: bool,
-    pub desktop: bool,
     pub highest_build: u32,
     pub profile_schema: Option<u32>,
 }
@@ -78,6 +76,16 @@ impl Platform {
         if !self.native_x64 || !self.workstation || self.build < 22000 {
             return Err("Threadline requires Windows 11 on native x64 hardware.");
         }
+        Ok(())
+    }
+}
+
+pub struct LaunchEnvironment {
+    pub graphics: bool,
+    pub desktop: bool,
+}
+impl LaunchEnvironment {
+    pub fn check(&self) -> Result<()> {
         if !self.desktop {
             return Err("Run setup in an interactive Windows desktop session.");
         }

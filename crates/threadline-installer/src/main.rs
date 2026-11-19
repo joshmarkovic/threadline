@@ -90,6 +90,10 @@ async fn run() -> Result<(), &'static str> {
     {
         use std::process::Command;
         let host = windows_host::detect()?;
+        if !request.verify_only {
+            host.check()?;
+            windows_host::require_launch_ready()?;
+        }
         let staged = source
             .stage(&request.selection, &host, request.offline.as_deref())
             .await?;
@@ -103,6 +107,7 @@ async fn run() -> Result<(), &'static str> {
             );
             return Ok(());
         }
+        windows_host::require_launch_ready()?;
         let result = Command::new(&staged.path).status().map_err(|_| {
             "Windows prevented setup from starting. Check organization policy or use the verified manual installer."
         })?;

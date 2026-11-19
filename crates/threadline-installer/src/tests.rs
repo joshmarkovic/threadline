@@ -22,8 +22,6 @@ fn platform() -> Platform {
         native_x64: true,
         workstation: true,
         build: 22631,
-        graphics: true,
-        desktop: true,
         highest_build: 3,
         profile_schema: Some(7),
     }
@@ -109,16 +107,12 @@ fn ut_019_selects_exact_version_channel_architecture_schema_and_safe_asset() {
             build: 21999,
             ..platform()
         },
-        Platform {
-            graphics: false,
-            ..platform()
-        },
-        Platform {
-            desktop: false,
-            ..platform()
-        },
     ] {
         assert!(source.select(&raw, &request(&raw), &p).is_err());
+    }
+    for (desktop, graphics) in [(false, true), (true, false), (true, true)] {
+        let environment = LaunchEnvironment { desktop, graphics };
+        assert_eq!(environment.check().is_ok(), desktop && graphics);
     }
     assert!(Selection::new("1.2.3-beta.1", "stable", &digest(b"m")).is_err());
     assert!(Source::https("http://example.invalid/release/", &digest(b"f")).is_err());
