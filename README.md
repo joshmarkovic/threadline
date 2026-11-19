@@ -14,6 +14,8 @@ Open **Accounts**, enter the private repository as `owner/repository`, paste its
 
 The per-user Windows 11 x64 development installer has been tested locally. The signed public package and its end-user download command remain pending. Developers can build and exercise the local installer. [Windows packaging guide](tools/windows/README.md) · [Package evidence](docs/reports/sprint-12.md)
 
+Uninstall preserves your local workspace and sign-in credentials. To preview or permanently remove the retained data, use the separate Windows cleanup command. [Remove a retained local workspace](tools/windows/README.md#remove-a-retained-local-workspace)
+
 The reports record which configurations and scenarios have actually run. The sprint pack contains the acceptance criteria and traceability ledgers. [Sprint reports](docs/reports/) · [Architecture](docs/architecture/foundation.md) · [Version 1.7 sprint pack](docs/spec/README.md)
 
 ## Test the workspace

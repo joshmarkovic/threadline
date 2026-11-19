@@ -18,6 +18,17 @@ The example uses local build ordinal 2 and schema 10. For schema 14 and later, b
 
 Use the actual version and schema from the chosen source revision. The sibling `.exe.json` records the setup and exact installed executable digests. Verify the former against the separately recorded digest from the build before running the local fixture. Launch setup normally or with `/S` and wait for completion. Start the app through **Threadline Installer Test** in the Start menu. Use the Windows installed-apps entry or `Uninstall.exe` in the fixture directory to uninstall. The fixture retains `HKCU\Software\Threadline.InstallTest` build history to reject older test packages after uninstall.
 
+### Remove a retained local workspace
+
+Ordinary uninstall preserves your data and credentials. To remove them, quit Threadline and run the separate Windows bootstrap from a terminal. These commands work offline, including after uninstall.
+
+```powershell
+.\threadline-installer.exe --preview-local-removal
+.\threadline-installer.exe --remove-local-data-and-credentials
+```
+
+The preview counts accounts, drafts, unresolved Outbox operations, managed SQLite files and recorded credential references in this Windows user's default workspace. It reports rows in migration backups separately. The removal command repeats the preview and asks you to type `REMOVE LOCAL WORKSPACE`. Confirming erases the listed databases and backups, including cached content, preferences, layouts, drafts and pending work for every local account. It also removes their recorded Windows Credential Manager entries. A request already sent to GitHub may still complete. User-named exports and other files stay in place.
+
 Run the canonical local case from a native Windows checkout with the fixture uninstalled.
 
 ```powershell

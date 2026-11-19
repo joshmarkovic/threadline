@@ -2,6 +2,8 @@ use std::{path::PathBuf, process::ExitCode};
 use threadline_installer::{Selection, Source};
 
 #[cfg(windows)]
+mod cleanup;
+#[cfg(windows)]
 mod windows_host;
 
 struct Request {
@@ -74,6 +76,18 @@ async fn main() -> ExitCode {
     }
 }
 async fn run() -> Result<(), &'static str> {
+    let mut arguments = std::env::args_os().skip(1);
+    if let Some(option) = arguments.next()
+        && (option == "--preview-local-removal" || option == "--remove-local-data-and-credentials")
+    {
+        if arguments.next().is_some() {
+            return Err("The local removal commands accept no additional arguments or paths.");
+        }
+        #[cfg(windows)]
+        return cleanup::command(option == "--remove-local-data-and-credentials");
+        #[cfg(not(windows))]
+        return Err("This local workspace removal command requires Windows.");
+    }
     let request = request()?;
     let source = configured_source()?;
     #[cfg(not(windows))]
