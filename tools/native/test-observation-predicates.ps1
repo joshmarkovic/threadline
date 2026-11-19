@@ -356,25 +356,42 @@ $null = [IO.Directory]::CreateDirectory($scratch)
 try {
     function Stop-Blocked([string]$Message) { throw $Message }
     $script:AccessPhaseFile = Join-Path $scratch 'access-fixture-phase.txt'
-    $pending = Join-Path $scratch 'reader-feed-pending.txt'
-    $ack = Join-Path $scratch 'reader-feed-observed.txt'
-    [IO.File]::WriteAllText($pending, '2')
+    $held = Join-Path $scratch 'reader-feed-2-held'
+    $ack = Join-Path $scratch 'reader-feed-2-painted'
+    $served = Join-Path $scratch 'reader-feed-2-served'
+    [IO.File]::WriteAllText($held, '')
     $script:app = [pscustomobject]@{ HasExited = $false }
     Wait-ConcurrentFeed 2
+    # The runner only publishes served after it observes this exact paint acknowledgment.
+    $runspace = [PowerShell]::Create()
+    $null = $runspace.AddScript({
+        param($ack, $served)
+        $clock = [Diagnostics.Stopwatch]::StartNew()
+        while (![IO.File]::Exists($ack) -and $clock.Elapsed.TotalSeconds -lt 3) { Start-Sleep -Milliseconds 10 }
+        if ([IO.File]::Exists($ack)) { [IO.File]::WriteAllText($served, '') }
+    }).AddArgument($ack).AddArgument($served)
+    $async = $runspace.BeginInvoke()
     $timing = [ordered]@{ status = 'Correlated'; input = 'UIA InvokePattern' }
-    Complete-ConcurrentFeed 2 $timing
-    if ($timing.feed_page -ne 2 -or [IO.File]::ReadAllText($ack) -cne '2') {
+    try {
+        Complete-ConcurrentFeed 2 $timing
+        $null = $runspace.EndInvoke($async)
+    } finally { $runspace.Dispose() }
+    if ($timing.feed_page -ne 2 -or !$timing.feed_response_written -or ![IO.File]::Exists($ack)) {
         throw 'The driver did not acknowledge the exact overlapped request.'
     }
     $timing.status = 'Unavailable'
-    [IO.File]::WriteAllText($pending, '3')
+    [IO.File]::WriteAllText((Join-Path $scratch 'reader-feed-3-held'), '')
     $refused = $false
     try { Complete-ConcurrentFeed 3 $timing } catch {
         $refused = $_.Exception.Message -like '*could not be correlated*'
     }
-    if (!$refused -or [IO.File]::ReadAllText($ack) -cne '2') {
+    if (!$refused -or [IO.File]::Exists((Join-Path $scratch 'reader-feed-3-painted'))) {
         throw 'The driver accepted a native action without matching paint evidence.'
     }
+    [IO.File]::WriteAllText((Join-Path $scratch 'reader-feed-3-expired'), '')
+    $expired = $false
+    try { Wait-ConcurrentFeed 3 } catch { $expired = $_.Exception.Message -like '*state expired*' }
+    if (!$expired) { throw 'A terminal request was mistaken for a held request.' }
 } finally {
     [IO.Directory]::Delete($scratch, $true)
 }

@@ -285,31 +285,44 @@ function Get-ReaderTimingAttribution([hashtable]$InputTiming, [object]$State, [s
     return $details
 }
 
-function Wait-ConcurrentFeed([int]$Page) {
+function Get-ConcurrentFeedState([int]$Page) {
     $directory = [IO.Path]::GetDirectoryName($script:AccessPhaseFile)
-    $pending = Join-Path $directory 'reader-feed-pending.txt'
-    try {
-        Wait-For 'the next scheduled loopback feed request' {
-            if ($script:app.HasExited) { throw 'Threadline exited before the concurrent input.' }
-            if (![IO.File]::Exists($pending)) { return $false }
-            [IO.File]::ReadAllText($pending) -ceq [string]$Page
-        } 12000 25
-    } catch {
-        if ($script:app.HasExited) { throw }
-        Stop-Blocked "Scheduled loopback feed page $Page was unavailable for timing."
+    foreach ($state in @('served','response-failed','disconnected','expired','stopped','held')) {
+        if ([IO.File]::Exists([IO.Path]::Combine($directory,"reader-feed-$Page-$state"))) {
+            return $state
+        }
     }
+    return 'waiting'
+}
+
+function Wait-ConcurrentFeed([int]$Page, [switch]$Served) {
+    $wanted = if ($Served) { 'served' } else { 'held' }
+    # Waiting for a scheduled request happens outside the client input-to-observation clock.
+    $deadline = if ($Served) { 4000 } else { 30000 }
+    $wait = [Diagnostics.Stopwatch]::StartNew()
+    do {
+        if ($script:app.HasExited) { throw 'Threadline exited during concurrent feed verification.' }
+        $state = Get-ConcurrentFeedState $Page
+        if ($state -ceq $wanted) { return }
+        if ($state -cnotin @('waiting','held')) {
+            Stop-Blocked "Scheduled loopback feed page $Page ended in state $state while waiting for $wanted."
+        }
+        Start-Sleep -Milliseconds 25
+    } while ($wait.ElapsedMilliseconds -lt $deadline)
+    Stop-Blocked "Scheduled loopback feed page $Page stayed in state $state while waiting for $wanted."
 }
 
 function Complete-ConcurrentFeed([int]$Page, $Attribution) {
     $directory = [IO.Path]::GetDirectoryName($script:AccessPhaseFile)
-    $pending = Join-Path $directory 'reader-feed-pending.txt'
-    if (![IO.File]::Exists($pending) -or [IO.File]::ReadAllText($pending) -cne [string]$Page -or
+    if ((Get-ConcurrentFeedState $Page) -cne 'held' -or
         $Attribution.status -cne 'Correlated' -or $Attribution.input -cne 'UIA InvokePattern') {
         Stop-Blocked "Scheduled loopback feed page $Page could not be correlated through the useful native paint."
     }
+    $ack = [IO.Path]::Combine($directory,"reader-feed-$Page-painted")
+    [IO.File]::Open($ack, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None).Dispose()
+    Wait-ConcurrentFeed $Page -Served
     $Attribution.feed_page = $Page
-    $acknowledged = Join-Path $directory 'reader-feed-observed.txt'
-    [IO.File]::WriteAllText($acknowledged, [string]$Page, [Text.Encoding]::ASCII)
+    $Attribution.feed_response_written = $true
 }
 
 function Measure-ReaderPerformance([IntPtr]$Window, $Samples, $Attribution, [switch]$Physical, [switch]$Concurrent) {

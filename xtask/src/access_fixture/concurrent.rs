@@ -1,8 +1,6 @@
 use super::*;
 use std::time::Instant;
 
-const PENDING: &str = "reader-feed-pending.txt";
-const ACKNOWLEDGED: &str = "reader-feed-observed.txt";
 const PAGE_END: &str = "&per_page=20&page=";
 const SAMPLE_COUNT: u8 = 60;
 const ARCHIVE: &str = "/repos/fixture-org/archive";
@@ -118,25 +116,72 @@ pub(super) fn page(target: &str) -> Option<u8> {
     sync_since(&format!("{query}{PAGE_END}1"), SYNC_ITEMS).then_some(page)
 }
 
-pub(super) fn hold(phase_file: &Path, stopping: &AtomicBool, page: u8) -> io::Result<bool> {
-    let pending = phase_file.with_file_name(PENDING);
-    let acknowledged = phase_file.with_file_name(ACKNOWLEDGED);
-    let encoded = page.to_string();
-    fs::write(&pending, &encoded)?;
-    let started = Instant::now();
-    let mut observed = false;
-    while !stopping.load(Ordering::Acquire) && started.elapsed() < Duration::from_secs(12) {
-        if Phase::read(phase_file).ok() != Some(Phase::BacklogConcurrent) {
-            break;
+fn marker(phase_file: &Path, page: u8, state: &str) -> PathBuf {
+    phase_file.with_file_name(format!("reader-feed-{page}-{state}"))
+}
+
+fn publish(phase_file: &Path, page: u8, state: &str) -> io::Result<()> {
+    fs::File::create_new(marker(phase_file, page, state)).map(drop)
+}
+
+pub(super) struct HeldFeed<'a> {
+    phase_file: &'a Path,
+    page: u8,
+    served: bool,
+}
+
+impl HeldFeed<'_> {
+    pub(super) fn response_written(mut self) -> io::Result<()> {
+        publish(self.phase_file, self.page, "served")?;
+        self.served = true;
+        Ok(())
+    }
+}
+
+impl Drop for HeldFeed<'_> {
+    fn drop(&mut self) {
+        if !self.served {
+            let _ = publish(self.phase_file, self.page, "response-failed");
         }
-        if fs::read_to_string(&acknowledged).is_ok_and(|contents| contents == encoded) {
-            observed = true;
-            break;
+    }
+}
+
+pub(super) fn hold<'a>(
+    phase_file: &'a Path,
+    stopping: &AtomicBool,
+    page: u8,
+    socket: &TcpStream,
+) -> io::Result<Option<HeldFeed<'a>>> {
+    let ack = marker(phase_file, page, "painted");
+    if ack.try_exists()? {
+        return Err(io::Error::other(
+            "paint acknowledged before the feed request",
+        ));
+    }
+    publish(phase_file, page, "held")?;
+    let started = Instant::now();
+    let terminal = loop {
+        if stopping.load(Ordering::Acquire) || Phase::read(phase_file)? != Phase::BacklogConcurrent
+        {
+            break "stopped";
+        }
+        if !still_connected(socket)? {
+            break "disconnected";
+        }
+        if started.elapsed() >= Duration::from_secs(12) {
+            break "expired";
+        }
+        if ack.try_exists()? {
+            return Ok(Some(HeldFeed {
+                phase_file,
+                page,
+                served: false,
+            }));
         }
         thread::sleep(Duration::from_millis(20));
-    }
-    fs::remove_file(pending)?;
-    Ok(observed)
+    };
+    publish(phase_file, page, terminal)?;
+    Ok(None)
 }
 
 pub(super) fn next(target: &str, page: u8) -> Option<String> {
@@ -144,7 +189,7 @@ pub(super) fn next(target: &str, page: u8) -> Option<String> {
     (page < SAMPLE_COUNT).then(|| format!("{query}{PAGE_END}{}", page + 1))
 }
 
-pub(super) fn still_connected(socket: &TcpStream) -> io::Result<bool> {
+fn still_connected(socket: &TcpStream) -> io::Result<bool> {
     socket.set_nonblocking(true)?;
     let observed = socket.peek(&mut [0]);
     socket.set_nonblocking(false)?;
@@ -226,13 +271,11 @@ mod tests {
             assert!(read(request(endpoint)).starts_with("HTTP/1.1 200"));
         }
         fs::write(&phase, "backlog-concurrent").unwrap();
-        let pending = phase.with_file_name(PENDING);
-        let acknowledgment = phase.with_file_name(ACKNOWLEDGED);
         for page in 1..=SAMPLE_COUNT {
             let target = format!("{SYNC_ITEMS}2026-11-19T00%3A00%3A00Z{PAGE_END}{page}");
             let socket = request(&target);
             let start = Instant::now();
-            while fs::read_to_string(&pending).ok().as_deref() != Some(page.to_string().as_str()) {
+            while !marker(&phase, page, "held").exists() {
                 assert!(start.elapsed() < Duration::from_secs(2));
                 thread::sleep(Duration::from_millis(5));
             }
@@ -242,10 +285,15 @@ mod tests {
                 io::ErrorKind::WouldBlock
             );
             socket.set_nonblocking(false).unwrap();
-            fs::write(&acknowledgment, page.to_string()).unwrap();
+            assert!(!marker(&phase, page, "served").exists());
+            if page > 1 {
+                assert!(marker(&phase, page - 1, "painted").exists());
+                assert!(marker(&phase, page - 1, "served").exists());
+            }
+            publish(&phase, page, "painted").unwrap();
             let reply = read(socket);
             assert!(reply.starts_with("HTTP/1.1 200"));
-            assert!(!pending.exists());
+            assert!(marker(&phase, page, "served").exists());
             if let Some(next) = next(&target, page) {
                 assert!(reply.contains(&format!(
                     "Link: <http://{}{next}>; rel=\"next\"",
@@ -260,5 +308,23 @@ mod tests {
             .unwrap();
         let trace = fs::read(profile.path().join("github-access-trace.json")).unwrap();
         assert!(!contains_fixture_credential(&trace));
+    }
+
+    #[test]
+    fn concurrent_disconnect_never_becomes_a_completed_paint() {
+        let profile = tempfile::tempdir().unwrap();
+        let phase = profile.path().join("phase");
+        fs::write(&phase, "backlog-concurrent").unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (server, _) = listener.accept().unwrap();
+        client.shutdown(std::net::Shutdown::Both).unwrap();
+        assert!(
+            hold(&phase, &AtomicBool::new(false), 51, &server)
+                .unwrap()
+                .is_none()
+        );
+        assert!(marker(&phase, 51, "disconnected").is_file());
+        assert!(!marker(&phase, 51, "served").exists());
     }
 }

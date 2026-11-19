@@ -583,18 +583,18 @@ fn answer(
             status: 0,
         });
     }
-    let next_feed = if let (true, Route::BacklogFeed(page), Some(target)) =
+    let held_feed = if let (true, Route::BacklogFeed(page), Some(target)) =
         (authorized, route, binding.as_deref())
     {
-        if !concurrent::hold(phase_file, stopping, page)? || !concurrent::still_connected(socket)? {
+        let Some(request) = concurrent::hold(phase_file, stopping, page, socket)? else {
             return Ok(RequestEvidence {
                 phase,
                 route,
                 fixture_authorization: true,
                 status: 0,
             });
-        }
-        concurrent::next(target, page)
+        };
+        Some((request, concurrent::next(target, page)))
     } else {
         None
     };
@@ -612,7 +612,7 @@ fn answer(
     if let Some(sso) = reply.sso {
         write!(socket, "X-GitHub-SSO: {sso}\r\n")?;
     }
-    if let Some(next) = next_feed {
+    if let Some((_, Some(next))) = &held_feed {
         let address = socket.local_addr()?;
         write!(socket, "Link: <http://{address}{next}>; rel=\"next\"\r\n")?;
     }
@@ -670,6 +670,9 @@ fn answer(
     }
     socket.write_all(b"\r\n")?;
     socket.write_all(&body)?;
+    if let Some((request, _)) = held_feed {
+        request.response_written()?;
+    }
     Ok(RequestEvidence {
         phase,
         route,
