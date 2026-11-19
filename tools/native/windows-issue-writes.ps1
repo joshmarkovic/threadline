@@ -26,7 +26,7 @@ function Set-WriteFixtureOffline([IntPtr]$Window, [bool]$Offline) {
 function Type-WriteFixtureField([IntPtr]$Window, [string]$Id, [string]$Value) {
     $name = switch -CaseSensitive ($Id) {
         'reader-issue-title-0' {
-            if ($Value -cin @('Cancelled fixture issue title', 'Local change to the same issue')) { 'Issue title' }
+            if ($Value -cin @('Cancelled fixture issue title', 'Local change to the same issue', 'Confirmed edit across both panes')) { 'Issue title' }
         }
         'reader-draft-input-0' {
             if ($Value -cin @(
@@ -217,6 +217,62 @@ function Invoke-IssueConflictProof([IntPtr]$Window, [string]$Profile) {
     Add-Evidence 'Reopen the exact existing issue and verify the saved local edit' ([ordered]@{ issue_number = 41; draft_retained = $true })
     Stop-ThroughUi
     $script:report.detail = 'The native reader restored the queued edit after restart, detected changed GitHub fields during preflight, showed its original, local and remote values, and kept the original issue draft available.'
+}
+
+function Confirm-FixtureIssuePaneTitles([IntPtr]$Window, [string]$Title) {
+    foreach ($pane in 0, 1) {
+        Wait-For "the exact issue title in native pane $pane" {
+            $null -ne (Find-OwnedFixtureControl $Window "reader-issue-title-label-$pane" $Title -AllowDisabled)
+        }
+    }
+}
+
+function Invoke-IssuePropagationProof([IntPtr]$Window) {
+    Wait-SeededFixtureAccount
+    $item = Open-WriteFixtureIssue $Window -UserConnected
+    $base = 'Existing issue for offline edits'
+    $title = 'Confirmed edit across both panes'
+    Wait-For 'duplicate the exact issue beside its original view' {
+        Invoke-OwnedFixtureControl $Window 'reader-duplicate-tab' $null 'Duplicate view beside'
+    }
+    $null = Wait-Reader 'both native panes retain separate tabs for the issue' {
+        param($reader)
+        $reader.active_item -eq $item -and $reader.pane_count -eq 2 -and
+            ($reader.tab_counts -join ',') -ceq '1,1' -and $reader.cached_visible_panes -eq 2
+    }
+    Confirm-FixtureIssuePaneTitles $Window $base
+    Click-AccountControl $Window 'reader-tab-0-0'
+    $null = Wait-Reader 'the first native pane is focused for its edit' {
+        param($reader) $reader.focused_pane -eq 0 -and $reader.active_item -eq $item
+    }
+    Set-WriteFixtureOffline $Window $true
+    Click-AccountControl $Window 'reader-edit-issue-0'
+    Type-WriteFixtureField $Window 'reader-issue-title-0' $title
+    Wait-WriteFixtureDraft $item 'Synthetic existing issue.'
+    Queue-WriteFixtureDraft $Window $item 1 'Queue issue edit'
+    $pending = 'Pending local action ' + [char]0x00b7 + ' Queued'
+    foreach ($pane in 0, 1) {
+        Wait-For "the queued issue edit is visibly separate from confirmed title in pane $pane" {
+            $null -ne (Find-OwnedFixtureControl $Window "reader-pending-projection-$pane-0" $pending -AllowDisabled)
+        }
+    }
+    Confirm-FixtureIssuePaneTitles $Window $base
+    Add-Evidence 'Show the same pending issue edit beside the unchanged confirmed title in both native panes' ([ordered]@{item = $item; issue_number = 41; panes = 2; queued_actions = 1})
+
+    Set-AccessPhase 'issue-edit-commit'
+    Set-WriteFixtureOffline $Window $false
+    $null = Wait-Reader 'the issue edit is confirmed with both original native panes still open' {
+        param($reader)
+        $reader.active_item -eq $item -and $reader.active_number -eq 41 -and $reader.outbox -eq 0 -and
+            $reader.cached_visible_panes -eq 2 -and ($reader.tab_counts -join ',') -ceq '1,1'
+    }
+    Confirm-FixtureIssuePaneTitles $Window $title
+    Add-Evidence 'Read the confirmed title on the same issue in both native panes' ([ordered]@{item = $item; issue_number = 41; panes = 2; pending = 0})
+    Click-AccountControl $Window 'reader-outbox'
+    Click-AccountControl $Window 'reader-outbox-filter-history'
+    Inspect-WriteFixtureAction $Window 0 'Confirmed' 'Issue edit'
+    Stop-ThroughUi
+    $script:report.detail = 'Two ordinary native panes kept the original confirmed issue title while an edit was queued offline. One scoped edit of the existing issue confirmed on reconnect and updated both visible titles.'
 }
 
 function Invoke-IssueWriteProof([IntPtr]$Window, [string]$Profile) {

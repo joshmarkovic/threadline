@@ -608,7 +608,10 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
             return vec![crate::activity::run(id, options, root, dir)];
         }
         Some(id) => {
-            let mode = if matches!(id, "S07-ISSUE-CONFLICT" | "S08-COMMENT-DEPENDENCY") {
+            let mode = if matches!(
+                id,
+                "S07-ISSUE-CONFLICT" | "S07-ISSUE-PROPAGATION" | "S08-COMMENT-DEPENDENCY"
+            ) {
                 Some(NativeMode::WindowsIssueWrites)
             } else if id == "S12-HISTORICAL-READER" {
                 Some(NativeMode::WindowsReaderResume)
@@ -903,6 +906,7 @@ fn native_driver(
         NativeMode::WindowsNativeLifecycle => Some("NativeLifecycle"),
         NativeMode::WindowsNativeActivity => Some("NativeActivity"),
         NativeMode::WindowsIssueWrites if id == "S07-ISSUE-CONFLICT" => Some("IssueConflict"),
+        NativeMode::WindowsIssueWrites if id == "S07-ISSUE-PROPAGATION" => Some("IssuePropagation"),
         NativeMode::WindowsIssueWrites if id == "S08-COMMENT-DEPENDENCY" => {
             Some("CommentDependency")
         }
@@ -1019,6 +1023,9 @@ fn native_driver(
         NativeMode::WindowsIssueWrites if id == "S07-ISSUE-CONFLICT" => {
             "issue-conflict-native.json"
         }
+        NativeMode::WindowsIssueWrites if id == "S07-ISSUE-PROPAGATION" => {
+            "issue-propagation-native.json"
+        }
         NativeMode::WindowsIssueWrites if id == "S08-COMMENT-DEPENDENCY" => {
             "comment-dependency-native.json"
         }
@@ -1114,6 +1121,9 @@ fn native_driver(
             (Status::Pass, NativeMode::WindowsNativeActivity) => TraceCheck::NativeActivity,
             (Status::Pass, NativeMode::WindowsIssueWrites) if id == "S07-ISSUE-CONFLICT" => {
                 TraceCheck::IssueEditConflict
+            }
+            (Status::Pass, NativeMode::WindowsIssueWrites) if id == "S07-ISSUE-PROPAGATION" => {
+                TraceCheck::IssueEditPropagation
             }
             (Status::Pass, NativeMode::WindowsIssueWrites) if id == "S08-COMMENT-DEPENDENCY" => {
                 TraceCheck::CommentDependency

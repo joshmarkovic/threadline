@@ -573,11 +573,20 @@ impl ReaderWorkspace {
         palette: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let id = format!("reader-pending-projection-{pane}-{index}");
+        let status = format!(
+            "Pending local action · {}",
+            state_label(projection.state, false)
+        );
         let mut row = div().p_2().border_1().border_color(palette.accent).child(
-            div().text_xs().text_color(palette.accent).child(format!(
-                "Pending local action · {}",
-                state_label(projection.state, false)
-            )),
+            div()
+                .id(id.clone())
+                .accessibility_id(id)
+                .role(Role::Status)
+                .aria_label(status.clone())
+                .text_xs()
+                .text_color(palette.accent)
+                .child(status),
         );
         match serde_json::from_str::<WriteIntent>(&projection.value) {
             Ok(intent) => {

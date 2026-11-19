@@ -26,18 +26,18 @@ if (@($helpers.Name | Sort-Object -Unique).Count -ne 5 -or $helpers.Count -ne 5)
 
 $script:AccessPhaseFile = [IO.Path]::GetTempFileName()
 try {
-    foreach ($phase in @('issue-edit-baseline', 'issue-edit-remote-change')) {
+    foreach ($phase in @('issue-edit-baseline', 'issue-edit-remote-change', 'issue-edit-commit')) {
         Set-AccessPhase $phase
         if ([IO.File]::ReadAllText($script:AccessPhaseFile) -cne $phase) {
-            throw 'The isolate did not advance to the exact conflict phase.'
+            throw 'The isolate did not advance to the exact issue edit phase.'
         }
     }
     $refused = $false
     try { Set-AccessPhase 'unlisted-issue-write' } catch {
         $refused = $_.Exception.Message -ceq 'Unknown access fixture phase.'
     }
-    if (!$refused -or [IO.File]::ReadAllText($script:AccessPhaseFile) -cne 'issue-edit-remote-change') {
-        throw 'An unsupported phase changed the conflict fixture.'
+    if (!$refused -or [IO.File]::ReadAllText($script:AccessPhaseFile) -cne 'issue-edit-commit') {
+        throw 'An unsupported phase changed the issue edit fixture.'
     }
 } finally {
     [IO.File]::Delete($script:AccessPhaseFile)

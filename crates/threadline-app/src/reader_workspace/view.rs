@@ -1163,6 +1163,7 @@ impl ReaderWorkspace {
                 )
             })
             .filter(|editor| editor.tab_id == tab.id);
+        let title_id = format!("reader-issue-title-label-{pane}");
         let content = div()
             .id(format!("reader-conversation-{pane}"))
             .test_support()
@@ -1176,7 +1177,15 @@ impl ReaderWorkspace {
             .flex_col()
             .gap_3()
             .p_3()
-            .child(div().text_lg().child(title.to_owned()))
+            .child(
+                div()
+                    .id(title_id.clone())
+                    .accessibility_id(title_id)
+                    .role(Role::Heading)
+                    .aria_label(title.to_owned())
+                    .text_lg()
+                    .child(title.to_owned()),
+            )
             .child(div().text_xs().text_color(palette.muted).child(format!(
                 "{} #{} · {state}",
                 kind_label(item.kind),

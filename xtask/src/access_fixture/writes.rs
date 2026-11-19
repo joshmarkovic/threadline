@@ -3,6 +3,14 @@ use super::*;
 const POST: &str = "/repos/fixture-org/private/issues/41/comments";
 const CONFIRMED: &str = "Threadline S07 explicitly queued comment.";
 const UNKNOWN: &str = "Threadline S07 accepted comment with a lost response.";
+const CONFIRMED_TITLE: &str = "Confirmed edit across both panes";
+
+pub(super) fn patch_issue(phase: Phase, path: &str, payload: &Value) -> Option<Route> {
+    (phase == Phase::IssueEditCommit
+        && path == ITEM
+        && *payload == json!({"title": CONFIRMED_TITLE}))
+    .then_some(Route::IssueEditCommitted)
+}
 
 pub(super) fn post(phase: Phase, path: &str, payload: &Value) -> Route {
     if path != POST {
@@ -19,6 +27,16 @@ pub(super) fn post(phase: Phase, path: &str, payload: &Value) -> Route {
     }
 }
 
+pub(super) fn committed_read(route: Route) -> Option<Response> {
+    let mut result = response(Phase::IssueEditCommit, Route::IssueEditCommitted)?;
+    match route {
+        Route::Items => result.body = json!([result.body]),
+        Route::Item | Route::ScheduledIssue => {}
+        _ => return None,
+    }
+    Some(result)
+}
+
 pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
     if !matches!(
         phase,
@@ -26,6 +44,7 @@ pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
             | Phase::WriteDrop
             | Phase::IssueEditBaseline
             | Phase::IssueEditRemoteChange
+            | Phase::IssueEditCommit
             | Phase::SyncNotificationSend
             | Phase::CredentialReady
             | Phase::CredentialOther
@@ -58,6 +77,12 @@ pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
     let (status, reason, body) = match route {
         Route::Items => (200, "OK", json!([issue()])),
         Route::Item | Route::ScheduledIssue => (200, "OK", issue()),
+        Route::IssueEditCommitted if phase == Phase::IssueEditCommit => {
+            let mut confirmed = issue();
+            confirmed["title"] = json!(CONFIRMED_TITLE);
+            confirmed["updated_at"] = json!("2018-01-01T03:00:00Z");
+            (200, "OK", confirmed)
+        }
         Route::UpdatedItems | Route::UpdatedComments | Route::CommentsFirst | Route::Timeline => {
             (200, "OK", json!([]))
         }
@@ -112,6 +137,48 @@ pub(super) fn issue_conflict_trace(records: &[RequestEvidence]) -> bool {
         })
 }
 
+pub(super) fn issue_propagation_trace(records: &[RequestEvidence]) -> bool {
+    let committed = records
+        .iter()
+        .position(|entry| entry.route == Route::IssueEditCommitted);
+    committed.is_some_and(|index| {
+        records[..index]
+            .iter()
+            .any(|entry| entry.phase == Phase::IssueEditBaseline && entry.route == Route::Items)
+            && records[..index]
+                .iter()
+                .any(|entry| entry.phase == Phase::IssueEditCommit && entry.route == Route::Item)
+    }) && records
+        .iter()
+        .filter(|entry| entry.route == Route::IssueEditCommitted)
+        .count()
+        == 1
+        && records.iter().all(|entry| {
+            entry.fixture_authorization
+                && entry.status == 200
+                && matches!(
+                    entry.phase,
+                    Phase::IssueEditBaseline | Phase::IssueEditCommit
+                )
+                && matches!(
+                    entry.route,
+                    Route::User
+                        | Route::Repository
+                        | Route::Discovery
+                        | Route::Items
+                        | Route::Item
+                        | Route::ScheduledIssue
+                        | Route::UpdatedItems
+                        | Route::UpdatedComments
+                        | Route::UpdatedInlineComments
+                        | Route::OpenPullIndex
+                        | Route::CommentsFirst
+                        | Route::Timeline
+                        | Route::IssueEditCommitted
+                )
+        })
+}
+
 pub(super) fn trace(records: &[RequestEvidence], include_loss: bool) -> bool {
     if records
         .iter()
@@ -144,6 +211,93 @@ pub(super) fn trace(records: &[RequestEvidence], include_loss: bool) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn issue_propagation_sends_exactly_one_edit_to_the_existing_issue() {
+        let fixture_root = tempfile::tempdir().unwrap();
+        let fixture = AccessFixture::start(fixture_root.path()).unwrap();
+        let request = |method, path, body: Value| {
+            let mut socket = TcpStream::connect(fixture.address()).unwrap();
+            let body = if body.is_null() {
+                String::new()
+            } else {
+                body.to_string()
+            };
+            write!(
+                socket,
+                "{method} {path} HTTP/1.1\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\nContent-Length: {}\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+            let mut reply = String::new();
+            socket.read_to_string(&mut reply).unwrap();
+            assert!(reply.starts_with("HTTP/1.1 200"));
+            serde_json::from_str::<Value>(reply.split_once("\r\n\r\n").unwrap().1).unwrap()
+        };
+        fs::write(fixture.phase_file(), "issue-edit-baseline").unwrap();
+        let initial = request("GET", ITEMS, Value::Null);
+        fs::write(fixture.phase_file(), "issue-edit-commit").unwrap();
+        assert_eq!(request("GET", ITEM, Value::Null), initial[0]);
+
+        let title = json!({"title": CONFIRMED_TITLE});
+        let result = request("PATCH", ITEM, title.clone());
+        assert_eq!(result["title"], CONFIRMED_TITLE);
+        for key in ["id", "node_id", "number", "repository_url", "body"] {
+            assert_eq!(result[key], initial[0][key]);
+        }
+        assert_ne!(result["updated_at"], initial[0]["updated_at"]);
+        assert_eq!(request("GET", ITEM, Value::Null), result);
+        fixture
+            .finish(fixture_root.path(), TraceCheck::IssueEditPropagation)
+            .unwrap();
+
+        assert_eq!(patch_issue(Phase::IssueEditBaseline, ITEM, &title), None);
+        assert_eq!(
+            patch_issue(
+                Phase::IssueEditCommit,
+                "/repos/fixture-org/private/issues/42",
+                &title
+            ),
+            None
+        );
+        assert_eq!(
+            patch_issue(
+                Phase::IssueEditCommit,
+                ITEM,
+                &json!({"title": CONFIRMED_TITLE, "body": "unexpected edit"})
+            ),
+            None
+        );
+        assert_eq!(
+            post(
+                Phase::IssueEditCommit,
+                "/repos/fixture-org/private/issues",
+                &title
+            ),
+            Route::Unexpected
+        );
+        let mut trace = Vec::from(
+            [
+                (Phase::IssueEditBaseline, Route::Items),
+                (Phase::IssueEditCommit, Route::Item),
+                (Phase::IssueEditCommit, Route::IssueEditCommitted),
+            ]
+            .map(|(phase, route)| RequestEvidence {
+                phase,
+                route,
+                fixture_authorization: true,
+                status: 200,
+            }),
+        );
+        assert!(issue_propagation_trace(&trace));
+        trace.push(RequestEvidence {
+            phase: Phase::IssueEditCommit,
+            route: Route::IssueEditCommitted,
+            fixture_authorization: true,
+            status: 200,
+        });
+        assert!(!issue_propagation_trace(&trace));
+    }
 
     #[test]
     fn issue_conflict_preserves_provider_identity_and_refuses_any_mutation() {

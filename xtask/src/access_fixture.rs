@@ -110,6 +110,7 @@ enum Phase {
     WriteDrop,
     IssueEditBaseline,
     IssueEditRemoteChange,
+    IssueEditCommit,
     BacklogAuth,
     BacklogHold,
     BacklogDrain,
@@ -183,6 +184,7 @@ impl Phase {
             "write-drop" => Ok(Self::WriteDrop),
             "issue-edit-baseline" => Ok(Self::IssueEditBaseline),
             "issue-edit-remote-change" => Ok(Self::IssueEditRemoteChange),
+            "issue-edit-commit" => Ok(Self::IssueEditCommit),
             "backlog-auth" => Ok(Self::BacklogAuth),
             "backlog-hold" => Ok(Self::BacklogHold),
             "backlog-drain" => Ok(Self::BacklogDrain),
@@ -262,6 +264,7 @@ enum Route {
     HistoryExactObject(history::ExactObject),
     CommentCreated,
     CommentReplyLost,
+    IssueEditCommitted,
     BacklogIssue,
     BacklogPermission,
     BacklogComment(u8),
@@ -331,6 +334,7 @@ pub enum TraceCheck {
     NativeActivity,
     CommentDependency,
     IssueEditConflict,
+    IssueEditPropagation,
     ReaderResume,
     SyncJourney,
     RateLimitedCache,
@@ -420,6 +424,7 @@ impl AccessFixture {
             TraceCheck::NativeActivity => activity::trace(&records),
             TraceCheck::CommentDependency => comment_dependency::trace(&records),
             TraceCheck::IssueEditConflict => writes::issue_conflict_trace(&records),
+            TraceCheck::IssueEditPropagation => writes::issue_propagation_trace(&records),
             TraceCheck::HistoricalReader => historical_reader::trace(&records),
             TraceCheck::ReaderResume => complete_reader_resume(&records),
             TraceCheck::SyncJourney => complete_sync_journey(&records),
@@ -592,16 +597,8 @@ fn serve(
                 if evidence.len() >= if activity::active(phase) { 512 } else { 128 } {
                     return Err(io::Error::other("too many requests to the access fixture"));
                 }
-                let merge_sent = evidence.iter().any(|record: &RequestEvidence| {
-                    record.route == Route::MergePut && record.status == 200
-                });
-                evidence.push(answer(
-                    &mut socket,
-                    phase,
-                    phase_file,
-                    stopping,
-                    merge_sent,
-                )?);
+                let request = answer(&mut socket, phase, phase_file, stopping, evidence)?;
+                evidence.push(request);
             }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
                 thread::sleep(Duration::from_millis(12));
@@ -617,7 +614,7 @@ fn answer(
     phase: Phase,
     phase_file: &Path,
     stopping: &AtomicBool,
-    merge_sent: bool,
+    previous_requests: &[RequestEvidence],
 ) -> io::Result<RequestEvidence> {
     let timeout = Some(Duration::from_secs(2));
     socket.set_nonblocking(false)?;
@@ -696,9 +693,21 @@ fn answer(
         }
         next_feed_page = concurrent::next(target, page);
     }
+    let succeeded = |expected| {
+        previous_requests
+            .iter()
+            .any(|record| record.route == expected && record.status == 200)
+    };
+    let committed_issue =
+        authorized && phase == Phase::IssueEditCommit && succeeded(Route::IssueEditCommitted);
     let reply = (authorized.then(|| review_threads::response(phase, route, binding.as_deref())))
         .flatten()
-        .unwrap_or_else(|| response(phase, route, authorized, merge_sent));
+        .or_else(|| {
+            committed_issue
+                .then(|| writes::committed_read(route))
+                .flatten()
+        })
+        .unwrap_or_else(|| response(phase, route, authorized, succeeded(Route::MergePut)));
     let body = serde_json::to_vec(&reply.body)?;
     write!(
         socket,
@@ -831,6 +840,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
                     | Phase::SyncRateThrottle
                     | Phase::IssueEditBaseline
                     | Phase::IssueEditRemoteChange
+                    | Phase::IssueEditCommit
                     | Phase::SyncNotificationSend
                     | Phase::CredentialReady
                     | Phase::CredentialOther
@@ -907,7 +917,8 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         route = serde_json::from_slice::<Value>(&body)
             .ok()
             .map_or(Route::Unexpected, |body| {
-                comment_dependency::patch(phase, &patch_path, &body)
+                writes::patch_issue(phase, &patch_path, &body)
+                    .unwrap_or_else(|| comment_dependency::patch(phase, &patch_path, &body))
             });
     } else if let Some(put_path) = put_path {
         let mut body = vec![0; content_length];

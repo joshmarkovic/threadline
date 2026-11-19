@@ -405,6 +405,7 @@ fn known_case(lane: Lane, case: &str) -> bool {
             | (Lane::E2e, "S08-THREAD-QUEUE")
             | (Lane::E2e, "S08-COMMENT-DEPENDENCY")
             | (Lane::E2e, "S07-ISSUE-CONFLICT")
+            | (Lane::E2e, "S07-ISSUE-PROPAGATION")
             | (Lane::E2e, "S08-REVIEW-PREDECESSOR")
             | (Lane::E2e, "S11-NATIVE-ACTIVITY")
             | (Lane::E2e, "S01-WINDOWS-TOAST")
@@ -445,10 +446,11 @@ mod tests {
 
     #[test]
     fn accepts_issue_conflict_only_in_the_native_lane() {
-        let id = "S07-ISSUE-CONFLICT";
-        let args = arguments(&["test", "e2e", "--suite", "full", "--case", id]);
-        assert_eq!(parse(&args).unwrap().case.as_deref(), Some(id));
-        assert!(parse(&arguments(&["test", "integration", "--case", id])).is_err());
+        for id in ["S07-ISSUE-CONFLICT", "S07-ISSUE-PROPAGATION"] {
+            let args = arguments(&["test", "e2e", "--suite", "full", "--case", id]);
+            assert_eq!(parse(&args).unwrap().case.as_deref(), Some(id));
+            assert!(parse(&arguments(&["test", "integration", "--case", id])).is_err());
+        }
     }
 
     #[test]
