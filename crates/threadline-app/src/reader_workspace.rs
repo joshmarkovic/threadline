@@ -249,6 +249,8 @@ pub(crate) struct ReaderWorkspace {
     pending_draft: Option<String>,
     review_editors: HashMap<ItemId, review_editor::ReviewEditor>,
     review_pending: HashSet<ItemId>,
+    #[cfg(feature = "e2e")]
+    pr_change_navigation: u64,
     editor_to_focus: Option<String>,
     departure: Option<Departure>,
     #[cfg(feature = "e2e")]
@@ -711,6 +713,8 @@ impl ReaderWorkspace {
             pending_draft: None,
             review_editors: HashMap::new(),
             review_pending: HashSet::new(),
+            #[cfg(feature = "e2e")]
+            pr_change_navigation: 0,
             editor_to_focus: None,
             departure: None,
             #[cfg(feature = "e2e")]

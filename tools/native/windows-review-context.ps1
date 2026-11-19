@@ -1,20 +1,31 @@
-function Select-FixtureRightReviewLine([IntPtr]$Window, [string]$Head, [string]$FixturePath = 'src/first.rs', [int]$Line = 1) {
+function Select-FixtureRightReviewLine([IntPtr]$Window, [string]$Head, [string]$FixturePath = 'src/first.rs', [int]$Line = 1, [switch]$ProveFresh) {
     if ($FixturePath -cnotin @('src/first.rs', 'src/second.rs')) { throw 'Unknown native fixture comparison.' }
-    $null = Wait-PrReader 'the exact loaded comparison before source navigation' {
+    $loaded = Wait-PrReader 'the exact loaded comparison before source navigation' {
         param($pr)
         $pr.head -ceq $Head -and $pr.selected_file -ceq $FixturePath -and $pr.diff_mode -ceq 'Split'
     }
+    $generation = if ($ProveFresh) { $loaded.cached_reader.pull_request.change_navigation } else { $null }
     Wait-For 'the owned native Next change action' {
         $current = Read-Observation
         $null -ne $current -and $current.pid -eq $script:app.Id -and
             $null -ne $current.bounds.PSObject.Properties['pr-0-next-change'] -and
             (Invoke-OwnedFixtureControl $Window 'pr-0-next-change' $null 'Next change')
     }
+    $accepted = @{ generation = $null }
     $null = Wait-PrReader 'the exact modified source line selected by the native action' {
         param($pr)
         $anchor = $pr.source_anchor
-        $pr.head -ceq $Head -and $pr.selected_source_line -eq $Line -and $null -ne $anchor -and
-            $anchor.path -ceq $FixturePath -and $anchor.side -ceq 'Right' -and $anchor.line -eq $Line
+        $lineMatches = $pr.head -ceq $Head -and $pr.selected_source_line -eq $Line -and $null -ne $anchor -and
+            $anchor.path -ceq $FixturePath -and $anchor.side -ceq 'Right' -and $anchor.line -eq $Line -and
+            (!$ProveFresh -or $pr.change_navigation -gt $generation)
+        if ($lineMatches -and $ProveFresh) { $accepted.generation = $pr.change_navigation }
+        return $lineMatches
+    }
+    if ($ProveFresh) {
+        Add-Evidence 'Confirm a new native change navigation for the live review line' ([ordered]@{
+            pid = $script:app.Id; path = $FixturePath; line = $Line
+            generation_before = $generation; generation_after = $accepted.generation
+        })
     }
 }
 
@@ -101,12 +112,12 @@ function Invoke-ReviewContextProof([IntPtr]$Window, [string]$Profile) {
     })
 
     Set-WriteFixtureOffline $Window $true
-    Select-FixtureRightReviewLine $Window $head
+    Select-FixtureRightReviewLine $Window $head -ProveFresh
     Open-FixtureReviewCommits $Window $firstItem $revision $head
     Wait-FixtureCommitCoverage $Window
     Return-ToFixtureReviewFiles $Window $draftId $head $revision
     Set-WriteFixtureOffline $Window $false
-    Select-FixtureRightReviewLine $Window $head
+    Select-FixtureRightReviewLine $Window $head -ProveFresh
     Open-FixtureReviewCommits $Window $firstItem $revision $head
     Wait-For 'the owned PR Commits fetch control' {
         Invoke-OwnedFixtureControl $Window 'pr-0-commits-fetch' $null 'Fetch from GitHub'
@@ -180,9 +191,17 @@ function Invoke-ReviewContextProof([IntPtr]$Window, [string]$Profile) {
     if (!$retained.cached_reader.offline -or $retained.cached_reader.active_item -ne $firstItem) {
         throw 'Restart did not restore the original offline review item.'
     }
-    Select-FixtureRightReviewLine $restarted $head
+    Select-FixtureRightReviewLine $restarted $head -ProveFresh
     Open-FixtureReviewCommits $restarted $firstItem $revision $head
     Wait-FixtureCommitCoverage $restarted -Downloaded
+    $away = Wait-PrReader 'the original offline comparison while Commits is visible' {
+        param($pr, $reader)
+        $reader.offline -and $pr.section -ceq 'Commits' -and $pr.revision_id -eq $revision -and $pr.head -ceq $head
+    }
+    Add-Evidence 'Read the line-selection state while cached Commits is visible after restart' ([ordered]@{
+        pid = $away.pid; revision = $revision; generation = $away.cached_reader.pull_request.change_navigation
+        retained_for_files = $away.cached_reader.pull_request.retains_section_selection
+    })
     Return-ToFixtureReviewFiles $restarted $draftId $head $revision
     Stop-ThroughUi
     if (!('ThreadlineReviewCache' -as [type])) {

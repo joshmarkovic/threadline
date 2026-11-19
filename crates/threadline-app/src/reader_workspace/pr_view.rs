@@ -89,6 +89,8 @@ pub(crate) struct PrObservation {
     patch_change_lines: Option<usize>,
     source_anchor: Option<PrSourceObservation>,
     selected_source_line: Option<usize>,
+    change_navigation: u64,
+    retains_section_selection: bool,
     narrow_surface: String,
     selected_file: Option<String>,
     revision_id: Option<i64>,
@@ -216,6 +218,8 @@ impl ReaderWorkspace {
                 selected_source_line: pr
                     .and_then(|pr| pr.diff.as_ref()?.read(cx).selected_lines())
                     .map(|selection| selection.start()),
+                change_navigation: self.pr_change_navigation,
+                retains_section_selection: pr.is_some_and(PullRequestView::retains_section_selection),
                 narrow_surface: format!("{:?}", settings.narrow_surface),
                 selected_file: pr.and_then(|pr| {
                     pr.data
@@ -1798,6 +1802,10 @@ impl ReaderWorkspace {
             state.scroll_to_line(position.clone(), cx);
         });
         let revision = pr.data.revision.clone();
+        #[cfg(feature = "e2e")]
+        {
+            self.pr_change_navigation += 1;
+        }
         self.code_selection(tab.clone(), &revision, position, window, cx);
     }
 

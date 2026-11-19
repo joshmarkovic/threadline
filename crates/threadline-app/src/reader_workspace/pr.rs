@@ -514,6 +514,11 @@ impl PullRequestView {
             .and_then(|diff| diff.read(cx).selected_lines());
     }
 
+    #[cfg(feature = "e2e")]
+    pub(super) fn retains_section_selection(&self) -> bool {
+        self.hidden_selection.is_some()
+    }
+
     pub(super) fn visible_code_anchor(
         &self,
         selected_path: Option<&str>,
