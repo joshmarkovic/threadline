@@ -1,0 +1,32 @@
+{
+  "criterion": "AC-22",
+  "source_revision": "19f0ff34c18856bdc89aa24d643735d9f5eabd4d",
+  "environment": "Windows 11 x64 native application test executable with E2E fixture feature",
+  "layer": "GPUI integration",
+  "filter": "diff_background_parse_and_highlighting",
+  "test": "diff_background_parse_and_highlighting_leave_native_file_navigation_usable",
+  "status": "Pass",
+  "exit_code": 0,
+  "passed": 1,
+  "failed": 0,
+  "ignored": 0,
+  "test_process_seconds": 12.27,
+  "executable_sha256": "34ed6ce8904b0fb0b39888dfde2d089b13037a6a602570f0200a99dece55a58d",
+  "log_sha256": "ab638cd9603ba51d29788559524d54ed90ae04fc4f430e83f4c07380b1201c50",
+  "fixture": {
+    "rust_changed_lines_per_side": 1200,
+    "tabs": 2,
+    "distinct_heads": 2,
+    "older_parse_held_off_the_ui_thread": true,
+    "other_tab_and_file_operable_during_parse": true,
+    "older_parse_rejected_on_new_revision": true,
+    "syntax_preparation_held_on_background_executor": true,
+    "active_file_remained_usable_during_highlighting": true,
+    "requested_file_restored_exact_first_and_last_source_lines": true
+  },
+  "separate_process_evidence": {
+    "case": "E2E-005",
+    "receipt": "verification.json",
+    "scope": "Independent files in two native PR tabs during a delayed response"
+  }
+}
