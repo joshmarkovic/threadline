@@ -127,10 +127,11 @@ function Invoke-PrMergeStateProof([IntPtr]$Window, [string]$Profile) {
             $pr.issue_rest_id -eq 443 -and $null -eq $pr.pull_request_rest_id -and $null -eq $pr.merged
     }
     Confirm-FixturePrMergeLabel $restart $unknownLabel
-    Activate-FixturePr $restart 'reader-tab-0-' 42 $updated
+    Activate-FixturePr $restart 'reader-result-' 42 $updated -Result
     $null = Wait-PrReader 'the confirmed merge and separate provider identities reload from SQLite' {
         param($pr, $reader)
-        $reader.active_item -eq $first -and $reader.offline -and $pr.closed -eq $true -and $pr.merged -eq $true -and
+        $reader.active_item -eq $first -and $reader.offline -and $reader.tab_counts[0] -eq 2 -and
+            $pr.closed -eq $true -and $pr.merged -eq $true -and
             $pr.issue_rest_id -eq 442 -and $pr.pull_request_rest_id -eq 762 -and $pr.revision_id -eq $revision
     }
     Confirm-FixturePrMergeLabel $restart $mergedLabel
