@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 use std::num::NonZeroU64;
 use std::time::Duration;
 
+use chrono::{DateTime, Datelike, SecondsFormat};
 use reqwest::header::{self, HeaderMap};
 use reqwest::{Client, Response, StatusCode, Url, redirect};
 use serde::{Deserialize, Deserializer};
@@ -82,8 +83,7 @@ impl RestProvider {
         }
         let revision = match entity_tag {
             Some(entity_tag) => Revision::EntityTag(entity_tag),
-            None if !payload.updated_at.is_empty() => Revision::UpdatedAt(payload.updated_at),
-            None => return Err(ProviderError::InvalidResponse),
+            None => Revision::UpdatedAt(utc_revision_time(&payload.updated_at)?),
         };
         let kind = if payload.pull_request.is_some() {
             ItemKind::PullRequest
@@ -131,6 +131,29 @@ fn deserialize_nullable<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<String>, D::Error> {
     Option::deserialize(deserializer)
+}
+
+fn utc_revision_time(value: &str) -> Result<String, ProviderError> {
+    let utc = DateTime::parse_from_rfc3339(value)
+        .map_err(|_| ProviderError::InvalidResponse)?
+        .to_utc();
+    if !(0..=9999).contains(&utc.year()) {
+        return Err(ProviderError::InvalidResponse);
+    }
+    let mut canonical = utc.to_rfc3339_opts(SecondsFormat::Secs, true);
+    if let Some((_, fraction_and_offset)) = value.split_once('.') {
+        // Chrono validates the entire fraction but holds at most nine digits.
+        let digits = fraction_and_offset
+            .split(['Z', 'z', '+', '-'])
+            .next()
+            .unwrap_or_default()
+            .trim_end_matches('0');
+        if !digits.is_empty() {
+            canonical.insert(canonical.len() - 1, '.');
+            canonical.insert_str(canonical.len() - 1, digits);
+        }
+    }
+    Ok(canonical)
 }
 
 async fn read_summary_response(mut response: Response) -> Result<IssueResponse, ProviderError> {

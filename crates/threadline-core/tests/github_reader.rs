@@ -89,6 +89,30 @@ async fn a_selected_public_repository_uses_the_same_id_verified_reader() {
 }
 
 #[tokio::test]
+async fn issue_timestamps_with_equivalent_offsets_use_the_same_utc_millis() {
+    let sim = Simulator::start().await;
+    let session = session(&sim, 71).await;
+    let cancel = CancellationToken::new();
+    let reader = session.reader(&route(), repo_id(), &cancel).await.unwrap();
+    for (created_at, updated_at) in [
+        (
+            "2026-11-01T01:30:00.123-04:00",
+            "2026-11-01T01:30:00.123-05:00",
+        ),
+        ("2026-11-01T05:30:00.123Z", "2026-11-01T06:30:00.123Z"),
+    ] {
+        let mut response = issue(41, false);
+        response["created_at"] = json!(created_at);
+        response["updated_at"] = json!(updated_at);
+        sim.enqueue(Method::GET, &format!("{BASE}/issues/41"), ok(response));
+        let row = reader.issue(number(41), &cancel).await.unwrap();
+        assert_eq!(row.created_at_ms, Some(1_793_511_000_123));
+        assert_eq!(row.updated_at_ms, 1_793_514_600_123);
+    }
+    check_requests(&sim, 4);
+}
+
+#[tokio::test]
 async fn private_dogfood_reader_reuses_one_verification_and_stops_after_the_first_get_page() {
     let sim = Simulator::start().await;
     let session = session(&sim, 71).await;

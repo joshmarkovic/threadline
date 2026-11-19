@@ -35,10 +35,12 @@ fn payload(number: u64, pull_request: bool) -> serde_json::Value {
 async fn reads_a_versioned_issue_endpoint_with_correct_pr_identity_and_revision() {
     let fixture = FeasibilityFixture::new(42);
     let simulator = Simulator::start().await;
+    let mut offset_payload = payload(42, true);
+    offset_payload["updated_at"] = json!("2026-11-17T07:00:00-05:00");
     simulator.enqueue(
         Method::GET,
         SUMMARY_PATH,
-        Reply::new(StatusCode::OK, payload(42, true).to_string())
+        Reply::new(StatusCode::OK, offset_payload.to_string())
             .header(header::ETAG, "W/\"summary-v1\""),
     );
     let provider = RestProvider::loopback(simulator.address).unwrap();
@@ -58,6 +60,49 @@ async fn reads_a_versioned_issue_endpoint_with_correct_pr_identity_and_revision(
     assert_eq!(log.len(), 1);
     assert!(log[0].matched && log[0].versioned && log[0].expected_media_type);
     assert!(!log[0].authorization_sent);
+}
+
+#[tokio::test]
+async fn timestamp_revisions_normalize_offsets_without_losing_precision() {
+    let fixture = FeasibilityFixture::new(42);
+    let simulator = Simulator::start().await;
+    let provider = RestProvider::loopback(simulator.address).unwrap();
+    for (wire, expected) in [
+        (
+            "2026-11-01T01:30:00.12345678901-04:00",
+            Some("2026-11-01T05:30:00.12345678901Z"),
+        ),
+        (
+            "2026-11-01T05:30:00.123456789010Z",
+            Some("2026-11-01T05:30:00.12345678901Z"),
+        ),
+        (
+            "2026-11-01T01:30:00.12345678901-05:00",
+            Some("2026-11-01T06:30:00.12345678901Z"),
+        ),
+        ("2026-11-01T01:00:00+09:00", Some("2026-10-31T16:00:00Z")),
+        ("", None),
+        ("2026-11-01T01:30:00", None),
+        ("2026-02-29T01:30:00Z", None),
+        ("2026-11-01T01:30:00.Z", None),
+        ("9999-12-31T23:59:59-01:00", None),
+    ] {
+        let mut response = payload(42, false);
+        response["updated_at"] = json!(wire);
+        simulator.enqueue(
+            Method::GET,
+            SUMMARY_PATH,
+            Reply::new(StatusCode::OK, response.to_string()),
+        );
+        let result = provider.read_summary(&fixture.request).await;
+        match expected {
+            Some(expected) => assert_eq!(
+                result.unwrap().revision(),
+                &Revision::UpdatedAt(expected.into())
+            ),
+            None => assert_eq!(result.unwrap_err(), ProviderError::InvalidResponse),
+        }
+    }
 }
 
 #[tokio::test]
