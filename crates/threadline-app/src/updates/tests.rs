@@ -9,6 +9,7 @@ use threadline_platform::PlatformError;
 #[derive(Default)]
 struct Fixture {
     configured: AtomicBool,
+    private_channel: AtomicBool,
     credential: Mutex<Option<Vec<u8>>>,
     reads: AtomicUsize,
     checks: AtomicUsize,
@@ -40,6 +41,9 @@ struct TestSource(Arc<Fixture>);
 impl Source for TestSource {
     fn configured(&self) -> bool {
         self.0.configured.load(Ordering::SeqCst)
+    }
+    fn private_channel(&self) -> bool {
+        self.0.private_channel.load(Ordering::SeqCst)
     }
     fn check<'a>(&'a self, token: Option<&'a str>) -> CheckFuture<'a> {
         Box::pin(async move {
@@ -84,7 +88,7 @@ fn await_model(cx: &mut TestAppContext, mut ready: impl FnMut(&mut TestAppContex
 }
 
 #[gpui_kit::test]
-fn startup_updates_wait_for_policy_cancel_and_require_explicit_restart(cx: &mut TestAppContext) {
+fn startup_updates_wait_for_policy_cancel_and_allow_manual_retry(cx: &mut TestAppContext) {
     cx.executor().allow_parking();
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let fixture = Arc::new(Fixture::default());
@@ -145,8 +149,9 @@ fn startup_updates_wait_for_policy_cancel_and_require_explicit_restart(cx: &mut 
     let acknowledged = Arc::new(AtomicBool::new(false));
     let signal = acknowledged.clone();
     let (_click, _acknowledgement) = cx.update(|cx| {
-        let click = cx.subscribe(&panel, |model, _: &RestartRequested, cx| {
-            model.update(cx, |model, cx| model.launch(cx));
+        let click = cx.subscribe(&panel, |model, request: &RestartRequested, cx| {
+            assert!(matches!(request, RestartRequested::User));
+            model.update(cx, |model, cx| model.launch(*request, cx));
         });
         let acknowledgement = cx.subscribe(&panel, move |_, _: &SetupStarted, _| {
             signal.store(true, Ordering::SeqCst);
@@ -198,6 +203,124 @@ fn startup_updates_skip_credential_store_and_network_when_unconfigured(cx: &mut 
     });
     assert_eq!(fixture.reads.load(Ordering::SeqCst), 0);
     assert_eq!(fixture.checks.load(Ordering::SeqCst), 0);
+}
+
+#[gpui_kit::test]
+fn private_updates_request_release_access_once_in_settings(cx: &mut TestAppContext) {
+    cx.executor().allow_parking();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let fixture = Arc::new(Fixture::default());
+    fixture.configured.store(true, Ordering::SeqCst);
+    fixture.private_channel.store(true, Ordering::SeqCst);
+    let (window, panel) = cx.update(|cx| {
+        gpui_kit::init(cx);
+        gpui_kit::open_window(WindowOptions::default(), cx, |window, cx| {
+            cx.new(|cx| {
+                Updates::with_source(
+                    runtime.handle().clone(),
+                    Arc::new(TestSource(fixture.clone())),
+                    fixture.clone(),
+                    window,
+                    cx,
+                )
+            })
+        })
+        .unwrap()
+    });
+    cx.update(|cx| panel.update(cx, |model, cx| model.set_policy(Some(true), cx)));
+    await_model(cx, |cx| {
+        cx.read(|cx| matches!(panel.read(cx).state, State::NeedsCredential))
+    });
+    assert_eq!(fixture.checks.load(Ordering::SeqCst), 0);
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.find("updates-open-settings").visible());
+        assert!(window.try_find("updates-token-save").is_none());
+        panel.update(cx, |model, cx| model.show_settings(true, window, cx));
+        window.render_frame(cx);
+        assert!(window.find("updates-token-save").visible());
+        panel
+            .read(cx)
+            .input
+            .clone()
+            .update(cx, |input, cx| input.set_value("fixture-only", window, cx));
+        window.click("updates-token-save", cx);
+    })
+    .unwrap();
+    await_model(cx, |_| fixture.checks.load(Ordering::SeqCst) == 1);
+    assert!(fixture.with_token.load(Ordering::SeqCst));
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.try_find("updates-token-save").is_none());
+        assert!(window.find("updates-manage-token").visible());
+    })
+    .unwrap();
+}
+
+#[gpui_kit::test]
+fn startup_installs_the_verified_update_automatically(cx: &mut TestAppContext) {
+    check_workspace_startup(cx, false);
+}
+
+#[gpui_kit::test]
+fn starting_work_during_the_check_defers_installation(cx: &mut TestAppContext) {
+    check_workspace_startup(cx, true);
+}
+
+fn check_workspace_startup(cx: &mut TestAppContext, interact: bool) {
+    cx.executor().allow_parking();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let fixture = Arc::new(Fixture::default());
+    fixture.configured.store(true, Ordering::SeqCst);
+    fixture.acknowledge_handoff.store(true, Ordering::SeqCst);
+    let ((window, _workspace), panel) = cx.update(|cx| {
+        gpui_kit::init(cx);
+        let mut panel = None;
+        let window = gpui_kit::open_window(WindowOptions::default(), cx, |window, cx| {
+            let updates = cx.new(|cx| {
+                Updates::with_source(
+                    runtime.handle().clone(),
+                    Arc::new(TestSource(fixture.clone())),
+                    fixture.clone(),
+                    window,
+                    cx,
+                )
+            });
+            panel = Some(updates.clone());
+            cx.new(|cx| {
+                let mut workspace = crate::workspace::Workspace::new(
+                    window,
+                    cx,
+                    42,
+                    runtime.handle().clone(),
+                    false,
+                    false,
+                );
+                workspace.attach_updates(updates, window, cx);
+                workspace
+            })
+        })
+        .unwrap();
+        (window, panel.unwrap())
+    });
+    cx.update(|cx| panel.update(cx, |model, cx| model.set_policy(Some(true), cx)));
+    await_model(cx, |_| fixture.checks.load(Ordering::SeqCst) == 1);
+    if interact {
+        cx.simulate_keystrokes(window, "a");
+    }
+    fixture.release_gate.notify_one();
+    if interact {
+        await_model(cx, |cx| {
+            cx.read(|cx| matches!(panel.read(cx).state, State::Ready(_)))
+        });
+        assert_eq!(fixture.handoffs.load(Ordering::SeqCst), 0);
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            window.click("updates-restart", cx);
+        })
+        .unwrap();
+    }
+    await_model(cx, |_| fixture.handoffs.load(Ordering::SeqCst) == 1);
 }
 
 #[cfg(feature = "e2e")]
@@ -256,12 +379,6 @@ fn startup_update_retries_after_workspace_save_and_installer_failures(cx: &mut T
         })
         .unwrap()
     });
-    cx.update(|cx| {
-        model.update(cx, |model, cx| {
-            model.state = State::Ready(Arc::new(TestSetup(fixture.clone())));
-            cx.notify();
-        })
-    });
     let db = rusqlite::Connection::open(db).unwrap();
     db.execute_batch(
         "CREATE TRIGGER refuse_layout BEFORE UPDATE OF layout ON workspaces
@@ -275,7 +392,8 @@ fn startup_update_retries_after_workspace_save_and_installer_failures(cx: &mut T
         })
         .unwrap()
     };
-    click(cx);
+    cx.update(|cx| model.update(cx, |model, cx| model.set_policy(Some(true), cx)));
+    fixture.release_gate.notify_one();
     await_model(cx, |cx| {
         cx.read(|cx| {
             model.read(cx).note

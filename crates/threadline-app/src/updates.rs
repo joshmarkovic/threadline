@@ -14,8 +14,14 @@ use threadline_platform::{Credential, CredentialRef, CredentialStore, NativeCred
 use tokio::{runtime::Handle, task::AbortHandle};
 use zeroize::Zeroize;
 
-pub(crate) struct RestartRequested;
+#[derive(Clone, Copy)]
+pub(crate) enum RestartRequested {
+    Startup,
+    User,
+}
 impl EventEmitter<RestartRequested> for Updates {}
+pub(crate) struct OpenUpdateSettings;
+impl EventEmitter<OpenUpdateSettings> for Updates {}
 pub(crate) struct SetupStarted;
 impl EventEmitter<SetupStarted> for Updates {}
 pub(crate) struct SetupStartFailed;
@@ -30,6 +36,7 @@ type CheckResult = Result<Option<Box<dyn VerifiedSetup>>, &'static str>;
 type CheckFuture<'a> = Pin<Box<dyn Future<Output = CheckResult> + Send + 'a>>;
 trait Source: Send + Sync {
     fn configured(&self) -> bool;
+    fn private_channel(&self) -> bool;
     fn check<'a>(&'a self, token: Option<&'a str>) -> CheckFuture<'a>;
 }
 
@@ -49,6 +56,16 @@ impl Source for Releases {
         #[cfg(windows)]
         {
             threadline_installer::github_update::configured()
+        }
+        #[cfg(not(windows))]
+        {
+            false
+        }
+    }
+    fn private_channel(&self) -> bool {
+        #[cfg(windows)]
+        {
+            threadline_installer::github_update::private_channel()
         }
         #[cfg(not(windows))]
         {
@@ -84,6 +101,7 @@ enum State {
     Unconfigured,
     Waiting,
     Checking,
+    NeedsCredential,
     Current,
     Failed(&'static str),
     Ready(Arc<dyn VerifiedSetup>),
@@ -95,10 +113,12 @@ pub(crate) struct Updates {
     source: Arc<dyn Source>,
     vault: Vault,
     state: State,
+    private_channel: bool,
     permitted: Option<bool>,
     generation: u64,
     check_task: Option<AbortHandle>,
     open: bool,
+    editing_credential: bool,
     input: Entity<InputState>,
     saving: bool,
     launching: bool,
@@ -125,10 +145,14 @@ impl Updates {
         cx: &mut Context<Self>,
     ) -> Self {
         let probe = source.clone();
-        let work = runtime.spawn_blocking(move || probe.configured());
+        let work = runtime.spawn_blocking(move || {
+            let configured = probe.configured();
+            (configured, configured && probe.private_channel())
+        });
         cx.spawn(async move |view, cx| {
-            let configured = work.await.unwrap_or(false);
+            let (configured, private_channel) = work.await.unwrap_or_default();
             let _ = view.update(cx, |model, cx| {
+                model.private_channel = private_channel;
                 model.state = if configured {
                     State::Waiting
                 } else {
@@ -144,10 +168,12 @@ impl Updates {
             source,
             vault,
             state: State::Inspecting,
+            private_channel: false,
             permitted: None,
             generation: 0,
             check_task: None,
             open: false,
+            editing_credential: false,
             input: Self::new_input(window, cx),
             saving: false,
             launching: false,
@@ -159,7 +185,7 @@ impl Updates {
     fn new_input(window: &mut Window, cx: &mut Context<Self>) -> Entity<InputState> {
         cx.new(|cx| {
             InputState::new(window, cx)
-                .placeholder("Optional release token")
+                .placeholder("GitHub token for release downloads")
                 .masked(true)
         })
     }
@@ -172,6 +198,7 @@ impl Updates {
     ) {
         self.open = open;
         if !self.open {
+            self.editing_credential = false;
             self.input = Self::new_input(window, cx);
         }
         cx.notify();
@@ -203,6 +230,7 @@ impl Updates {
         let generation = self.generation;
         let vault = self.vault.clone();
         let source = self.source.clone();
+        let private_channel = self.private_channel;
         let work = self.runtime.spawn(async move {
             let token =
                 tokio::task::spawn_blocking(move || vault.read(&CredentialRef::github_releases()))
@@ -215,7 +243,13 @@ impl Updates {
                 .map(|s| str::from_utf8(&s.0.0))
                 .transpose()
                 .map_err(|_| "Replace the saved release token in Settings.")?;
-            source.check(token).await
+            if private_channel && token.is_none() {
+                return Ok(State::NeedsCredential);
+            }
+            Ok(match source.check(token).await? {
+                Some(setup) => State::Ready(setup.into()),
+                None => State::Current,
+            })
         });
         self.check_task = Some(work.abort_handle());
         cx.spawn(async move |view, cx| {
@@ -225,11 +259,10 @@ impl Updates {
                     return;
                 }
                 model.check_task = None;
-                model.state = match result {
-                    Ok(Some(setup)) => State::Ready(setup.into()),
-                    Ok(None) => State::Current,
-                    Err(message) => State::Failed(message),
-                };
+                model.state = result.unwrap_or_else(State::Failed);
+                if matches!(model.state, State::Ready(_)) {
+                    cx.emit(RestartRequested::Startup);
+                }
                 cx.notify();
             });
         })
@@ -271,6 +304,7 @@ impl Updates {
             let ok = matches!(work.await, Ok(Ok(())));
             let _ = view.update(cx, |model, cx| {
                 model.saving = false;
+                model.editing_credential = !ok;
                 model.credential_note = Some(match (ok, save) {
                     (true, true) => "Private release token saved.",
                     (true, false) => "Private release token removed.",
@@ -288,14 +322,24 @@ impl Updates {
         cx.notify();
     }
 
-    pub(crate) fn launch(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn launch(&mut self, request: RestartRequested, cx: &mut Context<Self>) {
+        if matches!(request, RestartRequested::Startup) && self.permitted != Some(true) {
+            self.restart_problem(
+                "Automatic installation is paused by your sync settings.",
+                cx,
+            );
+            cx.emit(SetupStartFailed);
+            return;
+        }
         let State::Ready(setup) = &self.state else {
+            cx.emit(SetupStartFailed);
             return;
         };
         if self.launching {
             return;
         }
         self.launching = true;
+        self.note = None;
         let setup = Arc::clone(setup);
         let work = self.runtime.spawn_blocking(move || setup.launch());
         cx.spawn(async move |view, cx| {
@@ -337,21 +381,21 @@ impl Render for Updates {
         let configured = !matches!(self.state, State::Inspecting | State::Unconfigured);
         let status = match &self.state {
             State::Inspecting => "Checking this installation…".into(),
-            State::Unconfigured => {
-                "Automatic updates require a signed release installation.".into()
-            }
+            State::Unconfigured => "This installation does not receive automatic updates.".into(),
             State::Waiting if self.saving => "Saving release credential settings…".into(),
             State::Waiting if self.permitted == Some(false) => {
                 "Update checks are paused by your sync settings.".into()
             }
             State::Waiting => "Waiting for the workspace settings.".into(),
             State::Checking => "Checking for updates…".into(),
+            State::NeedsCredential => "Connect GitHub to download private app updates.".into(),
             State::Current => "No newer update is available.".into(),
             State::Failed(error) => error.to_string(),
             State::Ready(_) if self.launching => "Starting the verified installer…".into(),
             State::Ready(setup) => format!("Threadline {} is ready to install.", setup.version()),
         };
-        if !self.open && !ready {
+        let needs_access = matches!(self.state, State::NeedsCredential);
+        if !self.open && !ready && !needs_access {
             return div();
         }
         let mut panel = div().flex().flex_col().gap_2().p_3();
@@ -372,14 +416,46 @@ impl Render for Updates {
                     .label("Restart to update")
                     .accessibility_id("updates-restart")
                     .disabled(self.launching)
-                    .on_click(cx.listener(|_, _, _, cx| cx.emit(RestartRequested))),
+                    .on_click(cx.listener(|_, _, _, cx| cx.emit(RestartRequested::User))),
+            );
+        }
+        if needs_access && !self.open {
+            summary = summary.child(
+                Button::new("updates-open-settings")
+                    .label("Set up updates")
+                    .accessibility_id("updates-open-settings")
+                    .on_click(cx.listener(|_, _, _, cx| cx.emit(OpenUpdateSettings))),
+            );
+        }
+        if self.open && matches!(self.state, State::Failed(_)) {
+            summary = summary.child(
+                Button::new("updates-check-again")
+                    .label("Check again")
+                    .disabled(self.permitted != Some(true))
+                    .on_click(cx.listener(|model, _, _, cx| {
+                        model.state = State::Waiting;
+                        model.start(cx);
+                        cx.notify();
+                    })),
             );
         }
         panel = panel.child(summary);
-        if self.open && configured {
+        if self.open && configured && !self.editing_credential && !needs_access {
+            panel = panel.child(
+                Button::new("updates-manage-token")
+                    .label("Manage release access")
+                    .accessibility_id("updates-manage-token")
+                    .small()
+                    .on_click(cx.listener(|model, _, _, cx| {
+                        model.editing_credential = true;
+                        cx.notify();
+                    })),
+            );
+        }
+        if self.open && configured && (self.editing_credential || needs_access) {
             let token = Input::new(&self.input)
                 .small()
-                .aria_label("Optional private release token")
+                .aria_label("GitHub token for release downloads")
                 .accessibility_id("updates-release-token");
             let save = Button::new("updates-token-save")
                 .label("Save release token")
@@ -398,8 +474,8 @@ impl Render for Updates {
                     cx.listener(|model, _, window, cx| model.edit_credential(false, window, cx)),
                 );
             panel = panel
-                .child("For private releases, use a separate token with read access to the contents of joshmarkovic/threadline.")
-                .child(div().flex().items_center().gap_2().child(token).child(save).child(remove));
+                .child("For private downloads, save a GitHub token here once. Use an existing or dedicated token with Contents read access to joshmarkovic/threadline. Windows Credential Manager stores it separately from your workspace login.")
+                .child(div().flex().items_center().gap_2().child(token).child(save).children((!needs_access).then_some(remove)));
         }
         if self.open
             && let Some(note) = self.credential_note

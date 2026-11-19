@@ -178,6 +178,7 @@ pub struct Workspace {
     updates: Option<Entity<crate::updates::Updates>>,
     reader: Option<Entity<ReaderWorkspace>>,
     route: WorkspaceRoute,
+    user_interacted: bool,
     restarting: bool,
     initial_route_chosen: bool,
     feasibility_fixture: bool,
@@ -405,6 +406,7 @@ impl Workspace {
             updates: None,
             reader,
             route: WorkspaceRoute::Home,
+            user_interacted: false,
             restarting: false,
             initial_route_chosen: false,
             feasibility_fixture,
@@ -443,6 +445,7 @@ impl Workspace {
     }
 
     fn toggle_accounts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.user_interacted = true;
         if self.route == WorkspaceRoute::Onboarding {
             return;
         }
@@ -538,8 +541,21 @@ impl Workspace {
         self._subscriptions.push(cx.subscribe_in(
             &updates,
             window,
-            |this, updates, _: &crate::updates::RestartRequested, window, cx| {
-                if this.restarting {
+            |this, _, _: &crate::updates::OpenUpdateSettings, window, cx| {
+                if this.route == WorkspaceRoute::Home {
+                    this.toggle_accounts(window, cx);
+                }
+            },
+        ));
+        self._subscriptions.push(cx.subscribe_in(
+            &updates,
+            window,
+            |this, updates, request: &crate::updates::RestartRequested, window, cx| {
+                let request = *request;
+                if this.restarting
+                    || (matches!(request, crate::updates::RestartRequested::Startup)
+                        && this.user_interacted)
+                {
                     return;
                 }
                 if this
@@ -567,13 +583,13 @@ impl Workspace {
                     reader.update(cx, |reader, cx| {
                         reader.request_departure(
                             false,
-                            move |_, cx| updates.update(cx, |model, cx| model.launch(cx)),
+                            move |_, cx| updates.update(cx, |model, cx| model.launch(request, cx)),
                             window,
                             cx,
                         );
                     });
                 } else {
-                    updates.update(cx, |model, cx| model.launch(cx));
+                    updates.update(cx, |model, cx| model.launch(request, cx));
                 }
             },
         ));
@@ -1603,6 +1619,9 @@ impl gpui_kit::Render for Workspace {
         }
         let window_content = div()
             .id("threadline")
+            .capture_any_mouse_down(cx.listener(|this, _, _, _| this.user_interacted = true))
+            .capture_key_down(cx.listener(|this, _, _, _| this.user_interacted = true))
+            .on_scroll(cx.listener(|this, _, _, _| this.user_interacted = true))
             .track_focus(&self.shell_focus)
             .tab_stop(!self.feasibility_fixture)
             .key_context(if self.feasibility_fixture {
@@ -1724,7 +1743,7 @@ impl gpui_kit::Render for Workspace {
             .is_some_and(|panel| !panel.read(cx).loaded());
         let window_content = window_content
             .child(self.toolbar(palette, !self.feasibility_fixture, cx))
-            .when(self.route != WorkspaceRoute::Settings, |content| {
+            .when(self.route == WorkspaceRoute::Home, |content| {
                 content.children(self.updates.clone())
             })
             .when(

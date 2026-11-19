@@ -4,7 +4,7 @@ Threadline is a native desktop client for GitHub issues and pull requests. It ke
 
 ## Install the private Windows test build
 
-On Windows 11 x64, sign in to GitHub with an account that can read `joshmarkovic/threadline`, then download and run the installer. [Download Threadline-Setup-20.exe](https://github.com/joshmarkovic/threadline/releases/download/v0.1.0-local.20/Threadline-Setup-20.exe)
+On Windows 11 x64, run the installer once. If you already use build 20 or earlier, close Threadline and run this installer to turn on automatic updates. Setup closes and opens the app. Sign in to GitHub with an account that can read `joshmarkovic/threadline` to download it. [Download Threadline-Setup-21.exe](https://github.com/joshmarkovic/threadline/releases/download/v0.1.0-local.21/Threadline-Setup-21.exe)
 
 You can also download the installer with GitHub CLI. If you need the CLI, install it with `winget install --id GitHub.cli --exact` and open a new PowerShell window.
 
@@ -12,11 +12,15 @@ Run these commands from the folder where you want to keep the installer. Skip th
 
 ```powershell
 gh auth login --hostname github.com --web
-gh release download v0.1.0-local.20 --repo joshmarkovic/threadline --pattern Threadline-Setup-20.exe --dir . --clobber
-if ($LASTEXITCODE -eq 0) { & .\Threadline-Setup-20.exe }
+gh release download v0.1.0-local.21 --repo joshmarkovic/threadline --pattern Threadline-Setup-21.exe --dir . --clobber
+if ($LASTEXITCODE -eq 0) { & .\Threadline-Setup-21.exe }
 ```
 
-Open **Threadline Installer Test** from Start after setup finishes. This private prerelease is unsigned. The test installation keeps its own registration. Automatic updates require a signed stable installation.
+To enable private release downloads, choose **Set up updates** on Home or open **Settings → App updates**. Save a GitHub token with **Contents: Read** for `joshmarkovic/threadline` once. You may enter an existing token with that access or create a dedicated fine-grained token. Windows Credential Manager remembers it separately from your workspace sign-in.
+
+After that, open **Threadline Installer Test** from Start. It checks for newer private test builds, verifies the download, saves your workspace, installs the update quietly, and reopens. If you start working while the download runs, you can keep working and choose **Restart to update** when convenient, or let it install the next time you open the app. **Work offline** and **Pause background refresh** also pause automatic update checks.
+
+For unattended deployment, run `Start-Process .\Threadline-Setup-21.exe -ArgumentList '/S' -Wait` in PowerShell. A standalone silent install exits when setup finishes. Open the app from Start when you're ready.
 
 ## Install from source
 
@@ -53,7 +57,7 @@ On the Welcome screen, choose your display time zone and continue to GitHub. For
 
 Windows stores the workspace in `%LOCALAPPDATA%\Threadline\Data\threadline.sqlite3` and the display preference in `%LOCALAPPDATA%\Threadline\Config\display-timezone`. Threadline stores timestamps in UTC. Change how they appear under **Settings → Display time zone**. Choose a preset or enter an IANA name such as `America/New_York` and save it. Use `system` to follow the device. Calendar-day filters use your selected zone. Existing saved filters retain their UTC cutoffs. You can also set the preference before opening a workspace with `threadline --display-timezone America/New_York`. [Time-zone and storage behavior](docs/architecture/synchronization.md#time-zones)
 
-Registered signed Windows installations check for the latest stable GitHub release on startup. Threadline downloads and verifies compatible signed updates in the background and offers **Restart to update** when ready. For a private release repository, save a separate token with **Contents: Read** in Settings. [Windows packaging guide](tools/windows/README.md) · [Package evidence](docs/reports/sprint-12.md)
+The stable Windows installation opens as **Threadline** in Start and follows signed stable releases. The private test installation follows its own release channel and verifies updates with its pinned release key. Public release downloads do not require a GitHub token. Source builds use the source installation commands above. [Windows packaging guide](tools/windows/README.md) · [Package evidence](docs/reports/sprint-12.md)
 
 Uninstall preserves your local workspace and sign-in credentials. To preview or permanently remove the retained data, use the separate Windows cleanup command. [Remove a retained local workspace](tools/windows/README.md#remove-a-retained-local-workspace)
 
