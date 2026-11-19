@@ -1,0 +1,169 @@
+{
+  "scenario": "S12-NATIVE-LIFECYCLE",
+  "fixture_revision": "s12-native-lifecycle-v2",
+  "evidence_class": "optimized separate-process Windows test fixture",
+  "first_attempt": {
+    "run": "e2e-1795056731609-2600",
+    "status": "Fail",
+    "source_revision": "174f3102b31c8f8c8475f8771cdd571579ed5d62",
+    "reason": "Timed out waiting for account control pr-1-review-toggle-editor. See native-driver.log.",
+    "raw_sha256": "b0b1414b2f089aa8985974015c72476985c30682a32a94a46b4799f5c19f4186"
+  },
+  "second_attempt": {
+    "run": "e2e-1795057343128-34700",
+    "status": "Fail",
+    "exit_code": 1,
+    "started_at_unix_ms": 1795057343128,
+    "finished_at_unix_ms": 1795057703755,
+    "command": {
+      "program": "xtask",
+      "argv": [
+        "test",
+        "e2e",
+        "--suite",
+        "full",
+        "--case",
+        "S12-NATIVE-LIFECYCLE",
+        "--binary",
+        "<binary-path>",
+        "--seed",
+        "12345",
+        "--report-dir",
+        "<report-dir>"
+      ],
+      "redacted": true
+    },
+    "source_revision": "a007590a069d4ec4061356a6f96a8c7ba5a5b91c",
+    "source_dirty": false,
+    "app_revision": "174f3102b31c8f8c8475f8771cdd571579ed5d62",
+    "executable_sha256": "8955aca57f948389db85a2ddb412a470cddf83d768f24aefb618e7304d1ebdc1",
+    "executable_bytes": 44966400,
+    "host": {
+      "os": "windows",
+      "architecture": "x86_64",
+      "version": "Microsoft Windows [Version 10.0.22631.7652]",
+      "display_session": "Windows desktop availability is checked by native driver"
+    },
+    "dpi": 96,
+    "seed": 12345,
+    "native_actions": 54,
+    "reason": "The synthetic fill action is limited to the scoped credential boundary driver.",
+    "cached_surfaces": {
+      "item": 1,
+      "pr": 3,
+      "head": "000000000000303900000000000000000000000b",
+      "history_head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "local_search_matches": 1,
+      "feed_event": 1,
+      "draft_kinds": [
+        "IssueEdit",
+        "Comment",
+        "Review",
+        "Reply"
+      ],
+      "unfetched_checks": "Missing",
+      "pending_actions": 4
+    },
+    "offline_restart": true,
+    "delayed_provider": {
+      "cached_panes": 2,
+      "queued_actions": 4,
+      "protected_credential_reentered": false
+    },
+    "recovered": {
+      "work_offline": false,
+      "active_account": 1,
+      "alternate_queue": 0,
+      "protected_token_present": true,
+      "protected_reference_matches": true,
+      "actions": [
+        "OutcomeUnknown",
+        "Queued",
+        "Queued",
+        "Queued"
+      ],
+      "first_attempts": 1,
+      "first_send_starts": 1,
+      "dependent_holds": [
+        "dependency",
+        "dependency",
+        "dependency"
+      ],
+      "review_anchor_preserved": true,
+      "sync_checkpoint": {
+        "cursor": "2",
+        "started_at_ms": 1795057349253
+      },
+      "drafts": [
+        {
+          "id": "issue-1",
+          "kind": "IssueEdit",
+          "item": 1,
+          "tab": "fixture-tab-0",
+          "version": 1,
+          "body_sha256": "78593127aabea86e9a6fbdcbde17f250e03051af999c5d70cf0afbcab7ce7a62"
+        },
+        {
+          "id": "comment-2",
+          "kind": "Comment",
+          "item": 2,
+          "tab": "fixture-tab-1",
+          "version": 1,
+          "body_sha256": "84a843997a92a0d4ca85583f309abbdc0b8feefd49df8ba38eb4ee8fe9d025be"
+        },
+        {
+          "id": "review-3",
+          "kind": "Review",
+          "item": 3,
+          "tab": "fixture-tab-2",
+          "version": 1,
+          "body_sha256": "fe0366c85242efc552bb929e71a3169117d6deeeebc1284153b32bd4c23311c3"
+        },
+        {
+          "id": "review-reply-3-771",
+          "kind": "Reply",
+          "item": 3,
+          "tab": "fixture-tab-5",
+          "version": 1,
+          "body_sha256": "fc74329d24106be4a4ae3a13af1541a24f3f8dd2f75bfa97e5bad4fabb7d7baf"
+        }
+      ],
+      "delivery_groups": 1,
+      "delivery_unchanged_at_ms": 1795057379253
+    },
+    "signed_out": {
+      "protected_token_present": false,
+      "alternate_queue": 0,
+      "actions": [
+        "OutcomeUnknown",
+        "Queued",
+        "Queued",
+        "Queued"
+      ],
+      "first_attempts": 1,
+      "first_send_starts": 1,
+      "dependent_holds": [
+        "signed_out",
+        "signed_out",
+        "signed_out"
+      ]
+    },
+    "protected_fixture_key_removed": true,
+    "loopback_requests": 9,
+    "unexpected_or_unauthenticated_requests": 0,
+    "requests_that_could_mutate": [
+      {
+        "phase": "lifecycle_crash",
+        "route": "lifecycle_comment",
+        "status": 0
+      }
+    ],
+    "raw_sha256": {
+      "result": "c9a836e424e9885a6aac98a4a4f573da5db283384e19e93e78d86bbb41a3a611",
+      "native": "fa0e6b8a6dcb18969550970ee8add57e3a1d0e73c008ea5f0fa1e172390c3f48",
+      "recovered": "32a1eacd4a296af471a62ccaf7b1a58d9d0171440db685818ba3d47613f6fd63",
+      "signed_out": "973ad4078eb740de115bafddcc3728c8f66cae7169b44f61cf3be9daf750c33b",
+      "redacted_http_trace": "5bce5c95339778b25b0410a7230ffb191015ab0e07968d40d4c0f955a0971fdd"
+    }
+  }
+}
