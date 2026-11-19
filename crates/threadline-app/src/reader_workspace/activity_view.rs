@@ -18,6 +18,8 @@ use threadline_storage::{
     },
 };
 
+mod mute;
+
 const FEED_PAGE: u16 = 40;
 
 #[derive(Default)]
@@ -31,6 +33,7 @@ pub(super) struct ActivityState {
     inbox_busy: bool,
     pending_open: Option<(String, Destination)>,
     rule_form: Option<RuleForm>,
+    mute_preview: Option<mute::MutePreview>,
 }
 
 #[cfg(feature = "e2e")]
@@ -82,6 +85,7 @@ enum Setting {
     IgnoreAutomatedReviews,
     IgnoreAutomatedComments,
     Actor(ActorRule),
+    AddReviewMute(ActorRule),
     QuietDetails(QuietHours),
     QuietDay(u8),
 }
@@ -191,7 +195,7 @@ fn update_global(settings: &mut NotificationSettings, change: Setting) {
                 schedule.weekdays ^= day;
             }
         }
-        Setting::Mute | Setting::Relevance(None) => {}
+        Setting::Mute | Setting::Relevance(None) | Setting::AddReviewMute(_) => {}
     }
 }
 
@@ -210,6 +214,11 @@ fn update_override(rules: &mut RepositoryRules, change: Setting) {
         Setting::IgnoreAutomatedReviews => toggle_automated(&mut rules.actor_rules, true),
         Setting::IgnoreAutomatedComments => toggle_automated(&mut rules.actor_rules, false),
         Setting::Actor(rule) => toggle_actor_rule(&mut rules.actor_rules, rule),
+        Setting::AddReviewMute(rule) => {
+            if !rules.actor_rules.contains(&rule) {
+                rules.actor_rules.push(rule);
+            }
+        }
         _ => {}
     }
 }
@@ -333,6 +342,7 @@ impl ReaderWorkspace {
         if self.activity.busy {
             return;
         }
+        self.activity.mute_preview = None;
         self.activity.busy = true;
         self.launch(
             window,
@@ -402,6 +412,7 @@ impl ReaderWorkspace {
         if self.activity.busy || self.activity.repository != repository {
             return;
         }
+        let confirms_preview = matches!(change, Setting::AddReviewMute(_));
         self.activity.busy = true;
         self.launch(
             window,
@@ -422,6 +433,9 @@ impl ReaderWorkspace {
                 this.activity.busy = false;
                 match result {
                     Ok((settings, rules)) => {
+                        if confirms_preview {
+                            this.activity.mute_preview = None;
+                        }
                         if settings.is_some() {
                             this.activity.settings = settings;
                         }
@@ -528,7 +542,8 @@ impl ReaderWorkspace {
             .flex()
             .flex_col()
             .gap_2()
-            .child(scopes);
+            .child(scopes)
+            .children(self.review_mute_preview(cx));
         let flags = if let Some(overrides) = overrides {
             vec![("mute", "Mute repository", overrides.muted, Setting::Mute)]
         } else {
@@ -995,7 +1010,7 @@ impl ReaderWorkspace {
                     time_label(event.occurred_at_ms.or(Some(event.observed_at_ms))),
                     reason,
                 )));
-            let mut buttons = div().flex().gap_1().child(
+            let mut buttons = div().flex().flex_wrap().gap_1().child(
                 control(format!("activity-open-{event_id}"), "Open").on_click(cx.listener(
                     move |this, _, window, cx| {
                         if let Some(account) = this.account {
@@ -1004,6 +1019,20 @@ impl ReaderWorkspace {
                     },
                 )),
             );
+            if let (Some(account), Some(actor)) = (self.account, event.review_actor.clone())
+                && self
+                    .repositories
+                    .iter()
+                    .any(|repo| repo.id == event.repository && repo.selected)
+            {
+                buttons = buttons.child(self.review_mute_control(
+                    format!("activity-mute-review-{event_id}"),
+                    account,
+                    event.repository,
+                    actor,
+                    cx,
+                ));
+            }
             if event.read_at_ms.is_none() {
                 buttons = buttons.child(
                     control(format!("activity-read-{event_id}"), "Mark read")

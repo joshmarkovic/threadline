@@ -124,6 +124,14 @@ impl Default for NotificationSettings {
 }
 pub use threadline_core::github::reader::ActorIdentity as EventActor;
 impl RuleActor {
+    /// Match a particular account only when the provider supplied its numeric identity.
+    pub fn from_identity(actor: &EventActor) -> Option<Self> {
+        actor
+            .user_id
+            .map(Self::User)
+            .or_else(|| actor.app_id.map(Self::App))
+    }
+
     fn matches(&self, who: &EventActor) -> bool {
         match self {
             Self::User(id) => who.user_id == Some(*id),
@@ -133,7 +141,7 @@ impl RuleActor {
     }
 }
 impl RuleScope {
-    fn matches(&self, paths: &BTreeSet<Category>) -> bool {
+    pub(super) fn matches(&self, paths: &BTreeSet<Category>) -> bool {
         match self {
             Self::Categories(spec) => !spec.is_disjoint(paths),
             Self::ReviewsAndInline => paths.iter().any(|c| {

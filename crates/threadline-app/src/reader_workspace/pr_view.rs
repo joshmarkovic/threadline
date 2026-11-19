@@ -695,7 +695,25 @@ impl ReaderWorkspace {
                 cx,
             ));
             for (index, (_, record)) in page.rows.iter().enumerate() {
-                viewport = viewport.child(pr_record(record, palette));
+                let mute = if let PrRecord::Review { id, actor, .. } = record {
+                    threadline_storage::notifications::RuleActor::from_identity(actor).map(
+                        |actor| {
+                            div()
+                                .flex()
+                                .child(self.review_mute_control(
+                                    format!("pr-{pane}-mute-review-{id}"),
+                                    pr.data.revision.account,
+                                    pr.data.revision.repository,
+                                    actor,
+                                    cx,
+                                ))
+                                .into_any_element()
+                        },
+                    )
+                } else {
+                    None
+                };
+                viewport = viewport.child(pr_record(record, palette, mute));
                 if let Some(thread) = super::review_threads::Thread::from_record(record) {
                     viewport = viewport.child(self.thread_controls(
                         (pane, index),
@@ -1990,7 +2008,7 @@ fn reference_status(reference: &BodyReference, offline: bool) -> &'static str {
     }
 }
 
-fn pr_record(record: &PrRecord, palette: Palette) -> AnyElement {
+fn pr_record(record: &PrRecord, palette: Palette, mute: Option<AnyElement>) -> AnyElement {
     let mut card = div()
         .text_sm()
         .p_1()
@@ -2027,6 +2045,7 @@ fn pr_record(record: &PrRecord, palette: Palette) -> AnyElement {
                 author.as_deref().unwrap_or("Unknown reviewer"),
                 time_label(*submitted_at_ms)
             ))
+            .children(mute)
             .child(
                 div().text_xs().text_color(palette.muted).child(
                     commit_oid

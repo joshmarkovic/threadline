@@ -14,6 +14,7 @@ pub struct FeedEntry {
     pub id: i64,
     pub event_key: String,
     pub event_kind: String,
+    pub review_actor: Option<RuleActor>,
     pub occurred_at_ms: Option<i64>,
     pub revision: Option<String>,
     pub repository: RepositoryId,
@@ -583,7 +584,11 @@ impl Store {
                     [e.id],
                     |r| Ok((r.get::<_, String>(0)?, r.get(1)?)),
                 )?;
+                let review_actor = if RuleScope::ReviewsAndInline.matches(&e.facts.categories) {
+                    RuleActor::from_identity(&e.facts.actor)
+                } else { None };
                 out.push(FeedEntry {
+                    review_actor,
                     id: e.id,
                     event_key: e.key,
                     event_kind:e.kind,

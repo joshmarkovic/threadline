@@ -310,3 +310,104 @@ fn it_018_popup_waits_for_separately_committed_pages_and_survives_restart() {
             .is_none()
     );
 }
+
+#[test]
+fn it_018_contextual_review_muting_uses_provider_identity_and_preserves_existing_activity() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Store::open_profile(dir.path()).unwrap();
+    let (account, repository, item) = write_profile::setup(&db);
+    let profile = db.github_access_profile(account, "work").unwrap().unwrap();
+    let user = NonZeroU64::new(721).unwrap();
+    let app = NonZeroU64::new(951).unwrap();
+    db.enroll_notification_stream(&profile, repository, "comments", 100)
+        .unwrap();
+    let observe = |key, ts, category, actor| {
+        let mut f = facts(item, category);
+        f.actor = actor;
+        assert!(record(&db, &profile, repository, key, ts, &f));
+    };
+    let identity = EventActor {
+        user_id: Some(user),
+        ..Default::default()
+    };
+    observe("review-first", 101, Category::Approval, identity.clone());
+    observe(
+        "ordinary-first",
+        102,
+        Category::OrdinaryComment,
+        identity.clone(),
+    );
+    observe(
+        "review-unidentified",
+        103,
+        Category::Approval,
+        EventActor::default(),
+    );
+    observe(
+        "review-app",
+        104,
+        Category::CommentOnlyReview,
+        EventActor {
+            app_id: Some(app),
+            ..Default::default()
+        },
+    );
+    assert_eq!(
+        db.process_notification_events(account, 110, "UTC", false, 10)
+            .unwrap(),
+        4
+    );
+    let feed = db.notification_feed(account, None, 10).unwrap();
+    let event_key = |key| format!("observed:{}:comments:{key}", repository.0);
+    let review_actor = |key| {
+        feed.iter()
+            .find(|row| row.event_key == event_key(key))
+            .unwrap()
+            .review_actor
+            .clone()
+    };
+    assert_eq!(review_actor("review-first"), Some(RuleActor::User(user)));
+    assert_eq!(review_actor("ordinary-first"), None);
+    assert_eq!(review_actor("review-unidentified"), None);
+    assert_eq!(review_actor("review-app"), Some(RuleActor::App(app)));
+    db.update_repository_notification_rules(account, repository, |policy| {
+        policy.actor_rules.push(ActorRule {
+            actor: review_actor("review-first").unwrap(),
+            scope: RuleScope::ReviewsAndInline,
+        })
+    })
+    .unwrap();
+    observe("review-later", 120, Category::Approval, identity.clone());
+    observe(
+        "ordinary-later",
+        121,
+        Category::OrdinaryComment,
+        identity.clone(),
+    );
+    observe(
+        "other-review-later",
+        122,
+        Category::Approval,
+        EventActor {
+            user_id: NonZeroU64::new(723),
+            ..Default::default()
+        },
+    );
+    assert_eq!(
+        db.process_notification_events(account, 130, "UTC", false, 10)
+            .unwrap(),
+        3
+    );
+    let latest = db.notification_feed(account, None, 10).unwrap();
+    let contains = |key| latest.iter().any(|e| e.event_key == event_key(key));
+    assert!(
+        contains("review-first") && contains("ordinary-later") && contains("other-review-later")
+    );
+    assert!(!contains("review-later"));
+    let outsider = db.ensure_account("github.com", 3129).unwrap();
+    assert!(db.notification_feed(outsider, None, 10).unwrap().is_empty());
+    assert!(
+        db.repository_notification_rules(outsider, repository)
+            .is_err()
+    );
+}
