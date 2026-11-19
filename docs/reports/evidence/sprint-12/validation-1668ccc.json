@@ -1,0 +1,625 @@
+{
+  "source_revision": "1668ccc3afc5ff8f0b1b1de182a6ddada5c9b0e6",
+  "source_dirty": false,
+  "linux_canonical_lanes": [
+    {
+      "run": "unit-1795064982122-2647180",
+      "lane": "unit",
+      "status": "Pass",
+      "exit_code": 0,
+      "named_cases": 23,
+      "test_executions": 138,
+      "raw_result_sha256": "02fa85a92c6114f127cea1e2b33a66a4058849d8bba9a6a944acc4d398e19b0f",
+      "raw_junit_sha256": "301c45dc818f0264695916bf07de27801e64064b91eb2a3a7db0a4e603588378"
+    },
+    {
+      "run": "integration-1795065078166-2649207",
+      "lane": "integration",
+      "status": "Pass",
+      "exit_code": 0,
+      "named_cases": 36,
+      "test_executions": 152,
+      "raw_result_sha256": "a01704145cb408658f3675adb15a87208de223277940cce17a4816a3513eac62",
+      "raw_junit_sha256": "b06b83aa5d3eca84ad6a2a09db8a3a63191f41de0c709560ec49b48fc62e11f6"
+    },
+    {
+      "run": "ui-1795065453813-2657580",
+      "lane": "ui",
+      "status": "Pass",
+      "exit_code": 0,
+      "named_cases": 9,
+      "test_executions": 21,
+      "raw_result_sha256": "9783b9286c502da84e9f26b2deaa38c5b941f2f931d818990b54e21b8c4dca3f",
+      "raw_junit_sha256": "11c72b7841d7eb750199e6f548806851a6963448497f57534f60e62b19bef1b6"
+    }
+  ],
+  "clippy": {
+    "linux": {
+      "status": "Pass",
+      "raw_sha256": "f5dc700f8848e18303f24a2c512dd9a349124136fe1d66eb7e51bf9069511fbb"
+    },
+    "win": {
+      "status": "Pass",
+      "raw_sha256": "826365d14e79598ccb0adba41b57c9a6b95222eb313e4325d34ca513041a36b2"
+    }
+  },
+  "windows": {
+    "source": "1668ccc",
+    "expected_executables": 32,
+    "exit_zero": 32,
+    "default_totals": {
+      "passed": 312,
+      "failed": 0,
+      "ignored": 3
+    },
+    "explicit_generated_credentials": [
+      {
+        "case": "native_synthetic_protected_store_round_trip",
+        "exit_code": 0,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.26,
+        "failed_tests": [],
+        "raw_log_sha256": "a9a8ada347c2c912bce1f6983a141be606f10b4796c5a11505e25174795bea34"
+      },
+      {
+        "case": "it_019_explicit_removal_deletes_only_the_generated_profile_credential",
+        "exit_code": 0,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.45,
+        "failed_tests": [],
+        "raw_log_sha256": "468998d2e151ec0e95af4ba9bc55d2ef61fc170efd5ebf70f32618d2dca869e1"
+      }
+    ],
+    "raw_numeric_exits_sha256": "0fe00a8a9bda5409a6176a00d0d3800fed61a503733a3886c21761777a99dd58",
+    "raw_opt_in_exits_sha256": "d641aa7410bda78fdc492b3923738fcb998923282e06b27ae06ed4d1b65e0f22",
+    "raw_staged_binary_pins_sha256": "abf1c597aff1a809db42ec90685b0e46aa80ab0ed3fead1c600ea44d6a99bfe8",
+    "exact_binary_results": [
+      {
+        "executable": "access-c232fee6c62e98b2.exe",
+        "sha256": "d38337a93b9fe11104f507cab395856c96b4d3a4f3fda483ec6ee0277df4109e",
+        "exit_code": 0,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.6,
+        "failed_tests": [],
+        "raw_log_sha256": "0188bd536d6383a6224797f7988e44a5a2d674d6c7cbec27d35f004ab15fdbe1"
+      },
+      {
+        "executable": "bootstrap_command-4e9e8862c55f6ef7.exe",
+        "sha256": "6add64d6aa7385bb041b77bdabea4e53cfc0bef24dea75fad84cbe0c298aa2b9",
+        "exit_code": 0,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 1.27,
+        "failed_tests": [],
+        "raw_log_sha256": "d9144fc9c341b8e9f9b3acef756f9c3f8bd7c68577740d24fe7af6ef60ce7fd1"
+      },
+      {
+        "executable": "durability-ca8978b3e078a106.exe",
+        "sha256": "38da2f57965e4a47a43ce9821f0d03e4d2cb004dc1e36b991e1feae2e98bc77a",
+        "exit_code": 0,
+        "passed": 11,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 3.44,
+        "failed_tests": [],
+        "raw_log_sha256": "6b0c1438aaaf7af02d5d663d05636a2e484e2452ba21cab6d8dbb140340f1bbd"
+      },
+      {
+        "executable": "feasibility_ui-6b3d9a4be0c25b21.exe",
+        "sha256": "37a7c5f839885a65af7103177bf93f4491fa3e8cc63a3cc5023dfed12ebc9d50",
+        "exit_code": 0,
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 5.53,
+        "failed_tests": [],
+        "raw_log_sha256": "c7108f619b1fdf4f73f551c5d3e41c26f20b3223491902a43e1d0cba963a6ec3"
+      },
+      {
+        "executable": "fixtures-41187b4f488e65ee.exe",
+        "sha256": "a3a2dd001b6120fc93b46fb56c03aea2746f03e37eabe78a85ac144fb99f32d4",
+        "exit_code": 0,
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 123.96,
+        "failed_tests": [],
+        "raw_log_sha256": "9abd353e72db28a722e58548a188a0942b51832751d26f8630ab700df7d2b47d"
+      },
+      {
+        "executable": "foundation-37b0b2910121efed.exe",
+        "sha256": "a5c379e9f1a93afbbb136a5ee0f67b80d57533800e1267ff950cddbaa841560a",
+        "exit_code": 0,
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.04,
+        "failed_tests": [],
+        "raw_log_sha256": "1e93f1152e49bbf0118fd31a3622b74b7bb54364e2fc1b98c7313618686044a6"
+      },
+      {
+        "executable": "github_access-dd6dd39f611bd863.exe",
+        "sha256": "87e9235150cc49e27c7e138cfba27c364ae57019958e99239344f155b8b0dbe4",
+        "exit_code": 0,
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.07,
+        "failed_tests": [],
+        "raw_log_sha256": "f4558d9e454b586fb8826b346d8b54aff9769cbeb7ffb959db0bd86f31be30e0"
+      },
+      {
+        "executable": "github_history-e0482e2eca26b115.exe",
+        "sha256": "ef738741c8a651177c793d4ccf3906a855ef3474f0a33f59da35ed666a052187",
+        "exit_code": 0,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.03,
+        "failed_tests": [],
+        "raw_log_sha256": "0d51e502e9339ba02b3117c7c694b3c178dd79d14d987414df0998b2c24aa3aa"
+      },
+      {
+        "executable": "github_merge-b7dea7e485900c8e.exe",
+        "sha256": "ef86cfa76168354498ad67673d3c81838b5c32f1e3c952804597903d0b668e4e",
+        "exit_code": 0,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.02,
+        "failed_tests": [],
+        "raw_log_sha256": "43fa4e1fd8e05b6657edf6b2b28281b920e1d7b402db4d5ded021a5d9e1d34a5"
+      },
+      {
+        "executable": "github_pr-01fd841eab67e778.exe",
+        "sha256": "cccbc790dffc3a7f5bc5bd36f0bba0e1e11c59ac67cae9a0a994abc51b15b740",
+        "exit_code": 0,
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.05,
+        "failed_tests": [],
+        "raw_log_sha256": "5a93592a81e88bf710550d53658e37b799267a45699f77d665c12b043373871d"
+      },
+      {
+        "executable": "github_reader-318e5c0aed1727c5.exe",
+        "sha256": "3e1b9a5920dfa79879e0eb2cd0da074a54d57c76e859f3246491f0db2fd0efc8",
+        "exit_code": 0,
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.07,
+        "failed_tests": [],
+        "raw_log_sha256": "b18f66cc8289549d7dd9310e3d995905a317c8d6026aa37c4e6deb5d65449e7d"
+      },
+      {
+        "executable": "github_review_writes-23e03e434c6eef7d.exe",
+        "sha256": "6ba86d10b281de61984dbbf6df8bf27809fe9416d87711b50dc852587998d703",
+        "exit_code": 0,
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.04,
+        "failed_tests": [],
+        "raw_log_sha256": "6e5d2d62fa37b1d2e87ff4e53f347758c0b30e943c3f799c2e53dd5e9acdbcb4"
+      },
+      {
+        "executable": "github_writes-c4e43d33750781a7.exe",
+        "sha256": "73344547169cd906ed7c892370d2a2fef36c8b84d622d6d190fd5882d1185494",
+        "exit_code": 0,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.02,
+        "failed_tests": [],
+        "raw_log_sha256": "3a84107984ae75cbb586d3c1a1f17809184b61e65c8a58d6c2713ee27f5bb8e8"
+      },
+      {
+        "executable": "history-aebfa2f6c335da81.exe",
+        "sha256": "6d9807a4c9449fe0f3aac2a954079fa0083d96b5687c20c7066030701967bf44",
+        "exit_code": 0,
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 1.04,
+        "failed_tests": [],
+        "raw_log_sha256": "aabcb9c37733c6fa0aa57867d95c746b35947962615a36bb21ccab7cec75f079"
+      },
+      {
+        "executable": "history_monitor-39d2733ebacf7add.exe",
+        "sha256": "79897297418bcce8d4edea4c50c67591eb9f941d681505765f6f385c6404643f",
+        "exit_code": 0,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.91,
+        "failed_tests": [],
+        "raw_log_sha256": "a8f12891554de550d27b9eec66b67dee4ea5e6f7219311791e44a1d9eafa25d3"
+      },
+      {
+        "executable": "identity-aff3883a2bfa7481.exe",
+        "sha256": "eff12e15b1f6c5d3fb15d40fbea3d0c2af88ee7c7a0551a6c0f8698ac18c33a6",
+        "exit_code": 0,
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 1.92,
+        "failed_tests": [],
+        "raw_log_sha256": "16e1d130e9c2e66bf084b74c9bd268436212875535ae5993fcde5c19035604cf"
+      },
+      {
+        "executable": "merges-9a8fef78ca6d87a8.exe",
+        "sha256": "918fed8f99520b37a74d3c31fd59b000b59cb83a78eaa958958ebb523444a8fe",
+        "exit_code": 0,
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 1.45,
+        "failed_tests": [],
+        "raw_log_sha256": "d1298cf1ae206dc5de057f27a3d98732cae609368818d9ffc5100fe809835cfd"
+      },
+      {
+        "executable": "notifications-b1965cbd087da146.exe",
+        "sha256": "b0307c4831313a3b5a2e8f7129cd603f41b350dce21a80bb7e726e1cd557f004",
+        "exit_code": 0,
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.9,
+        "failed_tests": [],
+        "raw_log_sha256": "68ac509df4117bb9fedd015684abb347b21f0a5e3f019d176cbd055dc78e2a0b"
+      },
+      {
+        "executable": "pr-ede0b484083a25c5.exe",
+        "sha256": "697454ba8940f4dccaee82ecd3c89641a2aea8e36f9ec89ada3fc5091aa9c3f5",
+        "exit_code": 0,
+        "passed": 9,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 2.46,
+        "failed_tests": [],
+        "raw_log_sha256": "5995fbaa17e288bf9ac35c23efc626122b30147258a311b4068df3814dced407"
+      },
+      {
+        "executable": "reader-84ee2c21592db6ed.exe",
+        "sha256": "5fdcbc64ea4404eed20f9d3d2d020a4bf51e9b9273735eb74d7605bb1ab11875",
+        "exit_code": 0,
+        "passed": 11,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 71.46,
+        "failed_tests": [],
+        "raw_log_sha256": "b74709258b135365da8b8436b4ad79dbaa6bdf359c72f144bcbaf55086a19773"
+      },
+      {
+        "executable": "resources-02b077ad5e973572.exe",
+        "sha256": "2790cda9e61c81b14afe6d4328ee55bd1b701548411f6060e5f7d761e7b386ed",
+        "exit_code": 0,
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.92,
+        "failed_tests": [],
+        "raw_log_sha256": "3f88162c99fa4fd5aa26af5f8acf271ced2f63c481f266445bb7c6c379452db4"
+      },
+      {
+        "executable": "reviews-afa933d7336c0786.exe",
+        "sha256": "63ebcd4676243623d6f7cf114bafb6885f12a042d65bec9377340ebc108ffe32",
+        "exit_code": 0,
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 1.94,
+        "failed_tests": [],
+        "raw_log_sha256": "56b77441fccbe095882a471b3a246423a3a28f5e7ce805312bebbe0d31fefe9c"
+      },
+      {
+        "executable": "sync-79a76ddcb44649ae.exe",
+        "sha256": "f5e5bd0c2de22dbfe46cda0ec2154e0221188a75fbd9a580f8affcad4b0573c3",
+        "exit_code": 0,
+        "passed": 13,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 4.8,
+        "failed_tests": [],
+        "raw_log_sha256": "95c3be79c0c37964031b772caaf0916723f0be0224cfab05a821000e70399f36"
+      },
+      {
+        "executable": "threadline-73d1624afbb634d0.exe",
+        "sha256": "6918cf892d69b2576428878524f5336fa2f7764441a809609a3f24dac1d58a7d",
+        "exit_code": 0,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.27,
+        "failed_tests": [],
+        "raw_log_sha256": "de61383a04fcbdad08860b8f770a510b8ef56a68880ac0a70416626b7e33215d"
+      },
+      {
+        "executable": "threadline_app-8f3782b0a7b9d1f1.exe",
+        "sha256": "29e5f5623c1f36637a2d13d5e6812781c5882db76c822d20954868877171c04d",
+        "exit_code": 0,
+        "passed": 58,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 205.51,
+        "failed_tests": [],
+        "raw_log_sha256": "3a434a876718dfaf9787fdaaae03b0f5633276ccb4fff40cdf299bff8804cbfd"
+      },
+      {
+        "executable": "threadline_core-b41efcea136d4807.exe",
+        "sha256": "bcb86bf7b122d6e939308efd69ba05bd6f8894910f1880c86671395e20b789c3",
+        "exit_code": 0,
+        "passed": 17,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.01,
+        "failed_tests": [],
+        "raw_log_sha256": "2eaa769642f01864506d15e26a2fa59b0e0c658f65e4c8bba0ed0d31d13cd6a0"
+      },
+      {
+        "executable": "threadline_installer-a5f0bf3910f3ad96.exe",
+        "sha256": "c4a41805303757bff9e89498640dc50ac2dabc2d7dce5c8f93f1b3a9a8a6e2d2",
+        "exit_code": 0,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.09,
+        "failed_tests": [],
+        "raw_log_sha256": "4d382e7fe2829cfccb4cbcca05bd42d78bec518fdd5f860af371c6b0480dee7b"
+      },
+      {
+        "executable": "threadline_installer-df285c4ad8a79f07.exe",
+        "sha256": "d0f6c564bbabca4217bb3fb9f369fcd0a6866c80c2fadab1c349b872a6b0ddc5",
+        "exit_code": 0,
+        "passed": 4,
+        "failed": 0,
+        "ignored": 1,
+        "seconds": 1.34,
+        "failed_tests": [],
+        "raw_log_sha256": "ff35dda3772132fd8352ede3ffb29a258274ed930f22977852162f4028549b8b"
+      },
+      {
+        "executable": "threadline_platform-9d8f8df79deaf9f3.exe",
+        "sha256": "116f52f20f51830e891bbe077f2f728c32267b38f1d338af08f4f9c3b0e117cc",
+        "exit_code": 0,
+        "passed": 9,
+        "failed": 0,
+        "ignored": 2,
+        "seconds": 0.02,
+        "failed_tests": [],
+        "raw_log_sha256": "a77953dcf2879adf7d136da03b9438398020f51200c5512ac06acc8a0fc234c7"
+      },
+      {
+        "executable": "threadline_storage-02e9d249567f1630.exe",
+        "sha256": "56188162134fae3dfdd9a2f4cb28454f4e68ec92bd08fb0a5f2830d77c625de8",
+        "exit_code": 0,
+        "passed": 18,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 2.04,
+        "failed_tests": [],
+        "raw_log_sha256": "a7667711039b312fa8412b555322d3a716e603e1f9e523aa9d56840ccd95fe2c"
+      },
+      {
+        "executable": "writes-48d204f9b461499c.exe",
+        "sha256": "e361a19947109eb4478b19ae2d5be863fdbd5accf4565980752e9e475cbaaf62",
+        "exit_code": 0,
+        "passed": 12,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 3.35,
+        "failed_tests": [],
+        "raw_log_sha256": "4bf81bd7e640d7898bd7d41c6b97ebb8482b937c0fce37208a3cdb2b79149bd0"
+      },
+      {
+        "executable": "xtask-3c9f62fddad76bc7.exe",
+        "sha256": "9a871c2b999c01ba56dda101eb3227255576ad2b8f29433dd57681224cd8d391",
+        "exit_code": 0,
+        "passed": 73,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 5.31,
+        "failed_tests": [],
+        "raw_log_sha256": "28b5dfe9e1e08ffe4f1b12a17517f20cf81ee086c36b6bf6eb9fd542f4434d3f"
+      }
+    ]
+  },
+  "intermediate_windows": [
+    {
+      "source": "62691b9",
+      "expected_executables": 32,
+      "exit_zero": 31,
+      "default_totals": {
+        "passed": 303,
+        "failed": 3,
+        "ignored": 3
+      },
+      "explicit_generated_credentials": [
+        {
+          "case": "native_synthetic_protected_store_round_trip",
+          "exit_code": 0,
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "seconds": 0.25,
+          "failed_tests": [],
+          "raw_log_sha256": "9d57f3543c9fe320cad3eeafe72bfa4f2e53b8e03e7033449f6b70fb9f2463e7"
+        },
+        {
+          "case": "it_019_explicit_removal_deletes_only_the_generated_profile_credential",
+          "exit_code": 1,
+          "passed": 0,
+          "failed": 1,
+          "ignored": 0,
+          "seconds": 0.28,
+          "failed_tests": [
+            "cleanup::tests::it_019_explicit_removal_deletes_only_the_generated_profile_credential"
+          ],
+          "raw_log_sha256": "1557873e5db0e8ed2a744024119b061dc1cbe413d05b5238207db092378b7101"
+        }
+      ],
+      "raw_numeric_exits_sha256": "1263f8cd4b9dd708e4f22145061fbd69380ba94f3f55bcae40ccc9d7b4f5d88a",
+      "raw_opt_in_exits_sha256": "4d92379a0440a6cefc220af95047efc6c6ccd658eb3d9fc79e4c4747dc06d71c",
+      "raw_staged_binary_pins_sha256": "0c57e2742e3a9a2c47e61585d55f26e1eef66e6c6de56d41e2cd837acd6b8cb0",
+      "failed_executables": [
+        {
+          "executable": "threadline_installer-df285c4ad8a79f07.exe",
+          "sha256": "4cc893bee1f9e874d17919b7215627877c2f652262706b2059012df03267e34e",
+          "exit_code": 101,
+          "passed": 0,
+          "failed": 3,
+          "ignored": 1,
+          "seconds": 0.75,
+          "failed_tests": [
+            "cleanup::tests::it_019_busy_changed_or_unrecognized_profile_preserves_data_and_credentials",
+            "cleanup::tests::it_019_preview_counts_active_workspace_and_confirmation_removes_only_managed_files",
+            "cleanup::tests::it_019_vault_refusal_leaves_every_database_for_retry"
+          ],
+          "raw_log_sha256": "4963e0aea3b807235e2bf1b8919e7d0fefc8e9b2eb25e56d13f9c873d9e64c4e"
+        }
+      ]
+    },
+    {
+      "source": "b3ec477",
+      "expected_executables": 32,
+      "exit_zero": 30,
+      "default_totals": {
+        "passed": 306,
+        "failed": 4,
+        "ignored": 3
+      },
+      "explicit_generated_credentials": [
+        {
+          "case": "native_synthetic_protected_store_round_trip",
+          "exit_code": 0,
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "seconds": 0.24,
+          "failed_tests": [],
+          "raw_log_sha256": "5ab8d2fd92846db96b872c9d52edba1f57c5c241fff36dc84d6053ff5d01789a"
+        },
+        {
+          "case": "it_019_explicit_removal_deletes_only_the_generated_profile_credential",
+          "exit_code": 1,
+          "passed": 0,
+          "failed": 1,
+          "ignored": 0,
+          "seconds": 0.25,
+          "failed_tests": [
+            "cleanup::tests::it_019_explicit_removal_deletes_only_the_generated_profile_credential"
+          ],
+          "raw_log_sha256": "3cc38742952264ead65bcd24cabf09869000bfa6aed09975d711588b272f4fa0"
+        }
+      ],
+      "raw_numeric_exits_sha256": "5dbc8caf1db97c054f9d65f8bc147515d81048f976efc0e98722a185cc9ee8ac",
+      "raw_opt_in_exits_sha256": "4d92379a0440a6cefc220af95047efc6c6ccd658eb3d9fc79e4c4747dc06d71c",
+      "raw_staged_binary_pins_sha256": "84bda005900d0ce63dbc5b563b5683214999e6055c700317fbf24092faffdc24",
+      "failed_executables": [
+        {
+          "executable": "threadline_app-8f3782b0a7b9d1f1.exe",
+          "sha256": "3c6c55ee9401ef8003e17872091b422c48c958796655dd495fd1a2dcc03b717a",
+          "exit_code": 101,
+          "passed": 56,
+          "failed": 1,
+          "ignored": 0,
+          "seconds": 233.2,
+          "failed_tests": [
+            "reader_workspace::tests::ui_006_failed_enqueue_keeps_the_saved_comment_and_reports_the_failure"
+          ],
+          "raw_log_sha256": "7c11f513488d58739b73256baa91358fe271e55312c783f446013f49e639ab46"
+        },
+        {
+          "executable": "threadline_installer-df285c4ad8a79f07.exe",
+          "sha256": "f1cd91b33bd3da71eb591bfdb0f1ab50b8541efc5bfd21cf3fc28110ec7492a6",
+          "exit_code": 101,
+          "passed": 0,
+          "failed": 3,
+          "ignored": 1,
+          "seconds": 0.83,
+          "failed_tests": [
+            "cleanup::tests::it_019_busy_changed_or_unrecognized_profile_preserves_data_and_credentials",
+            "cleanup::tests::it_019_preview_counts_active_workspace_and_confirmation_removes_only_managed_files",
+            "cleanup::tests::it_019_vault_refusal_leaves_every_database_for_retry"
+          ],
+          "raw_log_sha256": "dcfd2aeb0745c2bde74ea359212207f73399926e4423f3618b78048bcbab5261"
+        }
+      ],
+      "isolated_retry": {
+        "test": "ui_006_failed_enqueue_keeps_the_saved_comment_and_reports_the_failure",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 17.82,
+        "failed_tests": [],
+        "raw_log_sha256": "a1d5a8ee2e5544bb0d2046b4e7b9008fe9ddf5345af72cd56b62fab99524f38b"
+      }
+    }
+  ],
+  "windows_unicode_profile": {
+    "tool_sha256": "ec4ca611277e57f13042283695d191ccf02e37a8f5dc87647a2855d364749e29",
+    "profile_root": "Explicit per-process fixture directory containing Latin and CJK characters",
+    "seed_result_sha256": "6305dcef861860b7bcc74480ff855558b66e8f4dd7c0a073b5146353f7424f42",
+    "independent_process_reopen_result_sha256": "6305dcef861860b7bcc74480ff855558b66e8f4dd7c0a073b5146353f7424f42",
+    "matched_durable_state": {
+      "drafts": 1,
+      "durable_projection_sha256": "ec2b1a22b0566c874607f933434e4396d21c0b729f1325887023ab7f70ed0359",
+      "outbox_paused": true,
+      "page_watermark_ms": 1700000499975,
+      "profile_bound": true,
+      "protected_credential_present": true,
+      "queued_operations": 8,
+      "saved_comment_page_cursor": "2",
+      "schema": 17,
+      "status": "Pass",
+      "step_receipts": 1,
+      "work_offline": true
+    },
+    "closed_sqlite_sha256": "22ff2f89c06479796dc0b09bd5f4773709ee586c6279197d21da5e7903600067",
+    "exact_synthetic_value_found_in_closed_database": false,
+    "protected_key_removed": true,
+    "cleanup_result_sha256": "f9e1deac9c926a62c0a61c528a56b118fc0086c93ebc8a52af4ed1052c1ccd4d",
+    "remaining": "A native Known Folder belonging to a Unicode Windows account and a locked or unavailable OS credential vault remain untested."
+  },
+  "linux_numeric_exits": {
+    "fmt": "0",
+    "clippy": "0",
+    "unit": "0",
+    "integration": "0",
+    "ui": "0"
+  },
+  "later_targeted_windows_runs": [
+    {
+      "revision": "93f5e15",
+      "executable": "reader-9084da0720039ee8.exe",
+      "sha256": "6913893cc4926c4e5f1903a6cf04aae68879e4aa494e0b93071bcc7d0856ebe7",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0,
+      "seconds": 104.29,
+      "failed_tests": [],
+      "raw_log_sha256": "9f92fb4dcc9383c53caa038a38dfda83a95661ab63544e963c126336a07e2af6"
+    },
+    {
+      "revision": "af10a42",
+      "executable": "threadline_app-2ae9192585e4506d.exe",
+      "sha256": "cdede8048943528b2edf702d6fed2d408efd36a1226517af006485b2acf91c8b",
+      "exit_code": 0,
+      "passed": 60,
+      "failed": 0,
+      "ignored": 0,
+      "seconds": 246.42,
+      "failed_tests": [],
+      "raw_log_sha256": "d72e712facf172c2a29f97f4b3035eb83c2f0dc52dd64e6e7f4b8371bd06fff3"
+    }
+  ]
+}
