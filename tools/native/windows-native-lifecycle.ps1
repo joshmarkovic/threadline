@@ -67,6 +67,10 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
     }
     Set-AccessPhase 'lifecycle-ready'
     Click-AccountControl $Window 'sync-work-offline'
+    $null = Wait-Sync 'online mode and both workload pauses committed' {
+        param($sync) !$sync.controls.work_offline -and $sync.controls.pause_background -and $sync.controls.pause_queued_actions
+    }
+    Click-AccountControl $Window 'sync-check-now'
     $null = Wait-Sync 'reachability using the native protected credential while submissions are paused' {
         param($sync) $sync.connection -ceq 'Reachable' -and !$sync.controls.work_offline -and $sync.controls.pause_queued_actions
     }
