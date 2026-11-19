@@ -1,0 +1,90 @@
+{
+  "source_revision": "2e01aec",
+  "raw_receipt_sha256": "39ab33db92e57fb3f9c80b9c4b3e68aea9b0f540277465d9e37ee6a25766d94b",
+  "initial_compile": {
+    "source": "573a54b",
+    "error": "CS1703 duplicate references to System.Windows.Forms and System.Drawing",
+    "window_launched": false,
+    "log_sha256": "973b6969de839c8fb4c840aaa708ce453b147d815ae8a777699efcc4b961c519"
+  },
+  "report": {
+    "diagnostic": "owned-native-uia-invoke",
+    "status": "Pass",
+    "frequency": 10000000,
+    "os_build": 22631,
+    "session": 2,
+    "shell_version": "5.1.22621.7649",
+    "provider_source_sha256": "a8a48a845246592a1d2c70820146eec603a3996f2f7d5fd57aa31e78893ed773",
+    "warmup": 1,
+    "samples": [
+      {
+        "sample": 1,
+        "client_begin_qpc": 9856868562319,
+        "provider_entry_qpc": 9856888658711,
+        "ui_handler_qpc": 9856888660317,
+        "client_return_qpc": 9856888660912,
+        "call_ms": 2009.8593,
+        "before_provider_ms": 2009.6392,
+        "provider_to_ui_ms": 0.1606,
+        "total_to_ui_ms": 2009.7998
+      },
+      {
+        "sample": 2,
+        "client_begin_qpc": 9856889266211,
+        "provider_entry_qpc": 9856909302657,
+        "ui_handler_qpc": 9856909304162,
+        "client_return_qpc": 9856909304977,
+        "call_ms": 2003.8766,
+        "before_provider_ms": 2003.6446,
+        "provider_to_ui_ms": 0.1505,
+        "total_to_ui_ms": 2003.7951
+      },
+      {
+        "sample": 3,
+        "client_begin_qpc": 9856909656064,
+        "provider_entry_qpc": 9856929734999,
+        "ui_handler_qpc": 9856929736107,
+        "client_return_qpc": 9856929736952,
+        "call_ms": 2008.0888,
+        "before_provider_ms": 2007.8935,
+        "provider_to_ui_ms": 0.1108,
+        "total_to_ui_ms": 2008.0043
+      },
+      {
+        "sample": 4,
+        "client_begin_qpc": 9856929896306,
+        "provider_entry_qpc": 9856950000895,
+        "ui_handler_qpc": 9856950001919,
+        "client_return_qpc": 9856950002690,
+        "call_ms": 2010.6384,
+        "before_provider_ms": 2010.4589,
+        "provider_to_ui_ms": 0.1024,
+        "total_to_ui_ms": 2010.5613
+      },
+      {
+        "sample": 5,
+        "client_begin_qpc": 9856950361153,
+        "provider_entry_qpc": 9856970491729,
+        "ui_handler_qpc": 9856970492971,
+        "client_return_qpc": 9856970494602,
+        "call_ms": 2013.3449,
+        "before_provider_ms": 2013.0576,
+        "provider_to_ui_ms": 0.1242,
+        "total_to_ui_ms": 2013.1818
+      },
+      {
+        "sample": 6,
+        "client_begin_qpc": 9856970710595,
+        "provider_entry_qpc": 9856990770164,
+        "ui_handler_qpc": 9856990771499,
+        "client_return_qpc": 9856990771673,
+        "call_ms": 2006.1078,
+        "before_provider_ms": 2005.9569,
+        "provider_to_ui_ms": 0.1335,
+        "total_to_ui_ms": 2006.0904
+      }
+    ],
+    "compiled_sha256": "6daddb48bd0eb92faf9ef31743e777a9b20d9114b8646d13b454c9c8b9ebaa29",
+    "compile_only": false
+  }
+}

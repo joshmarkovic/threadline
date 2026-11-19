@@ -86,6 +86,12 @@ The `d524740` Windows 11 run completed the offline and backlog journeys with 117
 
 Both runs missed the four external timing budgets. The v2 warm process reached its first useful two-pane paint at 13214.56 ms from the driver's start, with 11660.75 ms from app entry. The driver verified the report 23.28 ms after that paint. The v2 run passed the recorded idle redraw, working-set, three GPU counter samples, and local package-size checks at 96 DPI. The 60 samples in the table ran offline. The single tab switch during the held write supplies a separate overlap measurement. [Budget measurements and timing attribution](evidence/sprint-12/reader-performance.json)
 
+### Windows UI Automation reference
+
+A separate two-process reference used the same managed Windows UI Automation Invoke call in disconnected session 2. After one warmup, the six client calls took 2003.6446–2013.0576 ms to enter the reference provider. From provider entry to its posted UI handler took 0.1024–0.1606 ms. The first reference attempt failed at compilation because the compiler loaded two framework assemblies twice. The corrected compiler invocation launched the reference successfully. [Per-sample clock readings and source digests](evidence/sprint-12/uia-invoke-reference.json)
+
+In Threadline, the Windows AccessKit provider sends an accessibility action to GPUI's foreground executor, which dispatches it to the rendered node's handler. Threadline's app trace begins at that handler. The reference captured latency before entry into its own provider, while Threadline's data measures its own handler-to-paint interval and external end-to-end time. The published budgets still use the external timings. [Threadline measurements](evidence/sprint-12/reader-performance.json) · [Windows measurement driver](../../tools/native/windows-owned-uia.ps1) · [Windows provider entry](https://learn.microsoft.com/en-us/dotnet/framework/ui-automation/expose-a-server-side-ui-automation-provider)
+
 ### Portable regression
 
 On clean `8da02ce`, Linux x64 under WSL2 passed 23 unit scenarios with 100 reported tests, 36 integration scenarios with 144 tests, and nine UI scenarios with 18 tests. The canonical invocations returned exit 0. Formatting and strict Clippy passed. [Invocation and receipt hashes](evidence/sprint-12/portable-release-validation.json)
