@@ -1,0 +1,167 @@
+{
+  "scope": "Unsigned per-user Windows x64 local fixture package. Publication pending.",
+  "source_revision": "64a9a016dd805aa92fa1cc379a97c18686c0ee34",
+  "run": "install-1795108069424-31900",
+  "windows_build": "22631",
+  "seed": 12345,
+  "package": {
+    "profile": "release",
+    "e2e_feature": false,
+    "target": "x86_64-pc-windows-msvc",
+    "schema": 18,
+    "package_build": 18,
+    "installer_bytes": 11221088,
+    "installer_sha256": "b2c64e5d7de689025e2d1c2525e822ceb5f5a08845e3d0d587b2402c6ee02962",
+    "stage_failure_setup_sha256": "c85e4002110e34b8f43b0337c2ced6e040fc600c8d8125af1c6936080b540d90",
+    "app_sha256": "30f90b43e89720a4ce2b51153c0811326e0b453dc4a1a704c9a471615337a033",
+    "bootstrap_sha256": "4e90ceccad44dc60d6fe43f3e1fa4b65f5451d232d3d1a724393dc5ad158a1ba",
+    "retention_fixture_sha256": "b8e9afe175485ab0a0684c6641aeaad19d2f1c9a763ef2858f51c54c3cca6a78",
+    "runtime_inventory_sha256": "bb6b5a91027b2c89eae1c09c7811cdcde6409e1c9fde7641c9d14754671038e2"
+  },
+  "predecessor": {
+    "package_build": 17,
+    "schema": 18,
+    "setup_sha256": "a9f7b90b8921b5aecf0632449b669e5f9d66ebf4132a3d7faf90d318cf8ac4e0",
+    "seeder_sha256": "6947c5f28ead10b3684e1f603541e43dffb75540c79251383427abe5c46247cc"
+  },
+  "canonical_status": "Pass",
+  "canonical_exit_code": 0,
+  "requirement_ids": [
+    "TEST-04",
+    "INSTALL-04",
+    "INSTALL-05",
+    "INSTALL-06",
+    "INSTALL-07"
+  ],
+  "acceptance_ids": [
+    "AC-96",
+    "AC-97",
+    "AC-98"
+  ],
+  "native_steps": [
+    {
+      "step": "install_predecessor",
+      "exit_code": 0
+    },
+    {
+      "step": "repair_predecessor",
+      "exit_code": 0
+    },
+    {
+      "step": "refuse_locked_executable",
+      "exit_code": 14
+    },
+    {
+      "step": "fail_staged_write",
+      "exit_code": 16
+    },
+    {
+      "step": "upgrade_after_failures",
+      "exit_code": 0
+    },
+    {
+      "step": "repair_current",
+      "exit_code": 0
+    },
+    {
+      "step": "refuse_installed_downgrade",
+      "exit_code": 12
+    },
+    {
+      "step": "uninstall_retains_profile",
+      "exit_code": 0
+    },
+    {
+      "step": "refuse_downgrade_after_uninstall",
+      "exit_code": 12
+    },
+    {
+      "step": "reinstall_current",
+      "exit_code": 0
+    }
+  ],
+  "retained_at_all_ten_steps": true,
+  "preflight": {
+    "highest_build": 17,
+    "exact_install_present": false,
+    "default_data_absent": true
+  },
+  "data_after_ordinary_uninstall": {
+    "schema": 18,
+    "profile_bound": true,
+    "protected_credential_present": true,
+    "work_offline": true,
+    "outbox_paused": true,
+    "drafts": 1,
+    "queued_operations": 8,
+    "step_receipts": 1,
+    "saved_comment_page_cursor": "2",
+    "page_watermark_ms": 1700000499975,
+    "durable_projection_sha256": "ec2b1a22b0566c874607f933434e4396d21c0b729f1325887023ab7f70ed0359"
+  },
+  "same_schema": {
+    "database_sha256_before_launch": "3b8be5022c75a00f3c66031972aa83627859e91ff337e4e9085f4207b2ef08d1",
+    "database_sha256_after_launch_and_uninstall": "e15b7d2f44d5a4f589e141ea09dc0befa798f2f84a1d4df9174f4ea963f6c91b",
+    "migration": null
+  },
+  "native_read": {
+    "owned_window": true,
+    "tab_automation_id": "reader-tab-0-1",
+    "selected_before_invocation": false,
+    "tab_invoke_attempts": 1,
+    "tab_activated": true,
+    "orderly_exit": true
+  },
+  "resumed_checkpoint_on_copy": {
+    "scheduler_claimed_page": 2,
+    "completed_page_watermark_ms": 1700000500010,
+    "next_cursor_empty": true,
+    "archived_bytes_unchanged": true,
+    "network_requests": 0,
+    "queued_operations": 8,
+    "step_receipts": 1,
+    "queued_payloads_and_step_receipts_unchanged": true
+  },
+  "separate_confirmed_removal": {
+    "normal_preview_exit": 0,
+    "normal_confirmation_exit": 0,
+    "conpty_prompt_verified": true,
+    "actual_confirmation_sent_once": true,
+    "accounts": 1,
+    "drafts": 1,
+    "unresolved_operations": 9,
+    "databases_and_backups": 2,
+    "recorded_credential_references": 1,
+    "current_db_and_backup_removed": true,
+    "bound_protected_credential_removed": true,
+    "independent_export_unchanged": true,
+    "independent_credential_preserved_then_fixture_cleaned": true,
+    "prior_retention_archive_unchanged": true,
+    "default_profile_absent_before_and_after": true
+  },
+  "retention_archives": {
+    "previous_files": 19,
+    "new_archive_files": 2,
+    "all_archived_files_rehashed": 21,
+    "current_db_sha256": "e15b7d2f44d5a4f589e141ea09dc0befa798f2f84a1d4df9174f4ea963f6c91b",
+    "sealed_inputs_sha256": "6ccbfbac741f0e5955366cabb0bb2dfe15359873f075db358b2e32acaf1d83f3"
+  },
+  "identical_install_for_suite": {
+    "highest_build": 18,
+    "exact_install_present": true,
+    "app_sha256": "30f90b43e89720a4ce2b51153c0811326e0b453dc4a1a704c9a471615337a033",
+    "registered_uninstaller_sha256": "f50055e74d91b0b19189cfaf8df3116bea7e1c1f6c9416ce18ae15fff02a42ff",
+    "default_data_absent": true
+  },
+  "raw_receipt_sha256": {
+    "build": "5c47ef1a5ca1dee4c5bf42ecbb4dfd416f3b44eef1d33ba1d0c089f8857e3aec",
+    "pinned_package_fixture": "89b18cf2c858000240fc84fee6dccd1b1e1596616a40a32f5cfacf72a8ed98ef",
+    "runtime_inventory": "bb6b5a91027b2c89eae1c09c7811cdcde6409e1c9fde7641c9d14754671038e2",
+    "canonical": "f36d336dc7ae0465705bcd5612600cf6d8ccb08cc7778f5ad4d6bda4f6c05acc",
+    "junit": "b9d3d7dd00adc50c2329db959b11a2a176bf57b36e7414bec9a045f2c65d791b",
+    "matrix": "02c7133ae0f343882579e1e878307bd44a5a5f4998dafb12791de98c9e270adf",
+    "retention": "0bba50738c7c2856a2c3f3fcc93c5f0c28415b78836685d9ae63f83a81ad086f",
+    "preflight": "703e20ee6d79db8f5c560abefa6f219b0379b5d70eef4add14dbdebe2b2b345d",
+    "installed_for_suite": "2dcb23de7358165f29fbe70627291bde0c139f3b02722e589a635cca9859b6a8"
+  }
+}
