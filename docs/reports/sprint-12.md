@@ -74,6 +74,8 @@ E2E-014 failed on optimized app and driver `b88773b` at 96 DPI. The 50,000-item,
 
 The reader now constrains tab width independently of the downloaded title and keeps the full accessible name. The driver retains partial timing receipts and records the app's first paint of both populated panes alongside the external startup measurement. The concurrent Section 16 budget remains open. [Native driver](../../tools/native/windows-cached-reader.ps1)
 
+A Windows 11 concurrent-reader run on `8f330d6` completed 20 cached opens and 20 local searches while the server held a distinct scheduled feed request for each input. Their p95 times were 2,122.37 ms and 2,164.84 ms against 100 ms and 200 ms targets. Ten of the required 20 tab switches also completed. The runner returned Blocked before recording the eleventh tab switch. The server received page 51 and recorded no successful response for it. The tab-switch p95 remains unavailable for this run. [Per-input timings and request outcomes](evidence/sprint-12/concurrent-reader-partial.json)
+
 ### Large workspace and queued actions
 
 The `4700e75` replay completed all 60 offline samples and cancelled the first queued action. It stopped before the first eligible send. SQLite held the remaining actions in order behind an unresolved dependency on the same issue. The revised fixture places the cancelled action and its dependent on a different synthetic issue. A storage test reopened the seeded profile and verified that the dependency remained held and the independent action became eligible. [Original failure and revised run](evidence/sprint-12/reader-performance.json)
