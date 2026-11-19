@@ -32,6 +32,14 @@ function Get-Digest([string]$Path) {
     Assert-Ordinary $Path
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
+function Assert-SameSchemaSeeder([string]$CurrentHelper,[string]$OldHelper,[string]$OldPin,[uint32]$From,[uint32]$To) {
+    if ($From -or $To) { throw 'The declared migration does not match the package schemas.' }
+    if (!$OldHelper -and !$OldPin) { return }
+    if (!$OldHelper -or $OldPin -cnotmatch '^[A-Fa-f0-9]{64}$' -or (Get-Digest $OldHelper) -ine $OldPin -or
+        (Get-Item -LiteralPath $OldHelper).FullName -ieq (Get-Item -LiteralPath $CurrentHelper).FullName) {
+        throw 'Pin a separate seeder from the predecessor package.'
+    }
+}
 function Get-Snapshot([string[]]$Arguments,[string]$Helper=$Fixture,[string]$Pin=$FixtureSha256) {
     if ((Get-Digest $Helper) -ine $Pin) { throw 'The pinned fixture helper changed.' }
     $output = & $Helper @Arguments
@@ -105,8 +113,8 @@ if ($migrates) {
     if ($FromSchema -ne $previous.current_schema -or $ToSchema -ne $metadata.current_schema -or !$PredecessorFixture -or
         $PredecessorFixtureSha256 -cnotmatch '^[A-Fa-f0-9]{64}$' -or $PredecessorFixtureSha256 -ieq $FixtureSha256 -or
         (Get-Digest $PredecessorFixture) -ine $PredecessorFixtureSha256) { throw 'Pin the predecessor seeder and both package schemas.' }
-} elseif ($PredecessorFixture -or $PredecessorFixtureSha256 -or $FromSchema -or $ToSchema) {
-    throw 'The declared migration does not match the package schemas.'
+} else {
+    Assert-SameSchemaSeeder $Fixture $PredecessorFixture $PredecessorFixtureSha256 $FromSchema $ToSchema
 }
 $parent = Split-Path -Parent $data
 $nonce = [guid]::NewGuid().ToString('N')
@@ -119,7 +127,7 @@ $backupName = ''
 $migration = $null
 $stage = 'seed'
 try {
-    $before = if ($migrates) { Get-Snapshot @('seed',$nonce) $PredecessorFixture $PredecessorFixtureSha256 }
+    $before = if ($PredecessorFixture) { Get-Snapshot @('seed',$nonce) $PredecessorFixture $PredecessorFixtureSha256 }
               else { Get-Snapshot @('seed',$nonce) }
     if ($before.schema -ne $previous.current_schema) { throw 'The generated database does not match the predecessor schema.' }
     Assert-Seed $before
@@ -207,6 +215,7 @@ try {
     if (!$key.protected_fixture_key_absent -or !$resume.archived_bytes_unchanged -or !$confirmed.default_profile_absent_before_and_after -or
         (Get-ClosedDigest $archive $backupName) -cne $closed -or (Test-Path -LiteralPath $data)) { throw 'Fixture cleanup or archive validation failed.' }
     Write-LocalReceipt 'windows-retained-package.json' ([ordered]@{status='Pass';fixture_sha256=$FixtureSha256;bootstrap_sha256=$BootstrapSha256;
+        seed_fixture_sha256=$(if ($PredecessorFixture) { $PredecessorFixtureSha256 } else { $FixtureSha256 });
         current_sha256=$CurrentSha256;retained_at_steps=$inspectedSteps.ToArray();native=$opened;
         initial_database_sha256=$baseline;closed_database_sha256=$closed;before=$before;after_default_uninstall=$retained;
         migration=$migration;copied_checkpoint=$resume;separate_confirmed_removal=$confirmed;default_data_absent=$true})

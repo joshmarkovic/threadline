@@ -88,7 +88,9 @@ If the packages advertise different database schemas, build the same fixture exa
 }
 ```
 
-The runner seeds with the predecessor binary and checks both schema numbers against the package metadata. The first launch of the installed candidate must migrate that database and produce a backup with the predecessor schema, queued payloads, receipt and saved cursor. Ordinary uninstall must preserve both files byte for byte. The checkpoint and confirmation checks run against copies while the closed migration archive stays intact.
+For two packages with the same schema, set `retention.predecessor_fixture` to the previous package’s independently pinned seeder (`path` and `sha256`). Omit `migration`. The installed reader must open the original database and preserve its durable contents through uninstall. The receipt records the seeding executable’s digest.
+
+For a schema change, the runner seeds with the predecessor binary and checks both schema numbers against the package metadata. The first launch of the installed candidate must migrate that database and produce a backup with the predecessor schema, queued payloads, receipt and saved cursor. Ordinary uninstall must preserve both files byte for byte. The checkpoint and confirmation checks run against copies while the closed migration archive stays intact.
 
 `verify-local-signed-manifest.ps1` accepts a local fixture and attached CMS metadata with its own separately recorded signer pin. It checks the signature, publisher pin, exact setup digest and byte size. Developers can create a disposable signer and use `openssl cms -sign -binary -nodetach -outform DER` to exercise a matching fixture, changed bytes and a different signer without changing Windows certificate trust. This local proof leaves the Authenticode release gate open.
 

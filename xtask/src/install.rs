@@ -44,6 +44,7 @@ struct TrustedFixture {
 struct RetentionInputs {
     fixture: ExpectedPackage,
     bootstrap: ExpectedPackage,
+    predecessor_fixture: Option<ExpectedPackage>,
     migration: Option<RetainedMigration>,
     #[serde(default)]
     preserve_files: Vec<ExpectedPackage>,
@@ -318,6 +319,13 @@ fn run_matrix(
             .arg(&inputs.bootstrap.sha256)
             .arg("-EvidenceDirectory")
             .arg(dir);
+        if let Some(predecessor) = &inputs.predecessor_fixture {
+            native
+                .arg("-PredecessorFixture")
+                .arg(&predecessor.path)
+                .arg("-PredecessorFixtureSha256")
+                .arg(&predecessor.sha256);
+        }
         if let Some(migration) = &inputs.migration {
             native
                 .arg("-PredecessorFixture")
@@ -405,7 +413,12 @@ fn verified_schema_transition(receipt: &serde_json::Value, inputs: &RetentionInp
     let retained = &receipt["after_default_uninstall"];
     let transition = &receipt["migration"];
     let Some(migration) = &inputs.migration else {
-        return transition.is_null() && before == retained;
+        return transition.is_null()
+            && before == retained
+            && inputs.predecessor_fixture.as_ref().is_none_or(|seeder| {
+                receipt["seed_fixture_sha256"] == seeder.sha256
+                    && before["schema"].as_u64().is_some_and(|v| v > 0)
+            });
     };
     let mut expected_retained = before.clone();
     if !before.is_object() || before["schema"] != migration.from_schema {
@@ -540,6 +553,17 @@ fn trusted_fixture(config: &Path, candidate_digest: &str) -> Result<TrustedFixtu
         if inputs.preserve_files.len() > 64 {
             return Err("Supply at most 64 pinned files from the previous synthetic archives.");
         }
+        if let Some(seeder) = &mut inputs.predecessor_fixture {
+            if inputs.migration.is_some()
+                || seeder.path.file_name() != inputs.fixture.path.file_name()
+                || seeder.path == inputs.fixture.path
+            {
+                return Err(
+                    "Supply one separate predecessor seeder for a same-schema upgrade, or a migration interval.",
+                );
+            }
+            pinned.push(seeder);
+        }
         if let Some(migration) = &mut inputs.migration {
             if migration.from_schema == 0
                 || migration.from_schema >= migration.to_schema
@@ -625,6 +649,15 @@ mod tests {
         fs::create_dir(&predecessor_dir).unwrap();
         let predecessor_fixture = predecessor_dir.join("package_retention_fixture.exe");
         fs::write(&predecessor_fixture, b"previous independently built seeder").unwrap();
+        let old_seeder = json!({"path":"previous/package_retention_fixture.exe","sha256":sha256(&predecessor_fixture).unwrap()});
+        extended["retention"]["predecessor_fixture"] = old_seeder.clone();
+        fs::write(&notes, serde_json::to_vec(&extended).unwrap()).unwrap();
+        let same = trusted_fixture(&notes, &digest).unwrap().retention.unwrap();
+        assert_eq!(same.predecessor_fixture.unwrap().path, predecessor_fixture);
+        extended["retention"]
+            .as_object_mut()
+            .unwrap()
+            .remove("predecessor_fixture");
         extended["retention"]["migration"] = json!({
             "predecessor_fixture": {"path": "previous/package_retention_fixture.exe", "sha256": sha256(&predecessor_fixture).unwrap()},
             "from_schema": 15, "to_schema": 17
@@ -635,6 +668,13 @@ mod tests {
             approved.migration.unwrap().predecessor_fixture.path,
             predecessor_fixture
         );
+        extended["retention"]["predecessor_fixture"] = old_seeder;
+        fs::write(&notes, serde_json::to_vec(&extended).unwrap()).unwrap();
+        assert!(trusted_fixture(&notes, &digest).is_err());
+        extended["retention"]
+            .as_object_mut()
+            .unwrap()
+            .remove("predecessor_fixture");
         extended["retention"]["migration"]["predecessor_fixture"]["sha256"] =
             json!(sha256(&helper).unwrap());
         fs::write(&notes, serde_json::to_vec(&extended).unwrap()).unwrap();
@@ -730,6 +770,7 @@ mod tests {
                 path: "threadline-installer.exe".into(),
                 sha256: "b".repeat(64),
             },
+            predecessor_fixture: None,
             migration: None,
             preserve_files: vec![ExpectedPackage {
                 path: old.clone(),
@@ -772,6 +813,38 @@ mod tests {
     }
 
     #[test]
+    fn retained_same_schema_requires_the_pinned_seeder_and_unchanged_state() {
+        let package = |name: &str, digest: &str| ExpectedPackage {
+            path: name.into(),
+            sha256: digest.repeat(64),
+        };
+        let inputs = RetentionInputs {
+            fixture: package("current/package_retention_fixture.exe", "a"),
+            bootstrap: package("threadline-installer.exe", "b"),
+            predecessor_fixture: Some(package("previous/package_retention_fixture.exe", "c")),
+            migration: None,
+            preserve_files: vec![],
+        };
+        let before = json!({"schema":18,"durable_projection_sha256":"e".repeat(64)});
+        let receipt = json!({"before":before,"after_default_uninstall":before,"migration":null,"seed_fixture_sha256":"c".repeat(64)});
+        assert!(verified_schema_transition(&receipt, &inputs));
+        for (pointer, invalid) in [
+            ("/seed_fixture_sha256", json!("a".repeat(64))),
+            ("/seed_fixture_sha256", json!(null)),
+            ("/after_default_uninstall/schema", json!(19)),
+            (
+                "/after_default_uninstall/durable_projection_sha256",
+                json!("changed"),
+            ),
+            ("/migration", json!({"backup_sha256":"b".repeat(64)})),
+        ] {
+            let mut wrong = receipt.clone();
+            *wrong.pointer_mut(pointer).unwrap() = invalid;
+            assert!(!verified_schema_transition(&wrong, &inputs), "{pointer}");
+        }
+    }
+
+    #[test]
     fn retained_migration_requires_the_predecessor_and_its_unchanged_backup() {
         let package = |pin: &str| ExpectedPackage {
             path: "package_retention_fixture.exe".into(),
@@ -780,6 +853,7 @@ mod tests {
         let inputs = RetentionInputs {
             fixture: package("a"),
             bootstrap: package("b"),
+            predecessor_fixture: None,
             migration: Some(RetainedMigration {
                 predecessor_fixture: package("c"),
                 from_schema: 15,
