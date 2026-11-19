@@ -117,6 +117,10 @@ In Threadline, the Windows AccessKit provider sends an accessibility action to G
 
 ## Local regression suites
 
+On clean intermediate source `4114c34`, the Linux runner passed 127 unit tests across 23 cases, 148 integration tests across 36 cases and 20 UI tests across nine cases. On Windows 11 x64, 31 of 32 test executables exited 0. The combined result was 294 passes, one failure and three ignored entries. Both explicit generated-credential tests passed. [Canonical receipts, native executable hashes and numeric exits](evidence/sprint-12/validation-4114c34.json)
+
+The Windows app test executable exited 101. UI-006 had confirmed that a blocked enqueue preserved the saved comment and queue. After the conflicting writer released its reservation and the test retried submission, it timed out waiting for the draft’s submitted state. The same executable passed that test alone in 11.52 seconds, with 53 others filtered out. [Original failure and isolated rerun](evidence/sprint-12/validation-4114c34.json)
+
 The clean build 13 source, `fda5d91`, passed all three canonical lanes on WSL2 Linux x64. The unit lane ran 124 tests across 23 cases, integration ran 147 across 36, and UI ran 19 across nine. Workspace formatting and strict all-target Clippy passed, including Clippy for Windows x64. [Canonical run IDs, cases and receipt hashes](evidence/sprint-12/validation-fda5d91.json)
 
 On Windows 11 x64, all 32 test executables from the same source exited 0. The default runs recorded 291 passes and three ignored Credential Manager entries. Two explicit fixture runs also passed. They verified protected storage across a process restart and confirmed removal of the generated profile’s bound credential. The first launcher recorded just one executable before consuming the rest of its input list. The totals come from the complete rerun with a separate input stream. [Windows executable hashes, counts and exit codes](evidence/sprint-12/validation-fda5d91.json)
