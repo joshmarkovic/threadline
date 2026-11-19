@@ -72,14 +72,16 @@ function Invoke-NativeActivityProof([IntPtr]$Window, [string]$Profile) {
     Click-AccountControl $Window 'reader-repository-1'
     Click-AccountControl $Window 'reader-fetch-repository'
     Activate-FixturePr $Window 'reader-result-' 43 'Activity fixture pull request 43' -Result
-    Click-AccountControl $Window 'pr-0-refresh'
-    $null = Wait-PrReader 'the old already-merged pull request in the native reader' {
-        param($pr, $reader) $reader.active_number -eq 43 -and $null -ne $pr.head
+    $downloaded = Wait-PrReader 'the old already-merged pull request and its downloaded comparison' {
+        param($pr, $reader)
+        $reader.active_number -eq 43 -and $pr.merged -and
+            $pr.head -ceq ('b' * 40) -and $pr.files_coverage -ceq 'Complete' -and $pr.files_on_page -eq 1
     }
     $baseline = Read-NativeActivityFixture $Profile 'inspect' 'native-activity-baseline.json'
     if (@($baseline.feed).Count -ne 0 -or $baseline.delivered_groups -ne 0 -or @((Read-NativeActivityCapture $Profile)).Count -ne 0) {
         throw 'Historical activity produced an alert or feed row at the monitoring baseline.'
     }
+    $baseline | Add-Member -NotePropertyName comparison_complete -NotePropertyValue ($downloaded.cached_reader.pull_request.files_coverage -ceq 'Complete')
     Add-Evidence 'Download the old pull request and retain a zero-alert baseline' $baseline
 
     Set-AccessPhase 'activity-fresh'

@@ -49,11 +49,11 @@ pub(super) fn read_route(phase: Phase, target: &str) -> Option<Route> {
         "/repositories/71/commits?sha=9999999999999999999999999999999999999999&per_page=20&page=1" => {
             Some(Route::ActivityUnwatched)
         }
-        "/repositories/71/commits/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/check-runs?per_page=20&page=1" => {
-            Some(Route::ActivityOldReview)
+        "/repositories/71/commits/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/check-runs?filter=all&per_page=20&page=1" => {
+            Some(Route::ActivityCheckRuns)
         }
         "/repositories/71/commits/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/statuses?per_page=20&page=1" => {
-            Some(Route::ActivityThreads)
+            Some(Route::ActivityCommitStatuses)
         }
         _ => None,
     }
@@ -235,8 +235,8 @@ pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
             commit(MOVED, json!([{"sha":BASE}]), &delayed),
             commit(BASE, json!([]), &old)
         ])),
-        Route::ActivityOldReview => reply(json!({"total_count":0,"check_runs":[]})),
-        Route::ActivityThreads => reply(json!([])),
+        Route::ActivityCheckRuns => reply(json!({"total_count":0,"check_runs":[]})),
+        Route::ActivityCommitStatuses => reply(json!([])),
         Route::CompareA => pr::response(Phase::PrLoad, route),
         _ => None,
     }
@@ -261,10 +261,38 @@ pub(super) fn trace(records: &[RequestEvidence]) -> bool {
             )
             && row.status == 200
     }) && has(Phase::ActivityBaseline, Route::PullActivityB)
+        && has(Phase::ActivityBaseline, Route::PullB)
+        && has(Phase::ActivityBaseline, Route::CompareA)
         && has(Phase::ActivityFresh, Route::UpdatedComments)
         && has(Phase::ActivityFresh, Route::UpdatedInlineComments)
         && has(Phase::ActivityFresh, Route::PullActivityA)
         && has(Phase::ActivityCatchup, Route::PullActivityA)
         && has(Phase::ActivityCatchup, Route::ActivityMovedTip)
         && has(Phase::ActivityReplay, Route::UpdatedComments)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn activity_fixture_accepts_the_monitored_check_and_old_pr_download_paths() {
+        let phase = Phase::ActivityBaseline;
+        let path =
+            format!("/repositories/71/commits/{HEAD}/check-runs?filter=all&per_page=20&page=1");
+        assert_eq!(read_route(phase, &path), Some(Route::ActivityCheckRuns));
+        assert_eq!(read_route(Phase::PrLoad, &path), None);
+        assert_eq!(
+            response(phase, Route::ActivityCheckRuns).unwrap().status,
+            200
+        );
+        assert_eq!(response(phase, Route::PullB).unwrap().body["merged"], true);
+        assert_eq!(
+            response(phase, Route::CompareA).unwrap().body["files"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+    }
 }
