@@ -633,7 +633,7 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
                 "S04-READER-PERF" | "S12-PHYSICAL-READER" | "S12-READER-CONCURRENT"
             ) {
                 Some(NativeMode::WindowsReaderPerformance)
-            } else if id == "S09-MERGE-QUEUE" {
+            } else if matches!(id, "S09-MERGE-QUEUE" | "S09-MERGE-CANCEL") {
                 Some(NativeMode::WindowsDirectMerge)
             } else if matches!(
                 id,
@@ -908,6 +908,7 @@ fn native_driver(
         NativeMode::WindowsReviewDraft => Some("ReviewDraft"),
         NativeMode::WindowsReviewContext => Some("ReviewContext"),
         NativeMode::WindowsDirectMerge if id == "S09-MERGE-QUEUE" => Some("MergeQueue"),
+        NativeMode::WindowsDirectMerge if id == "S09-MERGE-CANCEL" => Some("MergeCancel"),
         NativeMode::WindowsDirectMerge => Some("DirectMerge"),
         NativeMode::WindowsCredentialBoundary => Some("CredentialBoundary"),
         NativeMode::WindowsNativeLifecycle if id == "S12-OFFLINE-MIXED-OUTBOX" => {
@@ -1133,6 +1134,9 @@ fn native_driver(
             (Status::Pass, NativeMode::WindowsReviewContext) => TraceCheck::ReviewContextJourney,
             (Status::Pass, NativeMode::WindowsDirectMerge) if id == "S09-MERGE-QUEUE" => {
                 TraceCheck::MergeQueueJourney
+            }
+            (Status::Pass, NativeMode::WindowsDirectMerge) if id == "S09-MERGE-CANCEL" => {
+                TraceCheck::MergeCancellation
             }
             (Status::Pass, NativeMode::WindowsDirectMerge) => TraceCheck::MergeJourney,
             (Status::Pass, NativeMode::WindowsCredentialBoundary) => TraceCheck::CredentialBoundary,

@@ -104,6 +104,9 @@ enum Phase {
     MergeWrongHead,
     MergeQueuePreflight,
     MergeQueueRejected,
+    MergeCancelHold,
+    MergeCancelRead,
+    MergeCancelFinish,
     CredentialReady,
     CredentialOffline,
     CredentialOther,
@@ -182,6 +185,9 @@ impl Phase {
             "merge-wrong-head" => Ok(Self::MergeWrongHead),
             "merge-queue-preflight" => Ok(Self::MergeQueuePreflight),
             "merge-queue-rejected" => Ok(Self::MergeQueueRejected),
+            "merge-cancel-hold" => Ok(Self::MergeCancelHold),
+            "merge-cancel-read" => Ok(Self::MergeCancelRead),
+            "merge-cancel-finish" => Ok(Self::MergeCancelFinish),
             "credential-ready" => Ok(Self::CredentialReady),
             "credential-offline" => Ok(Self::CredentialOffline),
             "credential-other" => Ok(Self::CredentialOther),
@@ -268,6 +274,7 @@ enum Route {
     MergePolicyA,
     MergePolicyB,
     MergePut,
+    MergeAcceptedResponseLost,
     MergeQueueDeniedPut,
     MergeReadback,
     HistoryBranches,
@@ -367,6 +374,7 @@ pub enum TraceCheck {
     ReviewThreadsJourney,
     MergeJourney,
     MergeQueueJourney,
+    MergeCancellation,
     CredentialBoundary,
     HistoryJourney,
     WritesWithLoss,
@@ -459,6 +467,7 @@ impl AccessFixture {
             TraceCheck::ReviewThreadsJourney => review_threads::trace(&records),
             TraceCheck::MergeJourney => merge::trace(&records),
             TraceCheck::MergeQueueJourney => merge::trace_queue(&records),
+            TraceCheck::MergeCancellation => merge::trace_cancellation(&records),
             TraceCheck::CredentialBoundary => complete_credential_boundary(&records),
             TraceCheck::HistoryJourney => history::trace(&records),
             TraceCheck::WritesWithLoss => writes::trace(&records, true),
@@ -640,6 +649,14 @@ fn answer(
     socket.set_read_timeout(timeout)?;
     socket.set_write_timeout(timeout)?;
     let (route, authorized, binding) = read_request(socket, phase)?;
+    if authorized && merge::hold_cancellation(phase, route, phase_file, stopping)? {
+        return Ok(RequestEvidence {
+            phase,
+            route,
+            fixture_authorization: true,
+            status: 0,
+        });
+    }
     if authorized
         && route == Route::ReviewDecision(review_decisions::DecisionStep::ApprovalReadInterrupted)
     {
@@ -726,7 +743,13 @@ fn answer(
                 .then(|| writes::committed_read(route))
                 .flatten()
         })
-        .unwrap_or_else(|| response(phase, route, authorized, succeeded(Route::MergePut)));
+        .unwrap_or_else(|| {
+            let merged = succeeded(Route::MergePut)
+                || previous_requests.iter().any(|entry| {
+                    entry.route == Route::MergeAcceptedResponseLost && entry.status == 0
+                });
+            response(phase, route, authorized, merged)
+        });
     let body = serde_json::to_vec(&reply.body)?;
     write!(
         socket,

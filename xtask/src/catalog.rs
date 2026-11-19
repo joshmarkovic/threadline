@@ -82,6 +82,9 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == crate::install::LOCAL_CASE {
         return Some("s12-windows-local-installer-v1");
     }
+    if case == "S09-MERGE-CANCEL" {
+        return Some("s09-accepted-merge-cancel-v1");
+    }
     if case == "S09-MERGE-QUEUE" {
         return Some("s09-required-merge-queue-v1");
     }
@@ -238,6 +241,7 @@ pub fn associations(case: &str) -> Associations {
         "S08-COMMENT-DEPENDENCY" => ("OUTBOX-06;TEST-04;TEST-05", "AC-63;AC-92"),
         "S08-REVIEW-PREDECESSOR" => ("REVIEW-04;OUTBOX-03;TEST-04", "AC-63"),
         "S09-MERGE-QUEUE" => ("MERGE-01;MERGE-03;MERGE-04;OUTBOX-03;TEST-04", "AC-77"),
+        "S09-MERGE-CANCEL" => ("MERGE-02;MERGE-04;OUTBOX-03;TEST-04", "AC-62;AC-66"),
         "S12-NATIVE-LIFECYCLE" => (
             "AUTH-05;CACHE-13;OUTBOX-10;TEST-04;TEST-05",
             "AC-68;AC-73;AC-74;AC-91;AC-92",

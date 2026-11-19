@@ -14,6 +14,9 @@ pub(super) fn applies(phase: Phase) -> bool {
             | Phase::MergeWrongHead
             | Phase::MergeQueuePreflight
             | Phase::MergeQueueRejected
+            | Phase::MergeCancelHold
+            | Phase::MergeCancelRead
+            | Phase::MergeCancelFinish
     )
 }
 
@@ -42,6 +45,11 @@ pub(super) fn put(phase: Phase, path: &str, payload: &Value) -> Route {
         && *payload == json!({"sha": A_HEAD, "merge_method": "squash"})
     {
         Route::MergePut
+    } else if phase == Phase::MergeCancelHold
+        && path == "/repos/fixture-org/private/pulls/42/merge"
+        && *payload == json!({"sha": A_HEAD, "merge_method": "squash"})
+    {
+        Route::MergeAcceptedResponseLost
     } else if phase == Phase::MergeQueueRejected
         && path == "/repos/fixture-org/private/pulls/43/merge"
         && *payload == json!({"sha": B_HEAD, "merge_method": "squash"})
@@ -50,6 +58,77 @@ pub(super) fn put(phase: Phase, path: &str, payload: &Value) -> Route {
     } else {
         Route::Unexpected
     }
+}
+
+// The driver can inspect the in-flight attempt before the server drops its reply,
+// then inspect the ambiguous outcome before the authoritative PR read completes.
+pub(super) fn hold_cancellation(
+    phase: Phase,
+    route: Route,
+    phase_file: &Path,
+    stopping: &AtomicBool,
+) -> io::Result<bool> {
+    let (marker, release, drop_response) = match (phase, route) {
+        (Phase::MergeCancelHold, Route::MergeAcceptedResponseLost) => {
+            ("merge-put-accepted", Phase::MergeCancelRead, true)
+        }
+        (Phase::MergeCancelRead, Route::MergeReadback) => {
+            ("merge-authoritative-read", Phase::MergeCancelFinish, false)
+        }
+        _ => return Ok(false),
+    };
+    let marker = phase_file.with_file_name(marker);
+    fs::File::create_new(marker)?;
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while !stopping.load(Ordering::Acquire) && Instant::now() < deadline {
+        if Phase::read(phase_file).is_ok_and(|current| current == release) {
+            return Ok(drop_response);
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+    Err(io::Error::new(
+        io::ErrorKind::TimedOut,
+        "merge fixture release was not observed",
+    ))
+}
+
+pub(super) fn trace_cancellation(records: &[RequestEvidence]) -> bool {
+    let mut accepted = false;
+    let mut read = false;
+    let mut eligible = false;
+    for entry in records {
+        if !entry.fixture_authorization {
+            return false;
+        }
+        match (entry.phase, entry.route, entry.status) {
+            (Phase::MergeCancelHold, Route::MergePolicyA, 200) => eligible = true,
+            (Phase::MergeCancelHold, Route::MergeAcceptedResponseLost, 0)
+                if eligible && !accepted =>
+            {
+                accepted = true
+            }
+            (Phase::MergeCancelRead, Route::MergeReadback, 200) if accepted && !read => read = true,
+            (Phase::MergePrepare, Route::MergePolicyA, 200) => {}
+            (
+                Phase::MergePrepare
+                | Phase::MergeCancelHold
+                | Phase::MergeCancelRead
+                | Phase::MergeCancelFinish,
+                Route::User
+                | Route::Repository
+                | Route::Items
+                | Route::PullA
+                | Route::CompareA
+                | Route::UpdatedItems
+                | Route::UpdatedComments
+                | Route::UpdatedInlineComments
+                | Route::OpenPullIndex,
+                200,
+            ) => {}
+            _ => return false,
+        }
+    }
+    read
 }
 
 pub(super) fn response(phase: Phase, route: Route, sent: bool) -> Option<Response> {
@@ -168,6 +247,79 @@ pub(super) fn trace(records: &[RequestEvidence]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cancelled_merge_holds_one_accepted_put_then_reads_its_committed_head() {
+        let temp = tempfile::tempdir().unwrap();
+        let fixture = AccessFixture::start(temp.path()).unwrap();
+        let address = fixture.address();
+        let request = |method: &str, path: &str, body: &str| {
+            let mut socket = TcpStream::connect(address).unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            write!(socket, "{method} {path} HTTP/1.1\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\nContent-Length: {}\r\n\r\n{body}", body.len()).unwrap();
+            let mut reply = String::new();
+            socket.read_to_string(&mut reply).unwrap();
+            reply
+        };
+        let phase = fixture.phase_file();
+        let wait_marker = |name| {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while !temp.path().join(name).exists() {
+                assert!(Instant::now() < deadline);
+                thread::sleep(Duration::from_millis(5));
+            }
+        };
+        fs::write(phase, "merge-cancel-hold").unwrap();
+        let query = |name| {
+            json!({"query":format!("query {name}($id:ID!) {{ node(id:$id) {{ id }} }}"),"variables":{"id":"PR_42"}}).to_string()
+        };
+        assert!(request("POST", "/graphql", &query("ThreadlineMergePolicy")).contains("MERGEABLE"));
+        thread::scope(|scope| {
+            let mutation = scope.spawn(|| {
+                request(
+                    "PUT",
+                    "/repos/fixture-org/private/pulls/42/merge",
+                    &json!({"sha":A_HEAD,"merge_method":"squash"}).to_string(),
+                )
+            });
+            wait_marker("merge-put-accepted");
+            fs::write(phase, "merge-cancel-read").unwrap();
+            assert!(mutation.join().unwrap().is_empty());
+            assert!(request("GET", "/repositories/71/pulls/42", "").contains("\"merged\":true"));
+            let read = scope.spawn(|| request("POST", "/graphql", &query("ThreadlineMergedPull")));
+            wait_marker("merge-authoritative-read");
+            fs::write(phase, "merge-cancel-finish").unwrap();
+            assert!(read.join().unwrap().contains(MERGED_OID));
+        });
+        fixture
+            .finish(temp.path(), TraceCheck::MergeCancellation)
+            .unwrap();
+        let row = |route| RequestEvidence {
+            phase: Phase::MergeCancelHold,
+            route,
+            status: 0,
+            fixture_authorization: true,
+        };
+        let duplicate = vec![
+            RequestEvidence {
+                phase: Phase::MergeCancelHold,
+                route: Route::MergePolicyA,
+                status: 200,
+                fixture_authorization: true,
+            },
+            row(Route::MergeAcceptedResponseLost),
+            row(Route::MergeAcceptedResponseLost),
+            RequestEvidence {
+                phase: Phase::MergeCancelRead,
+                route: Route::MergeReadback,
+                status: 200,
+                fixture_authorization: true,
+            },
+        ];
+        assert!(!trace_cancellation(&duplicate));
+    }
 
     #[test]
     fn queue_fixture_accounts_for_the_only_permitted_direct_attempt() {

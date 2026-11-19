@@ -57,6 +57,60 @@ function Invoke-MergeQueueProof([IntPtr]$Window) {
     $script:report.detail = 'The native Outbox retained both original unmerged intents when policy required a queue and when GitHub rejected the direct request with a queue requirement.'
 }
 
+function Invoke-MergeCancellationProof([IntPtr]$Window) {
+    $head = 'b' * 40
+    Wait-SeededFixtureAccount
+    Open-SyncSettings $Window
+    Click-AccountControl $Window 'sync-pause-background'
+    $null = Wait-Sync 'scheduled reads paused and writes enabled' {
+        param($sync) $sync.controls.pause_background -and !$sync.controls.pause_queued_actions
+    }
+    Click-AccountControl $Window 'reader-repository-1'
+    Click-AccountControl $Window 'reader-fetch-repository'
+    $null = Open-FixturePr $Window 0 42 'First fixture pull request' $head 'src/first.rs'
+    Queue-FixtureDirectMerge $Window $head
+    Click-AccountControl $Window 'reader-outbox-pause'
+    $null = Wait-Reader 'queued writes are paused before reconnecting' { param($reader) $reader.outbox_paused }
+    Set-AccessPhase 'merge-cancel-hold'
+    Set-WriteFixtureOffline $Window $false
+    Click-AccountControl $Window 'reader-outbox'
+    Click-AccountControl $Window 'reader-outbox-filter-all'
+    Inspect-WriteFixtureAction $Window 0 'Queued' 'Merge pull request'
+    Click-AccountControl $Window 'reader-outbox-pause'
+    $accepted = Join-Path $script:ProfileDir 'merge-put-accepted'
+    Wait-For 'the loopback server accepted the exact squash request' { [IO.File]::Exists($accepted) }
+    Click-AccountControl $Window 'reader-outbox-cancel'
+    $null = Wait-Reader 'cancel was requested while the accepted PUT was still sending' {
+        param($reader) $reader.outbox_action_state -ceq 'Sending' -and $reader.outbox_action_cancel_requested
+    }
+    Add-Evidence 'Request cancellation from the native Outbox after the provider received the merge' ([ordered]@{
+        state='Sending'; cancel_requested=$true; expected_head=$head; method='squash'
+    })
+    Set-AccessPhase 'merge-cancel-read'
+    $read = Join-Path $script:ProfileDir 'merge-authoritative-read'
+    Wait-For 'the lost response triggered authoritative merge readback' { [IO.File]::Exists($read) }
+    $null = Wait-Reader 'the ambiguous operation stays pending while readback is held' {
+        param($reader) $reader.outbox_action_state -ceq 'OutcomeUnknown' -and $reader.outbox_action_cancel_requested -and $reader.outbox -eq 1
+    }
+    Add-Evidence 'Observe the unresolved cancellation after the response was lost' ([ordered]@{
+        state='OutcomeUnknown'; cancel_requested=$true; unresolved=1
+    })
+    Set-AccessPhase 'merge-cancel-finish'
+    $null = Wait-Reader 'the exact merged commit is recorded without proving local authorship' {
+        param($reader) $reader.outbox_action_state -ceq 'Confirmed' -and $reader.outbox -eq 0 -and
+            $reader.outbox_unattributed_merge_commit -ceq ('c' * 40)
+    }
+    Click-AccountControl $Window 'reader-outbox-open'
+    $null = Wait-PrReader 'the original pull request shows the observed merge after cancellation' {
+        param($pr,$reader) $reader.active_number -eq 42 -and $pr.head -ceq $head -and $pr.merged -eq $true
+    }
+    Add-Evidence 'Open the confirmed original PR and retain its independently observed merge' ([ordered]@{
+        number=42; state='Confirmed'; merged=$true; expected_head=$head; merge_commit=('c' * 40); own_action_proved=$false
+    })
+    Stop-ThroughUi
+    $script:report.detail = 'The native Outbox requested cancellation during the original squash request. Response loss left the result uncertain until authoritative readback confirmed the merged PR. The fixture received one PUT.'
+}
+
 function Invoke-MergeProof([IntPtr]$Window) {
     $firstHead = 'b' * 40
     $secondHead = 'e' * 40

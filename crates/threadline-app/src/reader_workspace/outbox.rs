@@ -66,6 +66,20 @@ impl OutboxState {
         })
     }
 
+    pub(super) fn unattributed_merge_commit(&self) -> Option<String> {
+        let detail = self.selected.as_ref()?;
+        if detail.operation.reason.as_deref() != Some("merged_observed_origin_unproved") {
+            return None;
+        }
+        detail
+            .receipts
+            .iter()
+            .find(|receipt| {
+                receipt.step == "direct_merge" && receipt.object_kind == "merged_commit"
+            })
+            .map(|receipt| receipt.remote_id.clone())
+    }
+
     pub(super) fn cancel_requested(&self) -> bool {
         self.selected
             .as_ref()
