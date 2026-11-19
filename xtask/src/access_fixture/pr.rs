@@ -40,6 +40,7 @@ pub(super) fn applies(phase: Phase) -> bool {
             | Phase::ReviewChanged
             | Phase::ReviewDecisions
     ) || merge::applies(phase)
+        || review_threads::active(phase)
 }
 
 pub(super) fn activity_query(phase: Phase, request: &Value) -> Option<Route> {

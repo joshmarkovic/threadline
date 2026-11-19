@@ -74,7 +74,7 @@ function Queue-WriteFixtureDraft([IntPtr]$Window, [long]$Item, [int]$Expected) {
 function Inspect-WriteFixtureAction([IntPtr]$Window, [int]$Index, [string]$Expected, [string]$ActionLabel) {
     $id = "reader-outbox-action-$Index"
     if ($ActionLabel) {
-        if ($ActionLabel -cnotin @('Comment', 'Merge pull request', 'Review')) { throw 'Unknown fixture action label.' }
+        if ($ActionLabel -cnotin @('Comment', 'Merge pull request', 'Review', 'Reply', 'Resolve thread')) { throw 'Unknown fixture action label.' }
         $displayState = switch -CaseSensitive ($Expected) {
             'Queued' { 'Queued' }
             'Confirmed' { 'Confirmed' }

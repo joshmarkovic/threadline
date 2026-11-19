@@ -21,6 +21,7 @@ mod lifecycle;
 mod merge;
 mod pr;
 mod review_decisions;
+mod review_threads;
 mod writes;
 
 const MAX_REQUEST: u64 = 16 * 1024;
@@ -74,6 +75,8 @@ enum Phase {
     ReviewSend,
     ReviewChanged,
     ReviewDecisions,
+    ThreadQueue,
+    ThreadOutdated,
     MergePrepare,
     MergeSend,
     MergeWrongHead,
@@ -120,6 +123,8 @@ impl Phase {
             "review-send" => Ok(Self::ReviewSend),
             "review-changed" => Ok(Self::ReviewChanged),
             "review-decisions" => Ok(Self::ReviewDecisions),
+            "thread-queue" => Ok(Self::ThreadQueue),
+            "thread-outdated" => Ok(Self::ThreadOutdated),
             "merge-prepare" => Ok(Self::MergePrepare),
             "merge-send" => Ok(Self::MergeSend),
             "merge-wrong-head" => Ok(Self::MergeWrongHead),
@@ -176,6 +181,11 @@ enum Route {
     ReviewCreated,
     ReviewSubmitted,
     ReviewDecision(review_decisions::DecisionStep),
+    QueuedThreadList,
+    QueuedThreadReviewList,
+    QueuedThreadTarget,
+    QueuedThreadReply,
+    QueuedThreadResolve,
     MergePolicyA,
     MergePolicyB,
     MergePut,
@@ -233,6 +243,7 @@ pub enum TraceCheck {
     ReviewContextJourney,
     ReviewDraftJourney,
     ReviewDecisionsJourney,
+    ReviewThreadsJourney,
     MergeJourney,
     MergeQueueJourney,
     CredentialBoundary,
@@ -290,6 +301,7 @@ impl AccessFixture {
             TraceCheck::ReviewContextJourney => pr::trace_review_context(&records),
             TraceCheck::ReviewDraftJourney => pr::trace_review_draft(&records),
             TraceCheck::ReviewDecisionsJourney => review_decisions::trace(&records),
+            TraceCheck::ReviewThreadsJourney => review_threads::trace(&records),
             TraceCheck::MergeJourney => merge::trace(&records),
             TraceCheck::MergeQueueJourney => merge::trace_queue(&records),
             TraceCheck::CredentialBoundary => complete_credential_boundary(&records),
@@ -480,7 +492,7 @@ fn answer(
     socket.set_nonblocking(false)?;
     socket.set_read_timeout(timeout)?;
     socket.set_write_timeout(timeout)?;
-    let (route, authorized, feed_target) = read_request(socket, phase)?;
+    let (route, authorized, binding) = read_request(socket, phase)?;
     if authorized && let Some(status) = lifecycle::hold(phase, route, phase_file, stopping)? {
         return Ok(RequestEvidence {
             phase,
@@ -516,7 +528,7 @@ fn answer(
         });
     }
     let next_feed = if let (true, Route::BacklogFeed(page), Some(target)) =
-        (authorized, route, feed_target)
+        (authorized, route, binding.as_deref())
     {
         if !concurrent::hold(phase_file, stopping, page)? || !concurrent::still_connected(socket)? {
             return Ok(RequestEvidence {
@@ -526,11 +538,13 @@ fn answer(
                 status: 0,
             });
         }
-        concurrent::next(&target, page)
+        concurrent::next(target, page)
     } else {
         None
     };
-    let reply = response(phase, route, authorized, merge_sent);
+    let reply = (authorized.then(|| review_threads::response(phase, route, binding.as_deref())))
+        .flatten()
+        .unwrap_or_else(|| response(phase, route, authorized, merge_sent));
     let body = serde_json::to_vec(&reply.body)?;
     write!(
         socket,
@@ -555,6 +569,9 @@ fn answer(
     if route == Route::CommentCreated && reply.status == 201 {
         socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:4101:07\r\n")?;
     }
+    if route == Route::QueuedThreadReply && reply.status == 201 {
+        socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:772:08\r\n")?;
+    }
     if let Route::BacklogComment(index) = route
         && reply.status == 201
     {
@@ -570,6 +587,9 @@ fn answer(
             }
             Route::ReviewDecision(step) => {
                 write!(socket, "X-GitHub-Request-Id: SYNTHETIC:08:{step:?}\r\n")?
+            }
+            Route::QueuedThreadResolve => {
+                socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:771:08\r\n")?
             }
             Route::MergePut => socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:4201:09\r\n")?,
             _ => (),
@@ -658,7 +678,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
             .unwrap_or(Route::Unexpected),
         _ => Route::Unexpected,
     };
-    let feed_target = match route {
+    let mut binding = match route {
         Route::BacklogFeed(_) => request.1.map(str::to_owned),
         _ => None,
     };
@@ -704,15 +724,25 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         if route != Route::Graphql {
             route = payload.as_ref().map_or(Route::Unexpected, |body| {
                 lifecycle::post(phase, &post_path, body)
+                    .or_else(|| review_threads::post(phase, &post_path, body))
                     .or_else(|| review_decisions::post(phase, &post_path, body))
                     .or_else(|| backlog::post(phase, &post_path, body))
                     .or_else(|| pr::post(phase, &post_path, body))
                     .unwrap_or_else(|| writes::post(phase, &post_path, body))
             });
-        } else if let Some(merge) = payload.as_ref().and_then(|body| {
-            merge::graphql(phase, body).or_else(|| pr::activity_query(phase, body))
+        } else if let Some(operation) = payload.as_ref().and_then(|body| {
+            review_threads::graphql(phase, body)
+                .or_else(|| merge::graphql(phase, body))
+                .or_else(|| pr::activity_query(phase, body))
         }) {
-            route = merge;
+            route = operation;
+            if route == Route::QueuedThreadResolve {
+                binding = payload
+                    .as_ref()
+                    .and_then(|body| body.pointer("/variables/input/clientMutationId"))
+                    .and_then(Value::as_str)
+                    .map(str::to_owned);
+            }
         } else if !payload.is_some_and(|body| {
             body.pointer("/variables/owner").and_then(Value::as_str) == Some("fixture-org")
                 && body.pointer("/variables/name").and_then(Value::as_str) == Some("private")
@@ -724,7 +754,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
             route = Route::Unexpected;
         }
     }
-    Ok((route, authorized, feed_target))
+    Ok((route, authorized, binding))
 }
 
 fn sync_since(target: &str, prefix: &str) -> bool {

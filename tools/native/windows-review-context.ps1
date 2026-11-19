@@ -309,3 +309,76 @@ function Invoke-ReviewDecisionsProof([IntPtr]$Window, [string]$Profile) {
     Stop-ThroughUi
     $script:report.detail = 'Windows restored a two-note approval and an anchored request for changes in separate offline processes. Both original reviews confirmed through the exact reviewer and revision checks.'
 }
+
+function Invoke-ThreadQueueProof([IntPtr]$Window, [string]$Profile) {
+    $head = 'b' * 40
+    Wait-SeededFixtureAccount
+    Open-SyncSettings $Window
+    Click-AccountControl $Window 'sync-pause-background'
+    $null = Wait-Sync 'the fixture write worker remains enabled while background reads are paused' {
+        param($sync) $sync.controls.pause_background -and !$sync.controls.pause_queued_actions
+    }
+    Click-AccountControl $Window 'reader-repository-1'
+    Click-AccountControl $Window 'reader-fetch-repository'
+    $first = Open-FixturePr $Window 0 42 'First fixture pull request' $head 'src/first.rs'
+    $item = $first.cached_reader.active_item
+    Click-AccountControl $Window 'reader-maximize-pane'
+    Click-AccountControl $Window 'pr-0-conversation'
+    Click-AccountControl $Window 'pr-0-threads-fetch'
+    $null = Wait-AccountControl 'pr-0-thread-0-reply'
+    Set-WriteFixtureOffline $Window $true
+    Click-AccountControl $Window 'pr-0-thread-0-reply'
+    $reply = 'Threadline synthetic queued thread reply.'
+    Wait-For 'the owned original review reply editor' {
+        Set-OwnedFixtureEditValue $Window 'pr-0-thread-0-reply-input' 'Reply to review thread' $reply
+    }
+    Wait-WriteFixtureDraft $item $reply
+    Click-AccountControl $Window 'pr-0-thread-0-reply-submit'
+    $null = Wait-Reader 'the original thread reply is queued offline' {
+        param($reader) $reader.offline -and $reader.active_item -eq $item -and $reader.outbox -eq 1
+    }
+    Click-AccountControl $Window 'pr-0-thread-0-resolution'
+    $null = Wait-Reader 'the native thread resolution is queued behind the reply' {
+        param($reader) $reader.offline -and $reader.active_item -eq $item -and $reader.outbox -eq 2
+    }
+    $previous = $script:app.Id
+    $Window = Restart-Reader $Profile
+    if ($script:app.Id -eq $previous) { throw 'The isolated PR did not restart in a separate process.' }
+    $null = Wait-PrReader 'original offline PR and both durable thread operations after restart' {
+        param($pr, $reader) $reader.offline -and $reader.active_item -eq $item -and $reader.outbox -eq 2 -and $pr.head -ceq $head
+    }
+    Set-WriteFixtureOffline $Window $false
+    Click-AccountControl $Window 'reader-outbox'
+    Click-AccountControl $Window 'reader-outbox-filter-history'
+    Wait-For 'both queued operations confirmed against the original thread' {
+        if ($script:app.HasExited) { throw 'Threadline exited before the thread outcomes.' }
+        $snapshot = Read-Observation
+        if ($null -eq $snapshot -or $snapshot.pid -ne $script:app.Id) { return $false }
+        $reader = $snapshot.PSObject.Properties['cached_reader']
+        $null -ne $reader -and $reader.Value.outbox_visible -and $reader.Value.outbox -eq 0
+    } 30000 50
+    Inspect-WriteFixtureAction $Window 0 'Confirmed' 'Reply'
+    Inspect-WriteFixtureAction $Window 1 'Confirmed' 'Resolve thread'
+    Add-Evidence 'Restore and confirm the queued reply followed by resolution on the original thread' ([ordered]@{
+        number = 42; head = $head; thread = 'PRRT_42'; root = 771; reply = 772; confirmed = 2; distinct_process = $true
+    })
+    Click-AccountControl $Window 'reader-outbox-open'
+    Click-AccountControl $Window 'pr-0-conversation'
+    Set-WriteFixtureOffline $Window $true
+    Wait-For 'the confirmed thread provides a native reopening action' {
+        Invoke-OwnedFixtureControl $Window 'pr-0-thread-0-resolution' $null 'Queue reopening'
+    }
+    $null = Wait-Reader 'the reopening is queued for the same offline pull request' {
+        param($reader) $reader.offline -and $reader.active_item -eq $item -and $reader.outbox -eq 1
+    }
+    Set-AccessPhase 'thread-outdated'
+    Set-WriteFixtureOffline $Window $false
+    Click-AccountControl $Window 'reader-outbox'
+    Click-AccountControl $Window 'reader-outbox-filter-attention'
+    Inspect-WriteFixtureAction $Window 2 'NeedsAttention' 'Resolve thread'
+    Add-Evidence 'Hold reopening when provider preflight finds the original thread outdated' ([ordered]@{
+        head = $head; thread = 'PRRT_42'; needs_attention = $true
+    })
+    Stop-ThroughUi
+    $script:report.detail = 'Windows restored two queued operations on the original review thread, confirmed the exact reply before resolution, and held reopening when the thread became outdated.'
+}
