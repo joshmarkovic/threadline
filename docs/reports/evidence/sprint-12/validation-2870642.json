@@ -389,14 +389,24 @@
   "clippy": {
     "linux": {
       "status": "Pass",
+      "exit_code": 0,
+      "command": "cargo clippy --locked --offline --workspace --all-targets --features threadline-app/e2e -- -D warnings",
       "raw_log_sha256": "6cf02089cc7fa98077122bdc1c3b94ebcd3567172e49f02d37500b44310cc255"
     },
     "win": {
       "status": "Pass",
+      "exit_code": 0,
+      "command": "cargo clippy --locked --offline --target x86_64-pc-windows-msvc --workspace --all-targets --features threadline-app/e2e -- -D warnings",
       "raw_log_sha256": "51eb0b96f8d2a02b232b36c9b62e578fed84b544feef20aa71d372ba60cfe820"
+    },
+    "windows_ordinary_binaries": {
+      "status": "Pass",
+      "exit_code": 0,
+      "command": "cargo clippy --locked --offline --target x86_64-pc-windows-msvc --workspace --bins -- -D warnings",
+      "raw_log_sha256": "56ae71c6c2310fbb23fdcce50d1ce2ed180c9d38e9023423d0926b9d9172b8e9"
     }
   },
-  "clippy_scope": "Locked, offline workspace, all targets with threadline-app/e2e and warnings denied.",
+  "clippy_scope": "Locked offline workspace. Linux and Windows checked all targets with the E2E feature. The ordinary Windows binary check used the default release feature set. All three runs denied warnings.",
   "normal_release_compile": {
     "status": "Pass",
     "warnings": 0,

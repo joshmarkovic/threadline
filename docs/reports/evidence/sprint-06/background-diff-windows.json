@@ -3,7 +3,11 @@
   "source_revision": "19f0ff34c18856bdc89aa24d643735d9f5eabd4d",
   "environment": "Windows 11 x64 native application test executable with E2E fixture feature",
   "layer": "GPUI integration",
-  "filter": "diff_background_parse_and_highlighting",
+  "filter": "diff_background_parse_and_highlighting_leave_native_file_navigation_usable",
+  "arguments": [
+    "diff_background_parse_and_highlighting_leave_native_file_navigation_usable",
+    "--test-threads=1"
+  ],
   "test": "diff_background_parse_and_highlighting_leave_native_file_navigation_usable",
   "status": "Pass",
   "exit_code": 0,

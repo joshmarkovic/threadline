@@ -1,10 +1,16 @@
-# Sprint 12 Windows installer development
+# Sprint 12 Windows verification
 
-The Windows 11 x64 local installer passed ten setup and recovery checks on build 22631. An installed predecessor and candidate also opened the same offline workspace across a SQLite schema upgrade. The user selected local installer testing and left publication pending. The exact published-package checks remain open. [Setup outcomes and package digests](evidence/sprint-12/installer-lifecycle.json) · [Windows installation plan](../spec/INSTALLATION_PLAN.md)
+The current Windows 11 x64 test package is `0.1.0-local.16`, built from `2870642` with database schema 18. Its setup is `.build/windows-installer/local16-2870642/threadline-2870642-local16.exe` in the local repository workspace. It installs per user and adds **Threadline Installer Test** to Start. Build 16 passed all ten setup and same-schema retention steps. [Build 16 digests and setup receipt](evidence/sprint-12/installed-build-16.json) · [Local install, upgrade and uninstall instructions](../../tools/windows/README.md)
+
+The local regression suites passed on Windows and Linux. The first build 16 desktop run recorded 12 passes, eight blocked cases and one performance failure. Windows blocked the foreground steps, including the cold notification click. Four large-workspace timing budgets remain open. [Exact-source test results](evidence/sprint-12/validation-2870642.json) · [Desktop run and measured budgets](evidence/sprint-12/full-native-2870642-installed16.json)
+
+The user selected local installer testing and left publication pending. The local package is unsigned. The Windows release still needs a signed setup, its published installation commands and exact-package verification. macOS and Linux have separate release gates. [Windows release gates](#windows-release-gates) · [Installation plan](../spec/INSTALLATION_PLAN.md)
+
+The first Windows 11 x64 setup checks on build 22631 established the local install and recovery path. An installed predecessor and successor opened the same offline workspace across a SQLite schema upgrade. [Early setup outcomes and package digests](evidence/sprint-12/installer-lifecycle.json)
 
 | Windows test | Observed result |
 | --- | --- |
-| Per-user install and repair | Predecessor installation and repair both exited 0. The local fixture created a matching shortcut and registration. The current build also repaired successfully. |
+| Per-user install and repair | Predecessor installation and repair both exited 0. The local fixture created a matching shortcut and registration. The successor also repaired successfully. |
 | Interrupted update and retry | The canonical matrix held the executable open and received exit 14. A setup built with a staged-write fault returned 16. The previous installation survived both checks. A subsequent upgrade exited 0. |
 | Downgrade and uninstall | The older setup returned 12 both before and after uninstall. Uninstall removed the executable and registration, retained the preseeded profile, and allowed the current package to reinstall. |
 | Local trust fixture | The verifier accepted a fixture-signed manifest and its matching setup digest. It rejected a different publisher pin and a same-length modified setup before either could execute. Production signing and independent publisher trust remain pending. |
@@ -127,7 +133,7 @@ In Threadline, the Windows AccessKit provider sends an accessibility action to G
 
 ## Local regression suites
 
-At `2870642`, all 33 native Windows x64 test executables exited 0. They passed 343 tests with three ignored by default. The two opt-in checks covering synthetic protected credentials also passed. Linux passed 155 unit, 159 integration and 30 UI test executions across 23, 36 and 9 named cases respectively. Formatting and strict Clippy passed, including Clippy for the Windows target. [Exact executables, case results and log hashes](evidence/sprint-12/validation-2870642.json)
+At `2870642`, all 33 native Windows x64 test executables exited 0. They passed 343 tests with three ignored by default. The two opt-in checks covering synthetic protected credentials also passed. Linux passed 155 unit, 159 integration and 30 UI test executions across 23, 36 and 9 named cases respectively. Formatting and strict Clippy passed for the test configurations and for the ordinary Windows binaries. [Exact executables, case results and log hashes](evidence/sprint-12/validation-2870642.json)
 
 The build 15 source `c8f2412` passed 148 unit tests across 23 cases, 155 integration tests across 36 cases and 27 UI tests across nine cases on Linux. All 33 test executables exited 0 on Windows 11, with 333 passes and three ignored in the default runs. Both opt-in credential checks passed separately. The Windows GPUI run included the sidebar paint tests at three modeled scales. Formatting and E2E-enabled strict Clippy passed. The ordinary release build emitted one warning about a History field used only for observation. Revision `cbcffed` removed that duplication. [Numeric exits, test counts and binary identities](evidence/sprint-12/validation-c8f2412.json)
 
@@ -169,7 +175,7 @@ A separate Windows test delivered modeled suspend and resume messages to its own
 
 The first full Windows run on clean `2870642` recorded 12 passes, eight blocked cases and one failure at 96 DPI. The installed app delivered 37 fixture events as one group, then the foreground guard stopped the physical cold-activation check. Feed fallback and offline installed-runtime inspection passed. [Individual outcomes, installed executable and driver hashes](evidence/sprint-12/full-native-2870642-installed16.json)
 
-The large-workspace case failed its 2,000 ms warm-start budget at 24,254.58 ms. Across 20 samples per action, external p95 was 2,125.60 ms for opening a cached item, 2,105.68 ms for search and 2,090.56 ms for switching tabs. The respective limits were 100, 200 and 100 ms. The application finished constructing at 141.20 ms and entered its startup callback at 10,851.74 ms. The recorded interval includes toolkit initialization. No individual display or graphics call was timed. Idle redraw, memory and the 11,147,864-byte setup met their limits. [Action samples and startup milestones](evidence/sprint-12/full-native-2870642-installed16.json)
+The large-workspace case failed its 2,000 ms warm-start budget at 24,254.58 ms. Across 20 samples per action, external p95 was 2,125.60 ms for opening a cached item, 2,105.68 ms for search and 2,090.56 ms for switching tabs. The respective limits were 100, 200 and 100 ms. The application finished constructing at 141.20 ms and entered its startup callback at 10,851.74 ms. These markers bracket the delay before the application-run callback. Idle redraw, memory and the 11,147,864-byte setup met their limits. [Action samples and startup milestones](evidence/sprint-12/full-native-2870642-installed16.json)
 
 ### Full suite with installed local build 15
 
