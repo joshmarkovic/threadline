@@ -1,5 +1,7 @@
 function Read-NativeLifecycle([string]$Profile, [string]$Stage, [string]$Name) {
-    if ($script:ReaderProof -cne 'NativeLifecycle') { throw 'The protected fixture is scoped to the separate lifecycle case.' }
+    if ($script:ReaderProof -cnotin @('NativeLifecycle', 'OfflineMixedOutbox')) {
+        throw 'The protected fixture is scoped to the native lifecycle and offline Outbox cases.'
+    }
     $receipt = Join-Path $script:ReportDir $Name
     if (Test-Path -LiteralPath $receipt) { throw 'Refusing to reuse the protected lifecycle receipt.' }
     $child = Start-Threadline $Profile $receipt -Lifecycle $Stage
@@ -18,8 +20,11 @@ function Read-NativeLifecycle([string]$Profile, [string]$Stage, [string]$Name) {
 
 function Initialize-NativeLifecycle([string]$Profile) {
     Set-AccessPhase 'lifecycle-offline'
-    $script:lifecycleSeed = Read-NativeLifecycle $Profile 'seed' 'native-lifecycle-seeded.json'
-    if ($lifecycleSeed.fixture_revision -cne 's12-native-lifecycle-v2' -or
+    $mixedOutbox = $script:ReaderProof -ceq 'OfflineMixedOutbox'
+    $stage = if ($mixedOutbox) { 'seed-offline-outbox' } else { 'seed' }
+    $revision = if ($mixedOutbox) { 's12-offline-mixed-outbox-v1' } else { 's12-native-lifecycle-v2' }
+    $script:lifecycleSeed = Read-NativeLifecycle $Profile $stage 'native-lifecycle-seeded.json'
+    if ($lifecycleSeed.fixture_revision -cne $revision -or
         !$lifecycleSeed.work_offline -or !$lifecycleSeed.pause_queued_actions -or !$lifecycleSeed.protected_token_present -or
         ($lifecycleSeed.tab_counts -join ',') -cne '10,10' -or ($lifecycleSeed.actions -join ',') -cne 'Queued,Queued,Queued,Queued' -or
         !$lifecycleSeed.review_anchor_preserved -or $lifecycleSeed.prior_delivery -cne 'Delivered' -or $lifecycleSeed.feed_count -ne 1 -or
@@ -194,6 +199,120 @@ function Invoke-LifecycleCachedSurfaces([IntPtr]$Window) {
         local_search_matches = 1; feed_event = $script:lifecycleSeed.feed_event; draft_kinds = $drafts.kind
         unfetched_checks = 'Missing'; pending_actions = 4
     })
+}
+
+function Wait-LifecycleOutboxText([IntPtr]$Window, [string]$AutomationId, [string[]]$Parts) {
+    Wait-For ('the visible saved Outbox field ' + $AutomationId) {
+        $element = Find-OwnedFixtureControl $Window $AutomationId $null -AllowDisabled
+        if ($null -eq $element) { return $false }
+        $name = $element.Current.Name
+        foreach ($part in $Parts) {
+            if (!$name.Contains($part)) { return $false }
+        }
+        return $true
+    }
+}
+
+function Assert-OfflineOutboxCacheResult($Before, $After) {
+    if ($After.fixture_revision -cne 's12-offline-mixed-outbox-v1' -or $After.fixture_revision -cne $Before.fixture_revision -or
+        !$Before.offline -or !$After.offline -or $Before.account -ne $After.account -or
+        $After.content_bytes -ge $Before.content_bytes -or
+        $After.discussion_records -ge $Before.discussion_records -or $Before.offline_pins -ne $After.offline_pins -or
+        ($After.tabs -join ',') -cne ($Before.tabs -join ',') -or
+        $After.pending_dependents -ne 3 -or @($After.actions).Count -ne 4 -or
+        ($After.drafts | ConvertTo-Json -Compress -Depth 6) -cne ($Before.drafts | ConvertTo-Json -Compress -Depth 6)) {
+        throw 'Clearing unpinned content did not preserve the isolated offline workspace and four unsent drafts.'
+    }
+    for ($index = 0; $index -lt 4; $index++) {
+        $original = $Before.actions[$index]
+        $retained = $After.actions[$index]
+        $state = if ($index -eq 0) { 'Cancelled' } else { 'Queued' }
+        if ($retained.id -cne $original.id -or $retained.kind -cne $original.kind -or
+            ($retained.target -join ',') -cne ($original.target -join ',') -or $retained.item -ne $original.item -or
+            $retained.snapshot_sha256 -cne $original.snapshot_sha256 -or
+            ($retained.dependencies -join ',') -cne ($original.dependencies -join ',') -or
+            $retained.state -cne $state -or $retained.cancel_requested -ne ($index -eq 0) -or
+            $retained.attempts -ne 0) {
+            throw 'The original offline action, immutable snapshot, or dependency changed unexpectedly.'
+        }
+    }
+}
+
+function Invoke-OfflineMixedOutboxProof([IntPtr]$Window, [string]$Profile) {
+    $initial = Wait-LifecycleWorkspace $true $false
+    $seed = $script:lifecycleSeed
+    $before = $seed.offline_outbox
+    if ($before.drafts.Count -ne 4 -or $before.pending_dependents -ne 3 -or
+        ($before.actions.kind -join ',') -cne 'Comment,EditIssue,Review,Merge') {
+        throw 'This isolated fixture did not seed the mixed drafts and Outbox dependency chain.'
+    }
+    Click-AccountControl $Window 'reader-tab-0-1'
+    $null = Wait-Reader 'the existing second issue tab is active before opening the original Outbox item' {
+        param($reader) $reader.focused_pane -eq 0 -and $reader.active_item -eq $before.drafts[1].item -and
+            $reader.active_item -ne $before.actions[0].item
+    }
+    Wait-For 'open native Storage usage while working offline' {
+        Invoke-OwnedFixtureControl $Window 'reader-storage' $null 'Storage usage'
+    }
+    Wait-LifecycleOutboxText $Window 'reader-storage-policy' @(
+        'unpinned downloads', 'Offline pins, drafts, saved tabs, and Outbox dependencies are retained.'
+    )
+    Wait-For 'clear unpinned downloads through its exact native button' {
+        Invoke-OwnedFixtureControl $Window 'reader-clear-cache' $null 'Clear unpinned downloads'
+    }
+    Wait-LifecycleOutboxText $Window 'reader-status' @('Unpinned downloads were cleared.')
+    Add-Evidence 'Read the cache policy and clear only unpinned downloads in Work Offline' $null
+
+    Click-AccountControl $Window 'reader-outbox'
+    Click-AccountControl $Window 'reader-outbox-filter-pending'
+    Inspect-WriteFixtureAction $Window 0 'Queued' 'Comment'
+    $parent = $before.actions[0]
+    $middle = [char]0x00b7
+    $issueTarget = "Comment $middle fixture-org/private #$($parent.target[1])"
+    Wait-LifecycleOutboxText $Window 'reader-outbox-target' @($issueTarget)
+    Wait-LifecycleOutboxText $Window 'reader-outbox-intent' @('New comment', 'Threadline lifecycle submitted comment.')
+    Wait-LifecycleOutboxText $Window 'reader-outbox-dependent-impact' @('3 saved actions need this action to be confirmed')
+    Click-AccountControl $Window 'reader-outbox-open'
+    $null = Wait-Reader 'the original issue opens from its saved action after downloaded content is cleared' {
+        param($reader) $reader.active_item -eq $parent.item -and $reader.offline
+    }
+    Click-AccountControl $Window 'reader-outbox'
+    Inspect-WriteFixtureAction $Window 0 'Queued' 'Comment'
+    Click-AccountControl $Window 'reader-outbox-cancel'
+    $null = Wait-Reader 'only the prerequisite was cancelled locally' {
+        param($reader) $reader.offline -and $reader.outbox_visible -and $reader.outbox -eq 3 -and
+            $reader.outbox_action_state -ceq 'Cancelled' -and $reader.outbox_action_cancel_requested
+    }
+    Click-AccountControl $Window 'reader-outbox-filter-history'
+    Wait-For 'inspect the exact cancelled prerequisite in native History' {
+        Invoke-OwnedFixtureControl $Window 'reader-outbox-action-0' $null ("Comment $middle Cancelled")
+    }
+    Wait-LifecycleOutboxText $Window 'reader-outbox-dependent-impact' @('3 saved actions need this action to be confirmed')
+    Wait-LifecycleOutboxText $Window 'reader-outbox-intent' @('Threadline lifecycle submitted comment.')
+    Add-Evidence 'Inspect the original comment, open its item, cancel the parent and read the retained dependent impact' @($parent.id)
+
+    Click-AccountControl $Window 'reader-outbox-filter-all'
+    $children = @(
+        @{ label = 'Issue edit'; fields = @('Lifecycle fixture title edit') }
+        @{ label = 'Review'; fields = @('Request changes', 'Threadline lifecycle held review.', 'src/relay_00.rs', 'Right line 1', $seed.content.pr_head, 'Threadline lifecycle held inline note.') }
+        @{ label = 'Merge pull request'; fields = @('Squash and merge', 'Target branch main', $seed.content.pr_head) }
+    )
+    for ($index = 1; $index -lt 4; $index++) {
+        $child = $children[$index - 1]
+        $number = $before.actions[$index].target[1]
+        Inspect-WriteFixtureAction $Window $index 'Queued' $child.label
+        Wait-LifecycleOutboxText $Window 'reader-outbox-target' @("$($child.label) $middle fixture-org/private #$number")
+        Wait-LifecycleOutboxText $Window 'reader-outbox-intent' $child.fields
+        Wait-LifecycleOutboxText $Window 'reader-outbox-dependencies' @($parent.id)
+        Add-Evidence 'Read a saved dependent in the native Outbox after its parent was cancelled' $child.label
+    }
+    Stop-ThroughUi
+    $after = Read-NativeLifecycle $Profile 'offline-outbox' 'offline-outbox-durable.json'
+    Assert-OfflineOutboxCacheResult $before $after
+    Add-Evidence 'Reopen the closed profile and verify exact snapshots, no attempts, four unsent drafts and less cached content' ([ordered]@{
+        initial_pid = $initial.pid; before = $before; after = $after
+    })
+    $script:report.detail = 'The native offline cache clear retained four unsent drafts and all four inspectable submitted snapshots. The cancelled prerequisite remained in History and each queued child still showed its original payload and dependency.'
 }
 
 function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {

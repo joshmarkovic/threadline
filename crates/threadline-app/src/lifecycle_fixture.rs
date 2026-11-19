@@ -13,7 +13,7 @@ use threadline_storage::{
     Error, Store, UtcMillis,
     fixtures::{
         BACKLOG_OWNER, BACKLOG_USER, LIFECYCLE_REVISION, lifecycle_checkpoint,
-        populate_native_lifecycle,
+        populate_native_lifecycle, populate_native_offline_outbox,
     },
 };
 use zeroize::Zeroize;
@@ -127,7 +127,7 @@ impl CredentialStore for LifecycleVault {
     }
 }
 
-fn seed(scope: FixtureScope) -> Result<serde_json::Value, String> {
+fn seed(scope: FixtureScope, offline_outbox: bool) -> Result<serde_json::Value, String> {
     if fs::read_dir(&scope.root)
         .map_err(|_| ERROR)?
         .next()
@@ -153,18 +153,45 @@ fn seed(scope: FixtureScope) -> Result<serde_json::Value, String> {
         .ok_or(ERROR)?;
     let now = UtcMillis::now().map_err(|_| ERROR)?.0;
     let store = Store::open_profile(&scope.root).map_err(|_| ERROR)?;
-    let fixture = populate_native_lifecycle(&store, seed, &scope.credential.name, now, || {
+    let install_credential = || {
         NativeCredentialStore
             .save(
                 &scope.credential,
                 &Credential(FIXTURE_PAT.as_bytes().to_vec()),
             )
             .map_err(|_| Error::Conflict("The isolated Windows protected credential failed"))
-    })
+    };
+    let fixture = if offline_outbox {
+        populate_native_offline_outbox(
+            &store,
+            seed,
+            &scope.credential.name,
+            now,
+            install_credential,
+        )
+    } else {
+        populate_native_lifecycle(
+            &store,
+            seed,
+            &scope.credential.name,
+            now,
+            install_credential,
+        )
+    }
     .map_err(|error| format!("Could not seed the isolated lifecycle profile. {error}"))?;
     crate::reader_workspace::lifecycle_fixture::seed_drafts(&store, fixture.account)
         .map_err(|error| format!("Could not seed the isolated lifecycle drafts. {error}"))?;
-    inspect(&scope, &store, "seeded")
+    let mut snapshot = inspect(&scope, &store, "seeded")?;
+    if offline_outbox {
+        snapshot["fixture_revision"] = fixture.revision.into();
+        snapshot["offline_outbox"] =
+            crate::reader_workspace::lifecycle_fixture::offline_outbox_checkpoint(
+                &store,
+                fixture.account,
+            )
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(snapshot)
 }
 
 fn inspect(scope: &FixtureScope, store: &Store, stage: &str) -> Result<serde_json::Value, String> {
@@ -197,10 +224,31 @@ fn inspect(scope: &FixtureScope, store: &Store, stage: &str) -> Result<serde_jso
 fn run_command(stage: &str, report: &Path) -> Result<(), String> {
     let scope = FixtureScope::from_environment().ok_or(ERROR)?;
     let snapshot = match stage {
-        "seed" => seed(scope)?,
+        "seed" | "seed-offline-outbox" => seed(scope, stage == "seed-offline-outbox")?,
         "inspect" if scope.marked() => {
             let store = Store::open_profile(&scope.root).map_err(|_| ERROR)?;
             inspect(&scope, &store, "closed")?
+        }
+        "offline-outbox" if scope.marked() => {
+            let store = Store::open_profile(&scope.root).map_err(|_| ERROR)?;
+            let profile = store
+                .github_access_profiles()
+                .map_err(|_| ERROR)?
+                .into_iter()
+                .find(|profile| {
+                    profile.user_id.get() == BACKLOG_USER
+                        && profile.owner_scope == BACKLOG_OWNER
+                        && profile.credential_ref == scope.credential.name
+                })
+                .ok_or(ERROR)?;
+            if store.active_github_account().map_err(|_| ERROR)? != Some(profile.account) {
+                return Err(ERROR.into());
+            }
+            crate::reader_workspace::lifecycle_fixture::offline_outbox_checkpoint(
+                &store,
+                profile.account,
+            )
+            .map_err(|error| error.to_string())?
         }
         "probe" if scope.marked() => {
             let store = std::sync::Arc::new(Store::open_profile(&scope.root).map_err(|_| ERROR)?);

@@ -1,9 +1,13 @@
 use sha2::{Digest, Sha256};
 use threadline_storage::{
     AccountId, Error, ItemId, Result, Store,
-    fixtures::{LIFECYCLE_DRAFT, LIFECYCLE_THREAD, LIFECYCLE_THREAD_ROOT},
+    fixtures::{
+        LIFECYCLE_ACTIONS, LIFECYCLE_DRAFT, LIFECYCLE_THREAD, LIFECYCLE_THREAD_ROOT,
+        OFFLINE_OUTBOX_REVISION,
+    },
     pr::{PrSection, PrTabView},
     queue::{DraftContent, DraftKind, Workspace},
+    reviews::ReviewIntent,
 };
 
 use super::{drafts::draft_base, write_composer::WriteBase};
@@ -146,16 +150,61 @@ pub(crate) fn draft_checkpoint(store: &Store, account: AccountId) -> Result<serd
     Ok(drafts.into())
 }
 
+pub(crate) fn offline_outbox_checkpoint(
+    store: &Store,
+    account: AccountId,
+) -> Result<serde_json::Value> {
+    let review = store
+        .submitted_review(account, LIFECYCLE_ACTIONS[2])?
+        .ok_or(Error::NotFound)?;
+    if !matches!(review.intent, ReviewIntent::Review(payload) if payload.comments.len() == 1) {
+        return Err(Error::Conflict(
+            "This is not the isolated offline Outbox fixture",
+        ));
+    }
+    let usage = store.cache_usage(account)?;
+    let layout = store.workspace(account)?.ok_or(Error::NotFound)?;
+    let mut actions = Vec::new();
+    for id in LIFECYCLE_ACTIONS {
+        let operation = store.operation(account, id)?.ok_or(Error::NotFound)?;
+        let snapshot = serde_json::to_vec(&operation.snapshot).map_err(|_| Error::Corrupt)?;
+        actions.push(serde_json::json!({
+            "id": id,
+            "kind": format!("{:?}", operation.kind),
+            "target": (operation.original_repository.0, operation.original_number),
+            "item": operation.item.0,
+            "snapshot_sha256": format!("{:x}", Sha256::digest(snapshot)),
+            "dependencies": operation.dependencies,
+            "state": format!("{:?}", operation.state),
+            "cancel_requested": operation.cancel_requested,
+            "attempts": store.attempts(account, id)?.len(),
+        }));
+    }
+    Ok(serde_json::json!({
+        "fixture_revision": OFFLINE_OUTBOX_REVISION,
+        "account": account.0,
+        "offline": store.sync_settings(account)?.controls.work_offline,
+        "summaries": usage.downloaded_summaries,
+        "discussion_records": usage.discussion_records,
+        "content_bytes": usage.content_bytes,
+        "offline_pins": usage.offline_pins,
+        "tabs": layout.panes.iter().map(|pane| pane.tabs.len()).collect::<Vec<_>>(),
+        "drafts": draft_checkpoint(store, account)?,
+        "pending_dependents": store.pending_dependents_count(account, LIFECYCLE_ACTIONS[0])?,
+        "actions": actions,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use threadline_storage::fixtures::{lifecycle_checkpoint, populate_native_lifecycle};
+    use threadline_storage::fixtures::{lifecycle_checkpoint, populate_native_offline_outbox};
 
     #[test]
     fn mixed_lifecycle_fixture_restores_each_unsent_draft_and_cache_after_reopen() {
         let directory = tempfile::tempdir().unwrap();
         let store = Store::open_profile(directory.path()).unwrap();
-        let fixture = populate_native_lifecycle(
+        let fixture = populate_native_offline_outbox(
             &store,
             12345,
             "00112233445566778899aabbccddeeff",
@@ -169,6 +218,7 @@ mod tests {
         assert_eq!(draft_state.as_array().unwrap().len(), 4);
         assert_eq!(before["sync_checkpoint"]["cursor"], "2");
         assert_eq!(before["content"]["history_commits"], 2);
+        let outbox_before = offline_outbox_checkpoint(&store, fixture.account).unwrap();
         drop(store);
         let reopened = Store::open_profile(directory.path()).unwrap();
         assert_eq!(
@@ -176,5 +226,22 @@ mod tests {
             draft_state
         );
         assert_eq!(lifecycle_checkpoint(&reopened, "stable").unwrap(), before);
+
+        reopened.clear_cache(fixture.account).unwrap();
+        reopened
+            .cancel_operation(fixture.account, LIFECYCLE_ACTIONS[0])
+            .unwrap();
+        let after = offline_outbox_checkpoint(&reopened, fixture.account).unwrap();
+        assert!(
+            after["discussion_records"].as_u64() < outbox_before["discussion_records"].as_u64()
+        );
+        assert_eq!(after["offline_pins"], outbox_before["offline_pins"]);
+        assert_eq!(after["drafts"], outbox_before["drafts"]);
+        assert_eq!(after["tabs"], outbox_before["tabs"]);
+        assert_eq!(after["pending_dependents"], 3);
+        assert_eq!(after["actions"][0]["state"], "Cancelled");
+        assert_eq!(after["actions"][1], outbox_before["actions"][1]);
+        assert_eq!(after["actions"][2], outbox_before["actions"][2]);
+        assert_eq!(after["actions"][3], outbox_before["actions"][3]);
     }
 }

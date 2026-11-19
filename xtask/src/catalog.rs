@@ -49,6 +49,9 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == "S12-NATIVE-LIFECYCLE" {
         return Some("s12-native-lifecycle-v2");
     }
+    if case == "S12-OFFLINE-MIXED-OUTBOX" {
+        return Some("s12-offline-mixed-outbox-v1");
+    }
     if case == "S12-PANE-POSITIONS" {
         return Some("s12-pane-positions-v1");
     }
@@ -234,6 +237,10 @@ pub fn associations(case: &str) -> Associations {
         "S12-NATIVE-LIFECYCLE" => (
             "AUTH-05;CACHE-13;OUTBOX-10;TEST-04;TEST-05",
             "AC-68;AC-73;AC-74;AC-91;AC-92",
+        ),
+        "S12-OFFLINE-MIXED-OUTBOX" => (
+            "CACHE-07;CACHE-13;OUTBOX-03;OUTBOX-10;TEST-04",
+            "AC-10;AC-68;AC-71",
         ),
         "S11-NATIVE-ACTIVITY" => (
             "NOTIFY-01;NOTIFY-17;SYNC-11;TEST-04",

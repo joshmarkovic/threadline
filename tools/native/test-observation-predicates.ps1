@@ -21,7 +21,6 @@ if (@($helpers.Name | Sort-Object -Unique).Count -ne 5 -or $helpers.Count -ne 5)
 . (Join-Path $PSScriptRoot 'windows-sync.ps1')
 . (Join-Path $PSScriptRoot 'windows-native-lifecycle.ps1')
 . (Join-Path $PSScriptRoot 'windows-native-activity.ps1')
-. (Join-Path $PSScriptRoot 'windows-issue-writes.ps1')
 . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1')
 . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
 . (Join-Path $PSScriptRoot 'windows-review-context.ps1')
@@ -295,19 +294,6 @@ if (!(Test-NativeActivityBaselineComparison $activityBaseline)) {
 $activityBaseline.cached_reader.active_number = 42
 if (Test-NativeActivityBaselineComparison $activityBaseline) {
     throw 'The native baseline accepted a different pull request.'
-}
-
-$issuePanes = [pscustomobject]@{ pane_positions = [pscustomobject]@{ panes = @(
-    [pscustomobject]@{ index = 1; item = 17; repository = 9; pull_request = $false; tab = 'right-fixture' }
-    [pscustomobject]@{ index = 0; item = 17; repository = 9; pull_request = $false; tab = 'left-fixture' }
-) } }
-if (((Get-FixtureIssueTabs $issuePanes 17) -join ',') -cne 'left-fixture,right-fixture' -or
-    @(Get-FixtureIssueTabs $issuePanes 19).Count -ne 0) {
-    throw 'The issue edit driver did not bind both pane indexes to the exact existing issue.'
-}
-$issuePanes.pane_positions.panes[0].tab = 'left-fixture'
-if (@(Get-FixtureIssueTabs $issuePanes 17).Count -ne 0) {
-    throw 'The issue edit driver accepted the same tab twice.'
 }
 
 $script:observations.Clear()
@@ -625,3 +611,50 @@ $position = Wait-PanePositions 'the exact archive and PR panes' {
 if ($script:positionReads -ne 3 -or $position.cached_reader.pane_positions.panes[0].repository -ne 2) {
     throw 'The pane predicate did not wait for the exact archive repository beside the original PR.'
 }
+
+$script:viewportReads = 0
+function Read-Observation {
+    $script:viewportReads++
+    $geometry = @{ 'reader-conversation-0' = @(0, 0, 100, 100); 'pr-1-context-content' = @(101, 0, 100, 100) }
+    if ($script:viewportReads -gt 1) { $geometry['pr-0-conversation-records'] = @(0, 0, 100, 100) }
+    [pscustomobject]@{
+        bounds = [pscustomobject]$geometry
+        cached_reader = [pscustomobject]@{
+            shared_pr_panes = @(
+                [pscustomobject]@{ item = 1; conversation_offset = 0; view = [pscustomobject]@{ section = 'Conversation' } }
+                [pscustomobject]@{ item = 1; files_context_offset = 156; view = [pscustomobject]@{ section = 'Files' } }
+            )
+        }
+    }
+}
+$leftViewport = Wait-SharedPrViewport 1 $false
+if ($script:viewportReads -ne 3 -or $leftViewport.id -cne 'pr-0-conversation-records' -or $leftViewport.field -cne 'conversation_offset') {
+    throw 'The shared PR driver selected an issue viewport or acted before the exact PR Conversation appeared.'
+}
+$rightViewport = Wait-SharedPrViewport 1 $true
+if ($rightViewport.id -cne 'pr-1-context-content' -or $rightViewport.field -cne 'files_context_offset') {
+    throw 'The shared PR driver lost the exact Files context after moving its reading position.'
+}
+
+$mixedOfflineBefore = [pscustomobject]@{
+    fixture_revision = 's12-offline-mixed-outbox-v1'
+    account = 1; offline = $true; offline_pins = 1; content_bytes = 1000; discussion_records = 10
+    tabs = @(10, 10); drafts = @('issue', 'comment', 'review', 'reply'); pending_dependents = 3
+    actions = @(0..3 | ForEach-Object {
+        [pscustomobject]@{
+            id = "action-$_"; kind = @('Comment', 'EditIssue', 'Review', 'Merge')[$_]; target = @(1, ($_ + 1))
+            item = $_ + 1; snapshot_sha256 = "$_"; dependencies = @('action-0')
+            state = 'Queued'; cancel_requested = $false; attempts = 0
+        }
+    })
+}
+$mixedOfflineAfter = $mixedOfflineBefore | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+$mixedOfflineAfter.content_bytes = 250
+$mixedOfflineAfter.discussion_records = 1
+$mixedOfflineAfter.actions[0].state = 'Cancelled'
+$mixedOfflineAfter.actions[0].cancel_requested = $true
+Assert-OfflineOutboxCacheResult $mixedOfflineBefore $mixedOfflineAfter
+$mixedOfflineAfter.actions[2].snapshot_sha256 = 'changed'
+$refused = $false
+try { Assert-OfflineOutboxCacheResult $mixedOfflineBefore $mixedOfflineAfter } catch { $refused = $_.Exception.Message -like '*immutable snapshot*' }
+if (!$refused) { throw 'The offline Outbox predicate accepted a rewritten submitted review after cache clearing.' }

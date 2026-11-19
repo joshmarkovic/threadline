@@ -623,7 +623,7 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
                 Some(NativeMode::WindowsPullRequest)
             } else if id == "S11-NATIVE-ACTIVITY" {
                 Some(NativeMode::WindowsNativeActivity)
-            } else if id == "S12-NATIVE-LIFECYCLE" {
+            } else if matches!(id, "S12-NATIVE-LIFECYCLE" | "S12-OFFLINE-MIXED-OUTBOX") {
                 Some(NativeMode::WindowsNativeLifecycle)
             } else if matches!(
                 id,
@@ -903,6 +903,9 @@ fn native_driver(
         NativeMode::WindowsDirectMerge if id == "S09-MERGE-QUEUE" => Some("MergeQueue"),
         NativeMode::WindowsDirectMerge => Some("DirectMerge"),
         NativeMode::WindowsCredentialBoundary => Some("CredentialBoundary"),
+        NativeMode::WindowsNativeLifecycle if id == "S12-OFFLINE-MIXED-OUTBOX" => {
+            Some("OfflineMixedOutbox")
+        }
         NativeMode::WindowsNativeLifecycle => Some("NativeLifecycle"),
         NativeMode::WindowsNativeActivity => Some("NativeActivity"),
         NativeMode::WindowsIssueWrites if id == "S07-ISSUE-CONFLICT" => Some("IssueConflict"),
@@ -1018,6 +1021,9 @@ fn native_driver(
         NativeMode::WindowsReviewContext => "review-context-native.json",
         NativeMode::WindowsDirectMerge => "direct-merge-native.json",
         NativeMode::WindowsCredentialBoundary => "credential-boundary-native.json",
+        NativeMode::WindowsNativeLifecycle if id == "S12-OFFLINE-MIXED-OUTBOX" => {
+            "offline-mixed-outbox-native.json"
+        }
         NativeMode::WindowsNativeLifecycle => "native-lifecycle.json",
         NativeMode::WindowsNativeActivity => "native-activity.json",
         NativeMode::WindowsIssueWrites if id == "S07-ISSUE-CONFLICT" => {
@@ -1117,6 +1123,9 @@ fn native_driver(
             }
             (Status::Pass, NativeMode::WindowsDirectMerge) => TraceCheck::MergeJourney,
             (Status::Pass, NativeMode::WindowsCredentialBoundary) => TraceCheck::CredentialBoundary,
+            (_, NativeMode::WindowsNativeLifecycle) if id == "S12-OFFLINE-MIXED-OUTBOX" => {
+                TraceCheck::OfflineReader
+            }
             (Status::Pass, NativeMode::WindowsNativeLifecycle) => TraceCheck::NativeLifecycle,
             (Status::Pass, NativeMode::WindowsNativeActivity) => TraceCheck::NativeActivity,
             (Status::Pass, NativeMode::WindowsIssueWrites) if id == "S07-ISSUE-CONFLICT" => {
