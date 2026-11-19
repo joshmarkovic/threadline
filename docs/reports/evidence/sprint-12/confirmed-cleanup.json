@@ -1,0 +1,51 @@
+{
+  "status": "Pass",
+  "platform": "Windows 11 x64",
+  "source": "9a1da4871ed47ba399950cbf783e0a05e40c6fc4",
+  "source_delta": {
+    "scope": "Removed an unused unit expression in the platform notification-history match arm",
+    "patch_sha256": "ea0de03fcfb994ec1fef83b9db8ae02f810c5a82a687c8cd811e853bd0fac13b"
+  },
+  "fixture": {
+    "data": "New temporary SQLite reader workspace, seed 12345, small scale, active local account, draft and unresolved Outbox work",
+    "vault": "Two freshly generated synthetic Windows Credential Manager targets. Both were checked absent before seeding and absent after fixture teardown.",
+    "profile_scope": "The confirmation tests supplied their generated data directory and terminal input to the production command handler."
+  },
+  "confirmed_removal": {
+    "binary_sha256": "80429fa2291f603fb82a0032f9b8aa6b5033cb2c96de005d39b6d6964d406185",
+    "stdout_sha256": "5328a7443f91182f499d0e62df779fcaba4ce0c36b7c2e7b50230593dfcbef80",
+    "arguments": ["cleanup::tests::", "--include-ignored", "--test-threads=1"],
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0,
+    "exit_code": 0,
+    "seconds": 1.65,
+    "tests": [
+      "it_019_busy_changed_or_unrecognized_profile_preserves_data_and_credentials",
+      "it_019_explicit_removal_deletes_only_the_generated_profile_credential",
+      "it_019_preview_counts_active_workspace_and_confirmation_removes_only_managed_files",
+      "it_019_vault_refusal_leaves_every_database_for_retry"
+    ],
+    "observations": [
+      "Preview displayed the counted drafts and unresolved operations and the risk of already submitted GitHub work.",
+      "A declined confirmation or input without an interactive terminal left all files and targets intact.",
+      "Confirmation removed the listed current database and recognized migration backup. An independently named export remained intact.",
+      "The protected target recorded by the profile was removed. The unrelated synthetic target remained readable until fixture teardown.",
+      "An open handle that denied deletion, a changed database, a newer schema, a SQLite recovery file, or refused credential removal preserved the relevant data."
+    ]
+  },
+  "native_cli": {
+    "bootstrap_sha256": "cea2bea43944ce117b1d0a929b49be2a74a3afc4341f0339c55c4ff7ce59e391",
+    "test_binary_sha256": "0424c90ec76e5fd4980bacfe4c11e9978a9c4c527c79eaae7a90ba96845b9016",
+    "stdout_sha256": "8cec1f3912e3e3707f5aae72a7be259c5ad6b642b98b998c4428756be4b32411",
+    "passed": 2,
+    "failed": 0,
+    "exit_code": 0,
+    "seconds": 4.37,
+    "tests": [
+      "it_019_removal_commands_reject_arbitrary_paths_before_accessing_a_profile",
+      "it_021_command_explains_wrong_channel_and_invalid_manifest_pin_before_accessing_files"
+    ]
+  },
+  "release_scope": "Development bootstrap. Published-artifact uninstall, reinstall and protected sign-in checks remain separate."
+}
