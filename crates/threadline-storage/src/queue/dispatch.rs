@@ -157,6 +157,19 @@ impl Store {
             )?)
         })
     }
+    /// The original GitHub repository or credential can hold an operation even while offline.
+    pub fn github_dispatch_hold(&self, account: AccountId, id: &str) -> Result<Option<String>> {
+        self.read(|db| {
+            Ok(db
+                .query_row(
+                    "SELECT hold FROM github_dispatch_holds WHERE account_id=? AND id=?",
+                    params![account, id],
+                    |row| row.get::<_, Option<String>>(0),
+                )
+                .optional()?
+                .flatten())
+        })
+    }
     pub fn claim_next(
         &self,
         account: AccountId,

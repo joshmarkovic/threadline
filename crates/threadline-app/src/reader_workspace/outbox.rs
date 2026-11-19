@@ -101,6 +101,7 @@ struct Inspection {
     receipts: Vec<Receipt>,
     conflict: Option<WriteConflict>,
     repository: Option<String>,
+    scope_hold: Option<String>,
 }
 
 impl Inspection {
@@ -124,6 +125,13 @@ impl Inspection {
         } else {
             None
         };
+        let scope_hold = if matches!(operation.state, State::Queued | State::NeedsAttention)
+            && !operation.cancel_requested
+        {
+            store.github_dispatch_hold(account, id)?
+        } else {
+            None
+        };
         Ok(Some(Self {
             operation,
             intent: store.write_intent(account, id)?,
@@ -134,6 +142,7 @@ impl Inspection {
             receipts: store.receipts(account, id)?,
             conflict: store.write_conflict(account, id)?,
             repository,
+            scope_hold,
         }))
     }
 }
@@ -560,6 +569,15 @@ impl ReaderWorkspace {
                     .text_color(palette.muted)
                     .child(reason_label(reason))
             }))
+            .children(
+                detail
+                    .scope_hold
+                    .as_deref()
+                    .and_then(scope_hold_label)
+                    .map(|label| {
+                        outbox_text("reader-outbox-scope-hold", label.into(), label.into())
+                    }),
+            )
             .children(operation.draft.as_ref().map(|(_, revision)| {
                 div()
                     .text_xs()
@@ -732,6 +750,22 @@ fn reason_label(value: &str) -> String {
             "GitHub requires a merge queue for this branch. Direct merge is unavailable.".into()
         }
         _ => value.replace('_', " "),
+    }
+}
+
+fn scope_hold_label(hold: &str) -> Option<&'static str> {
+    match hold {
+        "repository_unselected" => {
+            Some("Held · A repository required by this action is no longer selected.")
+        }
+        "repository_access" => Some("Held · Verify access to the original repository."),
+        "credential_scope_unavailable" => {
+            Some("Held · Access for the original account and owner is unavailable.")
+        }
+        "credential_scope_changed" => {
+            Some("Held · The target moved outside the original credential scope.")
+        }
+        _ => None,
     }
 }
 
@@ -948,14 +982,54 @@ fn outbox_text(id: &'static str, label: String, text: String) -> impl Element {
 mod tests {
     use super::{
         DraftStatusLookup, Inspection, conflict_value, dependent_impact, intent_element,
-        merge_intent_element, review_intent_element,
+        merge_intent_element, outbox_text, review_intent_element, scope_hold_label,
     };
     use gpui_kit::{Element, Role, accesskit::Node};
     use threadline_storage::{
         Store,
         fixtures::{LIFECYCLE_ACTIONS, populate_native_offline_outbox},
+        queue::State,
         writes::{FieldEdit, IssueChanges, WriteIntent},
     };
+
+    #[test]
+    fn outbox_inspection_exposes_repository_hold_during_offline_work() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = Store::open_profile(directory.path()).unwrap();
+        let fixture = populate_native_offline_outbox(
+            &store,
+            12345,
+            "0123456789abcdef0123456789abcdef",
+            1_700_000_050_000,
+            || Ok(()),
+        )
+        .unwrap();
+        let id = LIFECYCLE_ACTIONS[1];
+        let action = Inspection::read(&store, fixture.account, id)
+            .unwrap()
+            .unwrap();
+        assert!(action.scope_hold.is_none());
+        store
+            .select_github_repository(fixture.account, fixture.repository, false)
+            .unwrap();
+        let action = Inspection::read(&store, fixture.account, id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(action.operation.state, State::Queued);
+        assert_eq!(
+            store.dispatch_hold(fixture.account, id).unwrap().as_deref(),
+            Some("offline")
+        );
+        let label = scope_hold_label(action.scope_hold.as_deref().unwrap()).unwrap();
+        let text = outbox_text("reader-outbox-scope-hold", label.into(), label.into());
+        let mut node = Node::new(text.a11y_role().unwrap());
+        text.write_a11y_info(&mut node);
+        assert_eq!(node.author_id(), Some("reader-outbox-scope-hold"));
+        assert_eq!(
+            node.label(),
+            Some("Held · A repository required by this action is no longer selected.")
+        );
+    }
 
     #[test]
     fn mixed_outbox_inspection_publishes_saved_review_anchor_merge_method_and_cancel_impact() {

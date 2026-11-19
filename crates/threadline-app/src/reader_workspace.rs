@@ -882,6 +882,12 @@ impl ReaderWorkspace {
             }
         }
         if let Some(account) = account {
+            if !changed
+                && (scope_changed || self.access != previous_access)
+                && self.surface == Surface::Outbox
+            {
+                self.refresh_outbox_state(window, cx);
+            }
             if changed {
                 #[cfg(feature = "e2e")]
                 if let Some(observer) = self.observer.as_ref() {
