@@ -207,6 +207,24 @@ fn observe_issue(
         state,
     };
     observe_object(tx, claim, &object, Some(baseline), now)?;
+    if !is_issue && state.is_some() {
+        let is_pull: bool = tx.query_row(
+            "SELECT kind='pull_request' FROM items WHERE id=?",
+            [item],
+            |row| row.get(0),
+        )?;
+        if is_pull {
+            super::pr_activity::enroll_item(
+                tx,
+                claim.account,
+                repo,
+                item,
+                now,
+                state == Some("closed"),
+                updated,
+            )?;
+        }
+    }
     if is_issue && let Some(assignees) = row.assignee_ids {
         observe_assignments(tx, claim, &object, item, &assignees, baseline, now)?;
     }

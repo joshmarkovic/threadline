@@ -59,6 +59,100 @@ fn pull() -> Value {
 }
 
 #[tokio::test]
+async fn it_018_unopened_pull_index_and_recent_timeline_preserve_identity_partial_access_and_cursor()
+ {
+    use threadline_core::github::reader::activity::PullEvent;
+    let sim = Simulator::start().await;
+    let cancel = CancellationToken::new();
+    let session = authorized(&sim, &cancel).await;
+    let (bound, _) = session
+        .bind_reader(
+            &RepositoryName::new("fixture-org", "private").unwrap(),
+            71.try_into().unwrap(),
+            &cancel,
+        )
+        .await
+        .unwrap();
+    let reader = bound.reader();
+    let path = "/repositories/71/pulls?state=open&sort=created&direction=asc&per_page=20&page=1";
+    sim.enqueue(Method::GET,path,reply(StatusCode::OK,json!([{"id":420,"node_id":"PR_420","number":42,"updated_at":TIME,"base":{"repo":{"id":71}}}])));
+    let open = reader
+        .open_pull_index(1, &ReadValidators::default(), &cancel)
+        .await
+        .unwrap()
+        .value
+        .unwrap();
+    assert_eq!(open.records[0].id.get(), 420);
+    let cursor = Some("next-recent-events");
+    let response = json!({"data":{"repository":{"databaseId":71,"owner":{"login":"fixture-org"},"name":"private",
+    "pullRequest":{"id":"PR_420","fullDatabaseId":"420","number":42,"title":"Fixture change","closed":false,"merged":false,
+        "updatedAt":TIME,"baseRefOid":BASE,"headRefOid":HEAD,"timelineItems":{"pageInfo":{"hasNextPage":true,"endCursor":cursor},"nodes":[
+            {"__typename":"PullRequestReview","fullDatabaseId":501,"submittedAt":TIME,"state":"APPROVED","body":"@fixture-user",
+                "author":{"__typename":"Bot","databaseId":92}},
+            {"__typename":"ReadyForReviewEvent","createdAt":TIME,"actor":{"__typename":"User","databaseId":91}},
+            {"__typename":"ReviewRequestedEvent","createdAt":TIME,"requestedReviewer":{"login":"fixture-user"}},
+            {"__typename":"MergedEvent","createdAt":TIME,"commit":{"oid":MERGE_BASE}}
+        ]}}}}});
+    let graph = |payload, cursor: Option<&str>| {
+        reply(StatusCode::OK,payload).graph_variables("ThreadlinePullActivity",
+        json!({"owner":"fixture-org","name":"private","number":42,"since":"2017-07-14T02:40:00Z","cursor":cursor}))
+    };
+    sim.enqueue(Method::POST, "/graphql", graph(response.clone(), None));
+    let n = 42.try_into().unwrap();
+    let page = reader
+        .pull_activity(n, 1_500_000_000_000, None, &cancel)
+        .await
+        .unwrap();
+    assert_eq!(page.identity.id.get(), 420);
+    assert_eq!(page.next.as_deref(), cursor);
+    assert!(
+        matches!(&page.events[0],PullEvent::Review{id,actor,..} if id.get()==501 && actor.known_automation)
+    );
+    assert!(matches!(&page.events[2],PullEvent::Requested{user,..} if user=="fixture-user"));
+    assert!(!page.partial);
+    assert!(
+        sim.take_observations()
+            .iter()
+            .all(|event| event.matched && event.authorization_sent)
+    );
+    assert!(
+        reader
+            .pull_activity(n, 1_500_000_000_000, Some("not a cursor"), &cancel)
+            .await
+            .is_err()
+    );
+    assert!(sim.take_observations().is_empty());
+    let mut partial = response.clone();
+    partial["errors"] = json!([{"type":"FORBIDDEN"}]);
+    partial["data"]["repository"]["pullRequest"]["timelineItems"]["pageInfo"] =
+        json!({"hasNextPage":false,"endCursor":null});
+    sim.enqueue(Method::POST, "/graphql", graph(partial, cursor));
+    let limited = reader
+        .pull_activity(n, 1_500_000_000_000, cursor, &cancel)
+        .await
+        .unwrap();
+    assert!(limited.partial && limited.permission_limited);
+    assert_eq!(limited.events.len(), 4);
+    let mut wrong = response;
+    wrong["data"]["repository"]["databaseId"] = json!(72);
+    sim.enqueue(Method::POST, "/graphql", graph(wrong, cursor));
+    assert_eq!(
+        reader
+            .pull_activity(n, 1_500_000_000_000, cursor, &cancel)
+            .await
+            .err()
+            .unwrap()
+            .kind,
+        AccessKind::IdentityMismatch
+    );
+    assert!(
+        sim.take_observations()
+            .iter()
+            .all(|event| event.matched && event.authorization_sent)
+    );
+}
+
+#[tokio::test]
 async fn pr_compare_checks_and_statuses_keep_immutable_source_and_explicit_partial_data() {
     let sim = Simulator::start().await;
     let cancel = CancellationToken::new();

@@ -41,6 +41,25 @@ pub(super) fn applies(phase: Phase) -> bool {
     ) || merge::applies(phase)
 }
 
+pub(super) fn activity_query(phase: Phase, request: &Value) -> Option<Route> {
+    let vars = request.get("variables")?;
+    let query = request.get("query")?.as_str()?;
+    if !applies(phase)
+        || !query.starts_with("query ThreadlinePullActivity(")
+        || vars.get("owner")?.as_str()? != "fixture-org"
+        || vars.get("name")?.as_str()? != "private"
+        || !vars.get("cursor")?.is_null()
+        || !vars.get("since")?.as_str()?.ends_with('Z')
+    {
+        return None;
+    }
+    match vars.get("number")?.as_u64()? {
+        42 => Some(Route::PullActivityA),
+        43 => Some(Route::PullActivityB),
+        _ => None,
+    }
+}
+
 fn data(phase: Phase, route: Route) -> Option<Value> {
     let summary = |number, title, body, date: &str| {
         json!({
@@ -112,6 +131,21 @@ fn data(phase: Phase, route: Route) -> Option<Value> {
             "updated_at":"2018-01-01T00:00:00Z",
             "repository_url":"https://api.github.com/repos/fixture-org/private"
         })),
+        Route::PullActivityA | Route::PullActivityB => {
+            let pull_route = if route == Route::PullActivityA {
+                Route::PullA
+            } else {
+                Route::PullB
+            };
+            let pull = data(phase, pull_route)?;
+            Some(
+                json!({"data":{"repository":{"databaseId":71,"name":"private","owner":{"login":"fixture-org"},
+                "pullRequest":{"id":pull["node_id"],"fullDatabaseId":pull["id"],"number":pull["number"],
+                "title":pull["title"],"closed":false,"merged":false,"updatedAt":pull["updated_at"],
+                "baseRefOid":pull["base"]["sha"],"headRefOid":pull["head"]["sha"],
+                "timelineItems":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}}}),
+            )
+        }
         Route::ReviewList => Some(json!([])),
         Route::ReviewRead | Route::ReviewCreated | Route::ReviewSubmitted
             if phase == Phase::ReviewSend =>

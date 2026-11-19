@@ -11,6 +11,7 @@ mod references;
 pub use references::*;
 mod observation;
 pub(crate) use observation::enroll_selected;
+pub(crate) use observation::monitor_event;
 mod model;
 pub use model::*;
 mod lines;

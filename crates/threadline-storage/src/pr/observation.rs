@@ -254,6 +254,21 @@ pub(super) fn reviewer_changes(
     current: &PrHeader,
     at: i64,
 ) -> Result<()> {
+    // The monitored timeline supplies the provider's exact event dates and actors.
+    let monitored: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM scheduled_reads
+            WHERE account_id=? AND repository_id=? AND item_id=? AND revision=?)",
+        params![
+            rev.account,
+            rev.repository,
+            rev.pr,
+            crate::sync::PrActivityRead::TIMELINE_KEY
+        ],
+        |row| row.get(0),
+    )?;
+    if monitored {
+        return Ok(());
+    }
     if previous.draft == Some(true) && current.draft == Some(false) {
         journal(
             tx,
@@ -295,6 +310,107 @@ pub(super) fn reviewer_changes(
             Some(at),
             at,
         )?;
+    }
+    Ok(())
+}
+
+pub(crate) fn monitor_event(
+    tx: &Transaction<'_>,
+    rev: &PrRevision,
+    event: threadline_core::github::reader::activity::PullEvent,
+    now: i64,
+) -> Result<()> {
+    use threadline_core::github::reader::activity::PullEvent;
+    let pr = rev.pr.0.to_string();
+    let (stream, kind, object, at, actor, body, reviewer, merge) = match event {
+        PullEvent::Review {
+            id,
+            state,
+            at,
+            actor,
+            body,
+        } => {
+            let kind = match state.as_str() {
+                "APPROVED" => "review_approved",
+                "CHANGES_REQUESTED" => "review_changes_requested",
+                "COMMENTED" => "review_commented",
+                _ => return Ok(()),
+            };
+            (
+                "pr-reviews",
+                kind,
+                id.to_string(),
+                at,
+                actor,
+                body,
+                None,
+                None,
+            )
+        }
+        PullEvent::Ready { at, actor } => (
+            "pr-review-requests",
+            "pr_ready",
+            pr,
+            at,
+            actor,
+            String::new(),
+            None,
+            None,
+        ),
+        PullEvent::Merged { at, actor, commit } => (
+            "pr-review-requests",
+            "pr_merged",
+            pr,
+            at,
+            actor,
+            String::new(),
+            None,
+            commit,
+        ),
+        PullEvent::Requested { at, actor, user } => (
+            "pr-review-requests",
+            "review_requested",
+            format!("{pr}:{}", user.to_ascii_lowercase()),
+            at,
+            actor,
+            String::new(),
+            Some(user),
+            None,
+        ),
+    };
+    journal(tx, rev, stream, kind, &object, Some(at), now)?;
+    let action = if stream == "pr-reviews" {
+        "review_submitted"
+    } else {
+        kind
+    };
+    let key = format!("github:{stream}:{object}:{action}:{at}");
+    enrich_text(tx, rev, &key, &body, &actor, None)?;
+    if reviewer.is_some() || merge.is_some() {
+        let raw: Option<(String, String)> = tx
+            .query_row(
+                "SELECT n.facts,p.login FROM notification_events n
+             JOIN github_repository_access r ON r.account_id=n.account_id AND r.repository_id=?
+             JOIN github_access_profiles p USING(account_id,owner_scope)
+             WHERE n.account_id=? AND n.event_key=? AND n.facts IS NOT NULL AND n.decision IS NULL",
+                params![rev.repository, rev.account, key],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()?;
+        if let Some((raw, login)) = raw {
+            let mut facts: EventFacts = serde_json::from_str(&raw).map_err(|_| Error::Corrupt)?;
+            facts.involves_me |= reviewer.is_some_and(|name| name.eq_ignore_ascii_case(&login));
+            if let Some(oid) = merge {
+                facts.receipt = Some(ReceiptMatch::Merge {
+                    head: rev.head.clone(),
+                    merge_oid: CommitOid::parse(&oid)?,
+                });
+            }
+            tx.execute(
+                "UPDATE notification_events SET facts=? WHERE account_id=? AND event_key=? AND decision IS NULL",
+                params![serde_json::to_string(&facts).map_err(|_| Error::Corrupt)?, rev.account, key],
+            )?;
+        }
     }
     Ok(())
 }

@@ -14,8 +14,7 @@ use tokio::task::JoinHandle;
 
 struct GraphNode {
     operation: &'static str,
-    id: &'static str,
-    cursor: Option<Option<&'static str>>,
+    variables: serde_json::Value,
 }
 
 pub struct Reply {
@@ -68,24 +67,26 @@ impl Reply {
 
     #[allow(dead_code)]
     pub fn graph_node(
-        mut self,
+        self,
         operation: &'static str,
         id: &'static str,
         cursor: Option<&'static str>,
     ) -> Self {
-        self.graph_node = Some(GraphNode {
-            operation,
-            id,
-            cursor: Some(cursor),
-        });
-        self
+        self.graph_variables(operation, serde_json::json!({"id":id,"cursor":cursor}))
     }
     #[allow(dead_code)]
-    pub fn graph_node_without_cursor(mut self, operation: &'static str, id: &'static str) -> Self {
+    pub fn graph_node_without_cursor(self, operation: &'static str, id: &'static str) -> Self {
+        self.graph_variables(operation, serde_json::json!({"id":id}))
+    }
+    #[allow(dead_code)]
+    pub fn graph_variables(
+        mut self,
+        operation: &'static str,
+        variables: serde_json::Value,
+    ) -> Self {
         self.graph_node = Some(GraphNode {
             operation,
-            id,
-            cursor: None,
+            variables,
         });
         self
     }
@@ -220,11 +221,7 @@ async fn serve_reply(State(shared): State<Arc<Shared>>, request: Request) -> Res
                 let Some(body) = &json_body else {
                     return false;
                 };
-                let expected = match graph.cursor {
-                    Some(cursor) => serde_json::json!({"id":graph.id,"cursor":cursor}),
-                    None => serde_json::json!({"id":graph.id}),
-                };
-                body["variables"] == expected
+                body["variables"] == graph.variables
                     && body["query"].as_str().is_some_and(|query| {
                         query.starts_with(&format!("query {}(", graph.operation))
                     })

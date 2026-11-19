@@ -5,6 +5,7 @@ use threadline_core::{
     domain::ItemNumber,
     github::reader::{
         ConversationComment, GitHubReader, IssueSummary, Page,
+        activity::{OpenPull, PullActivity},
         refresh::{ReadValidators, Refresh, UpdatedComment},
     },
 };
@@ -13,8 +14,8 @@ use threadline_storage::{
     reader::{DiscussionComment, ListSummary},
     resources::{ResourceFamily, Validators},
     sync::{
-        HistoryRead, ObservationPage, ObservedComment, ObservedItem, ReadClaim, ReadCompletion,
-        ReadFailure,
+        HistoryRead, ObservationPage, ObservedComment, ObservedItem, PrActivityRead, ReadClaim,
+        ReadCompletion, ReadFailure,
     },
 };
 
@@ -93,6 +94,20 @@ pub(super) async fn execute(
                         page.commit(store, &claim, now.0, &system_zone?)?;
                         changed
                     }
+                    Outcome::PullIndex(page, validators) => {
+                        store.commit_open_pull_index(
+                            &claim,
+                            page,
+                            &validators,
+                            now.0,
+                            &system_zone?,
+                        )?;
+                        true
+                    }
+                    Outcome::PullActivity(page) => {
+                        store.commit_pull_activity(&claim, *page, now.0, &system_zone?)?;
+                        true
+                    }
                     Outcome::History(page) => {
                         return match page.commit(store, &claim, now.0, &system_zone?) {
                             Ok(changed) => Ok(changed),
@@ -158,6 +173,8 @@ enum Outcome {
     Prepared,
     Unmodified(Validators),
     Pr(Box<pr::ClaimedPage>),
+    PullIndex(Page<OpenPull>, Validators),
+    PullActivity(Box<PullActivity>),
     History(Box<history::Claimed>),
     Metadata {
         summary: Box<ListSummary>,
@@ -236,6 +253,29 @@ async fn read_bound(
         etag: claim.validators.etag.clone(),
         last_modified: claim.validators.last_modified.clone(),
     };
+    match PrActivityRead::from_target(&claim.target) {
+        Some(PrActivityRead::OpenIndex) => {
+            let response = reader
+                .open_pull_index(page(claim)?, &validator, cancel)
+                .await?;
+            let validators = validators(response.validators);
+            let outcome = match response.value {
+                Some(page) => Outcome::PullIndex(page, validators),
+                None => Outcome::Unmodified(validators),
+            };
+            return Ok((outcome, response.rate));
+        }
+        Some(PrActivityRead::Timeline) => {
+            let item = claim.target.item.ok_or(ReaderError::InvalidIdentity)?;
+            let number = item_number(store, claim.account, item, claim.target.repository).await?;
+            let activity = reader
+                .pull_activity(number, window(claim)?, claim.cursor.as_deref(), cancel)
+                .await?;
+            let rate = activity.rate;
+            return Ok((Outcome::PullActivity(Box::new(activity)), rate));
+        }
+        None => (),
+    }
     match (claim.target.family, claim.target.item) {
         (ResourceFamily::RepositoryItems, None) => {
             let response = reader

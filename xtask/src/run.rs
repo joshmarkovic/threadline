@@ -128,7 +128,11 @@ const INTEGRATION: &[CargoTest] = &[
         id: "IT-018",
         arguments: &[
             "-p",
+            "threadline-core",
+            "-p",
             "threadline-storage",
+            "--test",
+            "github_pr",
             "--test",
             "sync",
             "--test",

@@ -9,8 +9,10 @@ use threadline_core::sync::policy::{activity_since, retry_delay};
 mod history;
 mod observation;
 mod pr;
+mod pr_activity;
 pub use history::{HistoryRead, MonitoredAncestors, MonitoredBranches};
 pub use observation::*;
+pub use pr_activity::PrActivityRead;
 
 const LEASE_MS: i64 = 90_000;
 const SPACING_MS: i64 = 1_000;
@@ -194,6 +196,7 @@ impl Store {
     pub fn schedule_selected_activity(&self, account: AccountId, now: i64) -> Result<()> {
         self.write(|tx| {
             crate::pr::enroll_selected(tx, account, now)?;
+            pr_activity::enroll_index(tx, account, now)?;
             history::enroll(tx, account, now)?;
             for family in [ResourceFamily::RepositoryItems, ResourceFamily::Comments, ResourceFamily::ReviewThreads] {
                 tx.execute(
@@ -720,7 +723,10 @@ fn claim_in(tx: &Transaction<'_>, account: AccountId, now: i64) -> Result<Option
                     | ResourceFamily::Comments
                     | ResourceFamily::ReviewThreads
             );
-        let since_ms = feed.then(|| activity_since(watermark, start));
+        let timeline = item.is_some()
+            && family == ResourceFamily::Reviews
+            && revision == pr_activity::TIMELINE;
+        let since_ms = (feed || timeline).then(|| activity_since(watermark, start));
         if cursor.is_some() || validator_since != since_ms {
             validators = Validators::default();
         }

@@ -140,6 +140,9 @@ enum Route {
     UpdatedItems,
     UpdatedComments,
     UpdatedInlineComments,
+    OpenPullIndex,
+    PullActivityA,
+    PullActivityB,
     PullA,
     PullB,
     CompareA,
@@ -316,7 +319,10 @@ fn complete_notification_schedule(records: &[RequestEvidence]) -> bool {
             entry.phase == Phase::SyncNotificationSend
                 && matches!(
                     entry.route,
-                    Route::UpdatedItems | Route::UpdatedComments | Route::UpdatedInlineComments
+                    Route::UpdatedItems
+                        | Route::UpdatedComments
+                        | Route::UpdatedInlineComments
+                        | Route::OpenPullIndex
                 )
         })
         && records.iter().any(|entry| {
@@ -565,6 +571,11 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
         (Some("GET"), Some(target), Some("HTTP/1.1")) if sync_since(target, SYNC_INLINE) => {
             Route::UpdatedInlineComments
         }
+        (
+            Some("GET"),
+            Some("/repositories/71/pulls?state=open&sort=created&direction=asc&per_page=20&page=1"),
+            Some("HTTP/1.1"),
+        ) => Route::OpenPullIndex,
         (Some("POST"), Some("/graphql"), Some("HTTP/1.1")) => Route::Graphql,
         (Some("GET"), Some(target), Some("HTTP/1.1")) => backlog::read_route(phase, target)
             .or_else(|| history::route(phase, target))
@@ -614,10 +625,9 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
                     .or_else(|| pr::post(phase, &post_path, body))
                     .unwrap_or_else(|| writes::post(phase, &post_path, body))
             });
-        } else if let Some(merge) = payload
-            .as_ref()
-            .and_then(|body| merge::graphql(phase, body))
-        {
+        } else if let Some(merge) = payload.as_ref().and_then(|body| {
+            merge::graphql(phase, body).or_else(|| pr::activity_query(phase, body))
+        }) {
             route = merge;
         } else if !payload.is_some_and(|body| {
             body.pointer("/variables/owner").and_then(Value::as_str) == Some("fixture-org")
@@ -670,7 +680,7 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
     if !authorized || phase == Phase::Revoked {
         return result(401, "Unauthorized", json!({"message":"Bad credentials"}));
     }
-    if route == Route::UpdatedInlineComments {
+    if matches!(route, Route::UpdatedInlineComments | Route::OpenPullIndex) {
         return result(200, "OK", json!([]));
     }
     if let Some(backlog) = backlog::response(phase, route) {

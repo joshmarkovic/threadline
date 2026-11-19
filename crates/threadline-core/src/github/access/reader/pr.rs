@@ -1,6 +1,6 @@
 //! Read PR data against the verified repository and provider-observed revision.
 
-mod graph;
+pub(super) mod graph;
 mod source;
 pub(super) mod wire;
 
@@ -263,6 +263,6 @@ fn delivered(page: u32, count: usize) -> u64 {
     u64::from(page.saturating_sub(1)) * u64::from(super::PAGE_SIZE) + count as u64
 }
 
-fn identity_mismatch() -> AccessError {
+pub(super) fn identity_mismatch() -> AccessError {
     AccessError::received(AccessKind::IdentityMismatch, 200)
 }

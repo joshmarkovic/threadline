@@ -187,7 +187,7 @@ impl GitHubReader<'_> {
         .await
     }
 
-    async fn refresh_page<T: DeserializeOwned, R>(
+    pub(super) async fn refresh_page<T: DeserializeOwned, R>(
         &self,
         suffix: &str,
         page: u32,
@@ -256,7 +256,7 @@ impl GitHubReader<'_> {
     }
 }
 
-fn since(since_ms: i64) -> Result<String, AccessError> {
+pub(super) fn since(since_ms: i64) -> Result<String, AccessError> {
     DateTime::from_timestamp_millis(since_ms)
         .map(|date| date.to_rfc3339_opts(SecondsFormat::Secs, true))
         .ok_or_else(|| AccessError::local(AccessKind::InvalidPagination))

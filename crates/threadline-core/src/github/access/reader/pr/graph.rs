@@ -207,11 +207,11 @@ impl GitHubReader<'_> {
     }
 }
 
-fn valid_cursor(cursor: &str) -> bool {
+pub(in crate::github::access::reader) fn valid_cursor(cursor: &str) -> bool {
     !cursor.is_empty() && cursor.len() <= 512 && cursor.bytes().all(|byte| byte.is_ascii_graphic())
 }
 
-fn graph_failure(errors: &[GraphError]) -> AccessError {
+pub(in crate::github::access::reader) fn graph_failure(errors: &[GraphError]) -> AccessError {
     let kind = errors
         .iter()
         .find_map(|error| {

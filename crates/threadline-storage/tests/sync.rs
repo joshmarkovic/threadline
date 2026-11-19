@@ -543,8 +543,13 @@ fn it_007_expired_cursors_partial_permissions_budget_floors_and_retry_exhaustion
                 .unwrap();
             failed += 1;
         } else {
-            s.commit_observed_page(&claim, no_changes(), now, "UTC")
-                .unwrap();
+            s.finish_sync_read(
+                &claim,
+                ReadCompletion::Fetched(Validators::default()),
+                now,
+                "UTC",
+            )
+            .unwrap();
         }
         now += 100_000;
     }
@@ -1159,4 +1164,212 @@ fn it_018_repository_inline_feed_finds_an_edit_on_an_unopened_pr_without_fetchin
         NotificationTarget::Item { item, thread: None }
     );
     assert!(store.current_pr_revision(account, item).unwrap().is_none());
+}
+
+#[test]
+fn it_018_unopened_old_pr_discovers_recent_reviews_changes_and_new_head_check_targets() {
+    use threadline_core::github::reader::{
+        Page,
+        activity::{OpenPull, PullActivity, PullEvent},
+    };
+    use threadline_storage::{
+        notifications::{Category, EventActor},
+        pr::PrFamily,
+    };
+    let temp = tempfile::tempdir().unwrap();
+    let store = Store::open_profile(temp.path()).unwrap();
+    let (account, repo) = install(&store);
+    store.schedule_selected_activity(account, START).unwrap();
+    let claim_for = |store: &Store, now: &mut i64, kind: PrActivityRead| {
+        for _ in 0..12 {
+            *now += 1000;
+            let claim = store.claim_sync_read(account, *now).unwrap().unwrap();
+            if PrActivityRead::from_target(&claim.target) == Some(kind) {
+                return claim;
+            }
+            store
+                .finish_sync_read(
+                    &claim,
+                    ReadCompletion::Fetched(Validators::default()),
+                    *now,
+                    "UTC",
+                )
+                .unwrap();
+        }
+        panic!("No eligible pull activity claim");
+    };
+    let mut clock = START;
+    let open = claim_for(&store, &mut clock, PrActivityRead::OpenIndex);
+    let identity = || OpenPull {
+        number: 42.try_into().unwrap(),
+        id: id(420),
+        node: "PR_420".into(),
+        updated_at: START + 100,
+    };
+    store
+        .commit_open_pull_index(
+            &open,
+            Page {
+                records: vec![identity()],
+                next_page: None,
+                sso_limited: false,
+            },
+            &tag("index"),
+            clock,
+            "UTC",
+        )
+        .unwrap();
+    let item = store
+        .resolve(
+            account,
+            ItemLocator {
+                repository: repo,
+                number: 42,
+            },
+        )
+        .unwrap()
+        .unwrap();
+    assert!(store.current_pr_revision(account, item).unwrap().is_none());
+    let timeline = claim_for(&store, &mut clock, PrActivityRead::Timeline);
+    assert_eq!(timeline.target.item, Some(item));
+    assert_eq!(timeline.since_ms, Some(START - 300_000));
+    let page = |events, next, partial| PullActivity {
+        identity: identity(),
+        title: "Pull request observed from the index".into(),
+        closed: false,
+        merged: false,
+        base: "a".repeat(40),
+        head: "b".repeat(40),
+        events,
+        next,
+        partial,
+        permission_limited: partial,
+        rate: Default::default(),
+    };
+    let actor = EventActor {
+        user_id: Some(id(5)),
+        ..Default::default()
+    };
+    let formal = |id, at| PullEvent::Review {
+        id: NonZeroU64::new(id).unwrap(),
+        state: "APPROVED".into(),
+        body: "ordinary approval".into(),
+        actor,
+        at,
+    };
+    store
+        .commit_pull_activity(
+            &timeline,
+            page(
+                vec![formal(5, START - 1), formal(6, START + 5)],
+                Some("next".into()),
+                false,
+            ),
+            clock,
+            "UTC",
+        )
+        .unwrap();
+    drop(store);
+    let store = Store::open_profile(temp.path()).unwrap();
+    let next = claim_for(&store, &mut clock, PrActivityRead::Timeline);
+    assert_eq!(next.cursor.as_deref(), Some("next"));
+    assert_eq!(next.since_ms, timeline.since_ms);
+    store
+        .commit_pull_activity(
+            &next,
+            page(
+                vec![
+                    formal(6, START + 5),
+                    PullEvent::Ready {
+                        actor,
+                        at: START + 7,
+                    },
+                    PullEvent::Requested {
+                        actor,
+                        at: START + 12,
+                        user: "test".into(),
+                    },
+                ],
+                None,
+                false,
+            ),
+            clock,
+            "UTC",
+        )
+        .unwrap();
+    assert_eq!(
+        store
+            .process_notification_events(account, clock + 1, "UTC", true, 20)
+            .unwrap(),
+        3
+    );
+    let feed = store.notification_feed(account, None, 20).unwrap();
+    let categories: BTreeSet<_> = feed
+        .iter()
+        .flat_map(|e| e.categories.iter().copied())
+        .collect();
+    assert_eq!(
+        categories,
+        [
+            Category::Approval,
+            Category::PrReady,
+            Category::ReviewRequest
+        ]
+        .into()
+    );
+    let (rev, _) = store.current_pr_revision(account, item).unwrap().unwrap();
+    assert!(
+        store
+            .pr_page(&rev, PrFamily::Reviews, None, 20)
+            .unwrap()
+            .rows
+            .is_empty()
+    );
+    let expected = [
+        rev.read_target(PrFamily::Checks),
+        rev.read_target(PrFamily::Statuses),
+    ];
+    let mut checks = 0;
+    for _ in 0..8 {
+        clock += 1000;
+        let Some(claim) = store.claim_sync_read(account, clock).unwrap() else {
+            continue;
+        };
+        if expected.contains(&claim.target) {
+            checks += 1;
+        }
+        store
+            .finish_sync_read(
+                &claim,
+                ReadCompletion::Fetched(Validators::default()),
+                clock,
+                "UTC",
+            )
+            .unwrap();
+    }
+    assert_eq!(checks, 2);
+    clock += 3_600_000;
+    let late = claim_for(&store, &mut clock, PrActivityRead::Timeline);
+    store
+        .select_github_repository(account, repo, false)
+        .unwrap();
+    assert!(
+        store
+            .commit_pull_activity(
+                &late,
+                page(
+                    vec![PullEvent::Merged {
+                        actor,
+                        at: clock,
+                        commit: Some("c".repeat(40))
+                    }],
+                    None,
+                    false
+                ),
+                clock,
+                "UTC"
+            )
+            .is_err()
+    );
+    assert_eq!(store.notification_feed(account, None, 20).unwrap().len(), 3);
 }

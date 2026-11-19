@@ -362,6 +362,9 @@ fn reader_reply(
         if path.starts_with("/pulls/comments?sort=updated&direction=asc&since=") {
             return Some(success(json!([])));
         }
+        if path == "/pulls?state=open&sort=created&direction=asc&per_page=20&page=1" {
+            return Some(success(json!([])));
+        }
     }
     let response = match target.strip_prefix(BASE)? {
         "" => success(open_repo),
