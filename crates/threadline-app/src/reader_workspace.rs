@@ -1391,16 +1391,17 @@ impl ReaderWorkspace {
                 let scroll = old
                     .as_ref()
                     .map_or_else(ScrollHandle::new, |view| view.scroll.clone());
-                if old.is_none() && tab.view.scroll_anchor.is_some() && !data.anchor_missing {
-                    let discussion = 5
-                        + usize::from(data.metadata.is_some())
-                        + usize::from(data.discussion.state.error.is_some());
-                    scroll.scroll_to_item(discussion);
-                } else if old.is_none() && tab.view.scroll_offset > 0 {
+                if old.is_none() && tab.view.scroll_offset > 0 {
                     let handle = scroll.clone();
                     window.on_next_frame(move |_, _| {
                         handle.set_offset(point(px(0.), px(-(tab.view.scroll_offset as f32))))
                     });
+                } else if old.is_none() && tab.view.scroll_anchor.is_some() && !data.anchor_missing
+                {
+                    let discussion = 5
+                        + usize::from(data.metadata.is_some())
+                        + usize::from(data.discussion.state.error.is_some());
+                    scroll.scroll_to_item(discussion);
                 }
                 if let Some(set) = data.pr.as_ref().and_then(|pr| pr.references.as_ref()) {
                     for current in self
@@ -1484,6 +1485,30 @@ impl ReaderWorkspace {
             return;
         }
         self.layout_busy = true;
+        let count_tabs = |workspace: &Workspace| {
+            workspace
+                .panes
+                .iter()
+                .map(|pane| pane.tabs.len())
+                .sum::<usize>()
+        };
+        let closing_positions: Vec<_> = if count_tabs(&layout) < count_tabs(&self.layout) {
+            self.layout
+                .panes
+                .iter()
+                .flat_map(|pane| &pane.tabs)
+                .filter(|tab| {
+                    !layout
+                        .panes
+                        .iter()
+                        .flat_map(|pane| &pane.tabs)
+                        .any(|open| open.id == tab.id)
+                })
+                .cloned()
+                .collect()
+        } else {
+            Vec::new()
+        };
         let state = layout.clone();
         let maximized = self.maximized.then_some(layout.focused_pane);
         let optimistic = show_cached
@@ -1511,7 +1536,12 @@ impl ReaderWorkspace {
             window,
             cx,
             move |store| {
-                store.save_reader_layout(account, &state, maximized)?;
+                store.save_reader_layout_with_closing_positions(
+                    account,
+                    &state,
+                    maximized,
+                    &closing_positions,
+                )?;
                 Ok(preload.map(|(tab, request)| {
                     let result = ItemData::read(store, account, actor, &tab);
                     (tab, request, result)
@@ -1660,6 +1690,7 @@ impl ReaderWorkspace {
         let preserve_view = anchor.is_none();
         if let Some(anchor) = anchor {
             tab.view.scroll_anchor = Some(anchor);
+            tab.view.scroll_offset = 0;
             self.tab_views.remove(&tab.id);
         }
         let target = tab.clone();

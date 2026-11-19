@@ -42,6 +42,79 @@ impl Fixture {
         }
     }
 }
+
+#[test]
+fn it_019_close_persists_the_latest_reading_positions_with_the_layout() {
+    let fixture = Fixture::new();
+    let mut workspace = Workspace {
+        focused_pane: 1,
+        proportions: vec![0.5, 0.5],
+        panes: vec![
+            Pane {
+                active: Some(0),
+                tabs: vec![Tab {
+                    id: "surviving-tab".into(),
+                    item: fixture.issue,
+                    view: TabView::default(),
+                }],
+            },
+            Pane {
+                active: Some(1),
+                tabs: vec![
+                    Tab {
+                        id: "closing-issue".into(),
+                        item: fixture.issue,
+                        view: TabView {
+                            scroll_anchor: Some("known-comment".into()),
+                            ..Default::default()
+                        },
+                    },
+                    Tab {
+                        id: "closing-pr".into(),
+                        item: fixture.pr,
+                        view: TabView {
+                            pr_reader: Some(threadline_storage::pr::PrTabView::default()),
+                            ..Default::default()
+                        },
+                    },
+                ],
+            },
+        ],
+    };
+    fixture
+        .store
+        .save_workspace(fixture.account, &workspace)
+        .unwrap();
+    let mut closing = workspace.panes.pop().unwrap().tabs;
+    workspace.focused_pane = 0;
+    workspace.proportions = vec![1.];
+    closing[0].view.scroll_offset = 156;
+    closing[0].view.scroll_anchor = Some("unconfirmed-override".into());
+    let pr = closing[1].view.pr_reader.as_mut().unwrap();
+    pr.context_scroll = 78;
+    pr.issue_scroll = 39;
+    fixture
+        .store
+        .save_reader_layout_with_closing_positions(fixture.account, &workspace, None, &closing)
+        .unwrap();
+
+    let reopened = Store::open(&fixture.path).unwrap();
+    let pr = reopened
+        .reopen_last_tab(fixture.account, None)
+        .unwrap()
+        .unwrap();
+    assert_eq!(pr.id, "closing-pr");
+    let pr = pr.view.pr_reader.unwrap();
+    assert_eq!((pr.context_scroll, pr.issue_scroll), (78, 39));
+    let issue = reopened
+        .reopen_last_tab(fixture.account, None)
+        .unwrap()
+        .unwrap();
+    assert_eq!(issue.id, "closing-issue");
+    assert_eq!(issue.view.scroll_offset, 156);
+    assert_eq!(issue.view.scroll_anchor.as_deref(), Some("known-comment"));
+}
+
 fn item(
     store: &Store,
     account: AccountId,

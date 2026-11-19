@@ -1186,6 +1186,7 @@ impl ReaderWorkspace {
                     .section = threadline_storage::pr::PrSection::Conversation;
             }
             tab.view.scroll_anchor = Some(anchor);
+            tab.view.scroll_offset = 0;
             self.tab_views.remove(&tab.id);
         }
         layout.focused_pane = pane;

@@ -12,16 +12,17 @@ function Wait-PanePositions([string]$Description, [scriptblock]$PositionCheck) {
     }
 }
 
-function Move-FixturePaneDiscussion([IntPtr]$Window, [long]$Item) {
-    $surface = Wait-Reader 'the exact left archive discussion before moving within it' {
-        param($reader) $reader.active_item -eq $Item -and $reader.focused_pane -eq 0 -and $reader.offline
+function Move-FixturePaneDiscussion([IntPtr]$Window, [long]$Item, [int]$Pane = 0) {
+    $surface = Wait-Reader 'the exact active archive discussion before moving within it' {
+        param($reader) $reader.active_item -eq $Item -and $reader.focused_pane -eq $Pane -and $reader.offline
     }
-    $bounds = $surface.bounds.PSObject.Properties['reader-conversation-0']
+    $id = "reader-conversation-$Pane"
+    $bounds = $surface.bounds.PSObject.Properties[$id]
     if ($null -eq $bounds -or $bounds.Value[2] -le 0 -or $bounds.Value[3] -le 0) {
-        $surface = Wait-AccountControl 'reader-conversation-0'
-        $bounds = $surface.bounds.PSObject.Properties['reader-conversation-0']
-        if ($surface.cached_reader.active_item -ne $Item -or $surface.cached_reader.focused_pane -ne 0) {
-            throw 'The left archive discussion changed before its functional scroll action.'
+        $surface = Wait-AccountControl $id
+        $bounds = $surface.bounds.PSObject.Properties[$id]
+        if ($surface.cached_reader.active_item -ne $Item -or $surface.cached_reader.focused_pane -ne $Pane) {
+            throw 'The active archive discussion changed before its functional scroll action.'
         }
     }
     $rect = $bounds.Value
@@ -242,6 +243,13 @@ function Invoke-PaneLifecycleProof([IntPtr]$Window, [string]$Profile) {
     }
     Add-Evidence 'Restore both panes, reorder the archive tab and move it with the original anchor and draft' $moved.cached_reader.pane_positions
 
+    Move-FixturePaneDiscussion $Window $archive.item 1
+    $closing = Wait-PaneLayout 'the moved archive view has a newer reading position immediately before Close tab' {
+        param($layout, $panes)
+        $panes.Count -eq 2 -and $panes[1].tab -ceq $archiveId -and $panes[1].discussion_anchor -ceq $archive.anchor -and
+            $panes[1].discussion_offset -gt $savedOffset
+    }
+    $savedOffset = $closing.cached_reader.pane_positions.panes[1].discussion_offset
     Click-AccountControl $Window 'reader-close-tab'
     $null = Wait-PaneLayout 'the original archive tab closes without changing the other entries' {
         param($layout) (Test-PaneLayoutOrder $layout.strips[0] $leftAfterMove) -and (Test-PaneLayoutOrder $layout.strips[1] $rightOrder)

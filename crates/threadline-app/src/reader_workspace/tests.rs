@@ -668,11 +668,19 @@ fn ui_002_independent_panes_share_one_editor_and_reopen_same_draft(cx: &mut Test
     let setup = ReaderHarness::seeded();
     let account = setup.fixture.account;
     let item = setup.fixture.long_discussion;
+    let anchored_comment = setup
+        .store
+        .discussion_page(account, item, None, 10)
+        .unwrap()
+        .records[0]
+        .key
+        .clone();
     let tab = Tab {
         id: "primary-note".into(),
         item,
         view: TabView {
             navigation: Some("issue-conversation".into()),
+            scroll_anchor: Some(anchored_comment),
             ..Default::default()
         },
     };
@@ -733,6 +741,15 @@ fn ui_002_independent_panes_share_one_editor_and_reopen_same_draft(cx: &mut Test
                 && view.layout.panes[1].tabs.len() == 2
         })
     });
+    let last_read_offset = 78;
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        let workspace = reader.read(cx);
+        let handle = &workspace.tab_views[&tab.id].scroll;
+        assert!(handle.bounds().size.height > px(0.));
+        handle.set_offset(point(px(0.), px(-(last_read_offset as f32))));
+    })
+    .unwrap();
     click(cx, window, "reader-close-tab");
     until(cx, |cx| {
         cx.read(|cx| {
@@ -755,6 +772,20 @@ fn ui_002_independent_panes_share_one_editor_and_reopen_same_draft(cx: &mut Test
         .unwrap();
     assert_eq!(reopened.view.navigation, tab.view.navigation);
     assert_eq!(reopened.view.draft.as_deref(), Some(draft_id.as_str()));
+    assert_eq!(reopened.view.scroll_anchor, tab.view.scroll_anchor);
+    assert_eq!(reopened.view.scroll_offset, last_read_offset);
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).tab_views.contains_key(&tab.id))
+    });
+    cx.update_window(window, |_, window, cx| {
+        window.simulate_next_frame(cx);
+        window.render_frame(cx);
+        assert_eq!(
+            reader.read(cx).tab_views[&tab.id].scroll.offset().y,
+            px(-(last_read_offset as f32))
+        );
+    })
+    .unwrap();
     assert_eq!(
         setup
             .store

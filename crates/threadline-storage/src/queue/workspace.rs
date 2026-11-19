@@ -144,6 +144,7 @@ pub(crate) fn write_workspace(
     tx: &Transaction<'_>,
     account: AccountId,
     workspace: &Workspace,
+    closing_positions: &[Tab],
 ) -> Result<()> {
     validate_workspace(tx, account, workspace)?;
     let serialized = json(workspace)?;
@@ -168,12 +169,27 @@ pub(crate) fn write_workspace(
                 .enumerate()
                 .filter(|(_, t)| !open.contains(t.id.as_str()))
             {
+                let mut view = tab.view.clone();
+                if let Some(closing) = closing_positions
+                    .iter()
+                    .find(|closing| closing.id == tab.id && closing.item == tab.item)
+                {
+                    view.scroll_offset = closing.view.scroll_offset;
+                    if let Some(latest) = &closing.view.pr_reader
+                        && (view.pr_reader.is_some()
+                            || item_kind(tx, account, tab.item)? == "pull_request")
+                    {
+                        let previous = view.pr_reader.get_or_insert_with(Default::default);
+                        previous.context_scroll = latest.context_scroll;
+                        previous.issue_scroll = latest.issue_scroll;
+                    }
+                }
                 tx.execute(
                     "DELETE FROM reader_closed_tabs WHERE account_id=? AND tab_id=?",
                     params![account, tab.id],
                 )?;
                 tx.execute("INSERT INTO reader_closed_tabs(account_id,item_id,tab_id,pane_index,tab_index,view) VALUES(?,?,?,?,?,?)",
-                    params![account,tab.item,tab.id,i64::try_from(pi).map_err(|_|Error::Corrupt)?,i64::try_from(ti).map_err(|_|Error::Corrupt)?,json(&tab.view)?])?;
+                    params![account,tab.item,tab.id,i64::try_from(pi).map_err(|_|Error::Corrupt)?,i64::try_from(ti).map_err(|_|Error::Corrupt)?,json(&view)?])?;
             }
         }
         tx.prepare_cached(
@@ -201,7 +217,7 @@ pub(crate) fn write_workspace(
 
 impl Store {
     pub fn save_workspace(&self, account: AccountId, workspace: &Workspace) -> Result<()> {
-        self.write(|tx| write_workspace(tx, account, workspace))
+        self.write(|tx| write_workspace(tx, account, workspace, &[]))
     }
     pub fn workspace(&self, account: AccountId) -> Result<Option<Workspace>> {
         Ok(self.reader_layout(account)?.map(|(workspace, _)| workspace))
@@ -213,13 +229,24 @@ impl Store {
         workspace: &Workspace,
         maximized_pane: Option<usize>,
     ) -> Result<()> {
+        self.save_reader_layout_with_closing_positions(account, workspace, maximized_pane, &[])
+    }
+
+    /// Save the next layout and the last reading positions of its removed tabs in one transaction.
+    pub fn save_reader_layout_with_closing_positions(
+        &self,
+        account: AccountId,
+        workspace: &Workspace,
+        maximized_pane: Option<usize>,
+        closing_positions: &[Tab],
+    ) -> Result<()> {
         if maximized_pane.is_some_and(|pane| pane >= workspace.panes.len()) {
             return Err(Error::InvalidInput(
                 "maximized pane is outside the workspace",
             ));
         }
         self.write(|tx| {
-            write_workspace(tx, account, workspace)?;
+            write_workspace(tx, account, workspace, closing_positions)?;
             match maximized_pane {
                 Some(pane) => tx.execute(
                     "INSERT INTO local_preferences(account_id, name, value)
@@ -314,7 +341,7 @@ impl Store {
         pane.tabs.insert(index, tab.clone());
         pane.active = Some(index);
         ws.focused_pane = position;
-        write_workspace(tx, account, &ws)?;
+        write_workspace(tx, account, &ws, &[])?;
         Ok(Some(tab))
     })
     }
@@ -393,7 +420,7 @@ impl Store {
                 .pr_reader
                 .get_or_insert_with(Default::default)
                 .context_mode = mode;
-            write_workspace(tx, account, &workspace)
+            write_workspace(tx, account, &workspace, &[])
         })
     }
     pub fn pr_context(&self, account: AccountId, pr: ItemId) -> Result<Option<PrContext>> {
@@ -603,7 +630,7 @@ pub(crate) fn refresh_contexts_in(
                 }
             }
         }
-        write_workspace(tx, account, &layout)?;
+        write_workspace(tx, account, &layout, &[])?;
     }
     Ok(())
 }
