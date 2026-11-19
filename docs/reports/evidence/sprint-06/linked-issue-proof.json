@@ -1,0 +1,82 @@
+{
+  "criteria": ["AC-79", "AC-80"],
+  "windows_component_checks": {
+    "environment": "Windows 11 x64 native development test executables",
+    "source_revision": "10e1a781b50099f9f1cf36c6a839cdd772375aae",
+    "cases": [
+      {
+        "case": "UT-012",
+        "filter": "ut_012",
+        "status": "Pass",
+        "exit_code": 0,
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.02,
+        "executable_sha256": "b9e9b9e98c20507c4b6b4f95f0f3e673c5f338c2171b14a31e603fb46f9c8985",
+        "log_sha256": "b53c8c83c4faebe52a4e7ab97d05a1c096e2de3daec2255a431cdc1b673c71bd",
+        "tests": [
+          "ut_012_all_supported_words_extract_distinct_issue_candidates",
+          "ut_012_closing_markdown_normalizes_routes_and_skips_code_and_untrusted_destinations",
+          "ut_012_inline_links_use_the_exact_github_issue_destination"
+        ]
+      },
+      {
+        "case": "IT-017",
+        "filter": "it_017",
+        "status": "Pass",
+        "exit_code": 0,
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.79,
+        "executable_sha256": "9579936472a036fd43c602ebaed6a8522536e82530e46a1b1b76057b5eea39fd",
+        "log_sha256": "bd5eff5aaf869522f6974b07a15a9554576188bb718b15d7d794d7cb85c8405f",
+        "tests": [
+          "it_017_actual_body_references_verify_original_identity_and_reject_delayed_evidence",
+          "it_017_body_and_reference_proof_are_one_snapshot_across_refresh",
+          "it_017_cross_owner_issue_verification_does_not_select_or_monitor_the_other_repository"
+        ]
+      }
+    ]
+  },
+  "windows_application_checks": {
+    "environment": "Windows 11 x64 native application test executable with E2E fixture feature",
+    "source_revision": "b230bbd23d639e447e89a70d7715d2bb10285a2e",
+    "status": "Pass",
+    "exit_code": 0,
+    "group_passed": 5,
+    "group_failed": 0,
+    "group_ignored": 0,
+    "group_seconds": 72.75,
+    "executable_sha256": "a9ea6fa29fd2f6bcbb7970b2595c3151109b52555d9c7045cb0d6193893844ce",
+    "log_sha256": "9fcb6d2d8b215db8b599f97b896f74da4ce9e30053f403ccc72aadae1ccc2b32",
+    "arguments": [
+      "pr_service_commits_verified_files_context_and_cross_repository_reference",
+      "pr_context",
+      "ui_007_preview_review_author_mute",
+      "write_dispatch_failed_local_completion_reconciles_without_replay",
+      "--test-threads=1"
+    ],
+    "reference_tests": [
+      "pr_service_commits_verified_files_context_and_cross_repository_reference",
+      "ui_001_pr_context_changes_keep_the_immutable_native_diff_and_each_tabs_state",
+      "ui_004_anchored_review_draft_survives_pr_context_changes_and_queues_the_original_head"
+    ]
+  },
+  "windows_native_process_cases": [
+    {
+      "case": "E2E-005",
+      "status": "Pass",
+      "receipt": "verification.json",
+      "scope": "Two PR tabs with a held issue response, isolated active PR, exact restored issue and split code"
+    },
+    {
+      "case": "E2E-008",
+      "run": "e2e-1795044411292-20392",
+      "status": "Pass",
+      "receipt": "../sprint-08/native-verification.json",
+      "scope": "Two distinct verified targets selected through native controls, exact review anchor retained, independent offline restart"
+    }
+  ]
+}
