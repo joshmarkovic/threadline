@@ -2055,7 +2055,7 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds {
                     origin: Point::default(),
-                    size: size(px(1060.), px(790.)),
+                    size: size(px(1320.), px(820.)),
                 })),
                 ..Default::default()
             },
@@ -2140,32 +2140,74 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
             read_account().is_some_and(|account| account[field] == true)
         });
     };
+    let set_route = |route: &str, cx: &mut gpui_kit::TestAppContext| {
+        cx.update_window(window, |_, window, cx| {
+            window.press("secondary-a", cx);
+            window.input(route, cx);
+        })
+        .unwrap();
+    };
+    let enter_token = |cx: &mut gpui_kit::TestAppContext| {
+        cx.update_window(window, |_, window, cx| window.input(FIXTURE_PAT, cx))
+            .unwrap();
+        wait_receipt("fixture_token_entered", cx);
+    };
+    let invalid_route = |cx: &mut gpui_kit::TestAppContext| {
+        let before = simulator.requests.load(Ordering::SeqCst);
+        let active = store.active_github_account().unwrap();
+        click("account-connect", cx);
+        wait_form(cx, |cx| {
+            cx.update_window(window, |_, window, cx| window.render_frame(cx))
+                .unwrap();
+            read_account().is_some_and(|account| {
+                account["input_issue"] == "InvalidRepository"
+                    && account["fixture_token_entered"] == true
+                    && account["fixture_route_focused"] == true
+                    && account["busy"] == false
+            })
+        });
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            let error = window.find("account-repository-error");
+            assert!(error.visible());
+            assert_eq!(error.role(), Some(gpui_kit::Role::Status));
+            assert_eq!(
+                error.label().unwrap(),
+                "Enter a repository as owner/repository, for example octocat/hello-world."
+            );
+            let [_, top, _, height] = observer.test_control_bounds("account-repository").unwrap();
+            assert!(error.bounds().top() >= px(top + height));
+            let [_, token_top, _, _] = observer.test_control_bounds("account-token").unwrap();
+            assert!(error.bounds().bottom() <= px(token_top));
+        })
+        .unwrap();
+        assert_eq!(store.active_github_account().unwrap(), active);
+        assert_eq!(simulator.requests.load(Ordering::SeqCst), before);
+    };
     // Exercise real focus transfer in both directions using the receipt geometry.
     click("account-token", cx);
     wait_receipt("fixture_token_focused", cx);
     click("account-repository", cx);
     wait_receipt("fixture_route_focused", cx);
-    cx.update_window(window, |_, window, cx| {
-        window.press("secondary-a", cx);
-        window.input("fixture-org/private", cx);
-    })
-    .unwrap();
-    wait_receipt("fixture_route_entered", cx);
+    set_route("fixture-org", cx);
     assert_eq!(read_account().unwrap()["fixture_token_entered"], false);
     cx.update_window(window, |_, window, cx| window.press("tab", cx))
         .unwrap();
     wait_receipt("fixture_token_focused", cx);
-    cx.update_window(window, |_, window, cx| {
-        window.press("secondary-a", cx);
-        window.input(FIXTURE_PAT, cx);
-    })
-    .unwrap();
-    wait_receipt("fixture_token_entered", cx);
+    enter_token(cx);
+    invalid_route(cx);
     assert!(
         !std::fs::read_to_string(&report)
             .unwrap()
             .contains(FIXTURE_PAT)
     );
+    set_route("fixture-org/private", cx);
+    wait_receipt("fixture_route_entered", cx);
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.try_find("account-repository-error").is_none());
+    })
+    .unwrap();
     click("account-connect", cx);
     wait_form(cx, |cx| {
         cx.update_window(window, |_, window, cx| window.render_frame(cx))
@@ -2180,6 +2222,56 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
     assert!(loaded[0].verified_current);
     assert_eq!(read_account().unwrap()["active_user_id"], 101);
     assert_eq!(read_account().unwrap()["fixture_token_entered"], false);
+
+    // The signed-in form retains both the masked input and the intended replacement.
+    cx.update_window(window, |_, window, cx| {
+        window.click(format!("account-renew-{}-fixture-org", account.0), cx);
+    })
+    .unwrap();
+    wait_receipt("fixture_replacement_active", cx);
+    set_route("fixture-org", cx);
+    click("account-token", cx);
+    enter_token(cx);
+    invalid_route(cx);
+    assert_eq!(read_account().unwrap()["fixture_replacement_active"], true);
+    set_route("fixture-org/private", cx);
+    simulator.probe.rejected.store(true, Ordering::Release);
+    click("account-connect", cx);
+    wait_form(cx, |cx| {
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            window.try_find("account-status").is_some_and(|status| {
+                status.visible()
+                    && status.role() == Some(gpui_kit::Role::Status)
+                    && status.label() == Some("GitHub rejected this credential")
+            })
+        })
+        .unwrap()
+            && read_account().is_some_and(|account| {
+                account["fixture_token_entered"] == false
+                    && account["fixture_replacement_active"] == true
+                    && account["busy"] == false
+            })
+    });
+    assert_eq!(simulator.user_requests.load(Ordering::SeqCst), 2);
+    assert_eq!(read_account().unwrap()["fixture_token_entered"], false);
+    assert_eq!(read_account().unwrap()["fixture_replacement_active"], true);
+    assert_eq!(store.active_github_account().unwrap(), Some(account));
+    simulator.probe.rejected.store(false, Ordering::Release);
+    click("account-token", cx);
+    enter_token(cx);
+    click("account-connect", cx);
+    wait_form(cx, |cx| {
+        cx.update_window(window, |_, window, cx| window.render_frame(cx))
+            .unwrap();
+        read_account().is_some_and(|account| {
+            account["profile_access"] == "Readable"
+                && account["fixture_replacement_active"] == false
+                && account["busy"] == false
+        })
+    });
+    assert_eq!(simulator.user_requests.load(Ordering::SeqCst), 3);
+
     simulator.sso.store(true, Ordering::Relaxed);
     click("account-refresh", cx);
     wait_form(cx, |cx| {
@@ -2187,6 +2279,18 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
             .unwrap();
         read_account().is_some_and(|account| account["discovery"] == "RestrictedBySso")
     });
+    click("account-token", cx);
+    enter_token(cx);
+    let before_sign_out = simulator.requests.load(Ordering::SeqCst);
+    click("account-sign-out", cx);
+    wait_form(cx, |cx| {
+        cx.update_window(window, |_, window, cx| window.render_frame(cx))
+            .unwrap();
+        read_account().is_some_and(|account| {
+            account["profile_access"] == "SignedOut" && account["fixture_token_entered"] == false
+        })
+    });
+    assert_eq!(simulator.requests.load(Ordering::SeqCst), before_sign_out);
     cx.update_window(window, |_, window, cx| {
         window.press("secondary-shift-a", cx)
     })

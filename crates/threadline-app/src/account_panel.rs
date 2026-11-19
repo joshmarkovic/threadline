@@ -5,7 +5,8 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::{Disableable, Sizable};
 use gpui_kit::{
     App, AppContext, Context, Entity, Focusable, InteractiveElement, IntoElement, ParentElement,
-    Render, Role, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder,
+    Render, Role, StatefulInteractiveElement, Styled, Subscription, TestSupportExt, Window, div,
+    prelude::FluentBuilder,
 };
 use threadline_core::{
     github::{AccessError, Reachability},
@@ -14,7 +15,10 @@ use threadline_core::{
 use threadline_storage::access::{AccessProfile, AccessState, DiscoveryState, RepositoryView};
 
 use crate::{
-    accounts::{AccountCommand, AccountReply, AccountService, AccountView, Pat},
+    accounts::{
+        AccountCommand, AccountReply, AccountService, AccountView, Pat, REPOSITORY_FORMAT,
+        parse_repository,
+    },
     palette::Palette,
 };
 
@@ -46,6 +50,8 @@ pub(crate) struct AccountPanel {
     runtime: tokio::runtime::Handle,
     focus: gpui_kit::FocusHandle,
     route: Entity<InputState>,
+    route_observation: Subscription,
+    repository_error: Option<&'static str>,
     display_zone: Entity<InputState>,
     display_zone_message: Option<&'static str>,
     saving_display_zone: bool,
@@ -62,8 +68,6 @@ pub(crate) struct AccountPanel {
     observer: Option<crate::observation::Observer>,
     #[cfg(feature = "e2e")]
     input_issue: Option<crate::accounts::AccountInputIssue>,
-    #[cfg(feature = "e2e")]
-    route_observation: Option<gpui_kit::Subscription>,
     #[cfg(feature = "e2e")]
     token_observation: Option<gpui_kit::Subscription>,
 }
@@ -87,10 +91,7 @@ impl AccountPanel {
         let display_zone_message = clock.and_then(|clock| clock.warning);
         let display_zone = cx.new(|cx| InputState::new(window, cx).default_value(value));
         let token = password_input(window, cx);
-        #[cfg(feature = "e2e")]
-        let route_observation = service
-            .fixture
-            .then(|| cx.observe(&route, |_, _, cx| cx.notify()));
+        let route_observation = cx.observe(&route, Self::route_changed);
         #[cfg(feature = "e2e")]
         let token_observation = service
             .fixture
@@ -100,6 +101,8 @@ impl AccountPanel {
             runtime,
             focus: cx.focus_handle(),
             route,
+            route_observation,
+            repository_error: None,
             display_zone,
             display_zone_message,
             saving_display_zone: false,
@@ -116,8 +119,6 @@ impl AccountPanel {
             observer: None,
             #[cfg(feature = "e2e")]
             input_issue: None,
-            #[cfg(feature = "e2e")]
-            route_observation,
             #[cfg(feature = "e2e")]
             token_observation,
         };
@@ -171,6 +172,7 @@ impl AccountPanel {
     }
 
     pub(crate) fn clear_token(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.repository_error = None;
         self.token = password_input(window, cx);
         #[cfg(feature = "e2e")]
         if self.service.fixture {
@@ -243,7 +245,11 @@ impl AccountPanel {
             fixture_identity_rejected: self.github_error.as_ref().is_some_and(|error| {
                 error.kind == threadline_core::github::AccessKind::IdentityMismatch
             }),
-            input_issue: self.input_issue,
+            input_issue: if self.repository_error.is_some() {
+                Some(crate::accounts::AccountInputIssue::InvalidRepository)
+            } else {
+                self.input_issue
+            },
         })
     }
 
@@ -261,6 +267,7 @@ impl AccountPanel {
         if self.busy {
             return;
         }
+        let replacing = matches!(&command, AccountCommand::Connect { renew: Some(_), .. });
         if let Some(window) = window {
             self.focus.focus(window, cx);
         }
@@ -288,10 +295,27 @@ impl AccountPanel {
                         message,
                         github_error,
                         reachability,
+                        succeeded,
                         #[cfg(feature = "e2e")]
                         input_issue,
                     }) => {
                         panel.view = view;
+                        if replacing
+                            && let Some(renew) = panel.renew.take()
+                            && !succeeded
+                        {
+                            panel.renew = panel
+                                .view
+                                .profiles
+                                .iter()
+                                .find(|profile| {
+                                    Some(profile.account) == panel.view.active
+                                        && profile.account == renew.account
+                                        && profile.user_id == renew.user_id
+                                        && profile.owner_scope == renew.owner_scope
+                                })
+                                .cloned();
+                        }
                         panel.message = message;
                         panel.github_error = github_error;
                         #[cfg(feature = "e2e")]
@@ -315,19 +339,49 @@ impl AccountPanel {
         if self.busy {
             return;
         }
-        let repository = self.route.read(cx).value().to_string();
+        let repository = self.route.read(cx).value();
+        if let Some(error) = self.repository_problem(&repository) {
+            self.repository_error = Some(error);
+            self.focus_form(window, cx);
+            cx.notify();
+            return;
+        }
         let pat = Pat::from_input(self.token.read(cx).text().to_string());
-        let renew = self.renew.take();
+        let renew = self.renew.clone();
         self.clear_token(window, cx);
         self.launch(
             AccountCommand::Connect {
-                repository,
+                repository: repository.to_string(),
                 pat,
                 renew,
             },
             Some(window),
             cx,
         );
+    }
+
+    fn repository_problem(&self, raw: &str) -> Option<&'static str> {
+        let Some(route) = parse_repository(raw) else {
+            return Some(REPOSITORY_FORMAT);
+        };
+        if self
+            .renew
+            .as_ref()
+            .is_some_and(|profile| !profile.owner_scope.eq_ignore_ascii_case(route.owner()))
+        {
+            return Some("Enter a repository owned by the account whose token you are replacing.");
+        }
+        None
+    }
+
+    fn route_changed(&mut self, route: Entity<InputState>, cx: &mut Context<Self>) {
+        let prior = self.repository_error;
+        if prior.is_some() {
+            self.repository_error = self.repository_problem(&route.read(cx).value());
+        }
+        if self.repository_error != prior || self.service.fixture {
+            cx.notify();
+        }
     }
 
     fn profile(&self, owner: &str) -> Option<&AccessProfile> {
@@ -388,6 +442,17 @@ impl AccountPanel {
                         .aria_label("GitHub repository"),
                 ),
             )
+            .children(self.repository_error.map(|error| {
+                div()
+                    .id("account-repository-error")
+                    .accessibility_id("account-repository-error")
+                    .test_support()
+                    .role(Role::Status)
+                    .aria_label(error)
+                    .text_sm()
+                    .text_color(palette.accent)
+                    .child(error)
+            }))
             .child(
                 self.control(
                     "account-token",
@@ -421,8 +486,10 @@ impl AccountPanel {
                             Button::new("account-add")
                                 .label("Add another account")
                                 .small()
+                                .disabled(self.busy)
                                 .on_click(cx.listener(|panel, _, _, cx| {
                                     panel.renew = None;
+                                    panel.repository_error = None;
                                     cx.notify();
                                 })),
                         )
@@ -501,11 +568,7 @@ impl AccountPanel {
                         .on_click(cx.listener(move |panel, _, window, cx| {
                             panel.route =
                                 cx.new(|cx| InputState::new(window, cx).placeholder("owner/name"));
-                            #[cfg(feature = "e2e")]
-                            if panel.service.fixture {
-                                panel.route_observation =
-                                    Some(cx.observe(&panel.route, |_, _, cx| cx.notify()));
-                            }
+                            panel.route_observation = cx.observe(&panel.route, Self::route_changed);
                             panel.clear_token(window, cx);
                             panel.renew = None;
                             panel.launch(AccountCommand::Switch(account), Some(window), cx)
@@ -570,6 +633,8 @@ impl AccountPanel {
                                     .accessibility_id("account-sign-out")
                                     .disabled(self.busy)
                                     .on_click(cx.listener(move |panel, _, window, cx| {
+                                        panel.clear_token(window, cx);
+                                        panel.renew = None;
                                         panel.launch(
                                             AccountCommand::SignOut(account),
                                             Some(window),
@@ -617,6 +682,7 @@ impl AccountPanel {
                                 .on_click(cx.listener(
                                     move |panel, _, window, cx| {
                                         panel.renew = Some(target.clone());
+                                        panel.repository_error = None;
                                         panel.focus_form(window, cx);
                                         cx.notify();
                                     },
@@ -792,7 +858,10 @@ impl Render for AccountPanel {
             .children(status.map(|status| {
                 div()
                     .id("account-status")
+                    .accessibility_id("account-status")
+                    .test_support()
                     .role(Role::Status)
+                    .aria_label(status.clone())
                     .text_sm()
                     .child(status)
             }))

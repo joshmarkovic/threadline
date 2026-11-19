@@ -123,6 +123,7 @@ pub(crate) struct AccountReply {
     pub(crate) message: Option<&'static str>,
     pub(crate) github_error: Option<AccessError>,
     pub(crate) reachability: Reachability,
+    pub(crate) succeeded: bool,
     #[cfg(feature = "e2e")]
     pub(crate) input_issue: Option<AccountInputIssue>,
 }
@@ -261,6 +262,7 @@ impl AccountService {
                 message,
                 github_error: None,
                 reachability,
+                succeeded: true,
                 #[cfg(feature = "e2e")]
                 input_issue: None,
             },
@@ -371,7 +373,7 @@ impl AccountService {
         renew: Option<&AccessProfile>,
         cancel: &Cancellation,
     ) -> Result<(Option<&'static str>, Reachability), Problem> {
-        let route = parse_repository(repository)?;
+        let route = parse_repository(repository).ok_or(Problem::InvalidRepository)?;
         let kind = pat.validated_kind(self.fixture)?;
         if let Some(account) = self.store.active_github_account()?
             && self.store.dispatch_profile(account)?.offline
@@ -510,7 +512,9 @@ impl AccountService {
             .transpose()
             .map_err(|_| Problem::InvalidRepository)?;
         let requested_route = if repository.is_none() {
-            requested.map(parse_repository).transpose()?
+            requested
+                .map(|raw| parse_repository(raw).ok_or(Problem::InvalidRepository))
+                .transpose()?
         } else {
             None
         };
@@ -697,12 +701,12 @@ fn credential_ref(profile: &AccessProfile) -> Result<CredentialRef, Problem> {
     )?)
 }
 
-fn parse_repository(raw: &str) -> Result<RepositoryName, Problem> {
-    let (owner, name) = raw
-        .trim()
-        .split_once('/')
-        .ok_or(Problem::InvalidRepository)?;
-    RepositoryName::new(owner, name).map_err(|_| Problem::InvalidRepository)
+pub(crate) const REPOSITORY_FORMAT: &str =
+    "Enter a repository as owner/repository, for example octocat/hello-world.";
+
+pub(crate) fn parse_repository(raw: &str) -> Option<RepositoryName> {
+    let (owner, name) = raw.trim().split_once('/')?;
+    RepositoryName::new(owner, name).ok()
 }
 
 fn check_cancel(cancel: &Cancellation) -> Result<(), Problem> {
@@ -741,6 +745,7 @@ fn problem_reply(view: AccountView, error: Problem) -> AccountReply {
             message: None,
             reachability,
             github_error: Some(github_error),
+            succeeded: false,
             #[cfg(feature = "e2e")]
             input_issue: None,
         };
@@ -751,6 +756,7 @@ fn problem_reply(view: AccountView, error: Problem) -> AccountReply {
             message: None,
             reachability: github_error.reachability,
             github_error: Some(github_error),
+            succeeded: false,
             #[cfg(feature = "e2e")]
             input_issue: None,
         };
@@ -770,7 +776,7 @@ fn problem_reply(view: AccountView, error: Problem) -> AccountReply {
             let _ = error;
             "Protected credential storage is unavailable or locked. Local content is still available."
         }
-        Problem::InvalidRepository => "Enter a GitHub repository as owner/name.",
+        Problem::InvalidRepository => REPOSITORY_FORMAT,
         Problem::InvalidPat => "Enter a valid personal access token.",
         Problem::NoSavedCredential => {
             "No saved token is available. Enter a token for this account."
@@ -785,6 +791,7 @@ fn problem_reply(view: AccountView, error: Problem) -> AccountReply {
         message: Some(message),
         github_error: None,
         reachability: Reachability::NotAttempted,
+        succeeded: false,
         #[cfg(feature = "e2e")]
         input_issue,
     }
