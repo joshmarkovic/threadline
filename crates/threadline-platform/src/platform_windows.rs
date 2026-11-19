@@ -701,4 +701,46 @@ mod tests {
         assert_ne!(first.class, other.class);
         assert_ne!(first.activation_message, normal.activation_message);
     }
+
+    #[test]
+    fn isolated_native_broker_reports_resume_without_suspending_the_machine() {
+        let (tx, mut events) = tokio::sync::mpsc::unbounded_channel();
+        let instance = format!("native-wake-test-{}", std::process::id());
+        let desktop = start(Activation::Focus, Some(Path::new(&instance)), tx, None)
+            .unwrap()
+            .expect("a unique isolated native broker");
+        let hwnd = desktop.0.window as HWND;
+        let replay = |notification| {
+            let mut owner = 0;
+            let mut handled = 0;
+            assert_ne!(unsafe { GetWindowThreadProcessId(hwnd, &mut owner) }, 0);
+            assert_eq!(owner, std::process::id());
+            assert_ne!(
+                unsafe {
+                    SendMessageTimeoutW(
+                        hwnd,
+                        WM_POWERBROADCAST,
+                        notification as WPARAM,
+                        0,
+                        SMTO_ABORTIFHUNG,
+                        2_000,
+                        &mut handled,
+                    )
+                },
+                0
+            );
+            handled
+        };
+        replay(PBT_APMSUSPEND);
+        assert!(
+            std::iter::from_fn(|| events.try_recv().ok()).all(|event| event != PlatformEvent::Wake)
+        );
+        assert_eq!(replay(PBT_APMRESUMEAUTOMATIC), 1);
+        assert_eq!(
+            std::iter::from_fn(|| events.try_recv().ok())
+                .filter(|event| *event == PlatformEvent::Wake)
+                .count(),
+            1
+        );
+    }
 }
