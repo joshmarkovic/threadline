@@ -1,3 +1,41 @@
+function Read-OwnedBadgeCompositor([IntPtr]$Window,[uint32]$Dpi,$Rows) {
+    $helper = $env:THREADLINE_E2E_SIDEBAR_COMPOSITOR
+    $pin = $env:THREADLINE_E2E_SIDEBAR_COMPOSITOR_SHA256
+    if (!$helper -or $pin -notmatch '^[a-fA-F0-9]{64}$' -or !(Test-Path -LiteralPath $helper -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $helper -Algorithm SHA256).Hash -ine $pin) {
+        Stop-Blocked 'The GPU client did not provide badge pixels through PrintWindow. Supply the pinned window-only compositor fixture.'
+    }
+    if (!(Test-OwnedFixtureWindow $Window)) { Stop-Blocked 'The sidebar window changed before compositor capture.' }
+    $numbers = @($Window.ToInt64(),$script:app.Id,$Dpi)
+    foreach ($row in $Rows) { $numbers += @($row.rect.Left,$row.rect.Top,$row.rect.Right,$row.rect.Bottom) }
+    $start = [Diagnostics.ProcessStartInfo]::new()
+    $start.FileName = (Get-Item -LiteralPath $helper).FullName
+    $start.Arguments = $numbers -join ' '
+    $start.UseShellExecute = $false
+    $start.CreateNoWindow = $true
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+    $child = [Diagnostics.Process]::Start($start)
+    try {
+        if (!$child.WaitForExit(12000)) {
+            $child.Kill()
+            $child.WaitForExit()
+            Stop-Blocked 'The fixture compositor did not return a frame in time.'
+        }
+        $summary = $child.StandardOutput.ReadToEnd()
+        $reason = $child.StandardError.ReadToEnd().Trim()
+        if ($child.ExitCode -ne 0) { Stop-Blocked ("Window-only compositor unavailable. " + $reason) }
+    } finally { $child.Dispose() }
+    if (!(Test-OwnedFixtureWindow $Window) -or [ThreadlineWinInput]::GetDpiForWindow($Window) -ne $Dpi) {
+        Stop-Blocked 'The fixture window or DPI changed during compositor capture.'
+    }
+    $measurement = $summary | ConvertFrom-Json
+    if ($measurement.dpi -ne $Dpi -or @($measurement.rows).Count -ne 3) {
+        throw 'The compositor returned an incomplete sidebar measurement.'
+    }
+    return $measurement
+}
+
 function Invoke-SidebarBadgeProof([IntPtr]$Window) {
     $state = Wait-Reader 'the signed-out offline archive and its known Outbox total' {
         param($reader) $reader.offline -and $reader.signed_out -and $reader.outbox -eq 900
@@ -28,11 +66,27 @@ function Invoke-SidebarBadgeProof([IntPtr]$Window) {
     if (($rows | Where-Object { $_.id -ceq 'reader-outbox' }).count -ne 900) {
         throw 'The accessible Outbox count differs from the fixture.'
     }
-    try { $image = [ThreadlineSidebarPixels]::Capture($Window, $script:app.Id, $client.Right, $client.Bottom) }
-    catch { Stop-Blocked 'The Windows backend did not return the owned client image.' }
+    $method = 'PrintWindow'
+    $image = $null
+    $measurements = @()
     try {
-        $samples = foreach ($row in $rows) {
-            $pixels = [ThreadlineSidebarPixels]::Measure($image, $row.rect)
+        try { $image = [ThreadlineSidebarPixels]::Capture($Window, $script:app.Id, $client.Right, $client.Bottom) }
+        catch { $image = $null }
+        if ($image) {
+            $measurements = @(foreach ($row in $rows) { [ThreadlineSidebarPixels]::Measure($image, $row.rect) })
+        }
+    } finally { if ($image) { $image.Dispose() } }
+    $printHadBadge = @($measurements | Where-Object { $_.BluePixels -gt 0 }).Count -gt 0
+    if (!$printHadBadge) {
+        $script:report.sidebar = [ordered]@{ dpi = $dpi; scale = $scale; capture = $method; print_window_badge = $false
+            rows = @($rows | ForEach-Object { [pscustomobject]@{ id=$_.id; total=$_.count; coverage=$_.coverage } }) }
+        $method = 'Windows Graphics Capture (CreateForWindow)'
+        $frame = Read-OwnedBadgeCompositor $Window $dpi $rows
+        $measurements = @($frame.rows)
+    }
+    $samples = @(for ($i=0; $i -lt $rows.Count; $i++) {
+            $row = $rows[$i]
+            $pixels = $measurements[$i]
             [pscustomobject]@{
                 id = $row.id; total = $row.count; coverage = $row.coverage
                 blue = $pixels.BluePixels; white_digits = $pixels.WhitePixels
@@ -41,11 +95,12 @@ function Invoke-SidebarBadgeProof([IntPtr]$Window) {
                 right_px = $pixels.Right; right_inset_px = $row.rect.Right - $pixels.Right
                 digit_offset_x_px = $pixels.DigitCenterX; digit_offset_y_px = $pixels.DigitCenterY
             }
-        }
-    } finally { $image.Dispose() }
-    $script:report.sidebar = [ordered]@{ dpi = $dpi; scale = $scale; rows = @($samples) }
+    })
+    $script:report.sidebar = [ordered]@{ dpi = $dpi; scale = $scale; capture = $method
+        print_window_badge = $printHadBadge; rows = $samples }
+    if (!$printHadBadge) { $script:report.sidebar.compositor_sha256 = $env:THREADLINE_E2E_SIDEBAR_COMPOSITOR_SHA256 }
     if (!($samples | Where-Object { $_.blue -gt 0 })) {
-        Stop-Blocked 'PrintWindow did not expose the expected badge color from the owned GPU client.'
+        Stop-Blocked 'Neither client capture path exposed the expected badge color on the owned window.'
     }
     $right = $null
     foreach ($sample in $samples) {

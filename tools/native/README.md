@@ -103,6 +103,8 @@ To replay a development build on hosted Windows Server x64, dispatch **Hosted Wi
 
 ## Windows measurements
 
+For sidebar badges, build the test-only compositor helper on Windows with `cargo build --locked -p xtask --example sidebar_compositor`. Set `THREADLINE_E2E_SIDEBAR_COMPOSITOR` to its absolute executable path and `THREADLINE_E2E_SIDEBAR_COMPOSITOR_SHA256` to the independently recorded build digest. Run `tools/native/windows-smoke.ps1 -ReaderProof SidebarBadges -Binary <E2E executable> -ReportDir <fresh directory>`. The driver first tries `PrintWindow`. If that image has no badge color, it verifies the fixture window owner and DPI, then uses Windows Graphics Capture on that window. Only color counts, bounds and digit offsets for the three accessible controls enter the receipt. The window capture API requires Windows 10 version 1903 or later. [Microsoft window capture API](https://learn.microsoft.com/windows/win32/api/windows.graphics.capture.interop/nf-windows-graphics-capture-interop-igraphicscaptureiteminterop-createforwindow)
+
 ```powershell
 cargo xtask measure windows --seed 12345
 cargo xtask measure windows --seed 12345 --artifact '<test-package-path>'
