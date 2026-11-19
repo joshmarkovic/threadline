@@ -28,13 +28,27 @@ function Initialize-NativeLifecycle([string]$Profile) {
     Add-Evidence 'Seed mixed private cached work and install one unique protected fixture key' $lifecycleSeed
 }
 
+function Test-LifecycleWorkspace($Reader, [long]$Item, [bool]$Offline, [bool]$SignedOut) {
+    return $null -ne $Reader -and $Reader.cached_content_ready -and $Reader.cached_visible_panes -eq 2 -and
+        $Reader.focused_pane -eq 1 -and $Reader.active_item -eq $Item -and
+        ($Reader.tab_counts -join ',') -ceq '10,10' -and $Reader.outbox -eq 4 -and
+        $Reader.offline -eq $Offline -and $Reader.signed_out -eq $SignedOut
+}
+
+function Test-LifecycleSync($Sync, [bool]$Offline, [bool]$OutboxPaused, [switch]$Reachable) {
+    if ($null -eq $Sync) { return $false }
+    $saved = $Sync.PSObject.Properties['controls']
+    if ($null -eq $saved -or $null -eq $saved.Value) { return $false }
+    $controls = $saved.Value
+    return $controls.work_offline -eq $Offline -and $controls.pause_background -and
+        $controls.pause_queued_actions -eq $OutboxPaused -and
+        (!$Reachable -or $Sync.connection -ceq 'Reachable')
+}
+
 function Wait-LifecycleWorkspace([bool]$Offline, [bool]$SignedOut) {
     return Wait-Reader 'the established native cached workspace and four retained actions' {
         param($reader)
-        $reader.cached_content_ready -and $reader.cached_visible_panes -eq 2 -and
-            $reader.focused_pane -eq 1 -and $reader.active_item -eq $script:lifecycleSeed.review_item -and
-            ($reader.tab_counts -join ',') -ceq '10,10' -and $reader.outbox -eq 4 -and
-            $reader.offline -eq $Offline -and $reader.signed_out -eq $SignedOut
+        Test-LifecycleWorkspace $reader $script:lifecycleSeed.review_item $Offline $SignedOut
     }
 }
 
@@ -63,17 +77,17 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
     })
     Open-SyncSettings $Window
     $null = Wait-Sync 'separate offline, read and Outbox holds' {
-        param($sync) $sync.controls.work_offline -and $sync.controls.pause_background -and $sync.controls.pause_queued_actions
+        param($sync) Test-LifecycleSync $sync $true $true
     }
     Set-AccessPhase 'lifecycle-ready'
     Click-AccountControl $Window 'sync-work-offline'
     $null = Wait-Sync 'online mode and both workload pauses committed' {
-        param($sync) !$sync.controls.work_offline -and $sync.controls.pause_background -and $sync.controls.pause_queued_actions
+        param($sync) Test-LifecycleSync $sync $false $true
     }
     Click-AccountControl $Window 'sync-check-now'
     try {
         $null = Wait-Sync 'reachability using the native protected credential while submissions are paused' {
-            param($sync) $sync.connection -ceq 'Reachable' -and !$sync.controls.work_offline -and $sync.controls.pause_queued_actions
+            param($sync) Test-LifecycleSync $sync $false $true -Reachable
         }
     } catch {
         Stop-ThroughUi
@@ -97,11 +111,11 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
         queued_actions = $ready.cached_reader.outbox; protected_credential_reentered = $false
     })
     Set-AccessPhase 'lifecycle-ready'
+    Open-SyncSettings $online
     $null = Wait-Sync 'the released startup probe reaches the actual loopback server' {
-        param($sync) $sync.connection -ceq 'Reachable' -and $sync.controls.pause_queued_actions
+        param($sync) Test-LifecycleSync $sync $false $true -Reachable
     }
 
-    Open-SyncSettings $online
     Set-AccessPhase 'lifecycle-crash'
     Click-AccountControl $online 'sync-pause-outbox'
     Wait-LifecycleMarker 'lifecycle-comment-held'
@@ -121,8 +135,9 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
     }
     $recovery = Start-LifecycleWindow $Profile 'native-lifecycle-recovery-observation.json'
     $null = Wait-LifecycleWorkspace $false $false
+    Open-SyncSettings $recovery
     $null = Wait-Sync 'the replacement process reconnects without repeating the uncertain mutation' {
-        param($sync) $sync.connection -ceq 'Reachable' -and !$sync.controls.pause_queued_actions
+        param($sync) Test-LifecycleSync $sync $false $false -Reachable
     }
     $recoveryDeadline = [long]$interrupted.next_recovery_at_ms
     if ($recoveryDeadline - [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -gt 180000) {

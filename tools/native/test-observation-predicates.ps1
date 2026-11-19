@@ -19,6 +19,7 @@ if (@($helpers.Name | Sort-Object -Unique).Count -ne 5 -or $helpers.Count -ne 5)
 . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
 . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1')
 . (Join-Path $PSScriptRoot 'windows-sync.ps1')
+. (Join-Path $PSScriptRoot 'windows-native-lifecycle.ps1')
 . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1')
 . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
 
@@ -26,6 +27,25 @@ $notLoaded = '{"connection":"Reachable","cache_generation":2,"panel_open":false,
 if (Test-NotificationSyncReady $notLoaded) { throw 'Reachable fixture transport did not prove saved Sync controls had loaded.' }
 $loaded = '{"connection":"Reachable","cache_generation":2,"panel_open":true,"controls":{"work_offline":false,"pause_background":false,"pause_queued_actions":false,"notification_quiet":false}}' | ConvertFrom-Json
 if (!(Test-NotificationSyncReady $loaded)) { throw 'The observed loaded Sync controls did not permit the quiet-hours journey.' }
+if ((Test-LifecycleSync $notLoaded $false $true -Reachable) -or
+    (Test-LifecycleSync ([pscustomobject]@{ connection = 'Reachable' }) $false $true -Reachable)) {
+    throw 'Native lifecycle treated a connected startup before the Sync controls loaded as ready.'
+}
+$lifecycleRestored = '{"connection":"Reachable","controls":{"work_offline":false,"pause_background":true,"pause_queued_actions":true}}' | ConvertFrom-Json
+if (!(Test-LifecycleSync $lifecycleRestored $false $true -Reachable) -or
+    (Test-LifecycleSync $lifecycleRestored $false $false -Reachable)) {
+    throw 'Native lifecycle did not distinguish saved paused work from released work.'
+}
+$lifecycleRestored.controls.pause_queued_actions = $false
+if (!(Test-LifecycleSync $lifecycleRestored $false $false -Reachable)) {
+    throw 'Native lifecycle did not recognize restored online state after interruption.'
+}
+$lifecycleReader = '{"cached_content_ready":true,"cached_visible_panes":2,"focused_pane":1,"active_item":3,"tab_counts":[10,10],"outbox":4,"offline":false,"signed_out":true}' | ConvertFrom-Json
+if (!(Test-LifecycleWorkspace $lifecycleReader 3 $false $true) -or
+    (Test-LifecycleWorkspace $lifecycleReader 3 $false $false) -or
+    (Test-LifecycleWorkspace $lifecycleReader 4 $false $true)) {
+    throw 'Native lifecycle did not fence the restored signed-out workspace and exact cached item.'
+}
 $quietChoice = 'Enable quiet hours ' + [char]0x00b7 + ' '
 if ((Get-NotificationChoiceName 'Enable quiet hours' $false) -cne ($quietChoice + 'Unselected') -or
     (Get-NotificationChoiceName 'Enable quiet hours' $true) -cne ($quietChoice + 'Selected')) {
