@@ -1,0 +1,155 @@
+{
+  "scope": "Isolated Windows 11 x64 profile. Synthetic issue metadata and scoped UI Automation controls only. Source-controlled evidence contains no personal identifiers or real filesystem paths.",
+  "requirement": "DATA-02",
+  "fixture_revision": "s12-display-timezone-v1",
+  "seed": 12345,
+  "runs": [
+    {
+      "run": "e2e-1795106732186-36216",
+      "phase": "fixture guard",
+      "source_revision": "f88be8c5569a6cff62c1a7aa2cefd6e6dd03e937",
+      "driver_revision": "f88be8c5569a6cff62c1a7aa2cefd6e6dd03e937",
+      "source_dirty": false,
+      "app_sha256": "ab739d6fe4615e5674641cc217572e86f63715ac0daa96c72c979116731b743a",
+      "runner_sha256": "8a199f1bee46196c95ebf4de7838202a0511af4f7432efbdf3b1dd098723bcf6",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "S12-DISPLAY-TIMEZONE",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "status": "Fail",
+      "exit_code": 1,
+      "native_exit_code": 1,
+      "dpi": null,
+      "action_count": 0,
+      "provider_requests": 0,
+      "started_at_utc": "2026-11-19T16:45:32.186Z",
+      "finished_at_utc": "2026-11-19T16:45:41.901Z",
+      "detail": "The isolated seed returned its new fixture revision and exact UTC timestamps. The driver still expected the general reader fixture revision, so it stopped before opening the app.",
+      "raw_receipt_sha256": {
+        "result.json": "6370cdefe0554f0ca18ca8865184ec878bc508b6a5e2f863a4faf288a292097e",
+        "junit.xml": "83634daf79238ce5762c6fb9fb68c88668aeebb9d66fda2c32946fbb16d56404",
+        "binary.json": "fad13dcf4e469a4d7cdd2dd74462899b816a19b94069b53278b7aa522e943932",
+        "reader-fixture.json": "4fce13454dab1fc63dc389a294406a59462599991f76b30e2973ed374679e969",
+        "display-timezone-native.json": "f3cd5dbab9c2d319f9f2a72664dd091f04b88875a4b66c8858cb85d1e1a33e28",
+        "github-access-trace.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "run": "e2e-1795106905300-37340",
+      "phase": "static text lookup",
+      "source_revision": "f88be8c5569a6cff62c1a7aa2cefd6e6dd03e937",
+      "driver_revision": "d226151d035b1f1f4611ad1de41992c3019708cc",
+      "source_dirty": false,
+      "app_sha256": "ab739d6fe4615e5674641cc217572e86f63715ac0daa96c72c979116731b743a",
+      "runner_sha256": "8a199f1bee46196c95ebf4de7838202a0511af4f7432efbdf3b1dd098723bcf6",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "S12-DISPLAY-TIMEZONE",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "status": "Fail",
+      "exit_code": 1,
+      "native_exit_code": 1,
+      "dpi": 144,
+      "action_count": 3,
+      "provider_requests": 0,
+      "started_at_utc": "2026-11-19T16:48:25.300Z",
+      "finished_at_utc": "2026-11-19T16:48:56.400Z",
+      "detail": "The corrected seed guard passed and the cached issue opened. Windows UI Automation did not expose the expected static text name.",
+      "raw_receipt_sha256": {
+        "result.json": "c1ff8462a9aa3e28fb1c8632b76ecd9b682367ebde34fd04ea870cedcc8ae3b3",
+        "junit.xml": "60271b336a794757bd32d54411d0e8b3503cd5e4f9fb1bfb24365f4e79826a6a",
+        "binary.json": "fad13dcf4e469a4d7cdd2dd74462899b816a19b94069b53278b7aa522e943932",
+        "reader-fixture.json": "4fce13454dab1fc63dc389a294406a59462599991f76b30e2973ed374679e969",
+        "display-timezone-native.json": "7fc962b9f0a1e944817d3b8e2c6241b34be03a3be46f330a8162e4e3d6887c1f",
+        "github-access-trace.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "run": "e2e-1795107572158-40968",
+      "phase": "selected proof",
+      "source_revision": "64a9a016dd805aa92fa1cc379a97c18686c0ee34",
+      "driver_revision": "64a9a016dd805aa92fa1cc379a97c18686c0ee34",
+      "source_dirty": false,
+      "app_sha256": "feeb2ab3e11029b8051fb155e479aec9f0d554919f144848eb14ecd88688611b",
+      "runner_sha256": "e40bde44faef7c7d6e44dd52c19a316d00c10307ccaa8f217bfb85dd623850b8",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "S12-DISPLAY-TIMEZONE",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "status": "Pass",
+      "exit_code": 0,
+      "native_exit_code": 0,
+      "dpi": 144,
+      "action_count": 14,
+      "provider_requests": 0,
+      "started_at_utc": "2026-11-19T16:59:32.157Z",
+      "finished_at_utc": "2026-11-19T17:00:15.715Z",
+      "observed": {
+        "issue_number": 1,
+        "created_at_ms": 1689163200000,
+        "updated_at_ms": 1700000000000,
+        "initial_zone": "UTC",
+        "initial_label": "Created 2023-07-12 12:00 UTC (+00:00) · Updated 2023-11-14 22:13 UTC (+00:00)",
+        "selected_zone": "America/New_York",
+        "selected_label": "Created 2023-07-12 08:00 EDT (-04:00) · Updated 2023-11-14 17:13 EST (-05:00)",
+        "restarted_in_separate_process": true,
+        "offline_and_signed_out_throughout": true,
+        "label_after_restart": "Created 2023-07-12 08:00 EDT (-04:00) · Updated 2023-11-14 17:13 EST (-05:00)",
+        "final_zone": "UTC",
+        "label_restored_to_utc": "Created 2023-07-12 12:00 UTC (+00:00) · Updated 2023-11-14 22:13 UTC (+00:00)"
+      },
+      "raw_receipt_sha256": {
+        "result.json": "7fa5fc19e5ad51a2ce3de1916bbfdcd7c5baea6141468c70fb575defa73e082a",
+        "junit.xml": "314545100bfeca2b095308b1cc5994198d11bbc61e0d6fecfcde366c8017a63b",
+        "binary.json": "f87c51eba16d45831b6650f3d9911b2f61aaa4ac3dd1a5e00f10971667d96069",
+        "reader-fixture.json": "4fce13454dab1fc63dc389a294406a59462599991f76b30e2973ed374679e969",
+        "display-timezone-native.json": "b8a438fcb1ae0c6173903d33c7518c2dc53eed4f5ecb03521d716c90d095d781",
+        "github-access-trace.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "reader-restart-observation.json": "ac486146664a23fd8e6b8fb14d9e7e07b83028df303698bffe5c0e46a4aba1e1",
+        "ui-observation.json": "bd7b114917d2610d4d2563801823a294a62ba8f18fbf9e36f58d6481f4cab409"
+      }
+    }
+  ]
+}

@@ -135,6 +135,17 @@ A separate two-process reference used the same managed Windows UI Automation Inv
 
 In Threadline, the Windows AccessKit provider sends an accessibility action to GPUI's foreground executor, which dispatches it to the rendered node's handler. Threadline's app trace begins at that handler. The reference captured latency before entry into its own provider, while Threadline's data measures its own handler-to-paint interval and external end-to-end time. The published budgets still use the external timings. [Threadline measurements](evidence/sprint-12/reader-performance.json) · [Windows measurement driver](../../tools/native/windows-owned-uia.ps1) · [Windows provider entry](https://learn.microsoft.com/en-us/dotnet/framework/ui-automation/expose-a-server-side-ui-automation-provider)
 
+## Display time zone and UTC storage
+
+On Windows 11 x64 at 144 DPI, the selected `64a9a01` test app opened a cached synthetic issue while signed out and offline. The Accounts control changed the display to `America/New_York`. Windows UI Automation read the same two UTC instants with their summer and winter offsets. A separate process reopened the same issue with the selected zone. The driver then changed the zone back to UTC. The loopback server received zero requests. [Native display, restart and fixture receipts](evidence/sprint-12/display-timezone-64a9a01.json)
+
+| Cached field | Stored Unix milliseconds (UTC) | UTC display | New York display |
+| --- | ---: | --- | --- |
+| Created | 1689163200000 | 2023-07-12 12:00 UTC (+00:00) | 2023-07-12 08:00 EDT (-04:00) |
+| Updated | 1700000000000 | 2023-11-14 22:13 UTC (+00:00) | 2023-11-14 17:13 EST (-05:00) |
+
+The first driver stopped before launch because it expected the general reader fixture revision. The next run opened the correct issue and timed out reading its static text through Windows UI Automation. The final build exposed the visible date text on the accessible label. The checked-in receipt contains the synthetic observations and raw file hashes. It contains no personal identifiers or real filesystem paths. [All three attempts](evidence/sprint-12/display-timezone-64a9a01.json) · [Calendar filters, schedule overrides and UTC deadlines](../architecture/synchronization.md#time-zones)
+
 ## Local regression suites
 
 The selected build 17 revision, `e3aec22`, passed 158 unit, 161 integration and 30 UI test executions on Linux across 23, 36 and nine named cases. Formatting and strict Clippy passed for the Linux and Windows test configurations and the ordinary Windows binaries. The feature-off Windows release build completed without warnings. The offline dependency repack reproduced the tracked GPUI Component archive and registry digest. [Exact Linux receipts, lint commands and build hashes](evidence/sprint-12/validation-e3aec22.json)
