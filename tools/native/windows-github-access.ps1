@@ -61,7 +61,7 @@ function Click-AccountControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwat
 }
 
 function Set-AccessPhase([string]$Phase) {
-    if ($Phase -cnotin @('ready', 'partial', 'sso', 'denied', 'revoked', 'reader-failure', 'reader-resume',
+    if ($Phase -cnotin @('ready', 'partial', 'sso', 'denied', 'revoked', 'reader-failure', 'reader-resume', 'historical-local', 'historical-remote',
         'sync-live', 'sync-offline', 'sync-service', 'sync-throttle', 'sync-transport', 'sync-notification-send',
         'backlog-auth', 'backlog-hold', 'backlog-drain', 'backlog-concurrent',
         'pr-load', 'pr-delay', 'pr-release', 'pr-shared-hold', 'pr-shared-release', 'review-send', 'review-changed', 'review-decisions', 'review-predecessor', 'review-resume', 'thread-queue', 'thread-outdated',

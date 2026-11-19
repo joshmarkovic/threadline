@@ -18,6 +18,7 @@ mod activity;
 mod backlog;
 mod comment_dependency;
 mod concurrent;
+mod historical_reader;
 mod history;
 mod lifecycle;
 mod merge;
@@ -63,6 +64,8 @@ enum Phase {
     Sso,
     Denied,
     Revoked,
+    HistoricalLocal,
+    HistoricalRemote,
     ReaderFailure,
     ReaderResume,
     SyncLive,
@@ -129,6 +132,8 @@ impl Phase {
             "sso" => Ok(Self::Sso),
             "denied" => Ok(Self::Denied),
             "revoked" => Ok(Self::Revoked),
+            "historical-local" => Ok(Self::HistoricalLocal),
+            "historical-remote" => Ok(Self::HistoricalRemote),
             "reader-failure" => Ok(Self::ReaderFailure),
             "reader-resume" => Ok(Self::ReaderResume),
             "sync-live" => Ok(Self::SyncLive),
@@ -200,6 +205,8 @@ enum Route {
     Items,
     Item,
     ScheduledIssue,
+    HistoricalSearch,
+    HistoricalIssue,
     CommentsFirst,
     CommentsNext,
     Timeline,
@@ -299,6 +306,7 @@ struct FixtureRun {
 }
 
 pub enum TraceCheck {
+    HistoricalReader,
     Observe,
     AccountJourney,
     OfflineReader,
@@ -395,6 +403,7 @@ impl AccessFixture {
             TraceCheck::NativeActivity => activity::trace(&records),
             TraceCheck::CommentDependency => comment_dependency::trace(&records),
             TraceCheck::IssueEditConflict => writes::issue_conflict_trace(&records),
+            TraceCheck::HistoricalReader => historical_reader::trace(&records),
             TraceCheck::ReaderResume => complete_reader_resume(&records),
             TraceCheck::SyncJourney => complete_sync_journey(&records),
             TraceCheck::NotificationSchedule => complete_notification_schedule(&records),
@@ -812,7 +821,8 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
             Some("HTTP/1.1"),
         ) => Route::OpenPullIndex,
         (Some("POST"), Some("/graphql"), Some("HTTP/1.1")) => Route::Graphql,
-        (Some("GET"), Some(target), Some("HTTP/1.1")) => review_decisions::get(phase, target)
+        (Some("GET"), Some(target), Some("HTTP/1.1")) => historical_reader::get(phase, target)
+            .or_else(|| review_decisions::get(phase, target))
             .or_else(|| comment_dependency::get(phase, target))
             .or_else(|| activity::read_route(phase, target))
             .or_else(|| lifecycle::read_route(phase, target))
@@ -974,6 +984,9 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
     }
     if let Some(backlog) = backlog::response(phase, route) {
         return backlog;
+    }
+    if let Some(reply) = historical_reader::response(phase, route) {
+        return reply;
     }
     if let Some(history) = history::response(phase, route) {
         return history;

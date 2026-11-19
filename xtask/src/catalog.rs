@@ -28,6 +28,9 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == "S08-REVIEW-PREDECESSOR" {
         return Some("s08-native-review-predecessor-v1");
     }
+    if case == "S12-HISTORICAL-READER" {
+        return Some("s12-historical-reader-v1");
+    }
     if case == "S08-THREAD-QUEUE" {
         return Some("s08-native-thread-queue-v1");
     }
@@ -199,6 +202,7 @@ pub fn associations(case: &str) -> Associations {
         "S04-READER-PERF" | "S12-PHYSICAL-READER" => {
             ("CACHE-01;SEARCH-01;WORKSPACE-08;TEST-08", "AC-35")
         }
+        "S12-HISTORICAL-READER" => ("CACHE-04;SEARCH-01;SEARCH-02;OFFLINE-03;TEST-04", "AC-04"),
         "S12-READER-CONCURRENT" => (
             "CACHE-01;SEARCH-01;SYNC-06;WORKSPACE-08;TEST-08",
             "AC-35;AC-48",

@@ -393,6 +393,7 @@ fn known_case(lane: Lane, case: &str) -> bool {
                 "S04-READER-PERF"
                     | "S12-PHYSICAL-READER"
                     | "S12-READER-CONCURRENT"
+                    | "S12-HISTORICAL-READER"
                     | "S12-NATIVE-LIFECYCLE"
             )
             | (Lane::E2e, "S05-WINDOWS-SYNC")
@@ -415,6 +416,17 @@ mod tests {
 
     fn arguments(args: &[&str]) -> Vec<String> {
         args.iter().map(|arg| (*arg).into()).collect()
+    }
+
+    #[test]
+    fn historical_reader_is_admitted_in_the_native_e2e_lane() {
+        let case = "S12-HISTORICAL-READER";
+        let options = parse(&arguments(&[
+            "test", "e2e", "--suite", "full", "--case", case,
+        ]))
+        .unwrap();
+        assert_eq!(options.case.as_deref(), Some(case));
+        assert!(parse(&arguments(&["test", "integration", "--case", case])).is_err());
     }
 
     #[test]

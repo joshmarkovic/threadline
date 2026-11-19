@@ -610,6 +610,8 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
         Some(id) => {
             let mode = if matches!(id, "S07-ISSUE-CONFLICT" | "S08-COMMENT-DEPENDENCY") {
                 Some(NativeMode::WindowsIssueWrites)
+            } else if id == "S12-HISTORICAL-READER" {
+                Some(NativeMode::WindowsReaderResume)
             } else if id == "S06-SHARED-PR-PANES" {
                 Some(NativeMode::WindowsPullRequest)
             } else if id == "S11-NATIVE-ACTIVITY" {
@@ -864,6 +866,7 @@ fn native_driver(
         .map_err(|error| NativeError::Blocked(error.to_string()))?;
     let reader_proof = match mode {
         NativeMode::WindowsReaderOffline => Some("Offline"),
+        NativeMode::WindowsReaderResume if id == "S12-HISTORICAL-READER" => Some("Historical"),
         NativeMode::WindowsReaderResume => Some("Resume"),
         NativeMode::WindowsReaderPerformance if id == "S12-PHYSICAL-READER" => {
             Some("PerformancePhysical")
@@ -1062,6 +1065,9 @@ fn native_driver(
                     .is_some_and(|json| json["backlog_checks_passed"] == true) =>
             {
                 TraceCheck::LargeWorkspaceBacklog
+            }
+            (Status::Pass, NativeMode::WindowsReaderResume) if id == "S12-HISTORICAL-READER" => {
+                TraceCheck::HistoricalReader
             }
             (Status::Pass, NativeMode::WindowsReaderResume) => TraceCheck::ReaderResume,
             (Status::Pass, NativeMode::WindowsSync) => TraceCheck::SyncJourney,
