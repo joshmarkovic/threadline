@@ -20,7 +20,7 @@ function Initialize-ReaderProfile([string]$Profile, [string]$Scale) {
         $seeder.Dispose()
     }
     $receipt = [IO.File]::ReadAllText($path) | ConvertFrom-Json
-    $revision = if ($Scale -eq 'section-16-backlog') { 's12-large-workspace-v1' } else { 's04-reader-v1' }
+    $revision = if ($Scale -eq 'section-16-backlog') { 's12-large-workspace-v2' } else { 's04-reader-v1' }
     if ($receipt.fixture_revision -cne $revision -or $receipt.scale -cne $Scale -or
         $receipt.seed -ne $script:Seed -or !$receipt.offline) {
         throw 'The reader fixture does not match the requested isolated workload.'

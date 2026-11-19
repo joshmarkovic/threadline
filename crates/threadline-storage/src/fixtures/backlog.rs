@@ -1,7 +1,7 @@
 use super::*;
 use crate::writes::{WriteIntent, WriteSubmission};
 
-pub const LARGE_WORKSPACE_REVISION: &str = "s12-large-workspace-v1";
+pub const LARGE_WORKSPACE_REVISION: &str = "s12-large-workspace-v2";
 pub const LARGE_WORKSPACE_WRITES: usize = 12;
 pub const BACKLOG_USER: u64 = 41;
 pub const BACKLOG_REPOSITORY: u64 = 71;
@@ -18,16 +18,22 @@ pub fn backlog_comment(index: usize) -> String {
     format!("Threadline synthetic backlog action {index}.")
 }
 
-pub(super) fn seed_writes(store: &Store, account: AccountId, issue: ItemId) -> Result<()> {
+pub(super) fn seed_writes(
+    store: &Store,
+    account: AccountId,
+    issue: ItemId,
+    blocked_issue: ItemId,
+) -> Result<()> {
     let first = operation(0);
     for index in 0..LARGE_WORKSPACE_WRITES {
+        // The intentionally unresolved dependency must hold only its own target.
         let dependency = [first.as_str()];
         let dependencies: &[&str] = if index == 1 { &dependency } else { &[] };
         store.submit_write(
             account,
             WriteSubmission {
                 id: &operation(index),
-                item: issue,
+                item: if index < 2 { blocked_issue } else { issue },
                 intent: &WriteIntent::CreateComment {
                     body: backlog_comment(index),
                 },

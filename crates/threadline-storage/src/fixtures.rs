@@ -338,7 +338,13 @@ fn populate_profile(store: &Store, seed: u64, scale: Scale, profile: Profile) ->
         enroll_reader(store, account, repository, seed, item_count, profile)?;
     }
     let typed_outbox_count = if backlog {
-        backlog::seed_writes(store, account, discussion)?;
+        let [_, _, blocked, ..] = issue_targets.as_slice() else {
+            return Err(Error::Conflict(
+                "The backlog fixture needs independent issue targets",
+            ));
+        };
+        let blocked_issue = ItemId(*blocked);
+        backlog::seed_writes(store, account, discussion, blocked_issue)?;
         let mut settings = store.sync_settings(account)?;
         settings.controls.pause_background = true;
         store.save_sync_settings(account, &settings)?;

@@ -1,8 +1,12 @@
 use rusqlite::Connection;
+use std::num::NonZeroU64;
 use threadline_storage::{
     Store,
-    fixtures::{Scale, populate},
+    access::{AccessState, CredentialKind, DiscoveryState, RepositoryObservation, RepositoryObservationSource},
+    fixtures::{Scale, backlog_comment, populate, populate_large_workspace},
+    queue::CancelResult,
     resources::{ResourceFamily, ResourceKey, ResourceTarget},
+    writes::WriteIntent,
 };
 
 fn seed() -> u64 {
@@ -109,4 +113,41 @@ fn section_16_fixture_contains_full_persisted_workload() {
         family: ResourceFamily::Comments,
     };
     assert_eq!(store.resource_records(discussion).unwrap().len(), 5_005);
+}
+
+#[test]
+fn large_workspace_cancelled_dependency_leaves_an_independent_ordered_backlog() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("section-16-backlog.sqlite");
+    let store = Store::open(&path).unwrap();
+    let fixture = populate_large_workspace(&store, seed()).unwrap();
+    let account = fixture.account;
+    const CANCELLED: &str = "00000000-0000-4000-8001-000000000000";
+    const DEPENDENT: &str = "00000000-0000-4000-8001-000000000001";
+    const FIRST: &str = "00000000-0000-4000-8001-000000000002";
+    assert_eq!(store.cancel_operation(account, CANCELLED).unwrap(), CancelResult::Cancelled);
+    assert!(store.claim_write(account, 20, 1000).unwrap().is_none());
+    drop(store);
+
+    let store = Store::open(&path).unwrap();
+    let previous = store.github_access_profile(account, "fixture-org").unwrap().unwrap();
+    let profile = store.reserve_access_profile_credential(
+        account, NonZeroU64::new(41).unwrap(), "fixture-user", "fixture-org",
+        CredentialKind::FineGrained, Some(&previous),
+    ).unwrap();
+    store.install_current_credential(&profile, || Ok::<_, ()>(())).unwrap().unwrap();
+    store.observe_github_repository(&profile, &RepositoryObservation {
+        provider_id: NonZeroU64::new(71).unwrap(), owner: "fixture-org", name: "private",
+        private: true, source: RepositoryObservationSource::Direct,
+    }, 22).unwrap();
+    store.record_access_result(&profile, profile.kind, AccessState::Readable, DiscoveryState::Unchecked, 23).unwrap();
+    store.set_dispatch_controls(account, false, false).unwrap();
+
+    assert_eq!(store.dispatch_hold(account, DEPENDENT).unwrap().as_deref(), Some("dependency"));
+    let first = store.claim_write(account, 24, 1000).unwrap().unwrap();
+    assert_eq!(first.operation_id(), FIRST);
+    assert_eq!(first.route.item, fixture.long_discussion);
+    assert_eq!(first.route.number.get(), 1);
+    assert_eq!(first.intent, WriteIntent::CreateComment { body: backlog_comment(2) });
+    assert!(store.claim_write(account, 25, 1000).unwrap().is_none());
 }
