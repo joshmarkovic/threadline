@@ -71,8 +71,15 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
         param($sync) !$sync.controls.work_offline -and $sync.controls.pause_background -and $sync.controls.pause_queued_actions
     }
     Click-AccountControl $Window 'sync-check-now'
-    $null = Wait-Sync 'reachability using the native protected credential while submissions are paused' {
-        param($sync) $sync.connection -ceq 'Reachable' -and !$sync.controls.work_offline -and $sync.controls.pause_queued_actions
+    try {
+        $null = Wait-Sync 'reachability using the native protected credential while submissions are paused' {
+            param($sync) $sync.connection -ceq 'Reachable' -and !$sync.controls.work_offline -and $sync.controls.pause_queued_actions
+        }
+    } catch {
+        Stop-ThroughUi
+        $diagnostic = Read-NativeLifecycle $Profile 'probe' 'native-lifecycle-probe-diagnostic.json'
+        $script:report.probe_diagnostic = $diagnostic.provider_probe
+        throw
     }
     Stop-ThroughUi
 

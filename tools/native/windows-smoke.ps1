@@ -210,7 +210,7 @@ function Get-ThreadlineArguments([string]$Observation, [switch]$OpenReview, [str
     return $arguments
 }
 
-function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenReview, [string]$SeedReader, [switch]$ReaderIdle, [switch]$SeedQuietEvent, [switch]$ReaderBacklog, [ValidateSet('seed','inspect','cleanup')][string]$Lifecycle, [ValidateSet('seed','inspect')][string]$ActivityFixture) {
+function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenReview, [string]$SeedReader, [switch]$ReaderIdle, [switch]$SeedQuietEvent, [switch]$ReaderBacklog, [ValidateSet('seed','inspect','cleanup','probe')][string]$Lifecycle, [ValidateSet('seed','inspect')][string]$ActivityFixture) {
     $info = New-Object System.Diagnostics.ProcessStartInfo
     $info.FileName = $script:Binary
     $info.UseShellExecute = $false

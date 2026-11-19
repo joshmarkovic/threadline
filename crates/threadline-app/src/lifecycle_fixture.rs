@@ -167,6 +167,16 @@ fn seed(scope: FixtureScope) -> Result<serde_json::Value, String> {
 
 fn inspect(scope: &FixtureScope, store: &Store, stage: &str) -> Result<serde_json::Value, String> {
     let mut snapshot = lifecycle_checkpoint(store, stage).map_err(|error| error.to_string())?;
+    snapshot["protected_reference_matches"] = store
+        .github_access_profiles()
+        .map_err(|_| ERROR)?
+        .iter()
+        .any(|profile| {
+            profile.user_id.get() == BACKLOG_USER
+                && profile.owner_scope == BACKLOG_OWNER
+                && profile.credential_ref == scope.credential.name
+        })
+        .into();
     snapshot["protected_token_present"] = NativeCredentialStore
         .read(&scope.credential)
         .map_err(|_| ERROR)?
@@ -182,6 +192,36 @@ fn run_command(stage: &str, report: &Path) -> Result<(), String> {
         "inspect" if scope.marked() => {
             let store = Store::open_profile(&scope.root).map_err(|_| ERROR)?;
             inspect(&scope, &store, "closed")?
+        }
+        "probe" if scope.marked() => {
+            let store = std::sync::Arc::new(Store::open_profile(&scope.root).map_err(|_| ERROR)?);
+            let account = store
+                .active_github_account()
+                .map_err(|_| ERROR)?
+                .ok_or(ERROR)?;
+            let profile = store
+                .github_access_profile(account, BACKLOG_OWNER)
+                .map_err(|_| ERROR)?
+                .filter(|profile| {
+                    profile.user_id.get() == BACKLOG_USER
+                        && profile.credential_ref == scope.credential.name
+                })
+                .ok_or(ERROR)?;
+            let service = crate::accounts::AccountService::new(store).ok_or(ERROR)?;
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|_| ERROR)?;
+            let cancel = threadline_core::sync::Cancellation::new();
+            let result = runtime.block_on(service.reader_session_with_guidance(&profile, &cancel));
+            let outcome = match result {
+                Ok((session, _)) if session.user().id.get() == BACKLOG_USER => "Verified",
+                Err(crate::reader::ReaderError::CredentialUnavailable) => "CredentialUnavailable",
+                Err(crate::reader::ReaderError::ProtectedStore(_)) => "ProtectedStore",
+                Err(crate::reader::ReaderError::Remote(_)) => "Provider",
+                _ => "Unexpected",
+            };
+            serde_json::json!({"provider_probe": outcome})
         }
         "cleanup" if scope.marked() => {
             let vault = LifecycleVault(scope.credential);
