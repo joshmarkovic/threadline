@@ -115,6 +115,7 @@ $clipboardBackup = $null
 $copiedClipboardSequence = $null
 $toastFixture = $null
 $toastSubmissionAttempted = $false
+$sidebarListener = $null
 $script:UseOwnedUiAutomation = $false
 $script:UseSeededFixtureAuth = $ReaderProof -in @('Resume', 'CursorRecovery', 'Historical', 'Sync', 'RateLimit', 'NotificationSchedule', 'PullRequest', 'SharedPullRequest', 'PullRequestMergeState', 'MixedCatchup', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ThreadPlacement', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'History', 'CommentDependency', 'IssueConflict', 'IssuePropagation', 'Writes', 'WriteSurface', 'PerformanceConcurrent', 'NativeActivity')
 
@@ -270,7 +271,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     if ($ToastProof -and $null -ne $script:toastFixture) {
         $info.EnvironmentVariables['THREADLINE_TEST_TOAST_TOKEN'] = $script:toastFixture.Token
     }
-    if ($AccessProof -or ($ReaderProof -and $ReaderProof -ne 'SidebarBadges')) {
+    if ($AccessProof -or $ReaderProof) {
         $info.EnvironmentVariables['THREADLINE_E2E_GITHUB_ADDR'] = $script:AccessAddress
     }
     if ($script:UseSeededFixtureAuth -or $ReaderBacklog) { $info.EnvironmentVariables['THREADLINE_E2E_FIXTURE_AUTH'] = '1' }
@@ -952,6 +953,12 @@ try {
     if (!$ProfileDir) {
         $ProfileDir = Join-Path ([IO.Path]::GetTempPath()) ('threadline-e2e-' + [guid]::NewGuid().ToString('N'))
     }
+    if ($ReaderProof -eq 'SidebarBadges') {
+        # E2E reader observations require an isolated provider. The offline fixture must never contact it.
+        $sidebarListener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+        $sidebarListener.Start(1)
+        $AccessAddress = '127.0.0.1:' + $sidebarListener.LocalEndpoint.Port
+    }
     if ($AccessProof -or ($ReaderProof -and $ReaderProof -ne 'SidebarBadges')) {
         $fixtureAddress = [regex]::Match($AccessAddress, '^127\.0\.0\.1:([1-9][0-9]{0,4})$')
         if ($Measure -or $PlatformProof -or $ToastProof -or ($AccessProof -and $ReaderProof) -or
@@ -1157,6 +1164,10 @@ try {
         }
         $report.detail = 'Exercised the native window, Markdown selection, independent focus and tabs, review input, and both splitters.'
     }
+    if ($null -ne $sidebarListener) {
+        $report.offline_fixture_received_connection = $sidebarListener.Pending()
+        if ($report.offline_fixture_received_connection) { throw 'The offline workspace contacted the isolated GitHub endpoint.' }
+    }
     $report.status = 'Pass'
 } catch {
     if (($AccessProof -or $ReaderProof) -and $app -and !$app.HasExited -and
@@ -1174,6 +1185,7 @@ try {
         } catch { Write-Warning "Could not capture the failure window: $_" }
     }
 } finally {
+    if ($null -ne $sidebarListener) { $sidebarListener.Stop() }
     if ($null -ne $copiedClipboardSequence -and
         [ThreadlineWinInput]::GetClipboardSequenceNumber() -eq $copiedClipboardSequence) {
         try {
