@@ -110,6 +110,12 @@ The driver measures a fresh app process with a fresh isolated profile. It does n
 
 Run `cargo xtask test e2e --suite full --case S12-READER-CONCURRENT --binary <optimized-e2e-binary>` to repeat the twenty cached opens, searches, and tab switches with scheduled reads in flight. The isolated Section 16 fixture keeps queued writes paused. Each accepted input must reach its first useful paint while a different verified loopback feed request is still waiting for a response. The report retains completed samples if a native input or a matching request becomes unavailable. Use the same optimized binary, desktop, and input source for the offline comparison.
 
+## Windows restart and interrupted writes
+
+Run `cargo xtask test e2e --suite full --case S12-NATIVE-LIFECYCLE --binary <optimized-e2e-binary> --seed 12345` from a Windows user session with Credential Manager available. The case uses a new temporary private workspace, the loopback provider and a unique synthetic protected credential. It uses the normal account, synchronization and Outbox controls. The runner terminates only the app process it launched, after the fixture received the exact known comment and while its response is held.
+
+Allow about three minutes for the normal dispatch lease to expire. The driver checks the restored workspace before an authenticated startup response and compares the closed database before and after interruption and normal sign-out. It records one uncertain request, retained dependents and draft, and the unchanged prior delivery receipt. It removes only its synthetic Credential Manager entry. The prior delivery is seed data. Review installed notification delivery and the separate disk-fault checks in the sprint reports.
+
 ## Early Linux and macOS checks
 
 The Linux driver needs a real X11 session, xdotool, xclip, ImageMagick with PNG support, jq, ripgrep, and GNU timeout. It uses the existing X11 clipboard and can preserve plain text. Use a disposable desktop if the clipboard contains other formats. WSLg results describe the WSLg/XWayland configuration. Run Ubuntu GNOME Wayland and X11 separately during Linux release verification.

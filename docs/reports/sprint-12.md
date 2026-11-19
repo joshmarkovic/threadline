@@ -72,6 +72,24 @@ E2E-014 failed on optimized app and driver `b88773b` at 96 DPI. The 50,000-item,
 
 The reader now constrains tab width independently of the downloaded title and keeps the full accessible name. The driver retains partial timing receipts and records the app's first paint of both populated panes alongside the external startup measurement. The concurrent Section 16 budget remains open. [Native driver](../../tools/native/windows-cached-reader.ps1)
 
+### Large workspace and queued actions
+
+The `4700e75` replay completed all 60 offline samples and cancelled the first queued action. It stopped before the first eligible send. SQLite held the remaining actions in order behind an unresolved dependency on the same issue. The revised fixture places the cancelled action and its dependent on a different synthetic issue. A storage test reopened the seeded profile and verified that the dependency remained held and the independent action became eligible. [Original failure and revised run](evidence/sprint-12/reader-performance.json)
+
+The `d524740` Windows 11 run completed the offline and backlog journeys with 117 native actions, including 60 timed inputs. While the simulator held the first authorized comment response, the app switched cached tabs in 2088.95 ms and cancelled another queued action in 2405.49 ms. The trace recorded 39 authenticated requests and exactly nine successful comment writes. The cancelled and dependent actions made no write requests. The unresolved count fell from 901 to 890 after two cancellations and nine confirmations. [Canonical E2E-014 evidence](evidence/sprint-12/reader-performance.json)
+
+| Optimized app and fixture | Cached open p95 | Local search p95 | Cached tab p95 | Warm useful startup |
+| --- | ---: | ---: | ---: | ---: |
+| Budget | <100 ms | <200 ms | <100 ms | <2000 ms |
+| `4700e75`, v1 | 2148.26 ms | 2119.01 ms | 2089.30 ms | 13874.84 ms |
+| `d524740`, v2 | 2154.68 ms | 2165.65 ms | 2108.55 ms | 13236.21 ms |
+
+Both runs missed the four external timing budgets. The v2 warm process reached its first useful two-pane paint at 13214.56 ms from the driver's start, with 11660.75 ms from app entry. The driver verified the report 23.28 ms after that paint. The v2 run passed the recorded idle redraw, working-set, three GPU counter samples, and local package-size checks at 96 DPI. The 60 samples in the table ran offline. The single tab switch during the held write supplies a separate overlap measurement. [Budget measurements and timing attribution](evidence/sprint-12/reader-performance.json)
+
+### Portable regression
+
+On clean `8da02ce`, Linux x64 under WSL2 passed 23 unit scenarios with 100 reported tests, 36 integration scenarios with 144 tests, and nine UI scenarios with 18 tests. The canonical invocations returned exit 0. Formatting and strict Clippy passed. [Invocation and receipt hashes](evidence/sprint-12/portable-release-validation.json)
+
 ## Local regression suites
 
 Formatting and strict Clippy passed on clean `f06de5e` in WSL Linux. Clippy checked all workspace targets with the app's E2E feature enabled and warnings treated as errors. The canonical runner used seed 12345 for the local test lanes. [Commands and test receipts](evidence/sprint-12/local-suite-validation.json)

@@ -1,0 +1,112 @@
+{
+  "source_revision": "8da02ce3720542ee6ac99b0eb186af29c05554b4",
+  "lanes": [
+    {
+      "run": "integration-1795048359567-2295863",
+      "source_revision": "8da02ce3720542ee6ac99b0eb186af29c05554b4",
+      "source_dirty": false,
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "Wayland and X11 environment"
+      },
+      "lane": "integration",
+      "seed": 12345,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "integration",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "cargo_lock_sha256": "082539453360bf3f03c3bda8861f85e9ea384536457a9dfd27b5143e05890f9a",
+      "cases_passed": 36,
+      "tests_reported": 144,
+      "started_at_unix_ms": 1795048359567,
+      "finished_at_unix_ms": 1795048646166,
+      "status": "Pass",
+      "exit_code": 0,
+      "result_sha256": "2c8a536d89996e7684c8be647631f073af36bf8de8ec676999f5baafcd2e59c6"
+    },
+    {
+      "run": "ui-1795048646562-2303279",
+      "source_revision": "8da02ce3720542ee6ac99b0eb186af29c05554b4",
+      "source_dirty": false,
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "Wayland and X11 environment"
+      },
+      "lane": "ui",
+      "seed": 12345,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "ui",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "cargo_lock_sha256": "082539453360bf3f03c3bda8861f85e9ea384536457a9dfd27b5143e05890f9a",
+      "cases_passed": 9,
+      "tests_reported": 18,
+      "started_at_unix_ms": 1795048646561,
+      "finished_at_unix_ms": 1795048840078,
+      "status": "Pass",
+      "exit_code": 0,
+      "result_sha256": "2ecc6ac53ee75aeba3d0064e2b0ee632ed4dc7924a796ec7f84a3b798bf98699"
+    },
+    {
+      "run": "unit-1795048249335-2293483",
+      "source_revision": "8da02ce3720542ee6ac99b0eb186af29c05554b4",
+      "source_dirty": false,
+      "host": {
+        "os": "linux",
+        "architecture": "x86_64",
+        "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+        "display_session": "Wayland and X11 environment"
+      },
+      "lane": "unit",
+      "seed": 12345,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "unit",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "cargo_lock_sha256": "082539453360bf3f03c3bda8861f85e9ea384536457a9dfd27b5143e05890f9a",
+      "cases_passed": 23,
+      "tests_reported": 100,
+      "started_at_unix_ms": 1795048249335,
+      "finished_at_unix_ms": 1795048359174,
+      "status": "Pass",
+      "exit_code": 0,
+      "result_sha256": "53a107f168852cc6224a1cfeee096aac623e5fbdf23622da496e6eaa1f0f5027"
+    }
+  ],
+  "format": {
+    "status": "Pass",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "clippy": {
+    "status": "Pass",
+    "log_sha256": "eeb87bbc99c7aa8b945e113fff80f48c3f622e2136c2583cf76100ae32a57214"
+  }
+}

@@ -354,5 +354,546 @@
     "http_count": 0,
     "backlog": "Not run",
     "persisted_timing_samples": null
-  }
+  },
+  "large_workspace_followups": [
+    {
+      "run": "e2e-1795047839382-38688",
+      "source_revision": "4700e75922950e0ec05f052bdb7e00e73f3b4293",
+      "source_dirty": false,
+      "app_sha256": "e65479c522ee9d343bd0e1fe5166906b4487cbdcfd5b433d08c1bb6d812e8de9",
+      "app_size_bytes": 44798464,
+      "app_version": "0.1.0",
+      "cargo_lock_sha256": "082539453360bf3f03c3bda8861f85e9ea384536457a9dfd27b5143e05890f9a",
+      "fixture_revision": "s12-large-workspace-v1",
+      "seed": 12345,
+      "status": "Fail",
+      "exit_code": 1,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-014",
+          "--binary",
+          "<binary-path>",
+          "--artifact",
+          "<artifact-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "host": {
+        "os": "windows",
+        "architecture": "x86_64",
+        "version": "Microsoft Windows [Version 10.0.22631.7652]",
+        "display_session": "Windows desktop availability is checked by native driver"
+      },
+      "started_at_unix_ms": 1795047839381,
+      "finished_at_unix_ms": 1795048176024,
+      "detail": "Timed out waiting for the owned loopback simulator accepted the first eligible request.",
+      "dpi": 96,
+      "display": {
+        "width": 2560,
+        "height": 1600
+      },
+      "fixture": {
+        "items": 50000,
+        "comments": 250000,
+        "open_tabs": 20,
+        "outbox_count": 1000,
+        "typed_outbox_count": 12,
+        "unresolved_outbox": 901
+      },
+      "action_count": 112,
+      "runtime": {
+        "initial_offline_start_ms": 4519.4658,
+        "initial_offline_start_timing": {
+          "status": "Correlated",
+          "process_start_call_ms": 1860.4153000000001,
+          "app_ready_ms": 1818.2304,
+          "launch_to_cached_panes_paint_ms": 4421.5499,
+          "app_start_to_cached_panes_paint_ms": 2536.0578,
+          "paint_to_verified_receipt_ms": 101.14460000000001
+        },
+        "initial_offline_peak_working_set_bytes": 96436224,
+        "warm_start_ms": 13874.8385,
+        "warm_start_timing": {
+          "status": "Correlated",
+          "process_start_call_ms": 1897.2736,
+          "app_ready_ms": 11450.6207,
+          "launch_to_cached_panes_paint_ms": 13849.4491,
+          "app_start_to_cached_panes_paint_ms": 11927.5879,
+          "paint_to_verified_receipt_ms": 27.0012
+        },
+        "warm_process_id": 46836,
+        "idle_frames": {
+          "pid": 46836,
+          "settle_ms": 2000,
+          "sample_ms": 3000,
+          "draws_per_second": [
+            0,
+            0,
+            0
+          ],
+          "presents_per_second": [
+            0,
+            0,
+            0
+          ]
+        },
+        "idle_working_set_bytes": 92655616,
+        "peak_working_set_bytes": 100073472,
+        "gpu_memory": {
+          "idle": {
+            "dedicated_bytes": 0,
+            "shared_bytes": 0
+          },
+          "after_actions": {
+            "dedicated_bytes": 0,
+            "shared_bytes": 0
+          },
+          "after_drain": null
+        },
+        "package": {
+          "bytes": 10883542,
+          "sha256": "95c420314ed4e8236720554bcd27eef636e0f1838853ac1668012064d0ac1aba"
+        }
+      },
+      "backlog": {
+        "process_id": 44960,
+        "held_action": 2,
+        "confirmed": null
+      },
+      "offline_checks_passed": true,
+      "backlog_checks_passed": null,
+      "budgets": {
+        "warm_start_ms": {
+          "value": 13874.8385,
+          "limit": 2000,
+          "status": "Fail"
+        },
+        "idle_redraw": {
+          "status": "Pass"
+        },
+        "idle_working_set_bytes": {
+          "value": 92655616,
+          "limit": 209715200,
+          "status": "Pass"
+        },
+        "cached_open": {
+          "sample_count": 20,
+          "p95_ms": 2148.2592,
+          "limit_ms": 100,
+          "status": "Fail"
+        },
+        "local_search": {
+          "sample_count": 20,
+          "p95_ms": 2119.0094,
+          "limit_ms": 200,
+          "status": "Fail"
+        },
+        "cached_tab_switch": {
+          "sample_count": 20,
+          "p95_ms": 2089.3042,
+          "limit_ms": 100,
+          "status": "Fail"
+        },
+        "peak_working_set_bytes": {
+          "value": 100073472,
+          "limit": 471859200,
+          "status": "Pass"
+        },
+        "gpu_memory_bytes": {
+          "value": 0,
+          "sample_count": 2,
+          "limit": 268435456,
+          "status": "Blocked"
+        },
+        "package_bytes": {
+          "value": 10883542,
+          "limit": 52428800,
+          "status": "Pass"
+        }
+      },
+      "attribution": {
+        "cached_open": {
+          "correlated_count": 20,
+          "input_call_p95_ms": 2015.1576,
+          "handler_to_useful_paint_p95_ms": 107.5977,
+          "input_to_useful_paint_p95_ms": 2120.8534
+        },
+        "local_search": {
+          "correlated_count": 20,
+          "input_call_p95_ms": 2013.7724,
+          "handler_to_useful_paint_p95_ms": 64.7072,
+          "input_to_useful_paint_p95_ms": 2071.4528
+        },
+        "cached_tab_switch": {
+          "correlated_count": 20,
+          "input_call_p95_ms": 2015.0449,
+          "handler_to_useful_paint_p95_ms": 37.0869,
+          "input_to_useful_paint_p95_ms": 2049.8154999999997
+        }
+      },
+      "trace": [
+        {
+          "phase": "backlog_auth",
+          "route": "repository",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "backlog_auth",
+          "route": "user",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "backlog_hold",
+          "route": "user",
+          "status": 200,
+          "count": 1
+        }
+      ],
+      "receipt_sha256": {
+        "result.json": "0fa6ea78d38e428321bcf500302181a291cd0f2368c7fe9a7d31e578ac05ab43",
+        "binary.json": "045756150d82d105bae897b4d9d332eec1ae5250c196a5a472cedb46e04336c7",
+        "large-workspace-native.json": "d2665240516f5385a040a7a352f539201876575394d700ad312c60faf5925694",
+        "github-access-trace.json": "94b57f3dfe65baa09935773942526cb2a4e9f6fa5795844f24d12eba000a9902",
+        "reader-restart-observation.json": "317f81c440a0493eca45498d376728ac9a85a880f0ee1ebe27f0253a6671e72b",
+        "reader-fixture.json": "a7e7f948127275d6e57aaf80fea546e523e6d8e05be410e40df720c6084c8a1b",
+        "reader-restart-observation.idle.json": "09c3e12bb9d3545affdd0fb330f4d754056f25a18cbd250298434c21a23d3485"
+      }
+    },
+    {
+      "run": "e2e-1795048688784-21856",
+      "source_revision": "d524740f3bc3504d69b975dce597e16eeb0ede6a",
+      "source_dirty": false,
+      "app_sha256": "95a3985524fd5414d609aa4aa38b46902afe009691e0773f3800b5f80e8278c8",
+      "app_size_bytes": 44975104,
+      "app_version": "0.1.0",
+      "cargo_lock_sha256": "082539453360bf3f03c3bda8861f85e9ea384536457a9dfd27b5143e05890f9a",
+      "fixture_revision": "s12-large-workspace-v2",
+      "seed": 12345,
+      "status": "Fail",
+      "exit_code": 1,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-014",
+          "--binary",
+          "<binary-path>",
+          "--artifact",
+          "<artifact-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "host": {
+        "os": "windows",
+        "architecture": "x86_64",
+        "version": "Microsoft Windows [Version 10.0.22631.7652]",
+        "display_session": "Windows desktop availability is checked by native driver"
+      },
+      "started_at_unix_ms": 1795048688783,
+      "finished_at_unix_ms": 1795049066582,
+      "detail": "At least one Section 16 large-workspace budget failed.",
+      "dpi": 96,
+      "display": {
+        "width": 2560,
+        "height": 1600
+      },
+      "fixture": {
+        "items": 50000,
+        "comments": 250000,
+        "open_tabs": 20,
+        "outbox_count": 1000,
+        "typed_outbox_count": 12,
+        "unresolved_outbox": 901
+      },
+      "action_count": 117,
+      "runtime": {
+        "initial_offline_start_ms": 3747.4318000000003,
+        "initial_offline_start_timing": {
+          "status": "Correlated",
+          "process_start_call_ms": 1538.727,
+          "app_ready_ms": 1674.5599,
+          "launch_to_cached_panes_paint_ms": 3713.4724,
+          "app_start_to_cached_panes_paint_ms": 2153.268,
+          "paint_to_verified_receipt_ms": 42.755700000000004
+        },
+        "initial_offline_peak_working_set_bytes": 95850496,
+        "warm_start_ms": 13236.2144,
+        "warm_start_timing": {
+          "status": "Correlated",
+          "process_start_call_ms": 1531.8538,
+          "app_ready_ms": 11199.1072,
+          "launch_to_cached_panes_paint_ms": 13214.5617,
+          "app_start_to_cached_panes_paint_ms": 11660.749600000001,
+          "paint_to_verified_receipt_ms": 23.282
+        },
+        "warm_process_id": 32240,
+        "idle_frames": {
+          "pid": 32240,
+          "settle_ms": 2000,
+          "sample_ms": 3000,
+          "draws_per_second": [
+            0,
+            0,
+            0
+          ],
+          "presents_per_second": [
+            0,
+            0,
+            0
+          ]
+        },
+        "idle_working_set_bytes": 93753344,
+        "peak_working_set_bytes": 101777408,
+        "gpu_memory": {
+          "idle": {
+            "dedicated_bytes": 0,
+            "shared_bytes": 0
+          },
+          "after_actions": {
+            "dedicated_bytes": 0,
+            "shared_bytes": 0
+          },
+          "after_drain": {
+            "dedicated_bytes": 0,
+            "shared_bytes": 0
+          }
+        },
+        "package": {
+          "bytes": 11045509,
+          "sha256": "bbcb2b3c12193df8aa6215053be948437f0351b3ebc3f4cd8294df7b89a846b4"
+        }
+      },
+      "backlog": {
+        "process_id": 44248,
+        "held_action": 2,
+        "confirmed": 9,
+        "cached_navigation_ms": 2088.951,
+        "cancellation_ms": 2405.4884,
+        "overlap_working_set_bytes": 101642240,
+        "unresolved_after": 890
+      },
+      "offline_checks_passed": true,
+      "backlog_checks_passed": true,
+      "budgets": {
+        "warm_start_ms": {
+          "value": 13236.2144,
+          "limit": 2000,
+          "status": "Fail"
+        },
+        "idle_redraw": {
+          "status": "Pass"
+        },
+        "idle_working_set_bytes": {
+          "value": 93753344,
+          "limit": 209715200,
+          "status": "Pass"
+        },
+        "cached_open": {
+          "sample_count": 20,
+          "p95_ms": 2154.6796,
+          "limit_ms": 100,
+          "status": "Fail"
+        },
+        "local_search": {
+          "sample_count": 20,
+          "p95_ms": 2165.6478,
+          "limit_ms": 200,
+          "status": "Fail"
+        },
+        "cached_tab_switch": {
+          "sample_count": 20,
+          "p95_ms": 2108.5533,
+          "limit_ms": 100,
+          "status": "Fail"
+        },
+        "peak_working_set_bytes": {
+          "value": 101777408,
+          "limit": 471859200,
+          "status": "Pass"
+        },
+        "gpu_memory_bytes": {
+          "value": 0,
+          "sample_count": 3,
+          "limit": 268435456,
+          "status": "Pass"
+        },
+        "package_bytes": {
+          "value": 11045509,
+          "limit": 52428800,
+          "status": "Pass"
+        }
+      },
+      "attribution": {
+        "cached_open": {
+          "correlated_count": 20,
+          "input_call_p95_ms": 2013.0218,
+          "handler_to_useful_paint_p95_ms": 111.8284,
+          "input_to_useful_paint_p95_ms": 2123.6347
+        },
+        "local_search": {
+          "correlated_count": 20,
+          "input_call_p95_ms": 2015.226,
+          "handler_to_useful_paint_p95_ms": 101.8667,
+          "input_to_useful_paint_p95_ms": 2118.935
+        },
+        "cached_tab_switch": {
+          "correlated_count": 20,
+          "input_call_p95_ms": 2012.6778,
+          "handler_to_useful_paint_p95_ms": 36.8,
+          "input_to_useful_paint_p95_ms": 2044.1941
+        }
+      },
+      "trace": [
+        {
+          "phase": "backlog_auth",
+          "route": "repository",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "backlog_auth",
+          "route": "user",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "backlog_drain",
+          "route": "backlog_issue",
+          "status": 200,
+          "count": 8
+        },
+        {
+          "phase": "backlog_drain",
+          "route": "repository",
+          "status": 200,
+          "count": 8
+        },
+        {
+          "phase": "backlog_drain",
+          "route": "user",
+          "status": 200,
+          "count": 8
+        },
+        {
+          "phase": "backlog_drain",
+          "route": {
+            "backlog_comment": 4
+          },
+          "status": 201,
+          "count": 1
+        },
+        {
+          "phase": "backlog_drain",
+          "route": {
+            "backlog_comment": 5
+          },
+          "status": 201,
+          "count": 1
+        },
+        {
+          "phase": "backlog_drain",
+          "route": {
+            "backlog_comment": 6
+          },
+          "status": 201,
+          "count": 1
+        },
+        {
+          "phase": "backlog_drain",
+          "route": {
+            "backlog_comment": 7
+          },
+          "status": 201,
+          "count": 1
+        },
+        {
+          "phase": "backlog_drain",
+          "route": {
+            "backlog_comment": 8
+          },
+          "status": 201,
+          "count": 1
+        },
+        {
+          "phase": "backlog_drain",
+          "route": {
+            "backlog_comment": 9
+          },
+          "status": 201,
+          "count": 1
+        },
+        {
+          "phase": "backlog_drain",
+          "route": {
+            "backlog_comment": 10
+          },
+          "status": 201,
+          "count": 1
+        },
+        {
+          "phase": "backlog_drain",
+          "route": {
+            "backlog_comment": 11
+          },
+          "status": 201,
+          "count": 1
+        },
+        {
+          "phase": "backlog_hold",
+          "route": "backlog_issue",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "backlog_hold",
+          "route": "repository",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "backlog_hold",
+          "route": "user",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "backlog_hold",
+          "route": {
+            "backlog_comment": 2
+          },
+          "status": 201,
+          "count": 1
+        }
+      ],
+      "receipt_sha256": {
+        "result.json": "2801c3e539feabefd3d51a28825302942b6526d81d1b4cfb1fbb3acda05b726b",
+        "binary.json": "9782ab806215cb099a9b9a5a8a7897863dbc321e897fe755f36f4cf95e64fb80",
+        "large-workspace-native.json": "f9b6ccb6a5dad00abdcb3c8dc7518fcd267a4c09cb7d43cae518c542f34490aa",
+        "github-access-trace.json": "1e37734e26eecf3788fb89f6f4258aee00796a33da78836488ca96d5d1e3f464",
+        "reader-restart-observation.json": "f69b3793aa56675dd44404971ed7406cac007e4674c952410f6ea5a8c539f56b",
+        "reader-fixture.json": "ea8659ca92f3dd0c2e6c7c9fe577b75639ffabe3ee16ae976a110103a1a5be3c",
+        "reader-restart-observation.idle.json": "976b75d5059c7bfa2ebd55c5a120fd9e66a001ff4f56791a6845a9a06b7fb962"
+      }
+    }
+  ]
 }
