@@ -111,7 +111,7 @@
         "dpi": 96,
         "actions": 1,
         "binary_sha256": "c98a01e1fa629040243835b6dc27b555816b9a6b7add69e67ab91b3aa6c5bb86",
-        "driver_location": "At C:\\Users\\jmarkovic\\AppData\\Local\\Temp\\threadline-s04-native.eFWxmO\\source-release-validation-43bd2fc\\tools\\native\\windows-smoke.ps1:144 char:5\r\n+     throw $Message\r\n+     ~~~~~~~~~~~~~~"
+        "driver_location": "At C:\\Users\\test-user\\AppData\\Local\\Temp\\threadline-s04-native.eFWxmO\\source-release-validation-43bd2fc\\tools\\native\\windows-smoke.ps1:144 char:5\r\n+     throw $Message\r\n+     ~~~~~~~~~~~~~~"
       },
       "application": "optimized_e2e"
     },
@@ -137,7 +137,7 @@
         "dpi": 96,
         "actions": 1,
         "binary_sha256": "c98a01e1fa629040243835b6dc27b555816b9a6b7add69e67ab91b3aa6c5bb86",
-        "driver_location": "At C:\\Users\\jmarkovic\\AppData\\Local\\Temp\\threadline-s04-native.eFWxmO\\source-release-validation-43bd2fc\\tools\\native\\windows-smoke.ps1:144 char:5\r\n+     throw $Message\r\n+     ~~~~~~~~~~~~~~"
+        "driver_location": "At C:\\Users\\test-user\\AppData\\Local\\Temp\\threadline-s04-native.eFWxmO\\source-release-validation-43bd2fc\\tools\\native\\windows-smoke.ps1:144 char:5\r\n+     throw $Message\r\n+     ~~~~~~~~~~~~~~"
       },
       "application": "optimized_e2e"
     },
@@ -165,7 +165,7 @@
         "dpi": 96,
         "actions": 4,
         "binary_sha256": "c98a01e1fa629040243835b6dc27b555816b9a6b7add69e67ab91b3aa6c5bb86",
-        "driver_location": "At C:\\Users\\jmarkovic\\AppData\\Local\\Temp\\threadline-s04-native.eFWxmO\\source-release-validation-43bd2fc\\tools\\native\\windows-smoke.ps1:144 char:5\r\n+     throw $Message\r\n+     ~~~~~~~~~~~~~~"
+        "driver_location": "At C:\\Users\\test-user\\AppData\\Local\\Temp\\threadline-s04-native.eFWxmO\\source-release-validation-43bd2fc\\tools\\native\\windows-smoke.ps1:144 char:5\r\n+     throw $Message\r\n+     ~~~~~~~~~~~~~~"
       },
       "application": "optimized_e2e"
     },

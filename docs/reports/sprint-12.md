@@ -139,6 +139,18 @@ A separate Windows test delivered modeled suspend and resume messages to its own
 
 ## Full native Windows suite
 
+### Full suite with installed local build 13
+
+The clean `fda5d91` suite recorded **11 Pass, eight Blocked and two Fail** on Windows 11 x64, exit 1. E2E-012, E2E-018 and E2E-020 used the installed normal build 13. The other cases used the optimized test executable from the same revision. [Builds, command and all 21 case outcomes](evidence/sprint-12/full-native-fda5d91-installed13.json)
+
+| Outcome | Cases and observations |
+| --- | --- |
+| Pass | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-013, E2E-018, E2E-020 and S05-WINDOWS-SYNC. The installed app retained all 37 events during feed fallback and reopened its saved offline comparison. |
+| Blocked | E2E-001, E2E-002, E2E-003, E2E-012, E2E-015, E2E-019, S01-WINDOWS-SHELL and S01-WINDOWS-TOAST. Windows did not grant foreground focus. In E2E-012 the installed app delivered one notification group and preserved the draft. The driver stopped before the shell click. |
+| Fail | E2E-011 opened the comparison file but timed out locating its accessible label. E2E-014 completed its workload and exceeded the three interaction p95 limits and the warm startup limit. [History comparison evidence](sprint-10.md) |
+
+E2E-014 restored 20 tabs in the 50,000-item profile. Across 20 samples per action, external p95 was 2122.91 ms for cached open, 2144.33 ms for local search and 2112.94 ms for tab switch. External warm startup was 7373.51 ms against 2000 ms. The app recorded the first useful warm paint 1572.55 ms after entry. The driver completed 117 actions and observed 39 authenticated fixture requests. Nine eligible comments confirmed. Idle redraw, working set, GPU memory and the actual 11,081,339-byte setup passed their limits. [Matched action timings, startup phases and setup digest](evidence/sprint-12/full-native-fda5d91-installed13.json)
+
 The canonical full suite on Windows 11 Enterprise x64 build 22631.7652 finished with **12 Pass, eight Blocked and one Fail**, exit 1. The clean runner, staged driver and optimized E2E app came from `013044b`. E2E-012, E2E-018 and E2E-020 exercised local installed build 11 from `8da02ce`. The receipt records all 21 cases, their fixture revisions and child exits, the build hashes and the exact invocation. [Full native suite receipt](evidence/sprint-12/full-native-013044b.json)
 
 | Result | Scenarios |
