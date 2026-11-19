@@ -24,6 +24,26 @@ if (@($helpers.Name | Sort-Object -Unique).Count -ne 5 -or $helpers.Count -ne 5)
 . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
 . (Join-Path $PSScriptRoot 'windows-review-context.ps1')
 
+$script:AccessPhaseFile = [IO.Path]::GetTempFileName()
+try {
+    foreach ($phase in @('issue-edit-baseline', 'issue-edit-remote-change')) {
+        Set-AccessPhase $phase
+        if ([IO.File]::ReadAllText($script:AccessPhaseFile) -cne $phase) {
+            throw 'The isolate did not advance to the exact conflict phase.'
+        }
+    }
+    $refused = $false
+    try { Set-AccessPhase 'unlisted-issue-write' } catch {
+        $refused = $_.Exception.Message -ceq 'Unknown access fixture phase.'
+    }
+    if (!$refused -or [IO.File]::ReadAllText($script:AccessPhaseFile) -cne 'issue-edit-remote-change') {
+        throw 'An unsupported phase changed the conflict fixture.'
+    }
+} finally {
+    [IO.File]::Delete($script:AccessPhaseFile)
+    Remove-Variable -Name AccessPhaseFile -Scope Script
+}
+
 $editorAction = [pscustomobject]@{
     ProcessId = 41; AutomationId = 'reader-submit-0'; Name = 'Queue comment edit'
     IsOffscreen = $false; IsEnabled = $false
@@ -317,12 +337,14 @@ try {
 $script:observations.Clear()
 $script:observations.Enqueue([pscustomobject]@{ bounds = [pscustomobject]@{
     'reader-issue-title-0' = @(1, 2, 20, 10)
+    'reader-draft-input-0' = @(1, 13, 20, 10)
 } })
 $script:fixtureText = $null
 $script:fixtureWrites = 0
 function Set-OwnedFixtureEditValue([IntPtr]$Window, [string]$Id, [string]$Name, [string]$Value) {
     if ($Window -ne 123 -or $Id -cne 'reader-issue-title-0' -or $Name -cne 'Issue title') {
-        if ($Window -ne 123 -or $Id -cne 'reader-search' -or $Name -cne 'Search downloaded content') {
+        if ($Window -ne 123 -or !(($Id -ceq 'reader-search' -and $Name -ceq 'Search downloaded content') -or
+            ($Id -ceq 'reader-draft-input-0' -and $Name -ceq 'Local Markdown draft'))) {
             throw 'Fixture editing did not target the expected owned field.'
         }
     }
@@ -334,13 +356,17 @@ function Get-OwnedFixtureEditPattern([IntPtr]$Window, [string]$Id, [string]$Name
     return [pscustomobject]@{ Current = [pscustomobject]@{ Value = $script:fixtureText } }
 }
 Type-WriteFixtureField 123 'reader-issue-title-0' 'Cancelled fixture issue title'
+Type-WriteFixtureField 123 'reader-issue-title-0' 'Local change to the same issue'
+if ($script:fixtureText -cne 'Local change to the same issue') { throw 'The conflict did not edit its known title.' }
+Type-WriteFixtureField 123 'reader-draft-input-0' 'Retain the local issue description across the conflict.'
+if ($script:fixtureText -cne 'Retain the local issue description across the conflict.') { throw 'The conflict did not edit its known description.' }
 $refused = $false
 try {
     Type-WriteFixtureField 123 'account-token' 'Cancelled fixture issue title'
 } catch {
     $refused = $_.Exception.Message -like '*unknown synthetic field or value*'
 }
-if (!$refused -or $script:fixtureWrites -ne 1) { throw 'The native edit journey accepted an out-of-scope field.' }
+if (!$refused -or $script:fixtureWrites -ne 3) { throw 'The native edit journey accepted an out-of-scope field.' }
 
 
 $script:observations.Clear()
