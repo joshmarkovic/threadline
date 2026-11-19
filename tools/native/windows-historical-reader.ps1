@@ -51,6 +51,10 @@ function Invoke-HistoricalReader([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Reader 'the historical issue restored from disk while offline' {
         param($reader) $reader.offline -and $reader.cached_content_ready -and $reader.active_number -eq 719 -and $reader.active_item -eq $item
     }
+    Click-AccountControl $restarted 'reader-close-tab'
+    $null = Wait-Reader 'the restored historical tab closed before searching again' {
+        param($reader) $reader.offline -and $reader.active_item -ne $item
+    }
     $saved = Invoke-HistoricalLocalSearch $restarted 'Xenolith'
     if ($saved.cached_reader.search_results -ne 1 -or $saved.cached_reader.first_search_item -ne $item) {
         throw 'The downloaded historical body did not survive offline restart.'
