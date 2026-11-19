@@ -360,6 +360,43 @@ struct RequestEvidence {
     status: u16,
 }
 
+#[derive(Serialize)]
+struct InterruptedClient {
+    phase: Phase,
+    stage: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    route: Option<Route>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fixture_authorization: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    intended_status: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error_kind: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    os_error: Option<i32>,
+}
+
+impl InterruptedClient {
+    fn new(phase: Phase, stage: &'static str, error: Option<&io::Error>) -> Self {
+        Self {
+            phase,
+            stage,
+            route: None,
+            fixture_authorization: None,
+            intended_status: None,
+            error_kind: error.map(|error| format!("{:?}", error.kind())),
+            os_error: error.and_then(io::Error::raw_os_error),
+        }
+    }
+}
+
+struct ClientRequest {
+    route: Route,
+    authorized: bool,
+    binding: Option<String>,
+    is_get: bool,
+}
+
 pub struct AccessFixture {
     address: SocketAddr,
     phase_file: PathBuf,
@@ -370,6 +407,7 @@ pub struct AccessFixture {
 #[derive(Default)]
 struct FixtureRun {
     records: Vec<RequestEvidence>,
+    interrupted: Vec<InterruptedClient>,
     error: Option<io::Error>,
 }
 
@@ -425,9 +463,16 @@ impl AccessFixture {
                 let phase_file = phase_file.clone();
                 let stopping = stopping.clone();
                 move || {
-                    let mut records = Vec::new();
-                    let error = serve(listener, &phase_file, &stopping, &mut records).err();
-                    FixtureRun { records, error }
+                    let mut run = FixtureRun::default();
+                    run.error = serve(
+                        listener,
+                        &phase_file,
+                        &stopping,
+                        &mut run.records,
+                        &mut run.interrupted,
+                    )
+                    .err();
+                    run
                 }
             })?;
         Ok(Self {
@@ -447,9 +492,19 @@ impl AccessFixture {
     }
 
     pub fn finish(mut self, report_dir: &Path, check: TraceCheck) -> io::Result<()> {
-        let FixtureRun { records, error } = self.stop()?;
+        let FixtureRun {
+            records,
+            interrupted,
+            error,
+        } = self.stop()?;
         let trace = serde_json::to_vec_pretty(&records)?;
         fs::write(report_dir.join("github-access-trace.json"), trace)?;
+        if !interrupted.is_empty() {
+            fs::write(
+                report_dir.join("github-access-interrupted-clients.json"),
+                serde_json::to_vec_pretty(&interrupted)?,
+            )?;
+        }
         if let Some(error) = error {
             let reason = match error.to_string().as_str() {
                 "too many requests to the access fixture" => "request limit reached",
@@ -463,6 +518,7 @@ impl AccessFixture {
                 "error_kind": format!("{:?}", error.kind()),
                 "os_error": error.raw_os_error(),
                 "completed_requests": records.len(),
+                "interrupted_clients": interrupted.len(),
             });
             fs::write(
                 report_dir.join("github-access-trace-error.json"),
@@ -473,7 +529,7 @@ impl AccessFixture {
         let valid = match check {
             TraceCheck::Observe => true,
             TraceCheck::AccountJourney => complete_journey(&records),
-            TraceCheck::OfflineReader => records.is_empty(),
+            TraceCheck::OfflineReader => records.is_empty() && interrupted.is_empty(),
             TraceCheck::LargeWorkspaceBacklog => backlog::trace(&records),
             TraceCheck::ConcurrentReader => concurrent::trace(&records),
             TraceCheck::NativeLifecycle => lifecycle::trace(&records),
@@ -652,16 +708,27 @@ fn serve(
     phase_file: &Path,
     stopping: &AtomicBool,
     evidence: &mut Vec<RequestEvidence>,
+    interrupted: &mut Vec<InterruptedClient>,
 ) -> io::Result<()> {
+    let mut accepted = 0;
     while !stopping.load(Ordering::Acquire) {
         match listener.accept() {
             Ok((mut socket, _)) => {
                 let phase = Phase::read(phase_file)?;
-                if evidence.len() >= if activity::active(phase) { 512 } else { 128 } {
+                if accepted >= if activity::active(phase) { 512 } else { 128 } {
                     return Err(io::Error::other("too many requests to the access fixture"));
                 }
-                let request = answer(&mut socket, phase, phase_file, stopping, evidence)?;
-                evidence.push(request);
+                accepted += 1;
+                if let Some(request) = answer(
+                    &mut socket,
+                    phase,
+                    phase_file,
+                    stopping,
+                    evidence,
+                    interrupted,
+                )? {
+                    evidence.push(request);
+                }
             }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
                 thread::sleep(Duration::from_millis(12));
@@ -678,38 +745,76 @@ fn answer(
     phase_file: &Path,
     stopping: &AtomicBool,
     previous_requests: &[RequestEvidence],
-) -> io::Result<RequestEvidence> {
+    interrupted: &mut Vec<InterruptedClient>,
+) -> io::Result<Option<RequestEvidence>> {
     let timeout = Some(Duration::from_secs(2));
     socket.set_nonblocking(false)?;
     socket.set_read_timeout(timeout)?;
     socket.set_write_timeout(timeout)?;
-    let (route, authorized, binding) = read_request(socket, phase)?;
+    let mut reader = BufReader::new((&*socket).take(MAX_REQUEST));
+    let mut first_line = String::new();
+    match reader.read_line(&mut first_line) {
+        Ok(0) => {
+            interrupted.push(InterruptedClient::new(phase, "before_request", None));
+            return Ok(None);
+        }
+        Err(error) if client_disconnected(&error) => {
+            let stage = if first_line.is_empty() {
+                "before_request"
+            } else {
+                "request"
+            };
+            interrupted.push(InterruptedClient::new(phase, stage, Some(&error)));
+            if first_line.is_empty() {
+                return Ok(None);
+            }
+            return Err(error);
+        }
+        Err(error) => return Err(error),
+        Ok(_) => {}
+    }
+    let request = match read_request(&mut reader, &first_line, phase) {
+        Ok(request) => request,
+        Err(error) => {
+            if client_disconnected(&error) || error.kind() == io::ErrorKind::UnexpectedEof {
+                interrupted.push(InterruptedClient::new(phase, "request", Some(&error)));
+            }
+            return Err(error);
+        }
+    };
+    let ClientRequest {
+        route,
+        authorized,
+        binding,
+        ..
+    } = &request;
+    let (route, authorized) = (*route, *authorized);
     if authorized && merge::hold_cancellation(phase, route, phase_file, stopping)? {
-        return Ok(RequestEvidence {
+        return Ok(Some(RequestEvidence {
             phase,
             route,
             fixture_authorization: true,
             status: 0,
-        });
+        }));
     }
     if authorized
         && route == Route::ReviewDecision(review_decisions::DecisionStep::ApprovalReadInterrupted)
     {
         review_decisions::interrupt_read(phase_file, stopping)?;
-        return Ok(RequestEvidence {
+        return Ok(Some(RequestEvidence {
             phase,
             route,
             fixture_authorization: true,
             status: 0,
-        });
+        }));
     }
     if authorized && let Some(status) = lifecycle::hold(phase, route, phase_file, stopping)? {
-        return Ok(RequestEvidence {
+        return Ok(Some(RequestEvidence {
             phase,
             route,
             fixture_authorization: true,
             status,
-        });
+        }));
     }
     if phase == Phase::PrDelay && route == Route::Item && authorized {
         pr::wait_for_release(phase_file, stopping)?;
@@ -724,24 +829,24 @@ fn answer(
                 Route::CommentReplyLost | Route::DependencyCommentLost
             ))
     {
-        return Ok(RequestEvidence {
+        return Ok(Some(RequestEvidence {
             phase,
             route,
             fixture_authorization: true,
             status: 0,
-        });
+        }));
     }
     if authorized
         && phase == Phase::BacklogHold
         && matches!(route, Route::BacklogComment(_))
         && !backlog::await_release(phase_file, stopping)?
     {
-        return Ok(RequestEvidence {
+        return Ok(Some(RequestEvidence {
             phase,
             route,
             fixture_authorization: true,
             status: 0,
-        });
+        }));
     }
     let mut evidence_route = route;
     if phase == Phase::MixedAfter && route == Route::MixedRecentComments && authorized {
@@ -757,12 +862,12 @@ fn answer(
                 evidence_route = Route::BacklogFeedRetry(page)
             }
             concurrent::FeedAttempt::Interrupted => {
-                return Ok(RequestEvidence {
+                return Ok(Some(RequestEvidence {
                     phase,
                     route,
                     fixture_authorization: true,
                     status: 0,
-                });
+                }));
             }
         }
         next_feed_page = concurrent::next(target, page);
@@ -802,6 +907,69 @@ fn answer(
     } else {
         serde_json::to_vec(&reply.body)?
     };
+    if let Err(error) = write_response(
+        socket,
+        phase,
+        route,
+        authorized,
+        &reply,
+        &body,
+        next_feed_page.as_deref(),
+    ) {
+        interrupted.push(InterruptedClient {
+            route: Some(evidence_route),
+            fixture_authorization: Some(authorized),
+            intended_status: Some(reply.status),
+            ..InterruptedClient::new(phase, "response", Some(&error))
+        });
+        if recover_read_disconnect(phase, &request, &error) {
+            return Ok(Some(RequestEvidence {
+                phase,
+                route: evidence_route,
+                fixture_authorization: authorized,
+                status: 0,
+            }));
+        }
+        return Err(error);
+    }
+    pr_pins::mark(phase, route, reply.status, phase_file)?;
+    if let Some(request) = held_feed {
+        request.response_written()?;
+    }
+    Ok(Some(RequestEvidence {
+        phase,
+        route: evidence_route,
+        fixture_authorization: authorized,
+        status: reply.status,
+    }))
+}
+
+fn client_disconnected(error: &io::Error) -> bool {
+    matches!(
+        error.kind(),
+        io::ErrorKind::ConnectionAborted
+            | io::ErrorKind::ConnectionReset
+            | io::ErrorKind::BrokenPipe
+    )
+}
+
+fn recover_read_disconnect(phase: Phase, request: &ClientRequest, error: &io::Error) -> bool {
+    client_disconnected(error)
+        && phase != Phase::SyncOffline
+        && request.is_get
+        && request.authorized
+        && request.route != Route::Unexpected
+}
+
+fn write_response(
+    socket: &mut TcpStream,
+    phase: Phase,
+    route: Route,
+    authorized: bool,
+    reply: &Response,
+    body: &[u8],
+    next_feed_page: Option<&str>,
+) -> io::Result<()> {
     write!(
         socket,
         "HTTP/1.1 {} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n",
@@ -812,7 +980,7 @@ fn answer(
     if mixed::active(phase) && matches!(route, Route::PrPinStatuses | Route::MixedStatusValidated) {
         write!(socket, "ETag: {}\r\n", mixed::STATUS_ETAG)?;
     }
-    if let Some(sso) = reply.sso {
+    if let Some(sso) = reply.sso.as_deref() {
         write!(socket, "X-GitHub-SSO: {sso}\r\n")?;
     }
     if let Some(next) = next_feed_page {
@@ -897,24 +1065,17 @@ fn answer(
         write!(socket, "Link: <http://{local}{next}>; rel=\"next\"\r\n")?;
     }
     socket.write_all(b"\r\n")?;
-    socket.write_all(&body)?;
-    pr_pins::mark(phase, route, reply.status, phase_file)?;
-    if let Some(request) = held_feed {
-        request.response_written()?;
-    }
-    Ok(RequestEvidence {
-        phase,
-        route: evidence_route,
-        fixture_authorization: authorized,
-        status: reply.status,
-    })
+    socket.write_all(body)?;
+    Ok(())
 }
 
-fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Option<String>)> {
-    let mut reader = BufReader::new(socket.take(MAX_REQUEST));
+fn read_request(
+    reader: &mut impl BufRead,
+    first_line: &str,
+    phase: Phase,
+) -> io::Result<ClientRequest> {
+    let mut parts = first_line.split_ascii_whitespace();
     let mut line = String::new();
-    reader.read_line(&mut line)?;
-    let mut parts = line.split_ascii_whitespace();
     let request = (parts.next(), parts.next(), parts.next());
     let is_get = request.0 == Some("GET");
     let post_path = match request {
@@ -1037,7 +1198,12 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         }
     }
     if phase == Phase::BacklogConcurrent && !is_get {
-        return Ok((Route::Unexpected, authorized, None));
+        return Ok(ClientRequest {
+            route: Route::Unexpected,
+            authorized,
+            binding: None,
+            is_get,
+        });
     }
     if let Some(patch_path) = patch_path {
         let mut body = vec![0; content_length];
@@ -1101,7 +1267,12 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
     if authorized && route == Route::Unexpected {
         route = dependency_failure.unwrap_or(Route::Unexpected);
     }
-    Ok((route, authorized, binding))
+    Ok(ClientRequest {
+        route,
+        authorized,
+        binding,
+        is_get,
+    })
 }
 
 fn sync_since(target: &str, prefix: &str) -> bool {
@@ -1306,6 +1477,124 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::net::Shutdown;
+
+    #[test]
+    fn fixture_keeps_serving_after_a_client_leaves_before_sending_a_request() {
+        let temp = tempfile::tempdir().unwrap();
+        let fixture = AccessFixture::start(temp.path()).unwrap();
+        let idle = TcpStream::connect(fixture.address()).unwrap();
+        idle.shutdown(Shutdown::Write).unwrap();
+        drop(idle);
+
+        let mut client = TcpStream::connect(fixture.address()).unwrap();
+        write!(
+            client,
+            "GET /user HTTP/1.1\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\n\r\n"
+        )
+        .unwrap();
+        let mut response = String::new();
+        client.read_to_string(&mut response).unwrap();
+        assert!(response.starts_with("HTTP/1.1 200"));
+        fixture.finish(temp.path(), TraceCheck::Observe).unwrap();
+
+        let trace = fs::read(temp.path().join("github-access-trace.json")).unwrap();
+        let records: Value = serde_json::from_slice(&trace).unwrap();
+        assert_eq!(records.as_array().unwrap().len(), 1);
+        assert_eq!(records[0]["route"], "user");
+        assert_eq!(records[0]["status"], 200);
+        let interrupted =
+            fs::read(temp.path().join("github-access-interrupted-clients.json")).unwrap();
+        let interrupted: Value = serde_json::from_slice(&interrupted).unwrap();
+        assert_eq!(interrupted.as_array().unwrap().len(), 1);
+        assert_eq!(interrupted[0]["stage"], "before_request");
+        assert!(interrupted[0].get("route").is_none());
+        assert!(interrupted[0].get("intended_status").is_none());
+    }
+
+    #[test]
+    fn fixture_keeps_partial_mutations_hard_failures_without_recording_the_input() {
+        let temp = tempfile::tempdir().unwrap();
+        let fixture = AccessFixture::start(temp.path()).unwrap();
+        let mut client = TcpStream::connect(fixture.address()).unwrap();
+        write!(
+            client,
+            "POST {COMMENTS_FIRST} HTTP/1.1\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\nContent-Length: 200\r\n\r\npartial-synthetic-body"
+        )
+        .unwrap();
+        client.shutdown(Shutdown::Write).unwrap();
+        let mut response = String::new();
+        client.read_to_string(&mut response).unwrap();
+        assert!(response.is_empty());
+        let failure = fixture
+            .finish(temp.path(), TraceCheck::Observe)
+            .unwrap_err();
+        assert_eq!(failure.kind(), io::ErrorKind::UnexpectedEof);
+
+        let trace = fs::read(temp.path().join("github-access-trace.json")).unwrap();
+        assert_eq!(serde_json::from_slice::<Value>(&trace).unwrap(), json!([]));
+        let details =
+            fs::read_to_string(temp.path().join("github-access-interrupted-clients.json")).unwrap();
+        assert!(!details.contains(FIXTURE_AUTHORIZATION));
+        assert!(!details.contains("partial-synthetic-body"));
+        let interrupted: Value = serde_json::from_str(&details).unwrap();
+        assert_eq!(interrupted.as_array().unwrap().len(), 1);
+        assert_eq!(interrupted[0]["stage"], "request");
+        assert_eq!(interrupted[0]["error_kind"], "UnexpectedEof");
+        assert!(interrupted[0].get("route").is_none());
+    }
+
+    #[test]
+    fn response_interruptions_only_allowlisted_for_known_authorized_reads() {
+        let mut request = ClientRequest {
+            route: Route::User,
+            authorized: true,
+            binding: None,
+            is_get: true,
+        };
+        for kind in [
+            io::ErrorKind::ConnectionAborted,
+            io::ErrorKind::ConnectionReset,
+            io::ErrorKind::BrokenPipe,
+        ] {
+            assert!(recover_read_disconnect(
+                Phase::SyncLive,
+                &request,
+                &kind.into()
+            ));
+        }
+        let disconnect = io::ErrorKind::ConnectionAborted.into();
+        assert!(!recover_read_disconnect(
+            Phase::SyncOffline,
+            &request,
+            &disconnect
+        ));
+        assert!(!recover_read_disconnect(
+            Phase::SyncLive,
+            &request,
+            &io::ErrorKind::TimedOut.into(),
+        ));
+        request.is_get = false;
+        assert!(!recover_read_disconnect(
+            Phase::SyncLive,
+            &request,
+            &disconnect
+        ));
+        request.is_get = true;
+        request.authorized = false;
+        assert!(!recover_read_disconnect(
+            Phase::SyncLive,
+            &request,
+            &disconnect
+        ));
+        request.authorized = true;
+        request.route = Route::Unexpected;
+        assert!(!recover_read_disconnect(
+            Phase::SyncLive,
+            &request,
+            &disconnect
+        ));
+    }
 
     #[test]
     fn immutable_compare_routes_to_the_active_native_fixture() {
