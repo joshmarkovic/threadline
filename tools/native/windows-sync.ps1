@@ -81,9 +81,11 @@ function Invoke-SyncProof([IntPtr]$Window, [string]$Profile) {
     $script:report.detail = 'Native synchronization settings survived restart and distinguished HTTP, throttling and transport outcomes.'
 }
 
-function Open-NotificationSchedule([IntPtr]$Window) {
-    Wait-For 'the process-owned Activity action' {
-        Invoke-OwnedFixtureControl $Window 'reader-activity' $null 'Activity'
+function Open-NotificationSchedule([IntPtr]$Window, [switch]$FromActivity) {
+    if (!$FromActivity) {
+        Wait-For 'the process-owned Activity action' {
+            Invoke-OwnedFixtureControl $Window 'reader-activity' $null 'Activity'
+        }
     }
     Wait-For 'the process-owned Notification settings action' {
         Invoke-OwnedFixtureControl $Window 'activity-toggle-settings' $null 'Notification settings'
@@ -212,25 +214,15 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Reader 'the restarted profile has its seeded queued item' {
         param($reader) $reader.offline -and $reader.outbox -eq 1
     }
-    Open-RestartedFixtureActivity $restarted
-    $null = Wait-Reader 'the exact seeded event is in the real Activity feed because quiet hours suppress popup and sound' {
-        param($reader) $reader.notification.isolated_quiet_event_feed_only
-    }
-    Add-NotificationCheckpoint 'quiet_hours_feed_only_verified'
-    Add-Evidence 'Observe the isolated event in the native feed with the exact Quiet Hours decision' ([ordered]@{
-        delivery = 'FeedOnly'; popup_suppressed_by = 'QuietHours'; sound = $false
-    })
     Open-SyncSettings $restarted
-    Open-NotificationSchedule $restarted
-    $restored = Wait-FixtureQuietSchedule $startMinute $endMinute
-    $controls = $restored.cached_reader.shared_sync.controls
-    if (!$controls.work_offline -or !$controls.pause_background -or !$controls.pause_queued_actions -or $controls.notification_quiet) {
-        throw 'The independent quiet-hours and synchronization preferences did not survive a separate process.'
+    $restored = Wait-Sync 'restore all three independent synchronization holds after restart' {
+        param($sync)
+        $sync.controls.work_offline -and $sync.controls.pause_background -and
+            $sync.controls.pause_queued_actions -and !$sync.controls.notification_quiet
     }
-    Add-Evidence 'Restore the quiet schedule and each independent pause after restart' $controls
-    Add-NotificationCheckpoint 'settings_restored'
+    Add-Evidence 'Restore Work Offline, background read pause and Outbox pause after restart' $restored.cached_reader.shared_sync.controls
 
-    Open-SyncSettings $restarted
+    # Work Offline defers new activity decisions as well as provider requests.
     Set-AccessPhase 'sync-live'
     Click-AccountControl $restarted 'sync-work-offline'
     $null = Wait-Sync 'network resume retains both distinct pauses' {
@@ -240,13 +232,30 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Reader 'the eligible queued fixture is retained while the queue is specifically paused' {
         param($reader) !$reader.offline -and $reader.outbox -eq 1
     }
+    Add-NotificationCheckpoint 'online_with_separate_pauses'
+
+    Open-RestartedFixtureActivity $restarted
+    $null = Wait-Reader 'the exact seeded event is in the real Activity feed because quiet hours suppress popup and sound' {
+        param($reader) $reader.notification.isolated_quiet_event_feed_only
+    }
+    Add-NotificationCheckpoint 'quiet_hours_feed_only_verified'
+    Add-Evidence 'Observe the isolated event in the native feed with the exact Quiet Hours decision' ([ordered]@{
+        delivery = 'FeedOnly'; popup_suppressed_by = 'QuietHours'; sound = $false
+    })
+    Open-NotificationSchedule $restarted -FromActivity
+    $restoredQuiet = Wait-FixtureQuietSchedule $startMinute $endMinute
+    Add-Evidence 'Restore the same quiet hours after restart and reconnection' $restoredQuiet.cached_reader.notification.quiet_hours
+    Add-NotificationCheckpoint 'settings_restored'
+
+    Open-SyncSettings $restarted
     Set-AccessPhase 'sync-service'
     Click-AccountControl $restarted 'sync-check-now'
     $null = Wait-Sync 'explicit provider check still executes with both default pauses and quiet hours' {
         param($sync) $sync.connection -ceq 'Reachable' -and $sync.reason -ceq 'ServiceFailure' -and
             $sync.controls.pause_background -and $sync.controls.pause_queued_actions -and !$sync.controls.work_offline
     }
-    Open-NotificationSchedule $restarted
+    Open-RestartedFixtureActivity $restarted
+    Open-NotificationSchedule $restarted -FromActivity
     $null = Wait-FixtureQuietSchedule $startMinute $endMinute
     Wait-For 'restore the native feed-only delivery default' {
         Invoke-OwnedFixtureControl $restarted 'notifications-default-1' $null (Get-NotificationChoiceName 'Feed only' $false)
