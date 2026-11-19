@@ -1,0 +1,60 @@
+{
+  "scenario": "S12-PANE-POSITIONS",
+  "status": "Pass",
+  "scope": "Windows test-build native process with isolated downloaded fixture",
+  "host": {
+    "os": "Windows 11 Enterprise",
+    "build": "10.0.22631.7652",
+    "architecture": "x86_64",
+    "dpi": 96
+  },
+  "app_runner_and_driver_revision": "401c4c67a4729671672e73a4a96128ea6203ea61",
+  "app_version": "0.1.0",
+  "cargo_lock_sha256": "ba1fa2481ba47ebb082dae4aff8bf1a099cea5775b4196b096aeb3bb094d4efb",
+  "binary_sha256": "9ed93b4266696c84e1a986865816a39cd4ff4b14c38f73572c5ab2f7ec423db8",
+  "binary_bytes": 45501440,
+  "command": "cargo xtask test e2e --suite full --case S12-PANE-POSITIONS --binary <binary-path> --seed 12345 --report-dir <report-dir>",
+  "fixture_revision": "s12-pane-positions-v1",
+  "seed": 12345,
+  "run_directory": "e2e-1795061596732-34452",
+  "exit_code": 0,
+  "native_actions": 15,
+  "loopback_requests": 0,
+  "tabs_per_pane": [10, 10],
+  "left": {
+    "issue_item": 2,
+    "archive_repository": 2,
+    "tab": "fixture-tab-1",
+    "search_hits": 1,
+    "comment_anchor": "00000000000000050009",
+    "functional_reading_offset_before_input": 0,
+    "functional_reading_offset_after_input": 78,
+    "same_offset_after_right_tab_switch_resize_and_return": true,
+    "retained_unsent_draft_sha256": "6d81ea22bda4aba055dfeb96c7aeb52fe8fa9e948aa2f9faa5b224c53a550058"
+  },
+  "right": {
+    "repository": 1,
+    "original_pr_item": 3,
+    "alternate_pr_item": 6,
+    "restored_pr_item": 3,
+    "width_fraction_before": 0.5,
+    "width_fraction_after": 0.44
+  },
+  "input": "Windows UI Automation and one functional WM_MOUSEWHEEL to the verified child HWND",
+  "sha256": {
+    "result.json": "0c568adab8daeec66963d75a1900224b5d684a829d6e6154c87ff34ca050e8a5",
+    "reader-native.json": "75cd963dea57add9abffa4000cc559fb81d0cb22dee14512c6e9ffe2a5fc88d6",
+    "reader-fixture.json": "0672705f26f05a8ff2b4c40a19ba30afd2e2645df26ab1c294d40c8d365ba2c1",
+    "github-access-trace.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "previous_attempt": {
+    "status": "Fail",
+    "run_directory": "e2e-1795061120053-47556",
+    "app_runner_and_driver_revision": "c0e49579a930aa6690b3351f985308832ebf193b",
+    "binary_sha256": "d934b66d9f69ac001ff19a3d35a44625095467592bd6b4b8ff68af17c37eb364",
+    "exit_code": 1,
+    "detail": "Both observed panes held the expected repositories, items, and comment anchor. The driver timed out because its nested PowerShell predicate reused the outer waiter's parameter name.",
+    "result_sha256": "e84b99b9b4074e3b4251e7d48014be2befdf3b9e2952a2f37ff954aa407b4173",
+    "native_sha256": "40b87cc65310a4cd95581e209c0bd2e692cf4fa91d4afee215ad86e878894a64"
+  }
+}
