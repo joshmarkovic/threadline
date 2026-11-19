@@ -99,15 +99,19 @@ In Threadline, the Windows AccessKit provider sends an accessibility action to G
 
 ## Local regression suites
 
-Formatting and strict Clippy passed on clean `013044b` in WSL2 Linux x64. Clippy checked all workspace targets with the app's E2E feature enabled and warnings treated as errors. The canonical runner used seed 12345. [Commands and results](evidence/sprint-12/current-local-validation.json)
+On clean `43bd2fc`, formatting passed in WSL2 Linux x64 and strict Clippy passed for the Linux and Windows x64 targets. Clippy covered all workspace targets with the app's E2E feature enabled. The portable runner used seed 12345. The earlier Windows target Clippy result at `1f9ce05` also passed. [Selected candidate commands and results](evidence/sprint-12/selected-candidate-validation.json)
 
 | Linux test lane | Selectors passed | Test results passed |
 | --- | ---: | ---: |
-| Unit | 23 | 104 |
-| Integration | 36 | 145 |
+| Unit | 23 | 114 |
+| Integration | 36 | 146 |
 | In-process GPUI | 9 | 18 |
 
-All 32 native test executables from `01d19b0` exited successfully on Windows 11 x64 build 22631.7652. The default run recorded 260 passes, zero failures and two ignored Credential Manager entries. The separately enabled protected-store test passed. Its child read the existing synthetic entry in a new process, and the test removed both of its keys. The receipts separate these runs from the external desktop journeys. [Per-executable digests, results and credential receipt](evidence/sprint-12/current-local-validation.json)
+All 32 native test executables from `43bd2fc` exited with code 0 on Windows 11 x64 build 22631.7652. The verified run recorded 276 passes, zero failures and three ignored Credential Manager entries. The first PowerShell launch recorded the same test totals with empty process exit fields. The rerun used the same executables and captured numeric exits. [Selected candidate executable digests and outcomes](evidence/sprint-12/selected-candidate-validation.json)
+
+Two separately enabled Windows Credential Manager tests each passed with exit 0. The protected-store test read a synthetic entry from a new process and verified removal of both test keys. The installer cleanup test verified that declined confirmation retained both generated keys. After explicit confirmation, it removed the selected database and its credential while preserving the second generated key until fixture teardown. [Protected-store and installer cleanup receipts](evidence/sprint-12/selected-candidate-validation.json)
+
+The earlier Windows `01d19b0` run recorded 32 successful executable exits, 260 passes, zero failures and two ignored entries. Its separate protected-store test passed. The earlier Linux `013044b` run passed formatting, strict Clippy and all 68 selectors. [Earlier Windows and Linux results](evidence/sprint-12/current-local-validation.json)
 
 The earlier Windows run on `3dc5b64` recorded 238 passes, two failures and two ignored entries. IT-021 failed because of a staged bootstrap path and passed after correction on `575b609`. A Windows timer rounded an idle-sampling test's one-nanosecond subtraction to the same tick. The corrected app suite on `4619aa5` passed all 42 tests. Earlier Linux results at `f06de5e` and `8da02ce` remain recorded. [Original outcomes and targeted reruns](evidence/sprint-12/local-suite-validation.json) · [Earlier portable suite](evidence/sprint-12/portable-release-validation.json)
 

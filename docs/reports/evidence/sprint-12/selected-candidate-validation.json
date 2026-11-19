@@ -1,0 +1,782 @@
+{
+  "source_revision": "43bd2fc625043687f9d5fec86637f1243e754739",
+  "source_dirty": false,
+  "previous_receipts": [
+    "current-local-validation.json",
+    "local-suite-validation.json",
+    "portable-release-validation.json"
+  ],
+  "portable": {
+    "lanes": [
+      {
+        "run": "unit-1795052974335-2398544",
+        "lane": "unit",
+        "source_revision": "43bd2fc625043687f9d5fec86637f1243e754739",
+        "source_dirty": false,
+        "host": {
+          "os": "linux",
+          "architecture": "x86_64",
+          "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+          "display_session": "Wayland and X11 environment"
+        },
+        "package_version": "0.1.0",
+        "seed": 12345,
+        "cargo_lock_sha256": "83587d235ce28277e15e3c6e2a0c2ad93f9826339812983027253991e5ebe8ab",
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "unit",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "started_at_unix_ms": 1795052974335,
+        "finished_at_unix_ms": 1795053080443,
+        "selectors_passed": 23,
+        "selectors_failed": 0,
+        "selectors_blocked": 0,
+        "tests_reported_passed": 114,
+        "status": "Pass",
+        "exit_code": 0,
+        "result_sha256": "e268669bd959adc334708fc3d7b56902dedb76afc00b114ec315b42b6c922629",
+        "junit_sha256": "301c45dc818f0264695916bf07de27801e64064b91eb2a3a7db0a4e603588378"
+      },
+      {
+        "run": "integration-1795053081202-2401117",
+        "lane": "integration",
+        "source_revision": "43bd2fc625043687f9d5fec86637f1243e754739",
+        "source_dirty": false,
+        "host": {
+          "os": "linux",
+          "architecture": "x86_64",
+          "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+          "display_session": "Wayland and X11 environment"
+        },
+        "package_version": "0.1.0",
+        "seed": 12345,
+        "cargo_lock_sha256": "83587d235ce28277e15e3c6e2a0c2ad93f9826339812983027253991e5ebe8ab",
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "integration",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "started_at_unix_ms": 1795053081201,
+        "finished_at_unix_ms": 1795053434115,
+        "selectors_passed": 36,
+        "selectors_failed": 0,
+        "selectors_blocked": 0,
+        "tests_reported_passed": 146,
+        "status": "Pass",
+        "exit_code": 0,
+        "result_sha256": "1324ebd380de8192635de0c81f04f3f356dc18041f9bf5855ec5280bededebd6",
+        "junit_sha256": "b06b83aa5d3eca84ad6a2a09db8a3a63191f41de0c709560ec49b48fc62e11f6"
+      },
+      {
+        "run": "ui-1795053434552-2407298",
+        "lane": "ui",
+        "source_revision": "43bd2fc625043687f9d5fec86637f1243e754739",
+        "source_dirty": false,
+        "host": {
+          "os": "linux",
+          "architecture": "x86_64",
+          "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+          "display_session": "Wayland and X11 environment"
+        },
+        "package_version": "0.1.0",
+        "seed": 12345,
+        "cargo_lock_sha256": "83587d235ce28277e15e3c6e2a0c2ad93f9826339812983027253991e5ebe8ab",
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "ui",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "started_at_unix_ms": 1795053434552,
+        "finished_at_unix_ms": 1795053585308,
+        "selectors_passed": 9,
+        "selectors_failed": 0,
+        "selectors_blocked": 0,
+        "tests_reported_passed": 18,
+        "status": "Pass",
+        "exit_code": 0,
+        "result_sha256": "4bd598b473d3c00d64b9c563865bd87f8b436782f69e58fa19fdccc30737b102",
+        "junit_sha256": "11c72b7841d7eb750199e6f548806851a6963448497f57534f60e62b19bef1b6"
+      }
+    ],
+    "checks": [
+      {
+        "source_revision": "43bd2fc625043687f9d5fec86637f1243e754739",
+        "command": "cargo fmt --all --check",
+        "target": "x86_64 Linux",
+        "status": "Pass",
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "source_revision": "43bd2fc625043687f9d5fec86637f1243e754739",
+        "command": "cargo clippy --offline --locked --workspace --all-targets --features threadline-app/e2e -- -D warnings",
+        "target": "x86_64 Linux",
+        "status": "Pass",
+        "exit_code": 0,
+        "log_sha256": "d236693683e0702abc38f8ce4a17a313e8832ac3e666657bdada5fe21c006047"
+      }
+    ]
+  },
+  "windows": {
+    "host": {
+      "os": "Windows 11 Enterprise 23H2",
+      "build": "22631.7652",
+      "architecture": "x64"
+    },
+    "target": "x86_64-pc-windows-msvc",
+    "scope": "Native Rust test executables including in-process GPUI. External product journeys and installer suites have separate receipts.",
+    "report_group": "unit-43bd2fc/receipts-verified",
+    "build_command": "cargo test --locked --offline --workspace --tests --no-run --features threadline-app/e2e --target x86_64-pc-windows-msvc --message-format json",
+    "default_suite": {
+      "executables": 32,
+      "passed": 276,
+      "failed": 0,
+      "ignored": 3,
+      "numeric_exit_receipts": 32,
+      "nonzero_exits": 0,
+      "exits_sha256": "16c57771c0cddfe2fb2e002c1243977bd72f0fec0f1d27bea12570da71c7821b",
+      "executable_manifest_sha256": "03561b5d8ebbea4df493b8eda3537a2f31a6c49d5e05061d664206ad1cddadf0",
+      "build_manifest_sha256": "e081cf1ad1fa01a64d893b8e4fcc61f22f8605a4a9e79afaa15b9d642650e736",
+      "ignored_tests": [
+        {
+          "suite": "threadline-installer",
+          "test": "cleanup::tests::it_019_explicit_removal_deletes_only_the_generated_profile_credential ... ignored, uses two freshly generated, test-owned native Windows Credential Manager entries"
+        },
+        {
+          "suite": "threadline_platform",
+          "test": "credentials::windows::tests::native_restart_fixture_reader ... ignored, child invoked only by the protected-store restart fixture"
+        },
+        {
+          "suite": "threadline_platform",
+          "test": "credentials::windows::tests::native_synthetic_protected_store_round_trip ... ignored, requires a Windows user logon with Credential Manager access"
+        }
+      ],
+      "runs": [
+        {
+          "suite": "access",
+          "cargo_target": "access-48f661e111acba4f.exe",
+          "package": "threadline-storage",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "339c3605bb056bb78d9b7a8f7748b86d7d2953d123f673fd12d009482f4e5051",
+          "libtest_status": "Pass",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "48da229b68ab7bbb758e6a76bb59b10cfdfaa61298872427c311d461af378155",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "bootstrap_command",
+          "cargo_target": "bootstrap_command-0af89cf1e83adde4.exe",
+          "package": "threadline-installer",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "9d40e149102ab6aee3425bd1c1c6d1d086314e1bb600a823770d965a521ad405",
+          "libtest_status": "Pass",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "e8b74cdc040ebf3b737b5e2ee69069b57d5ca9a0aae7eaa00fc9f2576c0e8bb2",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "durability",
+          "cargo_target": "durability-e5fff9fbfe9d2fe7.exe",
+          "package": "threadline-storage",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "fc75066b0790500b28e1a8c5c86368fb57b08cfd32a3efd37722844262b8177c",
+          "libtest_status": "Pass",
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "ff5a9cd7b3627c6c00f3b0edbe0e30aa75b43f4802772a60e193a42888e27efe",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "feasibility_ui",
+          "cargo_target": "feasibility_ui-876c585795e83ab7.exe",
+          "package": "threadline-app",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "4e669fa84e8a1dcc7cd2424a70a91cd9e36248fd7280ce3f58531b2658ecc642",
+          "libtest_status": "Pass",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "29b19d234ff9fdea0f2619aaad4972f3729cec8a0808029bab92bd8150b9e971",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "fixtures",
+          "cargo_target": "fixtures-045b020ddb78eead.exe",
+          "package": "threadline-storage",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "68ccf5824c10224d3f2cc61a9ce578563ee35237c6991e1c957e7dde63e87334",
+          "libtest_status": "Pass",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "825d2c0be066632f981a35968684f005f8bb42e9fb6b1e7176f8bebb3840155b",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "foundation",
+          "cargo_target": "foundation-a715a3daa3442743.exe",
+          "package": "threadline-core",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "da5f4b0a4a06fd5186ce7c9aad985e5c6aef08a2f4a6dd9139a74485852674fc",
+          "libtest_status": "Pass",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "7c51dda40f1bc6df9113d9fffec7b628cfd9dc30aba4b9c5af2e0003795064b4",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "github_access",
+          "cargo_target": "github_access-255c21de49cfeb7b.exe",
+          "package": "threadline-core",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "146b3c76dc877656a481992122e8785ef8481c2113c6f1e8c8cc8d84ab7f115a",
+          "libtest_status": "Pass",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "83701765087c35a24de7bcaddd74ed4def4e406d8ca9b2fe64ae18361eb34fae",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "github_history",
+          "cargo_target": "github_history-7b7dc8264599df35.exe",
+          "package": "threadline-core",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "41dd57a2d337facaaf473a7f76254dc4915b038511e318f10c2ff6c1f7963f9f",
+          "libtest_status": "Pass",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "c00f57659b416a2fd5efab24d9c19e3e13eea04a077afd800347b684e2ae2ab2",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "github_merge",
+          "cargo_target": "github_merge-50e05035baa9f588.exe",
+          "package": "threadline-core",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "2a447638f0b14c4b6db93efdca85f274cec588f18954aa3b0e4479d634717fcd",
+          "libtest_status": "Pass",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "42976cc05fa8773c062922539b411419f26871451e75e23df8bc8f22a9bf335c",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "github_pr",
+          "cargo_target": "github_pr-37e767667cda878a.exe",
+          "package": "threadline-core",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "6235a96c99530789c6a2f2477fc6422c554a1d339776ad08d63133765023774d",
+          "libtest_status": "Pass",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "40ca7550c9a5ab645c5f6815d7c5fa00a0acee57454a149252ec7dbe7fd7bcbc",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "github_reader",
+          "cargo_target": "github_reader-5e27ad09ade17781.exe",
+          "package": "threadline-core",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "4dc3aa89237729d6b6319e91a2a9bf55a0b165b098fe13de61041ddb1049b84a",
+          "libtest_status": "Pass",
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "438cec6cc0f67d6ace3a4490e1575198716c3e514bb7b907d77a9d0c75f765de",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "github_review_writes",
+          "cargo_target": "github_review_writes-edcd2e383d55394d.exe",
+          "package": "threadline-core",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "ba55f64d85494c252e23788c748c2a369def388616eb2ee11a704a8fb25e8941",
+          "libtest_status": "Pass",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "8fb87ab50f7a2a096b7fa0353a54f9a114ac355f10c75a63d78caf632377c8c6",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "github_writes",
+          "cargo_target": "github_writes-02f5f590d9c84537.exe",
+          "package": "threadline-core",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "7cefcfbc73265c2ccb99136c9169ca5df53c8a3d79ff581b811837f5cf6326b9",
+          "libtest_status": "Pass",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "3a84107984ae75cbb586d3c1a1f17809184b61e65c8a58d6c2713ee27f5bb8e8",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "history",
+          "cargo_target": "history-aa6ec91941dc5d49.exe",
+          "package": "threadline-storage",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "dae8920cd652fe28442b17bdd45212c2eae4df66fbf547fbedfe02bfed673746",
+          "libtest_status": "Pass",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "9cf09c6c426165f00033075cc1aeab3c066ff9a197761e1482f7bb268c85c6a4",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "history_monitor",
+          "cargo_target": "history_monitor-acbedc405128af21.exe",
+          "package": "threadline-storage",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "c8e5664164f4ccd7e5a6a47297eef90e0df5150e0cedbf5753b21536d7420e86",
+          "libtest_status": "Pass",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "24b25640f0234586e8f39bd8b28b829ea140e4cadd327133713f3b7f74aeefc5",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "identity",
+          "cargo_target": "identity-05dccc27e081c34f.exe",
+          "package": "threadline-storage",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "04963b31b3dc37154f65610d892949801e65052a33df07e9b2ef653819fd23d0",
+          "libtest_status": "Pass",
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "49db1d1f9359833d1e93f18067c7c270aa28bccb83c45fb921160512592ad552",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "merges",
+          "cargo_target": "merges-2bd31f55ab52f118.exe",
+          "package": "threadline-storage",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "9865909dfb658acd0607587858819b94b01b32341991b7d953291a330cc3f3c9",
+          "libtest_status": "Pass",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "be4c0c9fd8290a0bdc049134f455741c68b515648258bf6181e66ebf3b9d6154",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "notifications",
+          "cargo_target": "notifications-4a392bb761150d9e.exe",
+          "package": "threadline-storage",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "5497efd8a2d9bb8e903cabc82ad77ed1c88410fbc7e2e7b481f924cac92133d0",
+          "libtest_status": "Pass",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "a3fe43c480cd91a1bff63dfc1f4a88a72e5fda7f09392caec0b16834316239e2",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "pr",
+          "cargo_target": "pr-9f91bcafc1779459.exe",
+          "package": "threadline-storage",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "e71ffa7d1f33d13323eb96719cfc951eac3920b0393aae4cfda1828b8e56897a",
+          "libtest_status": "Pass",
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "f4b05996045fbe5048c8212c8e260155a0d083ffba6024e63d57e41668b19770",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "reader",
+          "cargo_target": "reader-a935a59ab17f7756.exe",
+          "package": "threadline-storage",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "42847ef85cc64d9257019424a8ef898e1893d666cad98422d1775985f44e216b",
+          "libtest_status": "Pass",
+          "passed": 11,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "871bc20f679b1a2367f437a732fb91c83c163eb66e45e1a1b5a0183dcf9a8d59",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "resources",
+          "cargo_target": "resources-fd242b86b9158ff4.exe",
+          "package": "threadline-storage",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "97a2b1c2fa780496c0c6fbf2ea6e60c5896ff798053299be86280b7119b1bdf2",
+          "libtest_status": "Pass",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "3f0ec13f6b898441809a322ae7291b8fbd1c2cd0fd87b718b92d76f48099a532",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "reviews",
+          "cargo_target": "reviews-3b5ca640f7db36b2.exe",
+          "package": "threadline-storage",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "f9dfba323a8173514ee1cad2817dd67d894d9caad2730f8cb5ee791993eb9861",
+          "libtest_status": "Pass",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "a97107fdb8411fac5008bdd903a101e3bb322466cb0295ec90da8537f41df643",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "sync",
+          "cargo_target": "sync-a7cc9ec0e31cf389.exe",
+          "package": "threadline-storage",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "91b689b6f4660d846b10212cae3f9e581b79e43bf739251e7d83efaaea0e30d0",
+          "libtest_status": "Pass",
+          "passed": 13,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "62ce93288fa16209c92f6c7c3a8dac759eb3ef8bba3146411b684bb0b79af4dd",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "threadline",
+          "cargo_target": "threadline-397c9ff00b37ed19.exe",
+          "package": "threadline-app",
+          "kind": [
+            "bin"
+          ],
+          "optimization": "0",
+          "executable_sha256": "237f24843bc6d6aaed7fec5975efaaa2a1c3949594c3187cb8b431364a63afbb",
+          "libtest_status": "Pass",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "df166913f47ff1f04202cae9b31df67ed272d692d99a0023a8117dc3029100dd",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "threadline-installer",
+          "cargo_target": "threadline_installer-848a0def737e7534.exe",
+          "package": "threadline-installer",
+          "kind": [
+            "bin"
+          ],
+          "optimization": "0",
+          "executable_sha256": "9679cac88cdc64c89b7ebc66acb34cf797bc25e00738df115540c049f36c7d07",
+          "libtest_status": "Pass",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 1,
+          "exit_code": 0,
+          "log_sha256": "19e02f58ecc518c0842986c0c1d7887139ba8f5776307d49253b054d1a39fcbf",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "threadline_app",
+          "cargo_target": "threadline_app-0f5d07f37ebfff57.exe",
+          "package": "threadline-app",
+          "kind": [
+            "lib"
+          ],
+          "optimization": "0",
+          "executable_sha256": "1ccdaa74a90f48ed8a7885487686e665bbb9a9d2a4f8e3dd986f860b56c0f4fd",
+          "libtest_status": "Pass",
+          "passed": 46,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "218c93c8ddcf7f5d9cd5133c645c436f13bf5aad9ba6b22232bd250c399bf9ae",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "threadline_core",
+          "cargo_target": "threadline_core-697e64608de25930.exe",
+          "package": "threadline-core",
+          "kind": [
+            "lib"
+          ],
+          "optimization": "0",
+          "executable_sha256": "950963b372f12d62a5df441f0888bd483948339fa33a18af913407c405d2d47b",
+          "libtest_status": "Pass",
+          "passed": 17,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "2eaa769642f01864506d15e26a2fa59b0e0c658f65e4c8bba0ed0d31d13cd6a0",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "threadline_installer",
+          "cargo_target": "threadline_installer-b264e28cb9bc88f1.exe",
+          "package": "threadline-installer",
+          "kind": [
+            "lib"
+          ],
+          "optimization": "0",
+          "executable_sha256": "8aa7dbf2d8ac11975a1808e46a9ceff28286c375223f1aef0f9e1a4440a0763d",
+          "libtest_status": "Pass",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "32ca33da6fb4f2c43c24f903b4de189937d2a7e71d6859bac7d493ee688958fa",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "threadline_platform",
+          "cargo_target": "threadline_platform-38814737af5a9aec.exe",
+          "package": "threadline-platform",
+          "kind": [
+            "lib"
+          ],
+          "optimization": "0",
+          "executable_sha256": "74de5fd1a4ca52c364c82d12f008498e22740bad43984d2e2394d7308d0f5108",
+          "libtest_status": "Pass",
+          "passed": 9,
+          "failed": 0,
+          "ignored": 2,
+          "exit_code": 0,
+          "log_sha256": "12236a4405162320f1c8e6332538809133bf7a81157d7a0fccce57c11b48e119",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "threadline_storage",
+          "cargo_target": "threadline_storage-e18a93b7b09c2224.exe",
+          "package": "threadline-storage",
+          "kind": [
+            "lib"
+          ],
+          "optimization": "0",
+          "executable_sha256": "a6d3711806292e1ddebac1c76223e4801b7009050720ea43536fd0001684ba3b",
+          "libtest_status": "Pass",
+          "passed": 16,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "e10620c1be0de64b48e968f562ab932b9ba670b4e89181196426bfada3461cec",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "writes",
+          "cargo_target": "writes-111cb9650ff87dae.exe",
+          "package": "threadline-storage",
+          "kind": [
+            "test"
+          ],
+          "optimization": "0",
+          "executable_sha256": "a0675dc3e30395c51c95d4c4d9fa2e7ab69468550a56a8cdc2dd444b9f0e5a98",
+          "libtest_status": "Pass",
+          "passed": 12,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "d8e621d7dedcf6c956905e16d3092309b58ab46317109e6393524ecfd237b0bc",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "xtask",
+          "cargo_target": "xtask-5f2a42cfbd487da1.exe",
+          "package": "xtask",
+          "kind": [
+            "bin"
+          ],
+          "optimization": "0",
+          "executable_sha256": "3dc98098822e5e8bbc61e838217ad4610db2f5604cc96d4f562f3b1578aa386a",
+          "libtest_status": "Pass",
+          "passed": 55,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "ad3882a05c22a5ef3f9c4acc6678eed96fdaa515481ec75b6213d7be11201605",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    "earlier_launcher": {
+      "report_group": "unit-43bd2fc/receipts",
+      "exit_receipt_sha256": "8a6d9e0a5ca05eef6ada1a114188a981189141501bfde0c01d2d4719192d995a",
+      "detail": "The PowerShell launcher did not record numeric child process exit status. Verified rerun used the same executable hashes.",
+      "libtest_totals": {
+        "passed": 276,
+        "failed": 0,
+        "ignored": 3
+      },
+      "protected_store_log_sha256": "a9a8ada347c2c912bce1f6983a141be606f10b4796c5a11505e25174795bea34"
+    },
+    "explicit_protected_store": {
+      "command": "native_synthetic_protected_store_round_trip --ignored",
+      "executable_sha256": "74de5fd1a4ca52c364c82d12f008498e22740bad43984d2e2394d7308d0f5108",
+      "libtest_status": "Pass",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "exit_code": 0,
+      "log_sha256": "f43b6081ec9c7ca7fc3cfef467432cfcf77bce4e0fa938db1cb777262c90f2ff",
+      "exit_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "uses_test_owned_credentials": true,
+      "cross_process_read_verified": true,
+      "cleanup_verified": true
+    },
+    "explicit_installer_owned_cleanup": {
+      "executable_sha256": "9679cac88cdc64c89b7ebc66acb34cf797bc25e00738df115540c049f36c7d07",
+      "test": "cleanup::tests::it_019_explicit_removal_deletes_only_the_generated_profile_credential",
+      "libtest_status": "Pass",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "exit_code": 0,
+      "log_sha256": "332eb26e889c583e017bbbcd59795f5cd19bdcfea942a53d31557bad35b26cf5",
+      "exit_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "scope": "The retained profile, selected native credential, and unrelated native credential were generated for this test.",
+      "declined_confirmation_kept_both_keys": true,
+      "accepted_confirmation_removed_selected_database_and_key": true,
+      "other_key_preserved_until_fixture_teardown": true
+    },
+    "windows_target_checks": [
+      {
+        "source_revision": "43bd2fc625043687f9d5fec86637f1243e754739",
+        "command": "cargo clippy --locked --offline --target x86_64-pc-windows-msvc --workspace --all-targets --features threadline-app/e2e -- -D warnings",
+        "target": "x86_64-pc-windows-msvc",
+        "status": "Pass",
+        "exit_code": 0,
+        "log_sha256": "66954fb3a63885993a6a2bacbf41314c067416510e1e5ec834ca1c52a059bfbe"
+      },
+      {
+        "source_revision": "1f9ce0596cdf205c5d74a597cf0d88830785bea4",
+        "target": "x86_64-pc-windows-msvc",
+        "status": "Pass",
+        "check": "Strict Clippy with the app E2E feature",
+        "log_sha256": "c86799db91c62eecc1fc1f6d19ac56d6cf7ec3bb2f1d9232894e83d5b0931416"
+      }
+    ]
+  }
+}
