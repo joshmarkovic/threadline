@@ -199,17 +199,27 @@ function Invoke-SharedPrPanesProof([IntPtr]$Window) {
     $null = Wait-Reader 'the duplicate added a second pane to the layout' {
         param($reader) $reader.pane_count -eq 2 -and ($reader.tab_counts -join ',') -ceq '1,1'
     }
-    Wait-For 'restore both panes after entering the review in a maximized pane' {
-        Invoke-OwnedFixtureControl $Window 'reader-maximize-pane' $null 'Restore panes'
-    }
-    $null = Wait-SharedPrPanes 'two distinct pane tabs displaying the same immutable pull request' $item {
-        param($left, $right) $left.view.review_draft.id -ceq $draft -and $right.view.review_draft.id -ceq $draft
+    $null = Wait-PrReader 'the maximized duplicate is focused with the original review in its other pane' {
+        param($pr, $reader)
+        $reader.focused_pane -eq 1 -and $reader.active_item -eq $item -and $pr.head -ceq $head -and
+            $null -ne $pr.review_draft -and $pr.review_draft.id -ceq $draft -and !$pr.review_draft.owner_tab
     }
     Click-AccountControl $Window 'pr-1-files'
     Click-AccountControl $Window 'pr-1-file-0'
     Click-AccountControl $Window 'pr-1-diff-split'
-    $null = Wait-SharedPrPanes 'the right pane has an exact independent split code selection' $item {
-        param($left, $right) $right.view.section -ceq 'Files' -and $right.view.selected_file -ceq $path -and $right.view.diff_mode -ceq 'Split'
+    $null = Wait-PrReader 'the right pane has an exact independent split code selection' {
+        param($pr, $reader)
+        $reader.focused_pane -eq 1 -and $pr.head -ceq $head -and $pr.section -ceq 'Files' -and
+            $pr.selected_file -ceq $path -and $pr.diff_mode -ceq 'Split'
+    }
+    Wait-For 'restore both panes after setting the split view in the maximized duplicate' {
+        Invoke-OwnedFixtureControl $Window 'reader-maximize-pane' $null 'Restore panes'
+    }
+    $null = Wait-SharedPrPanes 'two distinct tabs displaying the same immutable pull request and saved draft' $item {
+        param($left, $right)
+        $left.view.review_draft.id -ceq $draft -and $left.view.review_draft.owner_tab -and
+            $right.view.review_draft.id -ceq $draft -and !$right.view.review_draft.owner_tab -and
+            $right.view.section -ceq 'Files' -and $right.view.selected_file -ceq $path -and $right.view.diff_mode -ceq 'Split'
     }
     Click-AccountControl $Window 'pr-0-conversation'
     Click-AccountControl $Window 'pr-1-conversation'
