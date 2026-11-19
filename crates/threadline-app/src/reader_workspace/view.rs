@@ -625,10 +625,19 @@ impl ReaderWorkspace {
                         .iter()
                         .enumerate()
                         .map(|(index, hit)| {
+                            let anchor = hit.anchor.as_ref().map(|anchor| {
+                                if hit.row.kind == ItemKind::PullRequest
+                                    && hit.source == threadline_storage::reader::HitSource::Comment
+                                {
+                                    format!("{PR_DISCUSSION_ANCHOR}{anchor}")
+                                } else {
+                                    anchor.clone()
+                                }
+                            });
                             self.result_row(
                                 index,
                                 &hit.row,
-                                hit.anchor.clone(),
+                                anchor,
                                 Some(hit.excerpt.clone()),
                                 palette,
                                 cx,
@@ -2050,7 +2059,7 @@ pub(super) fn resource_problem(
         .child(accessible)
 }
 
-pub(super) const ISSUE_URL_ANCHOR: &str = "issue-comment:";
+pub(super) const PR_DISCUSSION_ANCHOR: &str = "issue-comment:";
 pub(super) const REVIEW_URL_ANCHOR: &str = "review-comment:";
 
 pub(super) struct ItemUrl {
@@ -2093,7 +2102,7 @@ pub(super) fn parse_item_url(raw: &str) -> Option<ItemUrl> {
     let anchor = comment
         .map(|id| {
             let prefix = if kind == ItemKind::PullRequest {
-                ISSUE_URL_ANCHOR
+                PR_DISCUSSION_ANCHOR
             } else {
                 ""
             };

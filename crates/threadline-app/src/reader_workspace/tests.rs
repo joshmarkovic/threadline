@@ -173,6 +173,26 @@ fn ui_008_pasted_github_comments_reuse_their_cached_tab_and_keep_other_panes(
             },
         )
         .unwrap();
+    let pull_comments = ResourceKey {
+        target: ResourceTarget::Item(pull),
+        ..comments
+    };
+    let progress = store
+        .start_resource_fetch(pull_comments, WalkMode::Full)
+        .unwrap();
+    store
+        .commit_discussion_page(
+            account,
+            pull,
+            &progress,
+            DiscussionInputPage {
+                comments: vec![comment(803, "PrSearchAnchor ordinary PR discussion")],
+                next_cursor: None,
+                completed_validators: None,
+                fetched_at_ms: 901,
+            },
+        )
+        .unwrap();
     let oid = |c: &str| CommitOid::parse(&c.repeat(40)).unwrap();
     let revision = store
         .record_pr_revision(
@@ -358,6 +378,59 @@ fn ui_008_pasted_github_comments_reuse_their_cached_tab_and_keep_other_panes(
         Some("00000000000000000802")
     );
     assert_eq!(saved.panes[1].tabs[0].id, "original-pull");
+    click(cx, window, "reader-tab-1-0");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let state = reader.read(cx);
+            !state.layout_busy
+                && state
+                    .active_tab()
+                    .is_some_and(|tab| tab.id == "original-pull")
+        })
+    });
+    click(cx, window, "pr-1-files");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let state = reader.read(cx);
+            !state.layout_busy
+                && state
+                    .active_tab()
+                    .is_some_and(|tab| pr::tab_settings(tab).section == PrSection::Files)
+        })
+    });
+    cx.update_window(window, |_, window, cx| {
+        reader.read(cx).search.focus_handle(cx).focus(window, cx);
+        window.input("PrSearchAnchor", cx);
+    })
+    .unwrap();
+    click(cx, window, "reader-search-submit");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            reader
+                .read(cx)
+                .search_hits
+                .as_ref()
+                .is_some_and(|hits| hits.len() == 1)
+        })
+    });
+    click(cx, window, "reader-result-0");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let state = reader.read(cx);
+            !state.layout_busy
+                && state.active_tab().is_some_and(|tab| {
+                    tab.id == "original-pull"
+                        && pr::tab_settings(tab).section == PrSection::Conversation
+                        && tab.view.scroll_anchor.as_deref()
+                            == Some("issue-comment:00000000000000000803")
+                })
+                && state.tab_views.get("original-pull").is_some_and(|view| {
+                    view.data.discussion.records.first().is_some_and(|record| {
+                        record.body == "PrSearchAnchor ordinary PR discussion"
+                    })
+                })
+        })
+    });
     assert!(
         view::parse_item_url("https://other.example/fixture/relay/pull/1#discussion_r902")
             .is_none()
