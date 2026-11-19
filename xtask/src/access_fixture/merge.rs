@@ -1,4 +1,5 @@
 use super::*;
+use std::time::Instant;
 
 pub(super) const A_HEAD: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const A_BASE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
