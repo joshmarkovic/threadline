@@ -50,6 +50,30 @@ pub(super) fn patch(phase: Phase, path: &str, body: &Value) -> Route {
     }
 }
 
+pub(super) fn classify_unexpected_request(
+    phase: Phase,
+    method: Option<&str>,
+    target: Option<&str>,
+) -> Option<Route> {
+    if phase != Phase::CommentDependencyResume {
+        return None;
+    }
+    let target = target?;
+    let (path, query) = target.split_once('?').unwrap_or((target, ""));
+    match method? {
+        "GET" | "PATCH" if path == EXACT && !query.is_empty() => {
+            Some(Route::DependencyUnexpectedCommentQuery)
+        }
+        "PATCH" if path == EXACT => Some(Route::DependencyEditBodyMismatch),
+        "GET" | "PATCH" if path.starts_with("/repos/fixture-org/private/issues/comments/") => {
+            Some(Route::DependencyWrongCommentId)
+        }
+        "GET" => Some(Route::DependencyUnexpectedRead),
+        "PATCH" => Some(Route::DependencyUnexpectedEdit),
+        _ => None,
+    }
+}
+
 pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
     if !active(phase) {
         return None;
@@ -111,6 +135,14 @@ pub(super) fn trace(records: &[RequestEvidence]) -> bool {
             && entry.phase != Phase::CommentDependencyOffline
             && !matches!(
                 entry.route,
+                Route::DependencyUnexpectedRead
+                    | Route::DependencyUnexpectedEdit
+                    | Route::DependencyWrongCommentId
+                    | Route::DependencyUnexpectedCommentQuery
+                    | Route::DependencyEditBodyMismatch
+            )
+            && !matches!(
+                entry.route,
                 Route::Unexpected | Route::CommentCreated | Route::CommentReplyLost
             )
     }) && effects
@@ -141,6 +173,36 @@ pub(super) fn trace(records: &[RequestEvidence]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dependent_comment_request_diagnostics_use_checked_shapes_only() {
+        let phase = Phase::CommentDependencyResume;
+        let cases = [
+            (
+                "GET",
+                "/repos/fixture-org/private/issues/comments/99",
+                Route::DependencyWrongCommentId,
+            ),
+            (
+                "GET",
+                "/repos/fixture-org/private/issues/comments/4101?unknown=value",
+                Route::DependencyUnexpectedCommentQuery,
+            ),
+            ("PATCH", EXACT, Route::DependencyEditBodyMismatch),
+            ("GET", "/elsewhere", Route::DependencyUnexpectedRead),
+            ("PATCH", "/elsewhere", Route::DependencyUnexpectedEdit),
+        ];
+        for (method, target, expected) in cases {
+            assert_eq!(
+                classify_unexpected_request(phase, Some(method), Some(target)),
+                Some(expected)
+            );
+            assert_eq!(
+                classify_unexpected_request(Phase::WriteOnline, Some(method), Some(target)),
+                None
+            );
+        }
+    }
 
     #[test]
     fn comment_dependency_fixture_uses_exact_remote_id_and_preserves_order() {

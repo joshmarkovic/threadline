@@ -247,6 +247,11 @@ enum Route {
     DependencyCommentRead,
     DependencyCommentEdited,
     DependencyCommentLost,
+    DependencyUnexpectedRead,
+    DependencyUnexpectedEdit,
+    DependencyWrongCommentId,
+    DependencyUnexpectedCommentQuery,
+    DependencyEditBodyMismatch,
     Unexpected,
 }
 
@@ -754,6 +759,8 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         Route::BacklogFeed(_) => request.1.map(str::to_owned),
         _ => None,
     };
+    let dependency_failure =
+        comment_dependency::classify_unexpected_request(phase, request.0, request.1);
     let mut authorized = false;
     let mut content_length = 0usize;
     loop {
@@ -835,6 +842,9 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         }) {
             route = Route::Unexpected;
         }
+    }
+    if authorized && route == Route::Unexpected {
+        route = dependency_failure.unwrap_or(Route::Unexpected);
     }
     Ok((route, authorized, binding))
 }
