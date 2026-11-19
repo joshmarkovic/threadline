@@ -164,3 +164,93 @@ function Invoke-PrReaderProof([IntPtr]$Window) {
     Stop-ThroughUi
     $script:report.detail = 'Native tabs preserved their own provider revision and code state while a verified linked issue response was delayed across the tab switch.'
 }
+
+function Wait-SharedPrPanes([string]$Description, [long]$Item, [scriptblock]$CheckPanes) {
+    return Wait-Reader $Description {
+        param($reader)
+        $property = $reader.PSObject.Properties['shared_pr_panes']
+        if ($null -eq $property -or @($property.Value).Count -ne 2 -or $reader.cached_visible_panes -ne 2) { return $false }
+        $left, $right = $property.Value
+        $left.pane -eq 0 -and $right.pane -eq 1 -and $left.item -eq $Item -and $right.item -eq $Item -and
+            $left.tab -and $right.tab -and $left.tab -cne $right.tab -and
+            $left.view.revision_id -gt 0 -and $left.view.revision_id -eq $right.view.revision_id -and
+            $left.view.head -ceq ('b' * 40) -and $right.view.head -ceq ('b' * 40) -and
+            (& $CheckPanes $left $right $reader)
+    }
+}
+
+function Invoke-SharedPrPanesProof([IntPtr]$Window) {
+    Set-AccessPhase 'pr-load'
+    Wait-SeededFixtureAccount
+    Click-AccountControl $Window 'reader-repository-1'
+    Click-AccountControl $Window 'reader-fetch-repository'
+    $head = 'b' * 40
+    $path = 'src/first.rs'
+    $first = Open-FixturePr $Window 0 42 'First fixture pull request' $head $path
+    $item = $first.cached_reader.active_item
+    $draft = Enter-FixtureAnchoredReview $Window $head $path
+    Click-AccountControl $Window 'pr-0-review-toggle-editor'
+    $null = Wait-PrReader 'the exact saved draft with its editor collapsed' {
+        param($pr) $pr.review_draft.id -ceq $draft -and $pr.review_draft.saved -and $pr.review_draft.collapsed
+    }
+    Wait-For 'open the same downloaded pull request beside its original view' {
+        Invoke-OwnedFixtureControl $Window 'reader-duplicate-tab' $null 'Duplicate view beside'
+    }
+    $null = Wait-SharedPrPanes 'two distinct pane tabs displaying the same immutable pull request' $item {
+        param($left, $right) $left.view.review_draft.id -ceq $draft -and $right.view.review_draft.id -ceq $draft
+    }
+    Click-AccountControl $Window 'pr-1-files'
+    Click-AccountControl $Window 'pr-1-file-0'
+    Click-AccountControl $Window 'pr-1-diff-split'
+    $null = Wait-SharedPrPanes 'the right pane has an exact independent split code selection' $item {
+        param($left, $right) $right.view.section -ceq 'Files' -and $right.view.selected_file -ceq $path -and $right.view.diff_mode -ceq 'Split'
+    }
+    Click-AccountControl $Window 'pr-0-conversation'
+    Click-AccountControl $Window 'pr-1-conversation'
+    $baseline = Wait-SharedPrPanes 'the two existing views show conversation before either requests the review family' $item {
+        param($left, $right, $reader)
+        $left.view.section -ceq 'Conversation' -and $right.view.section -ceq 'Conversation' -and
+            $left.provider_draft -eq $false -and $right.provider_draft -eq $false -and
+            $left.review_rows -eq 0 -and $right.review_rows -eq 0 -and
+            $left.review_coverage -cne 'Complete' -and $right.review_coverage -cne 'Complete' -and $reader.pending_pr_reads -eq 0
+    }
+    $tabs = @($baseline.cached_reader.shared_pr_panes.tab)
+    $revision = $baseline.cached_reader.shared_pr_panes[0].view.revision_id
+    Set-AccessPhase 'pr-shared-hold'
+    try {
+        Click-AccountControl $Window 'pr-0-reviews-fetch'
+        $pending = Join-Path ([IO.Path]::GetDirectoryName($script:AccessPhaseFile)) 'pr-shared-review-pending.txt'
+        Wait-For 'the authorized revision review response held by the local provider' {
+            [IO.File]::Exists($pending)
+        }
+        Click-AccountControl $Window 'pr-1-reviews-fetch'
+        Click-AccountControl $Window 'pr-1-files'
+        $held = Wait-SharedPrPanes 'the left Conversation and right Files views while the shared request is held' $item {
+            param($left, $right, $reader)
+            $left.tab -ceq $tabs[0] -and $right.tab -ceq $tabs[1] -and $left.view.revision_id -eq $revision -and
+                $left.view.section -ceq 'Conversation' -and $right.view.section -ceq 'Files' -and
+                $right.view.selected_file -ceq $path -and $right.view.diff_mode -ceq 'Split' -and
+                $left.review_rows -eq 0 -and $reader.pending_pr_reads -eq 1
+        }
+    } finally {
+        Set-AccessPhase 'pr-shared-release'
+    }
+    Add-Evidence 'Both native panes stay usable while the two review requests share one held flight' $held.cached_reader.shared_pr_panes
+    $after = Wait-SharedPrPanes 'the same two view selections and one partial shared review page after release' $item {
+        param($left, $right, $reader)
+        $anchor = @($left.view.review_draft.anchors)
+        $left.tab -ceq $tabs[0] -and $right.tab -ceq $tabs[1] -and $left.view.revision_id -eq $revision -and
+            $left.view.section -ceq 'Conversation' -and $right.view.section -ceq 'Files' -and
+            $left.provider_draft -eq $true -and $right.provider_draft -eq $true -and
+            $left.review_coverage -ceq 'Partial' -and $left.review_rows -eq 1 -and
+            $right.view.files_coverage -ceq 'Complete' -and $right.view.selected_file -ceq $path -and $right.view.diff_mode -ceq 'Split' -and
+            $left.view.review_draft.id -ceq $draft -and $right.view.review_draft.id -ceq $draft -and
+            $left.view.review_draft.saved -and $left.view.review_draft.owner_tab -and !$right.view.review_draft.owner_tab -and
+            $anchor.Count -eq 1 -and $anchor[0].path -ceq $path -and $anchor[0].side -ceq 'Right' -and
+            $anchor[0].first_line -eq 1 -and $anchor[0].last_line -eq 1 -and $anchor[0].source_oid -ceq $head -and
+            $reader.pending_pr_reads -eq 0 -and $reader.outbox -eq 0
+    }
+    Add-Evidence 'Publish the shared refresh to both panes and retain the independent code and anchored unsent review' $after.cached_reader.shared_pr_panes
+    Stop-ThroughUi
+    $script:report.detail = 'Two native tabs displayed Conversation and Files for the same pull request during a held shared review refresh. The same provider revision and draft remained bound, Files kept its split path, and the Conversation showed one partial review page.'
+}

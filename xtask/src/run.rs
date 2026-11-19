@@ -610,6 +610,8 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
         Some(id) => {
             let mode = if id == "S08-COMMENT-DEPENDENCY" {
                 Some(NativeMode::WindowsIssueWrites)
+            } else if id == "S06-SHARED-PR-PANES" {
+                Some(NativeMode::WindowsPullRequest)
             } else if id == "S11-NATIVE-ACTIVITY" {
                 Some(NativeMode::WindowsNativeActivity)
             } else if id == "S12-NATIVE-LIFECYCLE" {
@@ -873,6 +875,7 @@ fn native_driver(
         NativeMode::WindowsLargeWorkspace => Some("LargeWorkspace"),
         NativeMode::WindowsSync => Some("Sync"),
         NativeMode::WindowsNotificationSchedule => Some("NotificationSchedule"),
+        NativeMode::WindowsPullRequest if id == "S06-SHARED-PR-PANES" => Some("SharedPullRequest"),
         NativeMode::WindowsPullRequest => Some("PullRequest"),
         NativeMode::WindowsHistory => Some("History"),
         NativeMode::WindowsReviewDraft if id == "S08-REVIEW-DECISIONS" => Some("ReviewDecisions"),
@@ -1060,6 +1063,9 @@ fn native_driver(
             (Status::Pass, NativeMode::WindowsSync) => TraceCheck::SyncJourney,
             (Status::Pass, NativeMode::WindowsNotificationSchedule) => {
                 TraceCheck::NotificationSchedule
+            }
+            (Status::Pass, NativeMode::WindowsPullRequest) if id == "S06-SHARED-PR-PANES" => {
+                TraceCheck::SharedPrPanes
             }
             (Status::Pass, NativeMode::WindowsPullRequest) => TraceCheck::PullRequestJourney,
             (Status::Pass, NativeMode::WindowsHistory) => TraceCheck::HistoryJourney,

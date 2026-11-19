@@ -89,7 +89,54 @@ struct PrSourceObservation {
     path: String,
 }
 
+#[cfg(feature = "e2e")]
+#[derive(serde::Serialize)]
+pub(crate) struct SharedPrPaneObservation {
+    pane: usize,
+    tab: String,
+    item: i64,
+    provider_draft: Option<bool>,
+    review_coverage: Option<String>,
+    review_rows: Option<usize>,
+    view: PrObservation,
+}
+
 impl ReaderWorkspace {
+    #[cfg(feature = "e2e")]
+    pub(super) fn shared_pr_observation(&self, cx: &gpui_kit::App) -> Vec<SharedPrPaneObservation> {
+        static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        if self.maximized
+            || !*ENABLED.get_or_init(|| {
+                std::env::var_os("THREADLINE_E2E_SHARED_PR").is_some_and(|value| value == "1")
+            })
+        {
+            return Vec::new();
+        }
+        self.layout
+            .panes
+            .iter()
+            .enumerate()
+            .filter_map(|(pane, slot)| {
+                let tab = slot.active.and_then(|index| slot.tabs.get(index))?;
+                let cached = self.tab_views.get(&tab.id)?.pr.as_ref()?;
+                let reviews = cached
+                    .data
+                    .pages
+                    .iter()
+                    .find_map(|(family, page)| (*family == PrFamily::Reviews).then_some(page));
+                Some(SharedPrPaneObservation {
+                    pane,
+                    tab: tab.id.clone(),
+                    item: tab.item.0,
+                    provider_draft: cached.data.header.draft,
+                    review_coverage: reviews.map(|page| format!("{:?}", page.state.coverage)),
+                    review_rows: reviews.map(|page| page.rows.len()),
+                    view: self.pr_observation(tab, cx)?,
+                })
+            })
+            .collect()
+    }
+
     #[cfg(feature = "e2e")]
     pub(super) fn pr_observation(&self, tab: &Tab, cx: &gpui_kit::App) -> Option<PrObservation> {
         let cached = self.tab_views.get(&tab.id)?;

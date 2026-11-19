@@ -396,6 +396,7 @@ fn known_case(lane: Lane, case: &str) -> bool {
                     | "S12-NATIVE-LIFECYCLE"
             )
             | (Lane::E2e, "S05-WINDOWS-SYNC")
+            | (Lane::E2e, "S06-SHARED-PR-PANES")
             | (Lane::E2e, "S09-MERGE-QUEUE")
             | (Lane::E2e, "S08-REVIEW-DECISIONS")
             | (Lane::E2e, "S08-THREAD-QUEUE")
@@ -413,6 +414,17 @@ mod tests {
 
     fn arguments(args: &[&str]) -> Vec<String> {
         args.iter().map(|arg| (*arg).into()).collect()
+    }
+
+    #[test]
+    fn accepts_the_shared_pr_panes_in_the_native_full_suite() {
+        let id = "S06-SHARED-PR-PANES";
+        let options = parse(&arguments(&[
+            "test", "e2e", "--suite", "full", "--case", id,
+        ]))
+        .unwrap();
+        assert_eq!(options.case.as_deref(), Some(id));
+        assert!(parse(&arguments(&["test", "integration", "--case", id])).is_err());
     }
 
     #[test]

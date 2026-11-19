@@ -91,6 +91,8 @@ pub(crate) struct ReaderObservation {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pull_request: Option<pr_view::PrObservation>,
     pub pending_pr_reads: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub shared_pr_panes: Vec<pr_view::SharedPrPaneObservation>,
     pub history: Option<history_view::HistoryObservation>,
     pub notification: activity_view::NotificationObservation,
     pub outbox: Option<u64>,
@@ -438,6 +440,7 @@ impl ReaderWorkspace {
             }),
             pull_request: active.and_then(|tab| self.pr_observation(tab, cx)),
             pending_pr_reads: self.pr_reads.len(),
+            shared_pr_panes: self.shared_pr_observation(cx),
             history: (self.surface == Surface::History).then(|| self.history.observation()),
             notification: self.notification_observation(),
             outbox: self.counts.map(|counts| counts.outbox),

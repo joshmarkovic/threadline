@@ -74,6 +74,8 @@ enum Phase {
     PrLoad,
     PrDelay,
     PrRelease,
+    PrSharedHold,
+    PrSharedRelease,
     ReviewSend,
     ReviewChanged,
     ReviewDecisions,
@@ -134,6 +136,8 @@ impl Phase {
             "pr-load" => Ok(Self::PrLoad),
             "pr-delay" => Ok(Self::PrDelay),
             "pr-release" => Ok(Self::PrRelease),
+            "pr-shared-hold" => Ok(Self::PrSharedHold),
+            "pr-shared-release" => Ok(Self::PrSharedRelease),
             "review-send" => Ok(Self::ReviewSend),
             "review-changed" => Ok(Self::ReviewChanged),
             "review-decisions" => Ok(Self::ReviewDecisions),
@@ -203,6 +207,7 @@ enum Route {
     CompareB,
     ReviewContextIssue,
     ReviewList,
+    SharedPrReview,
     ReviewRead,
     ReviewCreated,
     ReviewSubmitted,
@@ -298,6 +303,7 @@ pub enum TraceCheck {
     SyncJourney,
     NotificationSchedule,
     PullRequestJourney,
+    SharedPrPanes,
     ReviewContextJourney,
     ReviewDraftJourney,
     ReviewDecisionsJourney,
@@ -383,6 +389,7 @@ impl AccessFixture {
             TraceCheck::SyncJourney => complete_sync_journey(&records),
             TraceCheck::NotificationSchedule => complete_notification_schedule(&records),
             TraceCheck::PullRequestJourney => pr::trace(&records),
+            TraceCheck::SharedPrPanes => pr::trace_shared(&records),
             TraceCheck::ReviewContextJourney => pr::trace_review_context(&records),
             TraceCheck::ReviewDraftJourney => pr::trace_review_draft(&records),
             TraceCheck::ReviewDecisionsJourney => review_decisions::trace(&records),
@@ -600,6 +607,9 @@ fn answer(
     }
     if phase == Phase::PrDelay && route == Route::Item && authorized {
         pr::wait_for_release(phase_file, stopping)?;
+    }
+    if phase == Phase::PrSharedHold && route == Route::SharedPrReview && authorized {
+        pr::wait_for_shared_review(phase_file, stopping)?;
     }
     if authorized
         && ((phase == Phase::SyncTransport && route == Route::User)
@@ -865,6 +875,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
             });
         } else if let Some(operation) = payload.as_ref().and_then(|body| {
             review_threads::graphql(phase, body)
+                .or_else(|| pr::shared_review_query(phase, body))
                 .or_else(|| activity::graphql(phase, body))
                 .or_else(|| merge::graphql(phase, body))
                 .or_else(|| pr::activity_query(phase, body))

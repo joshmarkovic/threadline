@@ -36,11 +36,24 @@ pub(super) fn applies(phase: Phase) -> bool {
         Phase::PrLoad
             | Phase::PrDelay
             | Phase::PrRelease
+            | Phase::PrSharedHold
+            | Phase::PrSharedRelease
             | Phase::ReviewSend
             | Phase::ReviewChanged
     ) || merge::applies(phase)
         || review_threads::active(phase)
         || review_decisions::active(phase)
+}
+
+pub(super) fn shared_review_query(phase: Phase, request: &Value) -> Option<Route> {
+    let variables = request.get("variables")?;
+    (matches!(phase, Phase::PrSharedHold | Phase::PrSharedRelease)
+        && request
+            .get("query")?
+            .as_str()?
+            .starts_with("query ThreadlineReviews(")
+        && variables == &json!({"id":"PR_42","cursor":null}))
+        .then_some(Route::SharedPrReview)
 }
 
 pub(super) fn activity_query(phase: Phase, request: &Value) -> Option<Route> {
@@ -108,7 +121,30 @@ fn data(phase: Phase, route: Route) -> Option<Value> {
     };
     match route {
         Route::Items => Some(json!([first(), second()])),
-        Route::PullA => Some(pull(first(), 42, A_BASE, A_HEAD)),
+        Route::PullA => {
+            let mut value = pull(first(), 42, A_BASE, A_HEAD);
+            if matches!(phase, Phase::PrSharedHold | Phase::PrSharedRelease) {
+                value["draft"] = json!(true);
+                value["updated_at"] = json!("2021-01-02T00:00:00Z");
+            }
+            Some(value)
+        }
+        Route::SharedPrReview if matches!(phase, Phase::PrSharedHold | Phase::PrSharedRelease) => {
+            Some(json!({
+                "data": { "node": {
+                    "id":"PR_42", "fullDatabaseId":762, "baseRefOid":A_BASE, "headRefOid":A_HEAD,
+                    "repository":{"id":"R_71","name":"private","owner":{"login":"fixture-org"}},
+                    "reviewDecision":"REVIEW_REQUIRED",
+                    "reviews": {
+                        "pageInfo":{"hasNextPage":true,"endCursor":"fixture-more-reviews"},
+                        "nodes":[{"id":"RV_92","fullDatabaseId":92,"body":"First known review page",
+                            "state":"COMMENTED","submittedAt":"2021-01-02T00:00:00Z",
+                            "author":{"__typename":"User","login":"fixture-human","databaseId":92},
+                            "commit":{"oid":A_HEAD}}]
+                    }
+                }}
+            }))
+        }
         Route::PullB => Some(pull(
             second(),
             43,
@@ -230,18 +266,73 @@ pub(super) fn trace_review_draft(records: &[RequestEvidence]) -> bool {
 }
 
 pub(super) fn wait_for_release(phase_file: &Path, stopping: &AtomicBool) -> io::Result<()> {
-    let marker = phase_file.with_file_name("pr-issue-pending.txt");
-    fs::write(marker, "verified issue request received\n")?;
-    let deadline = Instant::now() + Duration::from_secs(10);
+    hold_reply(
+        phase_file,
+        stopping,
+        "pr-issue-pending.txt",
+        Phase::PrRelease,
+        Duration::from_secs(10),
+    )
+}
+
+pub(super) fn wait_for_shared_review(phase_file: &Path, stopping: &AtomicBool) -> io::Result<()> {
+    hold_reply(
+        phase_file,
+        stopping,
+        "pr-shared-review-pending.txt",
+        Phase::PrSharedRelease,
+        Duration::from_secs(12),
+    )
+}
+
+fn hold_reply(
+    phase_file: &Path,
+    stopping: &AtomicBool,
+    filename: &str,
+    release: Phase,
+    timeout: Duration,
+) -> io::Result<()> {
+    fs::write(
+        phase_file.with_file_name(filename),
+        "verified request received\n",
+    )?;
+    let deadline = Instant::now() + timeout;
     while Instant::now() < deadline && !stopping.load(Ordering::Acquire) {
-        if Phase::read(phase_file).ok() == Some(Phase::PrRelease) {
+        if Phase::read(phase_file).ok() == Some(release) {
             return Ok(());
         }
         thread::sleep(Duration::from_millis(10));
     }
     Err(io::Error::other(
-        "the native proof did not release the bounded issue response",
+        "the native proof did not release the bounded response",
     ))
+}
+
+pub(super) fn trace_shared(records: &[RequestEvidence]) -> bool {
+    records.iter().all(|row| {
+        row.fixture_authorization
+            && row.status == 200
+            && matches!(
+                row.route,
+                Route::User
+                    | Route::Repository
+                    | Route::Items
+                    | Route::PullA
+                    | Route::CompareA
+                    | Route::SharedPrReview
+            )
+    }) && [Route::Items, Route::PullA, Route::CompareA]
+        .into_iter()
+        .all(|route| {
+            records
+                .iter()
+                .any(|row| row.phase == Phase::PrLoad && row.route == route)
+        })
+        && records
+            .iter()
+            .filter(|row| row.route == Route::SharedPrReview)
+            .map(|row| row.phase)
+            .eq([Phase::PrSharedHold])
 }
 
 pub(super) fn trace(records: &[RequestEvidence]) -> bool {
@@ -288,6 +379,84 @@ pub(super) fn trace_review_context(records: &[RequestEvidence]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shared_pr_fixture_holds_the_exact_review_page_until_its_own_release() {
+        let directory = tempfile::tempdir().unwrap();
+        let fixture = AccessFixture::start(directory.path()).unwrap();
+        let address = fixture.address();
+        let get = |path: &str| {
+            let mut socket = TcpStream::connect(address).unwrap();
+            write!(
+                socket,
+                "GET {path} HTTP/1.1\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\n\r\n"
+            )
+            .unwrap();
+            let mut output = String::new();
+            socket.read_to_string(&mut output).unwrap();
+            output
+        };
+        fs::write(fixture.phase_file(), "pr-load").unwrap();
+        assert!(get(ITEMS).contains("First fixture pull request"));
+        assert!(get("/repositories/71/pulls/42").contains("\"draft\":false"));
+        assert!(
+            get(&format!(
+                "/repositories/71/compare/{A_BASE}...{A_HEAD}?per_page=20&page=1"
+            ))
+            .contains("src/first.rs")
+        );
+        fs::write(fixture.phase_file(), "pr-shared-hold").unwrap();
+        assert!(get("/repositories/71/pulls/42").contains("\"draft\":true"));
+        let request = json!({"query":"query ThreadlineReviews($id:ID!,$cursor:String) { node(id:$id) { id } }",
+            "variables":{"id":"PR_42","cursor":null}});
+        let accepted = shared_review_query(Phase::PrSharedHold, &request);
+        assert_eq!(accepted, Some(Route::SharedPrReview));
+        assert_eq!(shared_review_query(Phase::PrLoad, &request), None);
+        let mut other_revision = request.clone();
+        other_revision["variables"]["id"] = json!("PR_43");
+        assert_eq!(
+            shared_review_query(Phase::PrSharedHold, &other_revision),
+            None
+        );
+        let response = thread::spawn(move || {
+            let mut socket = TcpStream::connect(address).unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(14)))
+                .unwrap();
+            let body = request.to_string();
+            write!(socket, "POST /graphql HTTP/1.1\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\nContent-Length: {}\r\n\r\n{body}", body.len()).unwrap();
+            let mut output = String::new();
+            socket.read_to_string(&mut output).unwrap();
+            output
+        });
+        let marker = directory.path().join("pr-shared-review-pending.txt");
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while !marker.exists() && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(10));
+        }
+        assert!(marker.is_file());
+        assert!(!response.is_finished());
+        fs::write(fixture.phase_file(), "pr-shared-release").unwrap();
+        let output = response.join().unwrap();
+        assert!(output.starts_with("HTTP/1.1 200"));
+        assert!(output.contains("\"hasNextPage\":true"));
+        fixture
+            .finish(directory.path(), TraceCheck::SharedPrPanes)
+            .unwrap();
+        let mut captured: Vec<Value> = serde_json::from_slice(
+            &fs::read(directory.path().join("github-access-trace.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            captured
+                .iter()
+                .filter(|row| row["route"] == "shared_pr_review")
+                .count(),
+            1
+        );
+        let duplicate = captured.pop().unwrap();
+        assert_eq!(duplicate["phase"], "pr_shared_hold");
+    }
 
     #[test]
     fn accepted_review_steps_return_distinct_required_request_receipts() {

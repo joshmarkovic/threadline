@@ -8,7 +8,7 @@ param(
     [switch]$PlatformProof,
     [switch]$ToastProof,
     [switch]$AccessProof,
-    [ValidateSet('Offline', 'Resume', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'CredentialBoundary', 'NativeLifecycle', 'NativeActivity', 'History', 'CommentDependency', 'Writes', 'WriteSurface')][string]$ReaderProof,
+    [ValidateSet('Offline', 'Resume', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace', 'Sync', 'NotificationSchedule', 'PullRequest', 'SharedPullRequest', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'CredentialBoundary', 'NativeLifecycle', 'NativeActivity', 'History', 'CommentDependency', 'Writes', 'WriteSurface')][string]$ReaderProof,
     [switch]$AccessibilityProof,
     [string]$AccessAddress,
     [string]$AccessPhaseFile,
@@ -37,7 +37,7 @@ $reportName = if ($Measure) {
     'sync-native.json'
 } elseif ($ReaderProof -eq 'NotificationSchedule') {
     'notification-schedule-native.json'
-} elseif ($ReaderProof -eq 'PullRequest') {
+} elseif ($ReaderProof -in @('PullRequest', 'SharedPullRequest')) {
     'pr-native.json'
 } elseif ($ReaderProof -in @('ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue')) {
     'review-draft-native.json'
@@ -94,7 +94,7 @@ $copiedClipboardSequence = $null
 $toastFixture = $null
 $toastSubmissionAttempted = $false
 $script:UseOwnedUiAutomation = $false
-$script:UseSeededFixtureAuth = $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'History', 'CommentDependency', 'Writes', 'WriteSurface', 'PerformanceConcurrent', 'NativeActivity')
+$script:UseSeededFixtureAuth = $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'SharedPullRequest', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'History', 'CommentDependency', 'Writes', 'WriteSurface', 'PerformanceConcurrent', 'NativeActivity')
 
 function Get-FileSha256 {
     param([string]$Path)
@@ -230,6 +230,8 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_READER_IDLE')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_NATIVE_LIFECYCLE')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_NATIVE_ACTIVITY')
+    $info.EnvironmentVariables.Remove('THREADLINE_E2E_SHARED_PR')
+    if ($ReaderProof -eq 'SharedPullRequest') { $info.EnvironmentVariables['THREADLINE_E2E_SHARED_PR'] = '1' }
     if ($ReaderProof -in @('Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) { $info.EnvironmentVariables['THREADLINE_E2E_READER_TIMING'] = '1' }
     if ($ReaderIdle) { $info.EnvironmentVariables['THREADLINE_E2E_READER_IDLE'] = '1' }
     if ($ToastProof -and $null -ne $script:toastFixture) {
@@ -925,7 +927,7 @@ try {
         }
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
-    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'CredentialBoundary', 'NativeLifecycle', 'NativeActivity', 'History', 'CommentDependency', 'Writes', 'WriteSurface', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) {
+    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'SharedPullRequest', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'CredentialBoundary', 'NativeLifecycle', 'NativeActivity', 'History', 'CommentDependency', 'Writes', 'WriteSurface', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) {
         Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
         . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
         $script:UseOwnedUiAutomation = !$AccessibilityProof -and $ReaderProof -ne 'PerformancePhysical'
@@ -933,9 +935,9 @@ try {
     }
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
     if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'DirectMerge', 'MergeQueue', 'NativeLifecycle', 'NativeActivity', 'PerformanceConcurrent')) { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
-    if ($ReaderProof -in @('PullRequest', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'NativeLifecycle', 'NativeActivity')) { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
+    if ($ReaderProof -in @('PullRequest', 'SharedPullRequest', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'NativeLifecycle', 'NativeActivity')) { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
     if ($ReaderProof -in @('NotificationSchedule', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'CredentialBoundary', 'History', 'CommentDependency', 'Writes', 'WriteSurface')) { . (Join-Path $PSScriptRoot 'windows-issue-writes.ps1') }
-    if ($ReaderProof -in @('ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'NativeLifecycle')) { . (Join-Path $PSScriptRoot 'windows-review-context.ps1') }
+    if ($ReaderProof -in @('SharedPullRequest', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'NativeLifecycle')) { . (Join-Path $PSScriptRoot 'windows-review-context.ps1') }
     if ($ReaderProof -in @('DirectMerge', 'MergeQueue')) { . (Join-Path $PSScriptRoot 'windows-merge.ps1') }
     if ($ReaderProof -in @('CredentialBoundary', 'NativeLifecycle')) { . (Join-Path $PSScriptRoot 'windows-credential-boundary.ps1') }
     if ($ReaderProof -eq 'NativeLifecycle') { . (Join-Path $PSScriptRoot 'windows-native-lifecycle.ps1') }
@@ -955,6 +957,7 @@ try {
             NotificationSchedule { 'sync-live' }
             NativeActivity { 'activity-offline' }
             PullRequest { 'pr-load' }
+            SharedPullRequest { 'pr-load' }
             ReviewDraft { 'pr-load' }
             ReviewDecisions { 'review-decisions' }
             ReviewPredecessor { 'review-predecessor' }
@@ -1028,6 +1031,7 @@ try {
             Sync { Invoke-SyncProof $window $firstProfile }
             NotificationSchedule { Invoke-NotificationScheduleProof $window $firstProfile }
             PullRequest { Invoke-PrReaderProof $window }
+            SharedPullRequest { Invoke-SharedPrPanesProof $window }
             ReviewDraft { Invoke-ReviewDraftProof $window $firstProfile }
             ReviewDecisions { Invoke-ReviewDecisionsProof $window $firstProfile }
             ReviewPredecessor { Invoke-ReviewDecisionsProof $window $firstProfile -Predecessor }
