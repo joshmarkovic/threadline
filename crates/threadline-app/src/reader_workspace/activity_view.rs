@@ -214,10 +214,8 @@ fn update_override(rules: &mut RepositoryRules, change: Setting) {
         Setting::IgnoreAutomatedReviews => toggle_automated(&mut rules.actor_rules, true),
         Setting::IgnoreAutomatedComments => toggle_automated(&mut rules.actor_rules, false),
         Setting::Actor(rule) => toggle_actor_rule(&mut rules.actor_rules, rule),
-        Setting::AddReviewMute(rule) => {
-            if !rules.actor_rules.contains(&rule) {
-                rules.actor_rules.push(rule);
-            }
+        Setting::AddReviewMute(rule) if !rules.actor_rules.contains(&rule) => {
+            rules.actor_rules.push(rule);
         }
         _ => {}
     }

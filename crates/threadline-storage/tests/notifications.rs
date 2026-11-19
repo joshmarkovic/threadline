@@ -330,13 +330,8 @@ fn it_018_contextual_review_muting_uses_provider_identity_and_preserves_existing
         user_id: Some(user),
         ..Default::default()
     };
-    observe("review-first", 101, Category::Approval, identity.clone());
-    observe(
-        "ordinary-first",
-        102,
-        Category::OrdinaryComment,
-        identity.clone(),
-    );
+    observe("review-first", 101, Category::Approval, identity);
+    observe("ordinary-first", 102, Category::OrdinaryComment, identity);
     observe(
         "review-unidentified",
         103,
@@ -377,13 +372,8 @@ fn it_018_contextual_review_muting_uses_provider_identity_and_preserves_existing
         })
     })
     .unwrap();
-    observe("review-later", 120, Category::Approval, identity.clone());
-    observe(
-        "ordinary-later",
-        121,
-        Category::OrdinaryComment,
-        identity.clone(),
-    );
+    observe("review-later", 120, Category::Approval, identity);
+    observe("ordinary-later", 121, Category::OrdinaryComment, identity);
     observe(
         "other-review-later",
         122,
