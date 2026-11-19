@@ -900,8 +900,9 @@ impl ReaderWorkspace {
                 .min_h_0()
                 .child(viewport)
                 .child(observer.visible_control_bounds(context_id))
+                .into_any_element()
         } else {
-            viewport
+            viewport.into_any_element()
         };
         div()
             .flex()
