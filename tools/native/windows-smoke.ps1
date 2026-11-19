@@ -455,13 +455,7 @@ function Invoke-Smoke([IntPtr]$Window) {
 
     [ThreadlineWinInput]::Chord(@(0x11, 0x32))
     $null = Wait-State 'right pane focus' { param($state) $state.focused_pane -eq 'right' }
-    if ($AccessibilityProof) {
-        Wait-For 'the owned native Load preview accessibility action' {
-            Invoke-OwnedFixtureControl $Window 'load-preview' $null 'Load preview'
-        }
-    } else {
-        [ThreadlineWinInput]::Chord(@(0x11, 0x52))
-    }
+    [ThreadlineWinInput]::Chord(@(0x11, 0x52))
     $null = Wait-State 'background preview starts' { param($state) $state.preview_state -eq 'loading' }
     [ThreadlineWinInput]::Chord(@(0x11, 0x46))
     [ThreadlineWinInput]::TypeText($draftText)
@@ -962,6 +956,15 @@ try {
     $coldMs = $clock.Elapsed.TotalMilliseconds
     $report.native_window = $window.ToInt64()
     $report.dpi = [ThreadlineWinInput]::GetDpiForWindow($window)
+    if ($AccessibilityProof) {
+        Wait-For 'the owned native Load preview accessibility action' {
+            Invoke-OwnedFixtureControl $window 'load-preview' $null 'Load preview'
+        }
+        $null = Wait-State 'the preview loaded by the accessibility action' {
+            param($state) $state.preview_state -ceq 'ready'
+        }
+        $report.accessibility_action_verified = $true
+    }
     if (!$script:UseOwnedUiAutomation) { Set-WindowFocus $window }
     $report.loaded_modules = @($app.Modules | ForEach-Object { $_.ModuleName } | Sort-Object -Unique)
     if ($report.loaded_modules | Where-Object { $_ -match '^(lib)?(webkit|wry|electron|cef|chromium|msedgewebview2)' }) {
@@ -1046,7 +1049,7 @@ try {
     }
     $report.status = if ($blocked) { 'Blocked' } else { 'Fail' }
     $report.detail = $_.Exception.Message
-    $report.driver_location = if ($AccessProof -or $ReaderProof) { $_.InvocationInfo.ScriptLineNumber } else { $_.InvocationInfo.PositionMessage }
+    $report.driver_location = if ($AccessProof -or $ReaderProof -or $AccessibilityProof) { $_.InvocationInfo.ScriptLineNumber } else { $_.InvocationInfo.PositionMessage }
     if (!$ToastProof -and !$AccessProof -and !$ReaderProof -and $app -and !$app.HasExited -and $app.MainWindowHandle -ne [IntPtr]::Zero) {
         try {
             if ([ThreadlineWinInput]::GetForegroundWindow() -eq $app.MainWindowHandle) {
