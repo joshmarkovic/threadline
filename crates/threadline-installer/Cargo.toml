@@ -26,3 +26,4 @@ windows-sys = { version = "0.61", features = [
 
 [target.'cfg(windows)'.dev-dependencies]
 threadline-storage = { path = "../threadline-storage" }
+windows-sys = { version = "0.61", features = ["Win32_System_Console", "Win32_System_Pipes", "Win32_Security"] }

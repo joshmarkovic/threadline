@@ -58,6 +58,28 @@ Build an explicit staging failure fixture with `THREADLINE_SETUP_FIXTURE_FAULT=s
 
 Run `test-local-lifecycle.ps1` in 64-bit Windows PowerShell with the actual predecessor and current packages, a `stage-write` fixture with the exact current payload, and independently recorded SHA-256 digests for all three. Supply `-ProfileSha256` for a closed, checkpointed synthetic profile at the native data location. The script exercises repair, an open-file refusal, a staged-write failure, upgrade, downgrade refusal, default uninstall, and reinstall. It leaves the current fixture installed. Run `smoke-installed.ps1` separately to start the exact installed executable without test flags, invoke a known tab through its owned accessibility tree, and close it normally.
 
+### Generated workspace, saved cursor and confirmed removal
+
+Use a dedicated Windows 11 x64 test user with an absent Threadline Data folder and no installed test package. Build the test helper and the normal bootstrap from the intended source revision.
+
+```powershell
+cargo build --locked --release -p threadline-installer --example package_retention_fixture --bin threadline-installer
+```
+
+Add a `retention` object to the existing local package manifest and omit `profile_sha256`. Point the two executable entries at the reviewed builds and supply independently recorded SHA-256 values. Paths may be relative to the manifest. The optional `preserve_files` array accepts individual pinned files from earlier synthetic archives. The runner verifies their bytes before and after the lifecycle.
+
+```json
+{
+  "fixture": {"path": "package_retention_fixture.exe", "sha256": "<independent SHA-256>"},
+  "bootstrap": {"path": "threadline-installer.exe", "sha256": "<independent SHA-256>"},
+  "preserve_files": []
+}
+```
+
+Run the same `cargo xtask test install --case S12-LOCAL-PACKAGE --artifact <current-setup.exe> --local-fixture <approved-local-packages.json>` command. In this mode the script generates a marked workspace and one temporary Credential Manager entry. It checks the protected profile, queued changes, draft, receipt and comment page cursor throughout the normal ten-step package matrix. It then opens and closes the installed native reader, performs a final ordinary uninstall, and resumes the saved page on a disposable copy without network access. A second generated workspace tests the normal bootstrap preview and confirmation in a Windows pseudoconsole. The helper verifies that an unrelated test credential and a user export survive removal. The generated databases stay in test-owned temporary archives. The runner records the results in `windows-local-lifecycle.json` and `windows-retained-package.json`.
+
+The current fixture seeder writes its own storage schema. Keep the separately versioned predecessor migration test when verifying the shipping package.
+
 `verify-local-signed-manifest.ps1` accepts a local fixture and attached CMS metadata with its own separately recorded signer pin. It checks the signature, publisher pin, exact setup digest and byte size. Developers can create a disposable signer and use `openssl cms -sign -binary -nodetach -outform DER` to exercise a matching fixture, changed bytes and a different signer without changing Windows certificate trust. This local proof leaves the Authenticode release gate open.
 
 ## Stage a signed Windows release

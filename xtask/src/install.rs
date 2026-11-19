@@ -36,6 +36,16 @@ struct TrustedFixture {
     current_sha256: String,
     stage_failure: ExpectedPackage,
     profile_sha256: Option<String>,
+    retention: Option<RetentionInputs>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RetentionInputs {
+    fixture: ExpectedPackage,
+    bootstrap: ExpectedPackage,
+    #[serde(default)]
+    preserve_files: Vec<ExpectedPackage>,
 }
 
 #[derive(Deserialize)]
@@ -82,7 +92,8 @@ impl MatrixReceipt {
             && self
                 .staged_fault_setup_sha256
                 .eq_ignore_ascii_case(&expected.stage_failure.sha256)
-            && self.preseeded_profile_checked == expected.profile_sha256.is_some()
+            && self.preseeded_profile_checked
+                == (expected.profile_sha256.is_some() || expected.retention.is_some())
             && self.completed_steps.len() <= STEPS.len()
             && self
                 .completed_steps
@@ -195,7 +206,7 @@ fn planned_result(id: &str) -> CaseResult {
             "Publication is pending. The exact public Windows installation command has no approved signed package."
         }
         "PKG-003" => {
-            "This case requires an installed application restart and retained-state migration evidence."
+            "The local matrix can verify a generated protected profile, checkpoint and installed restart. The shipping predecessor and candidate still require their own migration evidence."
         }
         "PKG-004" => {
             "The local lifecycle exercises lock and staging failures. Full package fault coverage is still required."
@@ -204,7 +215,7 @@ fn planned_result(id: &str) -> CaseResult {
             "Publication is pending. This case requires an offline smoke of the exact shipping package."
         }
         "PKG-006" => {
-            "The local lifecycle exercises default retention. The explicit data and credential removal case is still required."
+            "The local retention matrix includes default uninstall, reinstall and separately confirmed removal. The shipping package requires its own replay."
         }
         "PKG-009" => {
             "The local lifecycle exercises downgrade refusal. Full wrong-target and schema compatibility coverage is still required."
@@ -261,11 +272,16 @@ fn run_matrix(
             CANDIDATE,
         );
     };
+    let script = if expected.retention.is_some() {
+        "test-retained-package.ps1"
+    } else {
+        "test-local-lifecycle.ps1"
+    };
     let mut native = Command::new(shell);
     native
         .env_remove("PSModulePath")
         .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
-        .arg(root.join("tools/windows/test-local-lifecycle.ps1"))
+        .arg(root.join("tools/windows").join(script))
         .arg("-Predecessor")
         .arg(&expected.predecessor.path)
         .arg("-PredecessorSha256")
@@ -280,6 +296,19 @@ fn run_matrix(
         .arg(&expected.stage_failure.sha256);
     if let Some(profile) = &expected.profile_sha256 {
         native.arg("-ProfileSha256").arg(profile);
+    }
+    if let Some(inputs) = &expected.retention {
+        native
+            .arg("-Fixture")
+            .arg(&inputs.fixture.path)
+            .arg("-FixtureSha256")
+            .arg(&inputs.fixture.sha256)
+            .arg("-Bootstrap")
+            .arg(&inputs.bootstrap.path)
+            .arg("-BootstrapSha256")
+            .arg(&inputs.bootstrap.sha256)
+            .arg("-EvidenceDirectory")
+            .arg(dir);
     }
     let Ok(output) = native.output() else {
         return linked(
@@ -297,15 +326,29 @@ fn run_matrix(
             LOCAL_CASE,
             Status::Fail,
             "The Windows adapter did not return a valid local lifecycle receipt.",
-            CANDIDATE,
+            if expected.retention.is_some()
+                && dir.join("windows-retained-package-failure.json").is_file()
+            {
+                "windows-retained-package-failure.json"
+            } else {
+                CANDIDATE
+            },
         );
         failed.child_exit_code = output.status.code();
         return failed;
     };
     let bytes = serde_json::to_vec_pretty(&receipt).expect("the fixed receipt is serializable");
     let recorded = fs::write(dir.join(MATRIX), bytes).is_ok();
-    let passed =
-        recorded && output.status.success() && receipt.completed_steps.len() == STEPS.len();
+    let passed = recorded
+        && output.status.success()
+        && receipt.completed_steps.len() == STEPS.len()
+        && expected.retention.as_ref().is_none_or(|inputs| {
+            verified_retention(
+                &dir.join("windows-retained-package.json"),
+                inputs,
+                candidate_digest,
+            )
+        });
     let (status, detail) = if passed {
         (
             Status::Pass,
@@ -337,6 +380,63 @@ fn read_receipt(path: &Path) -> Option<MatrixReceipt> {
     serde_json::from_slice(&fs::read(path).ok()?).ok()
 }
 
+fn verified_retention(path: &Path, inputs: &RetentionInputs, candidate: &str) -> bool {
+    let Ok(file) = File::open(path) else {
+        return false;
+    };
+    let Ok(receipt) = serde_json::from_reader::<_, serde_json::Value>(file.take(65_537)) else {
+        return false;
+    };
+    let checkpoint = &receipt["copied_checkpoint"];
+    let cleanup = &receipt["separate_confirmed_removal"];
+    receipt["status"] == "Pass"
+        && receipt["retained_at_steps"].as_array().is_some_and(|seen| {
+            seen.iter()
+                .map(serde_json::Value::as_str)
+                .eq(STEPS.iter().map(|(name, _)| Some(*name)))
+        })
+        && receipt["fixture_sha256"] == inputs.fixture.sha256
+        && receipt["bootstrap_sha256"] == inputs.bootstrap.sha256
+        && receipt["current_sha256"] == candidate
+        && receipt["before"] == receipt["after_default_uninstall"]
+        && receipt["before"]["protected_credential_present"] == true
+        && receipt["before"]["step_receipts"] == 1
+        && receipt["before"]["queued_operations"] == 8
+        && receipt["before"]["saved_comment_page_cursor"] == "2"
+        && receipt["native"]["owned_window"] == true
+        && receipt["native"]["selected_before_invocation"] == false
+        && receipt["native"]["tab_activated"] == true
+        && receipt["native"]["orderly_exit"] == true
+        && receipt["closed_database_sha256"]
+            .as_str()
+            .is_some_and(valid_digest)
+        && checkpoint["source_database_sha256"] == receipt["closed_database_sha256"]
+        && checkpoint["scheduler_claimed_page"] == 2
+        && checkpoint["next_cursor_empty"] == true
+        && checkpoint["archived_bytes_unchanged"] == true
+        && checkpoint["queued_payloads_and_step_receipts_unchanged"] == true
+        && cleanup["bootstrap_sha256"] == inputs.bootstrap.sha256
+        && cleanup["normal_preview_exit"] == 0
+        && cleanup["normal_confirmation_exit"] == 0
+        && [
+            "conpty_prompt_verified",
+            "actual_confirmation_sent_once",
+            "current_db_and_backup_removed",
+            "bound_protected_credential_removed",
+            "independent_export_unchanged",
+            "independent_credential_preserved_then_fixture_cleaned",
+            "prior_retention_archive_unchanged",
+            "default_profile_absent_before_and_after",
+        ]
+        .iter()
+        .all(|field| cleanup[*field] == true)
+        && receipt["default_data_absent"] == true
+        && inputs
+            .preserve_files
+            .iter()
+            .all(|file| sha256(&file.path).is_ok_and(|hash| hash == file.sha256))
+}
+
 fn trusted_fixture(config: &Path, candidate_digest: &str) -> Result<TrustedFixture, &'static str> {
     let mut bytes = Vec::new();
     File::open(config)
@@ -365,6 +465,7 @@ fn trusted_fixture(config: &Path, candidate_digest: &str) -> Result<TrustedFixtu
     {
         return Err("The candidate setup digest did not match the trusted local fixture.");
     }
+    expected.current_sha256.make_ascii_lowercase();
     if expected
         .current_sha256
         .eq_ignore_ascii_case(&expected.predecessor.sha256)
@@ -379,7 +480,33 @@ fn trusted_fixture(config: &Path, candidate_digest: &str) -> Result<TrustedFixtu
         return Err("Supply three distinct approved local packages.");
     }
     let parent = config.parent().unwrap_or_else(|| Path::new("."));
-    for package in [&mut expected.predecessor, &mut expected.stage_failure] {
+    if expected.retention.is_some() && expected.profile_sha256.is_some() {
+        return Err(
+            "Choose either the existing profile digest or a newly generated retention fixture.",
+        );
+    }
+    let mut pinned = vec![&mut expected.predecessor, &mut expected.stage_failure];
+    if let Some(inputs) = &mut expected.retention {
+        if inputs.fixture.path.file_name()
+            != Some(std::ffi::OsStr::new("package_retention_fixture.exe"))
+            || inputs.bootstrap.path.file_name()
+                != Some(std::ffi::OsStr::new("threadline-installer.exe"))
+        {
+            return Err(
+                "Use the named package retention fixture and normal bootstrap executables.",
+            );
+        }
+        if inputs.preserve_files.len() > 64 {
+            return Err("Supply at most 64 pinned files from the previous synthetic archives.");
+        }
+        pinned.extend([&mut inputs.fixture, &mut inputs.bootstrap]);
+        pinned.extend(&mut inputs.preserve_files);
+    }
+    for package in pinned {
+        if !valid_digest(&package.sha256) {
+            return Err("Use independently recorded SHA-256 digests for the fixture.");
+        }
+        package.sha256.make_ascii_lowercase();
         package.path = parent.join(&package.path);
         let digest =
             sha256(&package.path).map_err(|_| "An approved local package could not be read.")?;
@@ -424,6 +551,37 @@ mod tests {
         assert_eq!(expected.predecessor.path, old);
         assert!(expected.profile_sha256.is_none());
 
+        let helper = dir.path().join("package_retention_fixture.exe");
+        let bootstrap = dir.path().join("threadline-installer.exe");
+        fs::write(&helper, b"local verification helper").unwrap();
+        fs::write(&bootstrap, b"normal bootstrap").unwrap();
+        let mut extended: serde_json::Value =
+            serde_json::from_slice(&fs::read(&notes).unwrap()).unwrap();
+        extended["retention"] = json!({
+            "fixture":{"path":"package_retention_fixture.exe","sha256": sha256(&helper).unwrap()},
+            "bootstrap":{"path":"threadline-installer.exe","sha256": sha256(&bootstrap).unwrap()}
+        });
+        fs::write(&notes, serde_json::to_vec(&extended).unwrap()).unwrap();
+        let approved = trusted_fixture(&notes, &digest).unwrap().retention.unwrap();
+        assert_eq!(approved.fixture.path, helper);
+        assert_eq!(approved.bootstrap.path, bootstrap);
+        fs::write(&helper, b"substituted helper").unwrap();
+        assert_eq!(
+            trusted_fixture(&notes, &digest).err(),
+            Some("An approved local package did not match its trusted digest.")
+        );
+        extended["profile_sha256"] = json!("a".repeat(64));
+        fs::write(&notes, serde_json::to_vec(&extended).unwrap()).unwrap();
+        assert_eq!(
+            trusted_fixture(&notes, &digest).err(),
+            Some(
+                "Choose either the existing profile digest or a newly generated retention fixture."
+            )
+        );
+        extended.as_object_mut().unwrap().remove("retention");
+        extended.as_object_mut().unwrap().remove("profile_sha256");
+        fs::write(&notes, serde_json::to_vec(&extended).unwrap()).unwrap();
+
         fs::write(&new, b"changed").unwrap();
         let actual = sha256(&new).unwrap();
         assert_eq!(
@@ -450,6 +608,7 @@ mod tests {
                 sha256: "c".repeat(64),
             },
             profile_sha256: Some("d".repeat(64)),
+            retention: None,
         };
         let mut receipt = MatrixReceipt {
             channel: "local-fixture".into(),
@@ -476,6 +635,60 @@ mod tests {
         receipt.preseeded_profile_checked = true;
         receipt.completed_steps[3].step = "a private or unrecognized step".into();
         assert!(!receipt.agrees_with(&expected));
+    }
+
+    #[test]
+    fn retention_requires_a_completed_checkpoint_and_unchanged_protected_archive() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = dir.path().join("prior-archive.sqlite3");
+        fs::write(&old, b"previous owned archive").unwrap();
+        let inputs = RetentionInputs {
+            fixture: ExpectedPackage {
+                path: "package_retention_fixture.exe".into(),
+                sha256: "a".repeat(64),
+            },
+            bootstrap: ExpectedPackage {
+                path: "threadline-installer.exe".into(),
+                sha256: "b".repeat(64),
+            },
+            preserve_files: vec![ExpectedPackage {
+                path: old.clone(),
+                sha256: sha256(&old).unwrap(),
+            }],
+        };
+        let state = json!({"protected_credential_present":true,"saved_comment_page_cursor":"2","step_receipts":1,"queued_operations":8});
+        let candidate = "c".repeat(64);
+        let mut receipt = json!({
+            "status":"Pass","retained_at_steps":STEPS.iter().map(|(name,_)|name).collect::<Vec<_>>(),"fixture_sha256":inputs.fixture.sha256,
+            "bootstrap_sha256":inputs.bootstrap.sha256,"current_sha256":candidate,
+            "native":{"owned_window":true,"selected_before_invocation":false,"tab_activated":true,"orderly_exit":true},
+            "before":state,"after_default_uninstall":state,"default_data_absent":true,
+            "closed_database_sha256":"d".repeat(64),
+            "copied_checkpoint":{"source_database_sha256":"d".repeat(64),"scheduler_claimed_page":2,"next_cursor_empty":true,
+                "archived_bytes_unchanged":true,"queued_payloads_and_step_receipts_unchanged":true},
+            "separate_confirmed_removal":{"bootstrap_sha256":inputs.bootstrap.sha256,"normal_preview_exit":0,"normal_confirmation_exit":0,
+                "conpty_prompt_verified":true,"actual_confirmation_sent_once":true,"current_db_and_backup_removed":true,
+                "bound_protected_credential_removed":true,"independent_export_unchanged":true,
+                "independent_credential_preserved_then_fixture_cleaned":true,"prior_retention_archive_unchanged":true,
+                "default_profile_absent_before_and_after":true}
+        });
+        let path = dir.path().join("retained.json");
+        fs::write(&path, serde_json::to_vec(&receipt).unwrap()).unwrap();
+        assert!(verified_retention(&path, &inputs, &candidate));
+        let mut incomplete = receipt.clone();
+        incomplete["separate_confirmed_removal"]
+            .as_object_mut()
+            .unwrap()
+            .remove("current_db_and_backup_removed");
+        fs::write(&path, serde_json::to_vec(&incomplete).unwrap()).unwrap();
+        assert!(!verified_retention(&path, &inputs, &candidate));
+        receipt["copied_checkpoint"]["scheduler_claimed_page"] = json!(1);
+        fs::write(&path, serde_json::to_vec(&receipt).unwrap()).unwrap();
+        assert!(!verified_retention(&path, &inputs, &candidate));
+        receipt["copied_checkpoint"]["scheduler_claimed_page"] = json!(2);
+        fs::write(&path, serde_json::to_vec(&receipt).unwrap()).unwrap();
+        fs::write(old, b"changed archive").unwrap();
+        assert!(!verified_retention(&path, &inputs, &candidate));
     }
 
     #[test]

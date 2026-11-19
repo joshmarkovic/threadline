@@ -6,7 +6,8 @@ param(
     [Parameter(Mandatory = $true)][ValidatePattern('^[0-9a-fA-F]{64}$')][string]$CurrentSha256,
     [Parameter(Mandatory = $true)][string]$StageFailure,
     [Parameter(Mandatory = $true)][ValidatePattern('^[0-9a-fA-F]{64}$')][string]$StageFailureSha256,
-    [ValidatePattern('^[0-9a-fA-F]{64}$')][string]$ProfileSha256
+    [ValidatePattern('^[0-9a-fA-F]{64}$')][string]$ProfileSha256,
+    [scriptblock]$AfterRetainedStep
 )
 
 Set-StrictMode -Version Latest
@@ -108,12 +109,14 @@ function Run-Setup([string]$Step, $Package, [int]$ExpectedExit) {
         throw 'A Threadline process appeared during a package-only operation.'
     }
     Assert-ProfileUnchanged
+    if ($AfterRetainedStep) { & $AfterRetainedStep $Step }
 }
 
 $old = Read-Package $Predecessor $PredecessorSha256 'none'
 $new = Read-Package $Current $CurrentSha256 'none'
 $fault = Read-Package $StageFailure $StageFailureSha256 'stage-write'
-if ($null -eq $old.schema -or $null -eq $new.schema -or $old.schema -ge $new.schema -or
+if ($null -eq $old.schema -or $null -eq $new.schema -or $old.schema -gt $new.schema -or
+    (!$AfterRetainedStep -and $old.schema -eq $new.schema) -or
     $old.build -ge $new.build -or $fault.build -ne $new.build -or $fault.app -ine $new.app -or
     $fault.schema -ne $new.schema -or $fault.version -cne $new.version) {
     throw 'Use documented predecessor/current schemas and a staging-fault build of the exact current payload.'
@@ -183,6 +186,7 @@ try {
         $remove.Dispose()
     }
     Assert-ProfileUnchanged
+    if ($AfterRetainedStep) { & $AfterRetainedStep 'uninstall_retains_profile' }
     Run-Setup 'refuse_downgrade_after_uninstall' $old 12
     Assert-Uninstalled
     Run-Setup 'reinstall_current' $new 0
