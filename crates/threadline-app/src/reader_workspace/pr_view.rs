@@ -6,7 +6,7 @@ use super::{
 use crate::palette::Palette;
 use gpui_kit::{
     AnyElement, Element, InteractiveElement, IntoElement, ParentElement, Role,
-    StatefulInteractiveElement, Styled,
+    StatefulInteractiveElement, Styled, TestSupportExt,
     base::ElementExt,
     component::{
         Disableable, Selectable,
@@ -31,6 +31,7 @@ fn pr_status(id: String, text: impl Into<String>, palette: Palette) -> impl Elem
     div()
         .id(id.clone())
         .accessibility_id(id)
+        .test_support()
         .role(Role::Status)
         .aria_label(text.clone())
         .text_xs()
