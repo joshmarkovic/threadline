@@ -1,0 +1,57 @@
+{
+  "case": "S06-INSTALLED-SELECTION",
+  "status": "Blocked",
+  "exit_code": 78,
+  "package_build": 18,
+  "source_revision": "64a9a016dd805aa92fa1cc379a97c18686c0ee34",
+  "driver_revision": "b24000e533aed9119a80a573b069371b3ca4f0a4",
+  "app_sha256": "30f90b43e89720a4ce2b51153c0811326e0b453dc4a1a704c9a471615337a033",
+  "fixture_sha256": "28901e8e7164e3b34ae6a2c77c1e97a07f484fa2c51add3f663462edbe7daa6f",
+  "offline": true,
+  "diff_mode": "Split",
+  "original_selection": {
+    "path": "second.txt",
+    "side": "Right",
+    "line": 1,
+    "original_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "comparison_revision": 1,
+  "comparison_base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "comparison_head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "draft_anchor": "Pass",
+  "new_draft": {
+    "id": "review-2",
+    "tab_draft": "review-2",
+    "anchors": [
+      {
+        "path": "second.txt",
+        "side": "Right",
+        "first_line": 1,
+        "last_line": 1,
+        "source_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    ]
+  },
+  "visible_anchor": "second.txt · modified 1–1",
+  "live_highlight": "Blocked",
+  "detail": "The owned window did not supply verifiable selection colors.",
+  "installed_display_timezone": {
+    "status": "Pass",
+    "effective_label": "Display time zone · America/New_York",
+    "explicit_field_matched": true,
+    "preference_sha256": "97a96def5389f70f749d69d5f58872871561f3155381b303845589bafcd48a0f"
+  },
+  "display_preference_unchanged": true,
+  "orderly_quit": true,
+  "synthetic_profile_archived": true,
+  "loopback_proxy_received_connection": false,
+  "after_fixture": {
+    "registered_build": 18,
+    "app_sha256": "30f90b43e89720a4ce2b51153c0811326e0b453dc4a1a704c9a471615337a033",
+    "preference_sha256": "97a96def5389f70f749d69d5f58872871561f3155381b303845589bafcd48a0f",
+    "default_data_absent": true,
+    "app_exited": true
+  },
+  "raw_receipt_sha256": "4768f481463b7ae8ea06c0bebcbdf20cc868201ddfb9232c4ca7ec1c27bf7689",
+  "after_fixture_receipt_sha256": "ace24b3ad48158193b25428b9e7849efb3e3d47ad8626bdbefe7e0fb27437d5b"
+}
