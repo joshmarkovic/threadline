@@ -968,6 +968,43 @@ fn click(cx: &mut TestAppContext, window: gpui_kit::AnyWindowHandle, id: &'stati
     .unwrap();
 }
 
+fn submit_then_focus_other_pane(
+    setup: &ReaderHarness,
+    cx: &mut TestAppContext,
+    window: gpui_kit::AnyWindowHandle,
+    reader: &Entity<ReaderWorkspace>,
+    controls: (&str, &str),
+    pending: impl Fn(&ReaderWorkspace) -> bool,
+) {
+    use rusqlite::{Connection, TransactionBehavior};
+
+    let account = setup.fixture.account;
+    let before = setup.store.queue_page(account, 0, 100).unwrap();
+    let mut writer = Connection::open(setup._directory.path().join("s04-ui.sqlite")).unwrap();
+    let held = writer
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .unwrap();
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        let original_pane = reader.read(cx).layout.focused_pane;
+        let original_item = reader.read(cx).active_tab().unwrap().item;
+        window.click(controls.0.to_owned(), cx);
+        assert!(pending(reader.read(cx)));
+        window.click(controls.1.to_owned(), cx);
+        let workspace = reader.read(cx);
+        assert_ne!(workspace.layout.focused_pane, original_pane);
+        assert_ne!(workspace.active_tab().unwrap().item, original_item);
+        assert!(workspace.focus[workspace.layout.focused_pane].is_focused(window));
+        assert!(pending(workspace));
+        assert_eq!(setup.store.queue_page(account, 0, 100).unwrap(), before);
+
+        // A second click from the original rendered frame must not queue a second operation.
+        window.click(controls.0.to_owned(), cx);
+    })
+    .unwrap();
+    drop(held);
+}
+
 fn fixture_seed() -> u64 {
     std::env::var("THREADLINE_TEST_SEED")
         .ok()
@@ -1307,6 +1344,84 @@ fn ui_002_independent_panes_share_one_editor_and_reopen_same_draft(cx: &mut Test
         setup.store.queue_page(account, 0, 100).unwrap(),
         queue_before
     );
+
+    let other = setup.fixture.reviewed_pr;
+    cx.update_window(window, |_, window, cx| {
+        reader.update(cx, |reader, cx| {
+            reader.open(other, None, OpenTab::Beside, window, cx)
+        });
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let workspace = reader.read(cx);
+            workspace.layout.focused_pane == 0
+                && !workspace.layout_busy
+                && workspace.active_tab().is_some_and(|tab| {
+                    tab.item == other && workspace.tab_views.contains_key(&tab.id)
+                })
+        })
+    });
+    click(cx, window, "reader-tab-1-1");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let workspace = reader.read(cx);
+            !workspace.layout_busy
+                && workspace
+                    .active_tab()
+                    .is_some_and(|active| active.id == tab.id)
+        })
+    });
+    click(cx, window, "reader-draft-comment-1");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            reader
+                .read(cx)
+                .drafts
+                .get(&draft_id)
+                .is_some_and(|editor| editor.saved() && editor.tab_id == tab.id)
+        })
+    });
+    let original_draft = setup.store.draft(account, &draft_id).unwrap().unwrap();
+    submit_then_focus_other_pane(
+        &setup,
+        cx,
+        window,
+        &reader,
+        ("reader-submit-1", "reader-tab-0-0"),
+        |workspace| workspace.drafts[&draft_id].submitting,
+    );
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let workspace = reader.read(cx);
+            !workspace.layout_busy
+                && workspace.layout.focused_pane == 0
+                && workspace.drafts[&draft_id].submitted.is_some()
+        })
+    });
+    let after = setup.store.queue_page(account, 0, 100).unwrap();
+    assert_eq!(&after[..queue_before.len()], queue_before.as_slice());
+    assert_eq!(after.len(), queue_before.len() + 1);
+    let queued = setup
+        .store
+        .operation(account, &after.last().unwrap().id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(queued.item, item);
+    assert_eq!(queued.original_repository, setup.fixture.repository);
+    assert_eq!(
+        queued.draft,
+        Some((draft_id.clone(), original_draft.revision))
+    );
+    assert_eq!(
+        setup.store.write_intent(account, &queued.id).unwrap(),
+        Some(threadline_storage::writes::WriteIntent::CreateComment {
+            body: "Shared draft in one editor".into()
+        })
+    );
+    let draft = setup.store.draft(account, &draft_id).unwrap().unwrap();
+    assert_eq!(draft.content, original_draft.content);
+    assert_eq!(draft.revision, original_draft.revision);
 }
 
 #[gpui_kit::test]
@@ -2363,7 +2478,11 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
         view: TabView::default(),
     };
     setup.one_pane(&tab);
-    let (window, reader) = setup.open(cx);
+    let (window, reader) = if review {
+        setup.open_at(cx, size(px(2200.), px(1450.)))
+    } else {
+        setup.open(cx)
+    };
     click(cx, window, "pr-0-file-1");
     until(cx, |cx| {
         cx.read(|cx| {
@@ -2618,10 +2737,52 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
         until(cx, |cx| {
             cx.read(|cx| reader.read(cx).maximized && !reader.read(cx).layout_busy)
         });
-        let operations_before = store.queue_page(account, 0, 100).unwrap().len();
-        click(cx, window, "pr-0-review-submit");
+        click(cx, window, "reader-maximize-pane");
         until(cx, |cx| {
-            cx.read(|cx| reader.read(cx).review_editors[&pr].submitted.is_some())
+            cx.read(|cx| !reader.read(cx).maximized && !reader.read(cx).layout_busy)
+        });
+        let other = issue_ids[0].0;
+        cx.update_window(window, |_, window, cx| {
+            reader.update(cx, |reader, cx| {
+                reader.open(other, None, OpenTab::Beside, window, cx)
+            });
+        })
+        .unwrap();
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let workspace = reader.read(cx);
+                workspace.layout.focused_pane == 1
+                    && !workspace.layout_busy
+                    && workspace.active_tab().is_some_and(|tab| {
+                        tab.item == other && workspace.tab_views.contains_key(&tab.id)
+                    })
+            })
+        });
+        click(cx, window, "reader-tab-0-0");
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let workspace = reader.read(cx);
+                workspace.layout.focused_pane == 0
+                    && !workspace.layout_busy
+                    && workspace.review_editors[&pr].saved()
+            })
+        });
+        let operations_before = store.queue_page(account, 0, 100).unwrap().len();
+        submit_then_focus_other_pane(
+            &setup,
+            cx,
+            window,
+            &reader,
+            ("pr-0-review-submit", "reader-tab-1-1"),
+            |workspace| workspace.review_editors[&pr].sending,
+        );
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let workspace = reader.read(cx);
+                !workspace.layout_busy
+                    && workspace.layout.focused_pane == 1
+                    && workspace.review_editors[&pr].submitted.is_some()
+            })
         });
         let operations = store.queue_page(account, 0, 100).unwrap();
         assert_eq!(operations.len(), operations_before + 1);
@@ -2630,14 +2791,23 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
             .unwrap()
             .unwrap();
         assert_eq!(operation.item, pr);
+        assert_eq!(operation.original_repository, repository);
+        assert_eq!(
+            operation.draft,
+            Some((draft_id.clone(), original_review.revision))
+        );
         assert_eq!(operation.state, threadline_storage::queue::State::Queued);
         let intent: threadline_storage::reviews::ReviewIntent =
             serde_json::from_str(&operation.snapshot.payload).unwrap();
         assert_eq!(
             intent,
-            threadline_storage::reviews::ReviewIntent::Review(original_review.draft)
+            threadline_storage::reviews::ReviewIntent::Review(original_review.draft.clone())
         );
         assert_eq!(operation.snapshot.base, revision.head.as_str());
+        assert_eq!(
+            store.review_draft(account, &draft_id).unwrap(),
+            Some(original_review)
+        );
     }
     if !review {
         cx.update_window(window, |_, window, cx| {
@@ -3361,13 +3531,34 @@ fn ui_005_offline_merge_targets_the_confirmed_pane_and_updates_the_outbox_badge(
             !state.layout_busy && state.layout.focused_pane == 1
         })
     });
-    click(cx, window, "pr-0-merge-confirm");
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.try_find("pr-0-merge-confirm").is_some());
+    })
+    .unwrap();
+    click(cx, window, "reader-tab-0-0");
     until(cx, |cx| {
         cx.read(|cx| {
-            reader
-                .read(cx)
-                .counts
-                .is_some_and(|counts| counts.outbox == before + 1)
+            let workspace = reader.read(cx);
+            !workspace.layout_busy && workspace.layout.focused_pane == 0
+        })
+    });
+    submit_then_focus_other_pane(
+        &setup,
+        cx,
+        window,
+        &reader,
+        ("pr-0-merge-confirm", "reader-tab-1-0"),
+        |workspace| workspace.merge_views[&tabs[0].id].busy,
+    );
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let workspace = reader.read(cx);
+            !workspace.layout_busy
+                && workspace.layout.focused_pane == 1
+                && workspace
+                    .counts
+                    .is_some_and(|counts| counts.outbox == before + 1)
         })
     });
     let statuses = store.merge_statuses(account, pr).unwrap();
@@ -3395,6 +3586,13 @@ fn ui_005_offline_merge_targets_the_confirmed_pane_and_updates_the_outbox_badge(
         .enumerate()
         .find(|(_, row)| row.kind == ActionKind::Merge && row.item == pr)
         .unwrap();
+    let operation = store.operation(account, &row.id).unwrap().unwrap();
+    assert_eq!(operation.original_repository, fixture.repository);
+    assert_eq!(
+        operation.original_number,
+        store.item(account, pr).unwrap().unwrap().locator.number
+    );
+    assert_eq!(operation.snapshot.base, revision.head.as_str());
     click(cx, window, "reader-outbox");
     until(cx, |cx| {
         cx.read(|cx| reader.read(cx).queue.iter().any(|q| q.id == row.id))
