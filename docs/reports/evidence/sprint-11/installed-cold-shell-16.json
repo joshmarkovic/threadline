@@ -1,0 +1,75 @@
+{
+  "case": "E2E-012",
+  "status": "Pass",
+  "run": "e2e-1795098785119-4744",
+  "seed": 12345,
+  "source_revision": "287064229188f6cc5f5d85c86693c0f74bd5e438",
+  "source_dirty": false,
+  "package_build": 16,
+  "app_sha256": "427f00141263d1fe5a123731cc3676c4fbf480e7c8761a7adf38c00a991e4085",
+  "fixture_sha256": "809c0d9b643e4189210a64784548ce3d962592adcab7ba529a7b896366d57d68",
+  "installer_sha256": "33d87decae67321a0586e642753d21bc38e8839cfff0792ec36599a8c34ca985",
+  "synthetic_event_kind": "mention",
+  "before": {
+    "event_count": 37,
+    "feed_count": 0,
+    "group_count": 0,
+    "read_count": 0,
+    "outcome": null,
+    "activated": false,
+    "selected_issue": 41,
+    "draft_preserved": true,
+    "draft_tab_preserved": true
+  },
+  "delivered_before_exit": {
+    "event_count": 37,
+    "feed_count": 37,
+    "group_count": 1,
+    "read_count": 0,
+    "outcome": "delivered",
+    "activated": false,
+    "selected_issue": 41,
+    "draft_preserved": true,
+    "draft_tab_preserved": true
+  },
+  "after_cold_activation": {
+    "event_count": 37,
+    "feed_count": 37,
+    "group_count": 1,
+    "read_count": 37,
+    "outcome": "delivered",
+    "activated": true,
+    "selected_issue": 42,
+    "draft_preserved": true,
+    "draft_tab_preserved": true
+  },
+  "notification_center": {
+    "target": "default card",
+    "window_class": "Windows.UI.Core.CoreWindow",
+    "polls": 27,
+    "elapsed_ms": 4453,
+    "title_matches": 1,
+    "body_matches": 1,
+    "verified_center_reads": 1,
+    "verified_card_reads": 2,
+    "default_invoke_reads": 2,
+    "invoke_attempts": 1,
+    "click_attempts": 0
+  },
+  "initial_process_id": 40004,
+  "cold_process_id": 26272,
+  "destination_controls": {
+    "draft_present": true,
+    "active_present": true,
+    "draft_label": "Issue threadline-activity-fixture/installed-alerts #41 Activity fixture issue 41 \u00b7 Draft",
+    "active_label": "Issue threadline-activity-fixture/installed-alerts #42 Activity fixture issue 42 \u00b7 Active tab",
+    "destination_selected": true
+  },
+  "synthetic_profile_archived": true,
+  "scope": "The system Notification Center invoked the default fixture card after normal process exit. All 37 fixture events were mentions. The separate grouped-review Windows test used the application delivery adapter.",
+  "raw_receipt_sha256": {
+    "result.json": "9896980e9e5eac0d8221ad607ef65822f870dcb29ef85d4bc89ffea5974a0d19",
+    "junit.xml": "f7e2e855d781d1653fb9e57ca06840058a065eb9d23bbdc091576df0516b68c0",
+    "installed-activity.json": "4668a1fe8bda0b9afd23b0a27695c2fe39cd218cfa3fff3978f64722ac417f58"
+  }
+}
