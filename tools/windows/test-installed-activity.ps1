@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory)][string]$FixtureTool,
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-fA-F]{64}$')][string]$FixtureSha256,
     [Parameter(Mandatory)][string]$ReportDir,
-    [ValidateSet('E2E-012','E2E-018')][string]$Case = 'E2E-012',
+    [ValidateSet('E2E-012','E2E-018','S11-GROUPED-REVIEW')][string]$Case = 'E2E-012',
     [ValidateSet('ColdOpen','WarmOpen','MarkRead','Snooze')][string]$CallbackProbe
 )
 Set-StrictMode -Version Latest
@@ -27,8 +27,10 @@ $data = Join-Path $dataParent Data
 $marker = 'threadline-s11-installed-fixture-v1'
 $identity = 'Threadline.InstallTest'
 $clsid = '{df3bb9a2-0794-44a6-b130-a35197093afe}'
+$groupedReview = $Case -ceq 'S11-GROUPED-REVIEW'
+if ($groupedReview) { $marker = 'threadline-s11-grouped-review-v1' }
 $fixtureTitle = 'Threadline'
-$fixtureBody = '37 new activity updates'
+$fixtureBody = if ($groupedReview) { '2 new activity updates' } else { '37 new activity updates' }
 $fixtureAppDisplayName = 'Threadline Installer Test'
 $fixtureActionLabel = 'Open'
 $fixtureSenderGuard = {
@@ -57,6 +59,7 @@ $blocked = $false
 $owned = $false
 $child = $null
 $focusForm = $null
+$reviewProxy = $null
 $toastHistory = $null
 $group = $null
 $ReportDir = [IO.Path]::GetFullPath($ReportDir)
@@ -169,11 +172,16 @@ try {
     }
     $null = New-Item -ItemType Directory -Path $data -ErrorAction Stop
     $owned = $true
-    $before = Read-Fixture seed
-    if ($before.event_count -ne 37 -or $before.feed_count -ne 0 -or $before.selected_issue -ne 41 -or
-        !$before.draft_preserved -or !$before.draft_tab_preserved) { throw 'The initial issue, draft or observer fixture is invalid.' }
-    Add-Evidence 'Create an isolated synthetic account with both network queues paused, a local draft on issue 41 and unseen activity on issue 42' $before
-    if ($Case -ceq 'E2E-018') {
+    if (!$groupedReview) {
+        $before = Read-Fixture seed
+        if ($before.event_count -ne 37 -or $before.feed_count -ne 0 -or $before.selected_issue -ne 41 -or
+            !$before.draft_preserved -or !$before.draft_tab_preserved) { throw 'The initial issue, draft or observer fixture is invalid.' }
+        Add-Evidence 'Create an isolated synthetic account with both network queues paused, a local draft on issue 41 and unseen activity on issue 42' $before
+    }
+    if ($groupedReview) {
+        . (Join-Path $PSScriptRoot 'installed-grouped-review.ps1')
+        Test-InstalledGroupedReview
+    } elseif ($Case -ceq 'E2E-018') {
         # The copied executable cannot satisfy the registered shortcut and LocalServer32 checks.
         $unregistered = New-Item -ItemType Directory -Path (Join-Path $ReportDir 'unregistered-app')
         $copy = Join-Path $unregistered.FullName 'threadline.exe'
@@ -294,6 +302,7 @@ try {
         }
         $child.Dispose()
     }
+    if ($reviewProxy) { $reviewProxy.Stop() }
     if ($group -and $null -ne $toastHistory) {
         try { $toastHistory.Remove($group.Substring(0,16),$group.Substring(16),$identity) } catch { $report.history_cleanup_error = $true }
     }
@@ -309,7 +318,7 @@ try {
             $report.synthetic_profile_archived = $true
         }
     }
-    if ($CallbackProbe -and $report.status -ceq 'Pass' -and
+    if (($CallbackProbe -or $groupedReview) -and $report.status -ceq 'Pass' -and
         (!$report.Contains('synthetic_profile_archived') -or $report.Contains('history_cleanup_error'))) {
         $report.status = 'Fail'
         $report.detail = 'The test-owned notification or synthetic profile did not finish cleanup.'

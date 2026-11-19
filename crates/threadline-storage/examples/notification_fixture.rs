@@ -1,4 +1,7 @@
 //! Create an empty-profile fixture for the installed activity adapter, or inspect its durable state.
+#[path = "notification_fixture/grouped.rs"]
+mod grouped;
+
 use std::{error::Error, fs, io::Write, num::NonZeroU64, path::Path};
 
 use rusqlite::{Connection, OpenFlags, OptionalExtension};
@@ -21,6 +24,13 @@ const DRAFT_BODY: &str = "Unsubmitted local fixture draft";
 const OWNER: &str = "threadline-activity-fixture";
 const COUNT: u32 = 37;
 
+#[derive(Clone, Copy, PartialEq)]
+enum Fixture {
+    Mentions,
+    Runtime,
+    Review,
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     let [mode, path] = args.as_slice() else {
@@ -31,8 +41,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err("Supply an existing absolute fixture directory.".into());
     }
     let result = match mode.to_str() {
-        Some("seed") => seed(root, false)?,
-        Some("seed-runtime") => seed(root, true)?,
+        Some("seed") => seed(root, Fixture::Mentions)?,
+        Some("seed-runtime") => seed(root, Fixture::Runtime)?,
+        Some("seed-review") => seed(root, Fixture::Review)?,
+        Some("inspect-review") => grouped::inspect(root)?,
+        Some("replay-review") => grouped::replay(root)?,
         Some("inspect-runtime") => inspect_runtime(root)?,
         Some("inspect") => inspect(root)?,
         _ => return Err("Unknown activity fixture command.".into()),
@@ -72,11 +85,15 @@ fn issue(
     )
 }
 
-fn seed(root: &Path, runtime: bool) -> Result<Value, Box<dyn Error>> {
+fn seed(root: &Path, fixture: Fixture) -> Result<Value, Box<dyn Error>> {
     if fs::read_dir(root)?.next().is_some() {
         return Err("The activity fixture requires an empty directory.".into());
     }
-    let marker_id = if runtime { RUNTIME_MARKER } else { MARKER };
+    let marker_id = match fixture {
+        Fixture::Runtime => RUNTIME_MARKER,
+        Fixture::Mentions => MARKER,
+        Fixture::Review => grouped::MARKER,
+    };
     let mut marker = fs::OpenOptions::new()
         .create_new(true)
         .write(true)
@@ -124,9 +141,15 @@ fn seed(root: &Path, runtime: bool) -> Result<Value, Box<dyn Error>> {
     store.update_sync_settings(account, |s| {
         s.controls.pause_background = true;
         s.controls.pause_queued_actions = true;
-        s.controls.work_offline = runtime;
+        s.controls.work_offline = fixture == Fixture::Runtime;
     })?;
-    if runtime {
+    if fixture == Fixture::Review {
+        seed_runtime(&store, account, repo)?;
+        store.schedule_selected_activity(account, now)?;
+        grouped::seed(&store, account, repo)?;
+        return grouped::inspect(root);
+    }
+    if fixture == Fixture::Runtime {
         seed_runtime(&store, account, repo)?;
         return inspect_runtime(root);
     }
