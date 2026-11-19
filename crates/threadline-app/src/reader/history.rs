@@ -69,20 +69,47 @@ impl ReaderService {
                 }
             }
             complete &= inventory_complete;
-            // Use the start of a complete scan so absence cannot overwrite a newer observation.
             if inventory_complete
                 && !inspected_present
-                && let (Some((reference, _)), Some(observed_at)) = (inspected_branch, started_at)
+                && let (Some((reference, name)), Some(scan_started)) =
+                    (inspected_branch, started_at)
                 && self
                     .store
                     .history_monitoring(account, repository)?
                     .watches(reference)
             {
+                let (tip, observed_at) = if page == 1 {
+                    (None, scan_started)
+                } else {
+                    // Offset pages may have shifted during a complete scan. Confirm the exact ref.
+                    self.check_scope(&scope, cancel)?;
+                    self.admit(account, cancel).await?;
+                    let point_started = UtcMillis::now()?.0;
+                    let result = self
+                        .history_value(account, reader.history_branch(name, cancel).await)
+                        .await;
+                    self.check_scope(&scope, cancel)?;
+                    let tip = match result {
+                        Ok(row) => Some(CommitOid::parse(&row.oid)?),
+                        Err(ReaderError::Remote(error))
+                            if error.kind == AccessKind::MissingOrInaccessible
+                                && error.http_status == Some(404) =>
+                        {
+                            // GitHub can mask loss of repository access with the same status.
+                            self.binding(&scope, cancel).await?;
+                            self.check_scope(&scope, cancel)?;
+                            None
+                        }
+                        Err(error) => return Err(error),
+                    };
+                    (tip, point_started)
+                };
+                // Request-start time keeps absence from replacing a newer observation.
                 self.store.observe_history_ref(
                     &scope.profile,
                     repository,
                     reference,
-                    None,
+                    tip.as_ref(),
                     observed_at,
                 )?;
             }

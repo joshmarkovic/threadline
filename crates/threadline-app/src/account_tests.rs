@@ -67,7 +67,7 @@ impl Simulator {
                                 (
                                     address,
                                     server_page_two.load(Ordering::Relaxed),
-                                    server_history_phase.load(Ordering::Relaxed),
+                                    server_history_phase.as_ref(),
                                 )
                             }),
                             &server_check_arrived,
@@ -116,7 +116,7 @@ fn respond(
     mut stream: TcpStream,
     sso: bool,
     repository_id: u64,
-    reader: Option<(SocketAddr, bool, usize)>,
+    reader: Option<(SocketAddr, bool, &AtomicUsize)>,
     check_arrived: &AtomicBool,
     hold_check_response: &AtomicBool,
 ) -> bool {
@@ -178,7 +178,11 @@ fn respond(
             )
         }
     } else if let Some(reply) = reader.and_then(|(address, page_two, history_phase)| {
-        reader_reply(&target, &repo, address, page_two, history_phase)
+        let phase = history_phase.load(Ordering::Relaxed);
+        if phase == 6 && target == "/repositories/42/branches/main" {
+            history_phase.store(7, Ordering::Relaxed);
+        }
+        reader_reply(&target, &repo, address, page_two, phase)
     }) {
         reply
     } else {
@@ -187,6 +191,8 @@ fn respond(
         "/repos/fixture-org/private" if sso => ("403 Forbidden",
             "X-GitHub-SSO: required; url=https://github.com/orgs/fixture-org/sso?authorization_request=synthetic-request\r\n".into(),
             r#"{"message":"Resource protected by organization SAML enforcement"}"#.into()),
+        "/repos/fixture-org/private" if reader.is_some_and(|(_, _, phase)| phase.load(Ordering::Relaxed) == 7) =>
+            ("403 Forbidden", String::new(), r#"{"message":"Fixture repository denied"}"#.into()),
         "/repos/fixture-org/private" => ("200 OK",String::new(),repo.to_owned()),
         target if target.starts_with("/user/repos?") => ("200 OK",if sso {"X-GitHub-SSO: partial-results; organizations=9\r\n".into()} else {String::new()},format!("[{repo}]")),
         _ => panic!("unexpected local fixture route"),
@@ -303,7 +309,7 @@ fn reader_reply(
         let page: u8 = page.parse().unwrap();
         let reply = match (history_phase, page) {
             (0, 1) | (1, 2) => success(json!([changed])),
-            (1 | 3, 1) | (2, 1..=4) => (
+            (1 | 3..=6, 1) | (2, 1..=4) => (
                 "200 OK",
                 format!(
                     "Link: <http://{address}{BRANCHES}{}>; rel=\"next\"\r\n",
@@ -311,13 +317,22 @@ fn reader_reply(
                 ),
                 "[]".into(),
             ),
-            (3, 2) => success(json!([])),
+            (3..=6, 2) => success(json!([])),
             _ => panic!("unexpected branch inventory page"),
         };
         return Some(reply);
     }
     if target == "/repositories/42/tags?per_page=20&page=1" {
         return Some(success(json!([])));
+    }
+    if target == "/repositories/42/branches/main" {
+        let reply = match history_phase {
+            3 => success(changed),
+            4 => ("503 Service Unavailable", String::new(), "{}".into()),
+            5 | 6 => ("404 Not Found", String::new(), "{}".into()),
+            _ => panic!("unexpected exact branch lookup"),
+        };
+        return Some(reply);
     }
     if target == "/repositories/73/branches/main" {
         return Some(success(main));
@@ -887,7 +902,7 @@ async fn sync_worker_waits_for_hydration_and_restored_offline_then_observes_both
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn inspected_watched_branch_requires_authoritative_absence_before_deletion() {
-    use crate::reader::ReaderService;
+    use crate::reader::{ReaderError, ReaderService};
     use threadline_storage::{
         history::{HistoryMonitoring, HistoryRef},
         resources::CommitOid,
@@ -915,13 +930,24 @@ async fn inspected_watched_branch_requires_authoritative_absence_before_deletion
         .await;
     assert!(connected.github_error.is_none());
     let account = connected.view.active.unwrap();
-    let repo = connected
+    let private_repo = connected
         .view
         .repositories
         .iter()
         .find(|repo| repo.name == "private")
         .unwrap()
-        .id;
+        .clone();
+    let repo = private_repo.id;
+    let selected = service
+        .execute(
+            AccountCommand::Select {
+                profile: connected.view.profiles[0].clone(),
+                repository: private_repo,
+            },
+            &cancel,
+        )
+        .await;
+    assert!(selected.github_error.is_none());
     store
         .set_history_monitoring(
             account,
@@ -932,7 +958,7 @@ async fn inspected_watched_branch_requires_authoritative_absence_before_deletion
             },
         )
         .unwrap();
-    let profile = &connected.view.profiles[0];
+    let profile = &selected.view.profiles[0];
     let reference = HistoryRef::Branch("main".into());
     let old = CommitOid::parse(&"a".repeat(40)).unwrap();
     let new = CommitOid::parse(&"b".repeat(40)).unwrap();
@@ -941,26 +967,37 @@ async fn inspected_watched_branch_requires_authoritative_absence_before_deletion
         .unwrap();
     let reader = ReaderService::new(service);
     for (phase, complete, expected) in [
-        (0, true, Some(&new)),
-        (1, true, Some(&new)),
-        (2, false, Some(&new)),
-        (3, true, None),
+        (0, Some(true), Some(&new)),
+        (1, Some(true), Some(&new)),
+        (2, Some(false), Some(&new)),
+        (3, Some(true), Some(&new)),
+        (4, None, Some(&new)),
+        (6, None, Some(&new)),
+        (5, Some(true), None),
     ] {
         simulator
             .history_branch_phase
             .store(phase, Ordering::Relaxed);
         let result = reader
             .fetch_history_refs(account, repo, Some(&reference), &cancel)
-            .await
-            .unwrap();
-        assert_eq!(result.complete, complete);
+            .await;
+        if let Some(complete) = complete {
+            assert_eq!(result.unwrap().complete, complete);
+        } else {
+            let status = if phase == 4 { 503 } else { 403 };
+            assert!(
+                matches!(result, Err(ReaderError::Remote(error)) if error.http_status == Some(status))
+            );
+        }
         let cached = store
             .history_ref(account, repo, &reference)
             .unwrap()
             .unwrap();
         assert_eq!(cached.tip.as_ref(), expected);
         let changes = store.history_ref_moves(account, repo, 0, 10).unwrap();
-        assert_eq!(changes.len(), if phase == 3 { 2 } else { 1 });
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].previous, old);
+        assert_eq!(changes[0].current, new);
     }
 }
 

@@ -185,6 +185,24 @@ enum MonitorHistory {
     Pull(std::num::NonZeroU64),
 }
 
+fn bounded_history_refs(
+    store: &Store,
+    account: AccountId,
+    repository: RepositoryId,
+    inspected: Option<&HistoryRef>,
+) -> Outcome<Vec<HistoryRefState>> {
+    const REF_LIMIT: u16 = 100;
+    let mut refs = store.history_refs(account, repository, None, REF_LIMIT)?;
+    if let Some(reference) = inspected
+        && !refs.iter().any(|entry| &entry.reference == reference)
+        && let Some(inspected) = store.history_ref(account, repository, reference)?
+    {
+        refs.insert(0, inspected);
+        refs.truncate(usize::from(REF_LIMIT));
+    }
+    Ok(refs)
+}
+
 impl HistoryData {
     fn load(
         store: &Store,
@@ -192,11 +210,20 @@ impl HistoryData {
         repository: RepositoryId,
         request: Option<(Option<i64>, HistoryView, Option<i64>)>,
     ) -> Outcome<Self> {
-        let refs = store.history_refs(account, repository, None, 100)?;
+        let saved = if request.is_none() {
+            store.history_view(account, repository, VIEW_ID)?
+        } else {
+            None
+        };
+        let inspected = request
+            .as_ref()
+            .map(|(_, view, _)| &view.reference)
+            .or_else(|| saved.as_ref().map(|saved| &saved.state.reference));
+        let refs = bounded_history_refs(store, account, repository, inspected)?;
         let monitoring = store.history_monitoring(account, repository)?;
         let (generation, view, after) = if let Some((generation, view, after)) = request {
             (generation, Some(view), after)
-        } else if let Some(saved) = store.history_view(account, repository, VIEW_ID)? {
+        } else if let Some(saved) = saved {
             let after = match saved.state.scroll_anchor.as_ref() {
                 Some(anchor) => store
                     .history_ordinal(account, repository, &saved.state.tip, anchor)?
@@ -550,7 +577,11 @@ impl ReaderWorkspace {
         let Some(data) = self.history.data.as_ref() else {
             return;
         };
-        let Some(tip) = data.view.as_ref().map(|view| view.tip.clone()) else {
+        let Some((tip, inspected)) = data
+            .view
+            .as_ref()
+            .map(|view| (view.tip.clone(), view.reference.clone()))
+        else {
             self.load_history(repository, None, window, cx);
             return;
         };
@@ -561,7 +592,7 @@ impl ReaderWorkspace {
             window,
             cx,
             move |store| {
-                let refs = store.history_refs(account, repository, None, 100)?;
+                let refs = bounded_history_refs(store, account, repository, Some(&inspected))?;
                 let page = store.history_page(account, repository, &tip, after, GRAPH_LIMIT)?;
                 Ok((refs, page))
             },

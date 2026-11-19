@@ -2515,7 +2515,25 @@ fn history_view_selects_exact_parents_and_restores_an_offline_comparison(cx: &mu
     assert_eq!(state.second, Some(oid('d')));
     assert!(state.parent.is_none());
 
-    // The shared history update changes labels in place while retaining this pinned comparison.
+    for index in 0..100 {
+        store
+            .observe_history_ref(
+                &profile,
+                repository,
+                &HistoryRef::Branch(format!("first-{index:03}")),
+                Some(&oid('d')),
+                now + 2,
+            )
+            .unwrap();
+    }
+    assert!(
+        store
+            .history_refs(account, repository, None, 100)
+            .unwrap()
+            .iter()
+            .all(|row| row.reference != reference)
+    );
+    // The selected ref remains present even after it falls outside the bounded alphabetic page.
     for (index, tip) in [Some(oid('a')), None].into_iter().enumerate() {
         store
             .observe_history_ref(
