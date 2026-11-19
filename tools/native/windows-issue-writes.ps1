@@ -111,6 +111,46 @@ function Wait-IssueConflictField([IntPtr]$Window, [string]$Id, [string]$Expected
     }
 }
 
+function Confirm-IssueDraftSubmissionLabel([IntPtr]$Window, [long]$Item, [string]$Label) {
+    if ($Label -cnotin @('Saved to Outbox', 'Needs attention')) { throw 'Unexpected issue submission label.' }
+    $null = Wait-Reader 'the exact native draft has a recorded submission for its saved revision' {
+        param($reader)
+        $reader.active_item -eq $Item -and $reader.active_number -eq 41 -and !$reader.outbox_visible -and
+            $reader.active_draft_saved -and $reader.active_draft_submitted
+    }
+    for ($step = 0; $step -le 5; $step++) {
+        $button = Find-OwnedFixtureControl $Window 'reader-submit-0' $Label -AllowDisabled
+        try {
+            if ($null -ne $button -and !$button.Current.IsEnabled) {
+                Add-Evidence 'Read the disabled submission label for the restored issue draft' ([ordered]@{
+                    issue_number = 41; automation_id = 'reader-submit-0'; label = $Label; enabled = $false
+                })
+                return
+            }
+        } catch [Windows.Automation.ElementNotAvailableException] {}
+        if ($step -eq 5) { break }
+        $status = @{snapshot = $null}
+        Wait-For 'the exact issue conversation viewport in the owned process' {
+            $current = Read-Observation
+            if ($null -eq $current -or !$current.ready -or $current.pid -ne $script:app.Id -or $current.scale_factor -le 0) { return $false }
+            $reader = $current.PSObject.Properties['cached_reader']
+            $viewport = $current.bounds.PSObject.Properties['reader-conversation-0']
+            if ($null -eq $reader -or $null -eq $reader.Value -or $reader.Value.active_item -ne $Item -or
+                $reader.Value.outbox_visible -or !$reader.Value.active_draft_submitted -or
+                $null -eq $viewport -or $viewport.Value.Count -ne 4 -or $viewport.Value[2] -le 0 -or $viewport.Value[3] -le 0) { return $false }
+            $status.snapshot = $current
+            return $true
+        }
+        $current = $status.snapshot
+        $rect = $current.bounds.PSObject.Properties['reader-conversation-0'].Value
+        $point = To-ClientPoint ($rect[0] + $rect[2] / 2) ($rect[1] + $rect[3] / 2) $current.scale_factor
+        $dpi = [uint32][Math]::Round(96 * $current.scale_factor)
+        [ThreadlineWinInput]::ScrollOwnedConversation($Window, [uint32]$script:app.Id, $dpi, $point, -1)
+        Start-Sleep -Milliseconds 100
+    }
+    throw 'The restored issue draft did not show the exact disabled submission state.'
+}
+
 function Invoke-IssueConflictProof([IntPtr]$Window, [string]$Profile) {
     Set-AccessPhase 'issue-edit-baseline'
     Wait-SeededFixtureAccount
@@ -141,6 +181,7 @@ function Invoke-IssueConflictProof([IntPtr]$Window, [string]$Profile) {
             $reader.active_draft_saved -and !$reader.outbox_visible
     }
     Wait-WriteFixtureDraft $item $description
+    Confirm-IssueDraftSubmissionLabel $restarted $item 'Saved to Outbox'
     Set-WriteFixtureOffline $restarted $false
     Wait-SeededFixtureAccount
     Click-AccountControl $restarted 'reader-outbox'
@@ -171,6 +212,7 @@ function Invoke-IssueConflictProof([IntPtr]$Window, [string]$Profile) {
             $false
         }
     }
+    Confirm-IssueDraftSubmissionLabel $restarted $item 'Needs attention'
     Add-Evidence 'Reopen the exact existing issue and verify the saved local edit' ([ordered]@{ issue_number = 41; draft_retained = $true })
     Stop-ThroughUi
     $script:report.detail = 'The native reader restored the queued edit after restart, detected changed GitHub fields during preflight, showed its original, local and remote values, and kept the original issue draft available.'
