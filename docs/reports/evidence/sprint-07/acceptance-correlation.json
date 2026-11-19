@@ -1,0 +1,69 @@
+{
+  "scope": "Existing Windows native journeys, Windows SQLite tests, and the production source that admits provider mutations",
+  "windows_evidence": {
+    "offline_edit_and_comment_restart": {
+      "receipt": "native-editors.json",
+      "run": "e2e-1795057238929-32548",
+      "case": "E2E-006",
+      "status": "Pass",
+      "observed": "The app reopened durable issue edit and comment submissions from the same offline profile. The ordinary comment confirmed automatically after reconnection. The issue edit was deliberately cancelled before its dispatch."
+    },
+    "existing_issue_confirmation": {
+      "receipt": "issue-propagation.json",
+      "run": "e2e-1795061509046-15188",
+      "case": "S07-ISSUE-PROPAGATION",
+      "status": "Pass",
+      "observed": "The offline issue edit appeared pending in both views. Reconnecting sent one scoped edit of issue 41 and replaced both pending views with the confirmed title."
+    },
+    "existing_issue_conflict": {
+      "receipt": "issue-conflict.json",
+      "run": "e2e-1795060034719-42684",
+      "case": "S07-ISSUE-CONFLICT",
+      "status": "Pass",
+      "observed": "A fresh read after the offline restart put the original issue edit in Needs attention. The submitted and GitHub fields remained readable, and the trace contained no write."
+    },
+    "native_creation_inventory": {
+      "receipt": "native-editors.json",
+      "run": "e2e-1795041019153-47996",
+      "case": "E2E-019",
+      "status": "Pass",
+      "observed": "Owned Windows controls and Ctrl+N exposed no issue-creation action. The only write in this run was a confirmed ordinary comment."
+    },
+    "sqlite_and_commands": {
+      "receipt": "../sprint-12/selected-candidate-validation.json",
+      "source": "43bd2fc625043687f9d5fec86637f1243e754739",
+      "writes_native_process_exit": 0,
+      "writes_log_sha256": "d8e621d7dedcf6c956905e16d3092309b58ab46317109e6393524ecfd237b0bc",
+      "writes_test_filters": [
+        "it_012_cached_repository_options_and_numeric_edit_base_survive_offline_restart",
+        "it_012_confirmed_issue_fields_and_repository_choices_preserve_unknown_unedited_values",
+        "it_012_conflicting_fields_retain_remote_local_original_and_an_unrelated_issue_can_dispatch"
+      ],
+      "app_native_process_exit": 0,
+      "app_log_sha256": "218c93c8ddcf7f5d9cd5133c645c436f13bf5aad9ba6b22232bd250c399bf9ae",
+      "app_test": "reader_workspace::tests::ui_006_registered_native_commands_offer_edits_and_comments_without_issue_creation"
+    }
+  },
+  "source_audit": {
+    "revision": "4b69ad2375e41a50cc3bc39c58d6a7d4d891c985",
+    "native_actions": [
+      "crates/threadline-app/src/workspace.rs",
+      "crates/threadline-app/src/reader_workspace/view.rs"
+    ],
+    "drafts_and_intents": [
+      "crates/threadline-storage/src/queue/workspace.rs",
+      "crates/threadline-storage/src/queue.rs",
+      "crates/threadline-storage/src/writes/model.rs",
+      "crates/threadline-storage/src/reviews.rs"
+    ],
+    "provider_writers": [
+      "crates/threadline-core/src/github/access/writer.rs",
+      "crates/threadline-core/src/github/access/writer/review/write.rs",
+      "crates/threadline-core/src/github/access/writer/merge.rs"
+    ],
+    "observed": "Native commands and durable intent types cover existing issues, ordinary comments, reviews, replies, thread resolution, and direct merges. The typed writers use the original issue, comment, review, thread, or PR identity. The complete set includes no issue or PR creation operation or fallback."
+  },
+  "remaining": {
+    "AC-64": "The conflict, persisted 429 floor, and credential cases have evidence. No recorded run drives an eligible write through all transient retries and then records automatic dispatch after reconnection or same-user repair."
+  }
+}
