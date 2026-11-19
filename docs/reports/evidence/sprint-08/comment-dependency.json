@@ -1,0 +1,328 @@
+{
+  "scenario": "S08-COMMENT-DEPENDENCY",
+  "fixture_revision": "s08-native-comment-dependency-v1",
+  "windows_version": "Microsoft Windows [Version 10.0.22631.7652]",
+  "command": {
+    "program": "xtask",
+    "argv": [
+      "test",
+      "e2e",
+      "--suite",
+      "full",
+      "--case",
+      "S08-COMMENT-DEPENDENCY",
+      "--binary",
+      "<binary-path>",
+      "--seed",
+      "12345",
+      "--report-dir",
+      "<report-dir>"
+    ],
+    "redacted": true
+  },
+  "seed": 12345,
+  "app_source": "fc916579c6205df66cc4765b397ac71b9425317a",
+  "runner_source": "fc916579c6205df66cc4765b397ac71b9425317a",
+  "records": [
+    {
+      "run": "e2e-1795052255922-45832",
+      "status": "Fail",
+      "exit_code": 1,
+      "driver": "ec28ba2720f352768bd42118c1b1d38b655e1e38",
+      "source_dirty": false,
+      "binary_sha256": "467f2fdd55260d89f9fed05ed71ad0ffe5f3ee8e07a77b03bd325d9b2d636c0a",
+      "dpi": 96,
+      "native_actions": 24,
+      "request_count": 24,
+      "routes": {
+        "write_online/user/200": 3,
+        "write_online/repository/200": 3,
+        "write_online/updated_items/200": 1,
+        "write_online/updated_comments/200": 1,
+        "write_online/updated_inline_comments/200": 1,
+        "write_online/open_pull_index/200": 1,
+        "write_online/items/200": 1,
+        "write_online/scheduled_issue/200": 1,
+        "comment_dependency_create/user/200": 2,
+        "comment_dependency_create/repository/200": 1,
+        "comment_dependency_create/item/200": 1,
+        "comment_dependency_create/dependency_comment_created/201": 1,
+        "comment_dependency_resume/user/200": 2,
+        "comment_dependency_resume/repository/200": 2,
+        "comment_dependency_resume/item/200": 1,
+        "comment_dependency_resume/unexpected/404": 1,
+        "comment_dependency_resume/scheduled_issue/200": 1
+      },
+      "detail": "The saved create and follow-up sequence reached reconnect, but an unexpected request was refused. The tester later isolated a stale native editor target.",
+      "raw_sha256": {
+        "result.json": "c2b59651e2df2f2ce8be01adeee6fa39dddcf5cdbd71cdcb0d284a3ce413d591",
+        "comment-dependency-native.json": "3aa0e877308e65d6e49b2942598f7c3753fe05fcef4854c96c0cfef699b75e8f",
+        "github-access-trace.json": "3d2f18188364eb002c6afd314c6f5fb99687eaab6a517dcd461904df280f2fbc",
+        "binary.json": "d45eb720fb2ff805bda279ae070a714b9f346896722457b8788b65f331a9b8ba"
+      }
+    },
+    {
+      "run": "e2e-1795053294916-31796",
+      "status": "Fail",
+      "exit_code": 1,
+      "driver": "43bd2fc625043687f9d5fec86637f1243e754739",
+      "source_dirty": false,
+      "binary_sha256": "c98a01e1fa629040243835b6dc27b555816b9a6b7add69e67ab91b3aa6c5bb86",
+      "dpi": 96,
+      "native_actions": 24,
+      "request_count": 24,
+      "routes": {
+        "write_online/user/200": 3,
+        "write_online/repository/200": 3,
+        "write_online/updated_items/200": 1,
+        "write_online/updated_comments/200": 1,
+        "write_online/updated_inline_comments/200": 1,
+        "write_online/items/200": 1,
+        "write_online/open_pull_index/200": 1,
+        "write_online/scheduled_issue/200": 1,
+        "comment_dependency_create/user/200": 2,
+        "comment_dependency_create/repository/200": 1,
+        "comment_dependency_create/item/200": 1,
+        "comment_dependency_create/dependency_comment_created/201": 1,
+        "comment_dependency_resume/user/200": 2,
+        "comment_dependency_resume/repository/200": 2,
+        "comment_dependency_resume/item/200": 1,
+        "comment_dependency_resume/unexpected/404": 1,
+        "comment_dependency_resume/scheduled_issue/200": 1
+      },
+      "detail": "The instrumented replay found the same unexpected request on reconnect without a second accepted create.",
+      "raw_sha256": {
+        "result.json": "0c5a4fe755c47248c31f6145e242fd1284e449f8e367739a55f7e55daa4d1711",
+        "comment-dependency-native.json": "ea7546d36249b8527b18366b2c2fb76394df22486c9a2856cc6a3c4f56916b91",
+        "github-access-trace.json": "ab2da3d546ebf5429ad29c192d91aeca5f3a1b0815acb33c6d6c00863faa83f9",
+        "binary.json": "94c26fad52abb31ea06b104be2cd7fb26cc22357c3a3acd872a64b9e59a8475e"
+      }
+    },
+    {
+      "run": "e2e-1795054271651-13596",
+      "status": "Fail",
+      "exit_code": 1,
+      "driver": "cb49699d32e517773994f85910eab16119dc5518",
+      "source_dirty": false,
+      "binary_sha256": "cf0169bcb17744d98b9f222c99ed6e5f96485c68162ca6e69562c8606a9fc5eb",
+      "dpi": 96,
+      "native_actions": 12,
+      "request_count": 12,
+      "routes": {
+        "write_online/user/200": 3,
+        "write_online/repository/200": 3,
+        "write_online/updated_items/200": 1,
+        "write_online/updated_comments/200": 1,
+        "write_online/updated_inline_comments/200": 1,
+        "write_online/open_pull_index/200": 1,
+        "write_online/items/200": 1,
+        "write_online/scheduled_issue/200": 1
+      },
+      "detail": "Exact submit labels stopped the driver before typing into the wrong editor. The intended follow-up control was outside the conversation viewport.",
+      "raw_sha256": {
+        "result.json": "c855bffe9db89cbd1f8038fc6b60e6eb751288fcb54147ccffa4f59f34defe3c",
+        "comment-dependency-native.json": "cbf9cdb006e1ea362fcec4aded5d2e4fb6a7b550faaa7a9a0e3d4d99e529049f",
+        "github-access-trace.json": "c39bcfed35e8261eb30e66701a63a675f64147f6bbf9e1c214756517b5964e24",
+        "binary.json": "4d2e5b875fb07f79faf01e29a40779e5f05fb2527e17667527305beb2700e738"
+      }
+    },
+    {
+      "run": "e2e-1795056139779-22340",
+      "status": "Fail",
+      "exit_code": 1,
+      "driver": "1375feb00b434069474bd3f53e3023648c979a33",
+      "source_dirty": false,
+      "binary_sha256": "3d6c15c0c0c50df78a15e593e18d351e603206af9b9416fb44975a1d74cd7051",
+      "dpi": 96,
+      "native_actions": 11,
+      "request_count": 12,
+      "routes": {
+        "write_online/user/200": 3,
+        "write_online/repository/200": 3,
+        "write_online/updated_items/200": 1,
+        "write_online/updated_comments/200": 1,
+        "write_online/updated_inline_comments/200": 1,
+        "write_online/open_pull_index/200": 1,
+        "write_online/items/200": 1,
+        "write_online/scheduled_issue/200": 1
+      },
+      "detail": "The app saved the original draft and one offline action. The test observation wrapper omitted the real conversation geometry, so the viewport guard refused input.",
+      "raw_sha256": {
+        "result.json": "f1a7050e06af1bdd8b2ab171ec8a4a20cbfe5ef304fdbb5be7fb0cb771c4b95d",
+        "comment-dependency-native.json": "1d928e0d30388f454f4c4375c7c467b5670f94a3844ee5d47aab3133313bda61",
+        "github-access-trace.json": "179eae4f44476f5bccef90e12796637ccdc30459e640b44ad5f00393dc134e3e",
+        "binary.json": "d64ac25657ee654be9164ef937e9566d7d3bfc487f69b53606ed35e83f0871db"
+      }
+    },
+    {
+      "run": "e2e-1795057718382-19224",
+      "status": "Fail",
+      "exit_code": 1,
+      "driver": "a007590a069d4ec4061356a6f96a8c7ba5a5b91c",
+      "source_dirty": false,
+      "binary_sha256": "cceb73f543b7b77dc821cf3f6fa00e31a74ffab3cfc3cd06c6095f518514ed30",
+      "dpi": 96,
+      "native_actions": 46,
+      "request_count": 30,
+      "routes": {
+        "write_online/user/200": 3,
+        "write_online/repository/200": 3,
+        "write_online/updated_items/200": 1,
+        "write_online/updated_comments/200": 1,
+        "write_online/updated_inline_comments/200": 1,
+        "write_online/open_pull_index/200": 1,
+        "write_online/items/200": 1,
+        "write_online/scheduled_issue/200": 1,
+        "comment_dependency_create/user/200": 2,
+        "comment_dependency_create/repository/200": 1,
+        "comment_dependency_create/item/200": 1,
+        "comment_dependency_create/dependency_comment_created/201": 1,
+        "comment_dependency_resume/user/200": 2,
+        "comment_dependency_resume/repository/200": 2,
+        "comment_dependency_resume/item/200": 1,
+        "comment_dependency_resume/dependency_comment_read/200": 1,
+        "comment_dependency_resume/dependency_comment_edited/200": 1,
+        "comment_dependency_resume/scheduled_issue/200": 1,
+        "comment_dependency_lost/user/200": 2,
+        "comment_dependency_lost/repository/200": 1,
+        "comment_dependency_lost/item/200": 1,
+        "comment_dependency_lost/dependency_comment_lost/0": 1
+      },
+      "detail": "The real provider completed the first dependent edit after restart. The second original lost its response as configured. The final native inspector requested row zero while the attention filter exposed absolute row two.",
+      "raw_sha256": {
+        "result.json": "f568073671789c7172294120141ba74e0ed210842819aec41f45c48e41a6a8cc",
+        "comment-dependency-native.json": "bd24fad77b8ba66cc19c961bf16afef8a9cf2118841b8f3d98ce73fdaca8ab04",
+        "github-access-trace.json": "8983e9922d3fa8d358f23d22c1a8a0ad92e27a0441841c4aaaab8f7d7d7344e8",
+        "binary.json": "1474de2d5666b60a78350c13e3da22e6314673bd364c57f10de0609c585b40af"
+      }
+    },
+    {
+      "run": "e2e-1795059841993-40288",
+      "status": "Pass",
+      "exit_code": 0,
+      "driver": "fc916579c6205df66cc4765b397ac71b9425317a",
+      "source_dirty": false,
+      "binary_sha256": "f88478a2857f77a6fb9615c99d5637cac3641a6d176d49bba8ec7a3a3b84dd2e",
+      "dpi": 96,
+      "native_actions": 49,
+      "request_count": 30,
+      "routes": {
+        "write_online/user/200": 3,
+        "write_online/repository/200": 3,
+        "write_online/updated_items/200": 1,
+        "write_online/updated_comments/200": 1,
+        "write_online/updated_inline_comments/200": 1,
+        "write_online/items/200": 1,
+        "write_online/open_pull_index/200": 1,
+        "write_online/scheduled_issue/200": 1,
+        "comment_dependency_create/user/200": 2,
+        "comment_dependency_create/repository/200": 1,
+        "comment_dependency_create/item/200": 1,
+        "comment_dependency_create/dependency_comment_created/201": 1,
+        "comment_dependency_resume/user/200": 2,
+        "comment_dependency_resume/repository/200": 2,
+        "comment_dependency_resume/item/200": 1,
+        "comment_dependency_resume/dependency_comment_read/200": 1,
+        "comment_dependency_resume/dependency_comment_edited/200": 1,
+        "comment_dependency_resume/scheduled_issue/200": 1,
+        "comment_dependency_lost/user/200": 2,
+        "comment_dependency_lost/repository/200": 1,
+        "comment_dependency_lost/item/200": 1,
+        "comment_dependency_lost/dependency_comment_lost/0": 1
+      },
+      "detail": "Native controls queued the comment and its dependent edit offline. The confirmed predecessor survived a separate process restart. The worker used the exact returned comment identity once. A distinct lost predecessor held its edit without replay.",
+      "raw_sha256": {
+        "result.json": "3c486312625ceba0fb0945c3fc7721b70983421a521a4df1ecc8e8b4926835f8",
+        "comment-dependency-native.json": "7ba5004d0db82804a8daa53993231d64e3ea07f8daefe5cf0d13bdfc11547530",
+        "github-access-trace.json": "031e8bda00634a5bed1c051abd3c78d2f810259bc0a5946746716f9d4d012b1b",
+        "binary.json": "b8b6f2edf1159356cccadddb76fe3ecc3ee14beb8600b544ca5dcdf81b722722"
+      }
+    }
+  ],
+  "checkpoints": [
+    {
+      "action": "Load the isolated verified account and scope",
+      "observed": {
+        "user": 41,
+        "repository_count": 1
+      }
+    },
+    {
+      "action": "Open existing GitHub issue 41 from the downloaded repository",
+      "observed": 41
+    },
+    {
+      "action": "Relaunch the same SQLite profile in a separate process",
+      "observed": {
+        "pid": 44064,
+        "sqlite_retained": true
+      }
+    },
+    {
+      "action": "Save one ordinary comment and its explicit edit, then restore both offline in a new process",
+      "observed": {
+        "item": 1,
+        "pending": 2,
+        "original_projection_used": true
+      }
+    },
+    {
+      "action": "Observe confirmed original receipt with its dependent still pending before quitting",
+      "observed": {
+        "item": 1,
+        "pending": 1,
+        "predecessor_confirmed": true
+      }
+    },
+    {
+      "action": "Relaunch the same SQLite profile in a separate process",
+      "observed": {
+        "pid": 45516,
+        "sqlite_retained": true
+      }
+    },
+    {
+      "action": "Confirm the dependent edit after restart with one cached comment and no pending actions",
+      "observed": {
+        "item": 1,
+        "cached_comments": 1,
+        "pending": 0
+      }
+    },
+    {
+      "action": "Preserve the uncertain predecessor and the separately visible queued edit without a second mutation",
+      "observed": {
+        "item": 1,
+        "uncertain": 1,
+        "held_dependent": 1
+      }
+    }
+  ],
+  "exact_dependency_requests": [
+    {
+      "phase": "comment_dependency_create",
+      "route": "dependency_comment_created",
+      "fixture_authorization": true,
+      "status": 201
+    },
+    {
+      "phase": "comment_dependency_resume",
+      "route": "dependency_comment_read",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "comment_dependency_resume",
+      "route": "dependency_comment_edited",
+      "fixture_authorization": true,
+      "status": 200
+    },
+    {
+      "phase": "comment_dependency_lost",
+      "route": "dependency_comment_lost",
+      "fixture_authorization": true,
+      "status": 0
+    }
+  ],
+  "confirmed_provider_comment_id": 4101
+}
