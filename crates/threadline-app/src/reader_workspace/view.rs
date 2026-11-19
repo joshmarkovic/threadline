@@ -491,14 +491,16 @@ impl ReaderWorkspace {
             .border_color(palette.border)
             .bg(palette.panel)
             .child(overview)
-            .child(
+            .child(self.observed_control(
+                "reader-browse",
                 control("reader-browse", "Selected repositories").on_click(cx.listener(
                     |this, _, window, cx| {
                         this.filter = BrowseFilter::default();
                         this.set_scope(ReaderScope::Selected, window, cx);
                     },
                 )),
-            )
+                false,
+            ))
             .children(
                 self.repositories
                     .iter()

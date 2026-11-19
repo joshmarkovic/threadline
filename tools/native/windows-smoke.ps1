@@ -8,7 +8,7 @@ param(
     [switch]$PlatformProof,
     [switch]$ToastProof,
     [switch]$AccessProof,
-    [ValidateSet('Offline', 'Resume', 'Performance', 'PerformancePhysical', 'LargeWorkspace', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface')][string]$ReaderProof,
+    [ValidateSet('Offline', 'Resume', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface')][string]$ReaderProof,
     [switch]$AccessibilityProof,
     [string]$AccessAddress,
     [string]$AccessPhaseFile,
@@ -29,7 +29,7 @@ $reportName = if ($Measure) {
     'toast-native.json'
 } elseif ($AccessProof) {
     'github-access-native.json'
-} elseif ($ReaderProof -in @('Performance', 'PerformancePhysical')) {
+} elseif ($ReaderProof -in @('Performance', 'PerformancePhysical', 'PerformanceConcurrent')) {
     'reader-performance.json'
 } elseif ($ReaderProof -eq 'LargeWorkspace') {
     'large-workspace-native.json'
@@ -88,7 +88,7 @@ $copiedClipboardSequence = $null
 $toastFixture = $null
 $toastSubmissionAttempted = $false
 $script:UseOwnedUiAutomation = $false
-$script:UseSeededFixtureAuth = $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'History', 'Writes', 'WriteSurface')
+$script:UseSeededFixtureAuth = $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'History', 'Writes', 'WriteSurface', 'PerformanceConcurrent')
 
 function Get-FileSha256 {
     param([string]$Path)
@@ -222,7 +222,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_ACCOUNT_FORM')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_READER_TIMING')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_READER_IDLE')
-    if ($ReaderProof -in @('Performance', 'PerformancePhysical', 'LargeWorkspace')) { $info.EnvironmentVariables['THREADLINE_E2E_READER_TIMING'] = '1' }
+    if ($ReaderProof -in @('Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) { $info.EnvironmentVariables['THREADLINE_E2E_READER_TIMING'] = '1' }
     if ($ReaderIdle) { $info.EnvironmentVariables['THREADLINE_E2E_READER_IDLE'] = '1' }
     if ($ToastProof -and $null -ne $script:toastFixture) {
         $info.EnvironmentVariables['THREADLINE_TEST_TOAST_TOKEN'] = $script:toastFixture.Token
@@ -233,7 +233,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     if ($script:UseSeededFixtureAuth -or $ReaderBacklog) { $info.EnvironmentVariables['THREADLINE_E2E_FIXTURE_AUTH'] = '1' }
     if ($ReaderProof -eq 'CredentialBoundary') { $info.EnvironmentVariables['THREADLINE_E2E_ACCOUNT_FORM'] = '1' }
     if ($ReaderBacklog) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
-    if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'DirectMerge', 'CredentialBoundary', 'Writes', 'WriteSurface')) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
+    if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'DirectMerge', 'CredentialBoundary', 'Writes', 'WriteSurface', 'PerformanceConcurrent')) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
     return [Diagnostics.Process]::Start($info)
 }
 
@@ -907,14 +907,14 @@ try {
         }
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
-    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface', 'Performance', 'PerformancePhysical', 'LargeWorkspace')) {
+    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) {
         Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
         . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
         $script:UseOwnedUiAutomation = !$AccessibilityProof -and $ReaderProof -ne 'PerformancePhysical'
         $report.driver = 'Windows PowerShell / owned UI Automation and guarded Win32 SendInput'
     }
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
-    if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'DirectMerge')) { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
+    if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'DirectMerge', 'PerformanceConcurrent')) { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
     if ($ReaderProof -in @('PullRequest', 'ReviewDraft', 'ReviewContext', 'DirectMerge')) { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
     if ($ReaderProof -in @('NotificationSchedule', 'ReviewDraft', 'ReviewContext', 'DirectMerge', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface')) { . (Join-Path $PSScriptRoot 'windows-issue-writes.ps1') }
     if ($ReaderProof -in @('ReviewDraft', 'ReviewContext')) { . (Join-Path $PSScriptRoot 'windows-review-context.ps1') }
@@ -925,7 +925,7 @@ try {
     $null = New-Item -ItemType Directory -Path $firstProfile -Force
     if ($ReaderProof -eq 'Offline') { Initialize-ReaderProfile $firstProfile 'small' }
     if ($ReaderProof -in @('Performance', 'PerformancePhysical')) { Initialize-ReaderProfile $firstProfile 'section-16' }
-    if ($ReaderProof -eq 'LargeWorkspace') { Initialize-ReaderProfile $firstProfile 'section-16-backlog' }
+    if ($ReaderProof -in @('LargeWorkspace', 'PerformanceConcurrent')) { Initialize-ReaderProfile $firstProfile 'section-16-backlog' }
     if ($script:UseSeededFixtureAuth) {
         $fixturePhase = switch ($ReaderProof) {
             Resume { 'reader-failure' }
@@ -936,6 +936,7 @@ try {
             ReviewContext { 'pr-load' }
             DirectMerge { 'merge-prepare' }
             History { 'history' }
+            PerformanceConcurrent { 'backlog-auth' }
             default { 'write-online' }
         }
         Set-AccessPhase $fixturePhase
@@ -995,6 +996,7 @@ try {
             Resume { Invoke-ReaderResumeProof $window $firstProfile }
             Performance { Invoke-ReaderPerformance $window }
             PerformancePhysical { Invoke-ReaderPerformance $window -Physical }
+            PerformanceConcurrent { Invoke-ConcurrentReaderPerformance $window }
             LargeWorkspace { Invoke-LargeWorkspaceProof $window $firstProfile $coldMs $initialStartupTiming }
             Sync { Invoke-SyncProof $window $firstProfile }
             NotificationSchedule { Invoke-NotificationScheduleProof $window $firstProfile }

@@ -40,6 +40,9 @@ function Click-AccountControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwat
                 Start-Sleep -Milliseconds 50
             }
         }
+        if ((Get-Variable ReaderProof -ValueOnly -ErrorAction SilentlyContinue) -eq 'PerformanceConcurrent') {
+            Stop-Blocked 'The concurrent benchmark needs the exact native UI Automation action for a matched input source.'
+        }
         if (!(Test-OwnedFixtureWindow $Window)) { Stop-Blocked 'The physical fallback lost the owned Threadline window.' }
         if ([ThreadlineWinInput]::GetForegroundWindow() -ne $Window) { Set-WindowFocus $Window }
         [ThreadlineWinInput]::TargetWindow = $Window
@@ -60,7 +63,7 @@ function Click-AccountControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwat
 function Set-AccessPhase([string]$Phase) {
     if ($Phase -cnotin @('ready', 'partial', 'sso', 'denied', 'revoked', 'reader-failure', 'reader-resume',
         'sync-live', 'sync-offline', 'sync-service', 'sync-throttle', 'sync-transport', 'sync-notification-send',
-        'backlog-auth', 'backlog-hold', 'backlog-drain',
+        'backlog-auth', 'backlog-hold', 'backlog-drain', 'backlog-concurrent',
         'pr-load', 'pr-delay', 'pr-release', 'review-send', 'review-changed',
         'merge-prepare', 'merge-send', 'merge-wrong-head', 'history', 'write-online', 'write-drop',
         'credential-ready', 'credential-offline', 'credential-other', 'credential-return')) {

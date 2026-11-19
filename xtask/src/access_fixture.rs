@@ -15,6 +15,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 mod backlog;
+mod concurrent;
 mod history;
 mod merge;
 mod pr;
@@ -83,6 +84,7 @@ enum Phase {
     BacklogAuth,
     BacklogHold,
     BacklogDrain,
+    BacklogConcurrent,
 }
 
 impl Phase {
@@ -119,6 +121,7 @@ impl Phase {
             "backlog-auth" => Ok(Self::BacklogAuth),
             "backlog-hold" => Ok(Self::BacklogHold),
             "backlog-drain" => Ok(Self::BacklogDrain),
+            "backlog-concurrent" => Ok(Self::BacklogConcurrent),
             _ => Err(io::Error::other("invalid access fixture phase")),
         }
     }
@@ -170,6 +173,11 @@ enum Route {
     BacklogIssue,
     BacklogPermission,
     BacklogComment(u8),
+    BacklogFeed(u8),
+    BacklogFeedMetadata(u16),
+    BacklogCachedPr,
+    BacklogArchive,
+    BacklogAuxiliaryFeed,
     Unexpected,
 }
 
@@ -193,6 +201,7 @@ pub enum TraceCheck {
     AccountJourney,
     OfflineReader,
     LargeWorkspaceBacklog,
+    ConcurrentReader,
     ReaderResume,
     SyncJourney,
     NotificationSchedule,
@@ -246,6 +255,7 @@ impl AccessFixture {
             TraceCheck::AccountJourney => complete_journey(&records),
             TraceCheck::OfflineReader => records.is_empty(),
             TraceCheck::LargeWorkspaceBacklog => backlog::trace(&records),
+            TraceCheck::ConcurrentReader => concurrent::trace(&records),
             TraceCheck::ReaderResume => complete_reader_resume(&records),
             TraceCheck::SyncJourney => complete_sync_journey(&records),
             TraceCheck::NotificationSchedule => complete_notification_schedule(&records),
@@ -441,7 +451,7 @@ fn answer(
     socket.set_nonblocking(false)?;
     socket.set_read_timeout(timeout)?;
     socket.set_write_timeout(timeout)?;
-    let (route, authorized) = read_request(socket, phase)?;
+    let (route, authorized, feed_target) = read_request(socket, phase)?;
     if phase == Phase::PrDelay && route == Route::Item && authorized {
         pr::wait_for_release(phase_file, stopping)?;
     }
@@ -468,6 +478,21 @@ fn answer(
             status: 0,
         });
     }
+    let next_feed = if let (true, Route::BacklogFeed(page), Some(target)) =
+        (authorized, route, feed_target)
+    {
+        if !concurrent::hold(phase_file, stopping, page)? || !concurrent::still_connected(socket)? {
+            return Ok(RequestEvidence {
+                phase,
+                route,
+                fixture_authorization: true,
+                status: 0,
+            });
+        }
+        concurrent::next(&target, page)
+    } else {
+        None
+    };
     let reply = response(phase, route, authorized, merge_sent);
     let body = serde_json::to_vec(&reply.body)?;
     write!(
@@ -479,6 +504,10 @@ fn answer(
     )?;
     if let Some(sso) = reply.sso {
         write!(socket, "X-GitHub-SSO: {sso}\r\n")?;
+    }
+    if let Some(next) = next_feed {
+        let address = socket.local_addr()?;
+        write!(socket, "Link: <http://{address}{next}>; rel=\"next\"\r\n")?;
     }
     if phase == Phase::History && route == Route::HistoryFirst && authorized && reply.status == 200
     {
@@ -526,12 +555,13 @@ fn answer(
     })
 }
 
-fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
+fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Option<String>)> {
     let mut reader = BufReader::new(socket.take(MAX_REQUEST));
     let mut line = String::new();
     reader.read_line(&mut line)?;
     let mut parts = line.split_ascii_whitespace();
     let request = (parts.next(), parts.next(), parts.next());
+    let is_get = request.0 == Some("GET");
     let post_path = match request {
         (Some("POST"), Some(path), Some("HTTP/1.1")) => Some(path.to_owned()),
         _ => None,
@@ -541,6 +571,9 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
         _ => None,
     };
     let mut route = match request {
+        (Some("GET"), Some(target), Some("HTTP/1.1")) if phase == Phase::BacklogConcurrent => {
+            concurrent::get(target)
+        }
         (Some("GET"), Some(USER), Some("HTTP/1.1")) => Route::User,
         (Some("GET"), Some(DISCOVERY), Some("HTTP/1.1")) => Route::Discovery,
         (Some("GET"), Some(REPOSITORY), Some("HTTP/1.1")) => Route::Repository,
@@ -583,6 +616,10 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
             .unwrap_or(Route::Unexpected),
         _ => Route::Unexpected,
     };
+    let feed_target = match route {
+        Route::BacklogFeed(_) => request.1.map(str::to_owned),
+        _ => None,
+    };
     let mut authorized = false;
     let mut content_length = 0usize;
     loop {
@@ -606,6 +643,9 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
                     .ok_or_else(|| io::Error::other("invalid access fixture body length"))?;
             }
         }
+    }
+    if phase == Phase::BacklogConcurrent && !is_get {
+        return Ok((Route::Unexpected, authorized, None));
     }
     if let Some(put_path) = put_path {
         let mut body = vec![0; content_length];
@@ -640,7 +680,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
             route = Route::Unexpected;
         }
     }
-    Ok((route, authorized))
+    Ok((route, authorized, feed_target))
 }
 
 fn sync_since(target: &str, prefix: &str) -> bool {
@@ -682,6 +722,9 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
     }
     if matches!(route, Route::UpdatedInlineComments | Route::OpenPullIndex) {
         return result(200, "OK", json!([]));
+    }
+    if let Some(reply) = concurrent::response(phase, route) {
+        return reply;
     }
     if let Some(backlog) = backlog::response(phase, route) {
         return backlog;

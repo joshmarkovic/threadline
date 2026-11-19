@@ -108,6 +108,8 @@ cargo xtask measure windows --seed 12345 --artifact '<test-package-path>'
 
 The driver measures a fresh app process with a fresh isolated profile. It does not flush the operating system disk cache. Record whether it is the first run after boot when comparing cold results. It records elapsed time to the ready fixture window, idle and peak working sets, GPU process-memory samples where Windows exposes them, and the executable's digest and byte size. Separate native wheel passes measure the discussion and large diff. The larger p95 is compared with the scrolling budget. Package size requires an actual candidate artifact. The result records its digest separately from the executable digest. Missing metrics are Blocked and measurements beyond the checked-in limits are Fail.
 
+Run `cargo xtask test e2e --suite full --case S12-READER-CONCURRENT --binary <optimized-e2e-binary>` to repeat the twenty cached opens, searches, and tab switches with scheduled reads in flight. The isolated Section 16 fixture keeps queued writes paused. Each accepted input must reach its first useful paint while a different verified loopback feed request is still waiting for a response. The report retains completed samples if a native input or a matching request becomes unavailable. Use the same optimized binary, desktop, and input source for the offline comparison.
+
 ## Early Linux and macOS checks
 
 The Linux driver needs a real X11 session, xdotool, xclip, ImageMagick with PNG support, jq, ripgrep, and GNU timeout. It uses the existing X11 clipboard and can preserve plain text. Use a disposable desktop if the clipboard contains other formats. WSLg results describe the WSLg/XWayland configuration. Run Ubuntu GNOME Wayland and X11 separately during Linux release verification.

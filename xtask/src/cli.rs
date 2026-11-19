@@ -387,7 +387,10 @@ fn known_case(lane: Lane, case: &str) -> bool {
                 "S05-FEED-HTTP" | "S05-SYNC-WORKER" | "S07-WRITE-WORKER"
             )
             | (Lane::E2e, "S01-WINDOWS-SHELL")
-            | (Lane::E2e, "S04-READER-PERF" | "S12-PHYSICAL-READER")
+            | (
+                Lane::E2e,
+                "S04-READER-PERF" | "S12-PHYSICAL-READER" | "S12-READER-CONCURRENT"
+            )
             | (Lane::E2e, "S05-WINDOWS-SYNC")
             | (Lane::E2e, "S01-WINDOWS-TOAST")
             | (Lane::Install, crate::install::LOCAL_CASE)

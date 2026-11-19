@@ -16,7 +16,7 @@ pub fn scenario_ids() -> impl Iterator<Item = &'static str> {
 }
 
 pub fn fixture_revision(case: &str) -> Option<&'static str> {
-    if case == "E2E-014" {
+    if matches!(case, "E2E-014" | "S12-READER-CONCURRENT") {
         return Some("s12-large-workspace-v2");
     }
     if case == "E2E-020" {
@@ -172,6 +172,10 @@ pub fn associations(case: &str) -> Associations {
         "S04-READER-PERF" | "S12-PHYSICAL-READER" => {
             ("CACHE-01;SEARCH-01;WORKSPACE-08;TEST-08", "AC-35")
         }
+        "S12-READER-CONCURRENT" => (
+            "CACHE-01;SEARCH-01;SYNC-06;WORKSPACE-08;TEST-08",
+            "AC-35;AC-48",
+        ),
         "S04-READ-TRANSPORT" => (
             "CACHE-05;ISSUE-01;SEARCH-02;SEARCH-03;TEST-03",
             "AC-07;AC-08;AC-09",

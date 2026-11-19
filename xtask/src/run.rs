@@ -608,7 +608,10 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
             return vec![crate::activity::run(id, options, root, dir)];
         }
         Some(id) => {
-            let mode = if matches!(id, "S04-READER-PERF" | "S12-PHYSICAL-READER") {
+            let mode = if matches!(
+                id,
+                "S04-READER-PERF" | "S12-PHYSICAL-READER" | "S12-READER-CONCURRENT"
+            ) {
                 Some(NativeMode::WindowsReaderPerformance)
             } else {
                 WINDOWS_CASES
@@ -848,6 +851,9 @@ fn native_driver(
         NativeMode::WindowsReaderPerformance if id == "S12-PHYSICAL-READER" => {
             Some("PerformancePhysical")
         }
+        NativeMode::WindowsReaderPerformance if id == "S12-READER-CONCURRENT" => {
+            Some("PerformanceConcurrent")
+        }
         NativeMode::WindowsReaderPerformance => Some("Performance"),
         NativeMode::WindowsLargeWorkspace => Some("LargeWorkspace"),
         NativeMode::WindowsSync => Some("Sync"),
@@ -997,6 +1003,16 @@ fn native_driver(
     });
     if let Some(fixture) = access_fixture {
         let check = match (status, mode) {
+            (_, NativeMode::WindowsReaderPerformance) if id == "S12-READER-CONCURRENT" => {
+                if details
+                    .as_ref()
+                    .is_some_and(|json| json["concurrent_checks_passed"] == true)
+                {
+                    TraceCheck::ConcurrentReader
+                } else {
+                    TraceCheck::Observe
+                }
+            }
             (Status::Pass, NativeMode::WindowsGitHubAccess) => TraceCheck::AccountJourney,
             (
                 Status::Pass,

@@ -294,7 +294,7 @@ if ($script:fixtureInvocations -ne 2) {
     throw 'The journey did not retry transient pre-activation unavailability within the wait.'
 }
 
-function Measure-ReaderPerformance([IntPtr]$Window, $Samples, $Attribution, [switch]$Physical) {
+function Measure-ReaderPerformance([IntPtr]$Window, $Samples, $Attribution, [switch]$Physical, [switch]$Concurrent) {
     for ($index = 0; $index -lt 20; $index++) { $Samples.cached_open.Add(100.0) }
     $Samples.cached_tab_switch.Add(90.0)
     $Attribution.cached_tab_switch.Add([ordered]@{ status = 'Correlated' })
@@ -328,4 +328,32 @@ if ($timing.status -cne 'Correlated' -or $timing.process_start_call_ms -ne 1000 
 $timing = Get-LargeStartupTiming $startup $frequency (2 * $frequency) (2 * $frequency)
 if ($timing.status -cne 'Unavailable' -or $null -ne $timing.launch_to_cached_panes_paint_ms) {
     throw 'Startup timing accepted an app stamp newer than the external observation.'
+}
+
+$scratch = Join-Path ([IO.Path]::GetTempPath()) ('threadline-feed-test-' + [guid]::NewGuid())
+$null = [IO.Directory]::CreateDirectory($scratch)
+try {
+    function Stop-Blocked([string]$Message) { throw $Message }
+    $script:AccessPhaseFile = Join-Path $scratch 'access-fixture-phase.txt'
+    $pending = Join-Path $scratch 'reader-feed-pending.txt'
+    $ack = Join-Path $scratch 'reader-feed-observed.txt'
+    [IO.File]::WriteAllText($pending, '2')
+    $script:app = [pscustomobject]@{ HasExited = $false }
+    Wait-ConcurrentFeed 2
+    $timing = [ordered]@{ status = 'Correlated'; input = 'UIA InvokePattern' }
+    Complete-ConcurrentFeed 2 $timing
+    if ($timing.feed_page -ne 2 -or [IO.File]::ReadAllText($ack) -cne '2') {
+        throw 'The driver did not acknowledge the exact overlapped request.'
+    }
+    $timing.status = 'Unavailable'
+    [IO.File]::WriteAllText($pending, '3')
+    $refused = $false
+    try { Complete-ConcurrentFeed 3 $timing } catch {
+        $refused = $_.Exception.Message -like '*could not be correlated*'
+    }
+    if (!$refused -or [IO.File]::ReadAllText($ack) -cne '2') {
+        throw 'The driver accepted a native action without matching paint evidence.'
+    }
+} finally {
+    [IO.Directory]::Delete($scratch, $true)
 }
