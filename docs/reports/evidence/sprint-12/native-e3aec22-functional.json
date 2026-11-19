@@ -1,0 +1,862 @@
+{
+  "source_revision": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+  "source_dirty": false,
+  "seed": 12345,
+  "ordinary_local_package": {
+    "target": "x86_64-pc-windows-msvc",
+    "profile": "release",
+    "e2e_feature": false,
+    "channel": "unsigned local fixture",
+    "schema": 18,
+    "package_build": 17,
+    "app_sha256": "7088621d171dc41a6c57f43fe4411a1f486965ec71aa9795de678e5748b364a6",
+    "installer_sha256": "a9f7b90b8921b5aecf0632449b669e5f9d66ebf4132a3d7faf90d318cf8ac4e0",
+    "installer_bytes": 11174959,
+    "setup": "local17-e3aec22/threadline-e3aec22-local17.exe",
+    "build_receipt_sha256": "70d513ac2ac80c82351a8f3c4a091be351f503a223f4f274f30b2440cffdf11b"
+  },
+  "optimized_test_app_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+  "runner_sha256": "a7cfa68286384b356f452d4151bbc92c3403e504b905c36bce6a50d34c4d9c1c",
+  "exact_source_functional_outcomes": {
+    "Pass": 13,
+    "Blocked": 1,
+    "Fail": 2
+  },
+  "cases": [
+    {
+      "run": "e2e-1795102321835-29772",
+      "case": "E2E-012",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "fixture_revision": "threadline-s11-installed-fixture-v1",
+      "detail": "The installed Windows case completed with matching native and durable-state evidence.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-012",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>",
+          "--local-fixture",
+          "<local-fixture-path>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+      "started_at_utc": "2026-11-19T15:32:01.835Z",
+      "finished_at_utc": "2026-11-19T15:33:22.172Z",
+      "application": "installed local build 17",
+      "receipts": {
+        "result.json": "dabbbc63831449df3568cb9acc314b32f29759228c745f33f3d76d164b1d29c9",
+        "junit.xml": "c6c6e91d062984688863fd6411e043618ba7197cf06a0421a0a9b7b38bd0c403",
+        "installed-activity.json": "54edf18a3f8bd1eaeb11fa715ff0185c493b18c77feb0c723d689109ac3bb204"
+      },
+      "native": {
+        "status": "Pass",
+        "app_sha256": "7088621d171dc41a6c57f43fe4411a1f486965ec71aa9795de678e5748b364a6",
+        "synthetic_profile_archived": true,
+        "action_count": 7,
+        "cold": {
+          "separate_process": true,
+          "event_count": 37,
+          "feed_count": 37,
+          "selected_issue": 42,
+          "draft_preserved": true,
+          "draft_tab_preserved": true,
+          "outcome": "delivered",
+          "group_count": 1
+        }
+      }
+    },
+    {
+      "run": "e2e-1795102402279-10664",
+      "case": "E2E-018",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "fixture_revision": "threadline-s11-installed-fixture-v1",
+      "detail": "The installed Windows case completed with matching native and durable-state evidence.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-018",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>",
+          "--local-fixture",
+          "<local-fixture-path>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+      "started_at_utc": "2026-11-19T15:33:22.278Z",
+      "finished_at_utc": "2026-11-19T15:33:37.036Z",
+      "application": "unregistered copy of installed build 17 bytes",
+      "receipts": {
+        "result.json": "a042e7b407d857c9855d06f90dad264b8cc67795b84c0859c83eb0ff8a9cbf5c",
+        "junit.xml": "8f6da9493ecf168f0d7b567838b6b63fc3c2d7dc44264cede5843585c81cc365",
+        "installed-activity.json": "1bd9e3199ee33480fdc8a36b35e9ebe11987d78ea14da55bd622cbb4c7a958b9"
+      },
+      "native": {
+        "status": "Pass",
+        "app_sha256": "7088621d171dc41a6c57f43fe4411a1f486965ec71aa9795de678e5748b364a6",
+        "synthetic_profile_archived": true,
+        "action_count": 3,
+        "fallback": {
+          "event_count": 37,
+          "feed_count": 37,
+          "registration_feed_only": 37,
+          "read_count": 1,
+          "snoozed_targets": 1,
+          "selected_issue": 41,
+          "draft_preserved": true
+        }
+      }
+    },
+    {
+      "run": "e2e-1795102417151-47304",
+      "case": "E2E-020",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "fixture_revision": "threadline-s12-installed-runtime-v1",
+      "detail": "The installed Windows case completed with matching native and durable-state evidence.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-020",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>",
+          "--local-fixture",
+          "<local-fixture-path>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+      "started_at_utc": "2026-11-19T15:33:37.151Z",
+      "finished_at_utc": "2026-11-19T15:33:45.303Z",
+      "application": "installed local build 17",
+      "receipts": {
+        "result.json": "08e41608022b20ffaab0ff9538752fb01c64188e3ccce3755ee85041197047a9",
+        "junit.xml": "c9a8f64ef76d14cc91f41f02eb987b9bac276cb4f45e012a226346ae50bdc2bf",
+        "installed-runtime.json": "180ee7022c468d9e2aa1c7047d10e4ed6a6f455666dd09c6f3f3f8d18c5c8fa8"
+      },
+      "native": {
+        "status": "Pass",
+        "app_sha256": "7088621d171dc41a6c57f43fe4411a1f486965ec71aa9795de678e5748b364a6",
+        "synthetic_profile_archived": true,
+        "offline": true,
+        "orderly_quit": true,
+        "diff_mode": "Split",
+        "observations": [
+          {
+            "phase": "Native Markdown with parsed image attachment",
+            "module_count": 72,
+            "descendants": 0,
+            "browser_matches": 0
+          },
+          {
+            "phase": "Native selected comparison file and diff toolbar",
+            "module_count": 72,
+            "descendants": 0,
+            "browser_matches": 0
+          },
+          {
+            "phase": "Native split diff after the persisted action",
+            "module_count": 72,
+            "descendants": 0,
+            "browser_matches": 0
+          }
+        ]
+      }
+    },
+    {
+      "run": "e2e-1795102434285-49128",
+      "case": "E2E-002",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "fixture_revision": "s03-github-access-v1",
+      "detail": "Native account controls verified the synthetic GitHub access and SSO journey and restored repository selection after restart. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-002",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+      "started_at_utc": "2026-11-19T15:33:54.285Z",
+      "finished_at_utc": "2026-11-19T15:34:11.610Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "09df427768d3982cc0f0f46cd92c8bfdbcfda964e122d4a335819c56814fa95f",
+        "junit.xml": "0aa35ee68de9087df8c637ac4052db4e7c6011228696630562673105921be6c4",
+        "binary.json": "0009e983b54004ead388bcacc3dfc6c1c83289059d53d66944d228e70e432927",
+        "github-access-native.json": "8fd3b837719bbd25e5c51830e9edb0f421740113aeec990ea82c239541f6995d"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Pass",
+        "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+        "action_count": 19
+      }
+    },
+    {
+      "run": "e2e-1795102451760-23164",
+      "case": "E2E-004",
+      "status": "Fail",
+      "exit_code": 1,
+      "child_exit_code": 1,
+      "fixture_revision": "s04-reader-v1",
+      "detail": "Timed out waiting for a failed later page preserving the first page and the download request. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-004",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+      "started_at_utc": "2026-11-19T15:34:11.759Z",
+      "finished_at_utc": "2026-11-19T15:34:44.331Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "81cc06a616a1b1b0a44a2710e9880c05a957a6ea1bf280758e3c0f58c4f8f5bf",
+        "junit.xml": "4f7b77d8379858d294685ab19ac0eac991e8f19f6090d5a5172b573c53033c61",
+        "binary.json": "0009e983b54004ead388bcacc3dfc6c1c83289059d53d66944d228e70e432927",
+        "reader-native.json": "defea2d9c665bec982053a863da7fc15e761d3f8b5d14baed48973e18125fef9",
+        "ui-observation.json": "2971cbbd8e86f8b33c1d49ef944b23b31b66e51bda115e06661f42de4f6e326e",
+        "github-access-trace.json": "159c62affad16c80e9e7fbc0ba019bb989f91f6f30fb688c0bd2ca5c2774be6c"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Fail",
+        "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+        "action_count": 6,
+        "final_reader": {
+          "active_number": 41,
+          "offline": false,
+          "active_draft_saved": null,
+          "active_draft_chars": null,
+          "tab_counts": [
+            1
+          ],
+          "comments_coverage": "Partial",
+          "comment_fetch_state": "Downloading",
+          "comment_count": 1,
+          "download_state": "Active"
+        },
+        "discussion_http": [
+          {
+            "phase": "reader_failure",
+            "route": "comments_first",
+            "fixture_authorization": true,
+            "status": 200
+          }
+        ]
+      }
+    },
+    {
+      "run": "e2e-1795102484508-3884",
+      "case": "E2E-005",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "fixture_revision": "s06-pr-reading-v1",
+      "detail": "Native tabs preserved their own provider revision and code state while a verified linked issue response was delayed across the tab switch. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-005",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+      "started_at_utc": "2026-11-19T15:34:44.507Z",
+      "finished_at_utc": "2026-11-19T15:35:02.153Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "a5a4225ff3920ada83a24a0ee54e1d57564daece4ae3174dd47f3b561b9b692e",
+        "junit.xml": "63697aebbea23e3f228bbb40cc7eab490fde972971aa829174eb357ba8240126",
+        "binary.json": "0009e983b54004ead388bcacc3dfc6c1c83289059d53d66944d228e70e432927",
+        "pr-native.json": "13b9665d351a609e0e4451ca9654ef519053be6ffdaa2baf409056d933aadc5a"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Pass",
+        "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+        "action_count": 27
+      }
+    },
+    {
+      "run": "e2e-1795102502360-42776",
+      "case": "E2E-006",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "fixture_revision": "s07-write-engine-v1",
+      "detail": "The native editor restored two offline actions, cancelled the unsent issue edit and completed the retained ordinary comment after reconnect. A second ordinary comment lost its server response and retained an uncertain outcome after cancellation. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-006",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+      "started_at_utc": "2026-11-19T15:35:02.360Z",
+      "finished_at_utc": "2026-11-19T15:35:32.541Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "15a51d993162bb57c346c38992ee1721672e90fa00d181652ffcf65f8c00e5bb",
+        "junit.xml": "ac59d5d3666555daa5025c40ec5de650e37760223cb207790e0ef6a10dc16782",
+        "binary.json": "0009e983b54004ead388bcacc3dfc6c1c83289059d53d66944d228e70e432927",
+        "writes-native.json": "bb5d3d9e28c078dd6584165b4e89e0e09cb809bcfe7c8bfcd30e1eb1d0c6f630"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Pass",
+        "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+        "action_count": 39
+      }
+    },
+    {
+      "run": "e2e-1795102532840-45936",
+      "case": "E2E-007",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "fixture_revision": "s08-revision-bound-reviews-v1",
+      "detail": "Native review input survived an offline restart and confirmed the unchanged expected head. A second approval was held when provider preflight observed a different head, with original source and draft retained. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-007",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+      "started_at_utc": "2026-11-19T15:35:32.839Z",
+      "finished_at_utc": "2026-11-19T15:36:37.411Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "7b065151bc678554dc428cf69468d85135f5a18319c9537e7f9078b180287693",
+        "junit.xml": "59fc7816027a2a1093c081ec450b170bfde57a5bcaed2d808ac249d2fff2cb62",
+        "binary.json": "0009e983b54004ead388bcacc3dfc6c1c83289059d53d66944d228e70e432927",
+        "review-draft-native.json": "e7b1f32c7771bbc7764b2c91dcc42f910da9329135e5713a2826bdd4febbd6fd"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Pass",
+        "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+        "action_count": 55
+      }
+    },
+    {
+      "run": "e2e-1795102597531-21072",
+      "case": "E2E-008",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "fixture_revision": "s08-revision-bound-reviews-v1",
+      "detail": "The real Windows review draft retained its source line, code comparison and original head through verified issue switches, app layout changes and a separate offline restart. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-008",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+      "started_at_utc": "2026-11-19T15:36:37.530Z",
+      "finished_at_utc": "2026-11-19T15:37:07.643Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "24c8927fec34950d423e9502653547703753ddd1fd4b0e1ea803bc38a7335841",
+        "junit.xml": "8e9b878f2d91f40c0a12b2000c99f362d19d7e8399ea4b2aca738b2fbb638452",
+        "binary.json": "0009e983b54004ead388bcacc3dfc6c1c83289059d53d66944d228e70e432927",
+        "review-context-native.json": "26c1564b41167e20e9d62261e192a0cc3df17929e28606f96166f195384c3cba"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Pass",
+        "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+        "action_count": 40
+      }
+    },
+    {
+      "run": "e2e-1795102627723-39500",
+      "case": "E2E-009",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "fixture_revision": "s09-direct-merge-v1",
+      "detail": "An offline native squash intent confirmed only after exact-head submission and readback. A second offline intent was held without sending when the provider returned a changed head. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-009",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+      "started_at_utc": "2026-11-19T15:37:07.723Z",
+      "finished_at_utc": "2026-11-19T15:38:02.948Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "ed0c622e100e8be53e30be05ff62768cb65fa1bb690d0ae0c65b7e6be5ad1182",
+        "junit.xml": "7ab9e74b9416fe9f0c35d2c2a5d56f7a7265939d5e356a653fe72dc78f1f4350",
+        "binary.json": "0009e983b54004ead388bcacc3dfc6c1c83289059d53d66944d228e70e432927",
+        "direct-merge-native.json": "777af4dd3e416da59a9df24ac1bf7ea1fb4f8418f4b0ff6bd30bb1756db3ce3c"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Pass",
+        "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+        "action_count": 53
+      }
+    },
+    {
+      "run": "e2e-1795102683043-45976",
+      "case": "E2E-010",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "fixture_revision": "s09-credential-boundary-v1",
+      "detail": "Sign-out and offline restart retained the original scoped action. Wrong-user renewal was rejected, another account could not see or send it, and the original verified account renewed and confirmed it once. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-010",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+      "started_at_utc": "2026-11-19T15:38:03.043Z",
+      "finished_at_utc": "2026-11-19T15:38:39.749Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "4d7810a0f411c7ec88f2b2ba276255d5149ff56fcc3642ca5a8ea42dac3ee2a5",
+        "junit.xml": "626a2e196f7439e250161d7bb0c763b65c37d977513aa629e44f57b845d9ee0f",
+        "binary.json": "0009e983b54004ead388bcacc3dfc6c1c83289059d53d66944d228e70e432927",
+        "credential-boundary-native.json": "f329cbaf3c2396643beb3c503534f46adb7326c3791a22bba485bb8ceab86ae6"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Pass",
+        "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+        "action_count": 51
+      }
+    },
+    {
+      "run": "e2e-1795102719920-33400",
+      "case": "E2E-011",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "fixture_revision": "s10-history-endpoints-v3",
+      "detail": "Native history verified the three comparison labels and preserved cached commits, the selected divergent file and an unsent anchored PR draft through branch movement, deletion and an offline restart. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-011",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+      "started_at_utc": "2026-11-19T15:38:39.920Z",
+      "finished_at_utc": "2026-11-19T15:39:10.974Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "541836ce6b6b8c9be577c660b78b85a719de73e9839cc875519f3d19bb276318",
+        "junit.xml": "822136e2da0c16c72729d1e3570e377d2dfcd3bd32b147c0fcc100cf15ed3ab5",
+        "binary.json": "0009e983b54004ead388bcacc3dfc6c1c83289059d53d66944d228e70e432927",
+        "history-native.json": "c94030de6585be3414c00cb5706f40b0f6c26b3ceb686ab511adb1dd7d9e30e4"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Pass",
+        "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+        "action_count": 47
+      }
+    },
+    {
+      "run": "e2e-1795102751083-23144",
+      "case": "E2E-013",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "fixture_revision": "s11-native-notification-schedule-v1",
+      "detail": "Windows quiet hours kept the seeded native activity in the feed while independent native synchronization controls held network requests and the queued action. Explicit checking and queue resumption were each verified against saved preferences and loopback requests. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-013",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+      "started_at_utc": "2026-11-19T15:39:11.082Z",
+      "finished_at_utc": "2026-11-19T15:39:48.588Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "a8043c0f337f7195a78bb49054e6b5fe72653ecf13b6a00843ac5ce28bea2bee",
+        "junit.xml": "0720dcc4339448af25e18841949a5eaa73393a027c051ecb5726372e0880a78f",
+        "binary.json": "0009e983b54004ead388bcacc3dfc6c1c83289059d53d66944d228e70e432927",
+        "notification-schedule-native.json": "4311b5f0231e80030cd10692a863825294a0c8f7481e39f632458da8bfce46fb"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Pass",
+        "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+        "action_count": 34
+      }
+    },
+    {
+      "run": "e2e-1795102788698-43500",
+      "case": "E2E-019",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "fixture_revision": "s07-write-engine-v1",
+      "detail": "The owned native controls, Ctrl+N, existing issue draft and actual ordinary comment did not expose an issue-creation path. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-019",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+      "started_at_utc": "2026-11-19T15:39:48.698Z",
+      "finished_at_utc": "2026-11-19T15:40:07.244Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "f2c0f7668ba1fdd5e5fce87af6b3d6a532ed5228ee8aa1374c951d9dd0d38542",
+        "junit.xml": "2b7b4e791fb33027e8f8d599fe3dc39144846272cbf966cd2a0c0fda048ec690",
+        "binary.json": "0009e983b54004ead388bcacc3dfc6c1c83289059d53d66944d228e70e432927",
+        "writes-native.json": "e12ee1c1e69114eeeadbae641039a6a136ea8091d672715767b8921959c4f8e4"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Pass",
+        "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+        "action_count": 13
+      }
+    },
+    {
+      "run": "e2e-1795102815116-35208",
+      "case": "E2E-003",
+      "status": "Fail",
+      "exit_code": 1,
+      "child_exit_code": 1,
+      "fixture_revision": "s04-reader-v1",
+      "detail": "Timed out waiting for the exact native draft saved in the offline profile. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-003",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+      "started_at_utc": "2026-11-19T15:40:15.116Z",
+      "finished_at_utc": "2026-11-19T15:40:35.282Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "dec7563d6cdcf73b59457e1883ffb52e854afe9ca58da8a307735faa4a62484b",
+        "junit.xml": "5eeca28f8fa7d68bb90beae0d0e96bb588caba60960fdcb8699130fc3e96978b",
+        "binary.json": "0009e983b54004ead388bcacc3dfc6c1c83289059d53d66944d228e70e432927",
+        "reader-native.json": "6ea792c4ac0e1943080e4f6c2a19fec6d3ddf1e1601f421929cb2420f14a681b",
+        "ui-observation.json": "3ffa7ad42574210741d67e51eda71e222bbd066150e7c04a3ad28e7e61b9cf12"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Fail",
+        "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+        "action_count": 2,
+        "final_reader": {
+          "active_number": 3,
+          "offline": true,
+          "active_draft_saved": true,
+          "active_draft_chars": 0,
+          "tab_counts": [
+            10,
+            10
+          ],
+          "comments_coverage": "Complete",
+          "comment_fetch_state": "Idle",
+          "comment_count": 2,
+          "download_state": null
+        }
+      }
+    },
+    {
+      "run": "e2e-1795102835377-47564",
+      "case": "E2E-015",
+      "status": "Blocked",
+      "exit_code": 78,
+      "child_exit_code": 78,
+      "fixture_revision": "s01-feasibility-v1",
+      "detail": "Native keyboard, focus, exact Unicode clipboard, high DPI and owned UI Automation passed. Signed human visual and screen-reader observations are pending. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-015",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+      "started_at_utc": "2026-11-19T15:40:35.376Z",
+      "finished_at_utc": "2026-11-19T15:40:57.449Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "3aa41075b2cd95170787b6c3af3086b42c9f6f102382891123a05868878b6f1e",
+        "junit.xml": "63846249c3e8129e8cfaf5518dc4027dabc022e31dd4f5d1716dbfa676df301d",
+        "binary.json": "0009e983b54004ead388bcacc3dfc6c1c83289059d53d66944d228e70e432927",
+        "accessibility-native.json": "7fa82f1aea12e4a24f86330050fbc7d7a23e0a4557867fdb47b686afc20b3ebf",
+        "launch.png": "97eb03a4eb13de57d6b56fa9e682cf7f362af7f03265b9537e595e44959fac30",
+        "interaction.png": "7e8a79af547bbb27dab35ddb375fd1ebce4be570d7e859a7cddfb83c2e5fb847"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Blocked",
+        "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+        "action_count": 11,
+        "accessibility": {
+          "automated_checks_passed": true,
+          "native_input_verified": true,
+          "high_dpi_verified": true,
+          "accessibility_action_verified": true,
+          "original_clipboard_restored": true,
+          "manual_screen_reader_and_visual": "Pending"
+        },
+        "completed_actions": [
+          "Activate an owned accessibility control",
+          "Launch native window",
+          "Pointer select formatted Markdown and copy",
+          "Type into the right review input while background preview is pending and copy its value",
+          "Change the active tab and return to the same draft target",
+          "Switch context to linked issue",
+          "Resize workspace panes with the pointer",
+          "Resize PR context and code with the pointer",
+          "Forward a second launch through the Windows instance channel",
+          "Quit with the native keyboard shortcut",
+          "Relaunch the same isolated profile and retain its SQLite database"
+        ]
+      }
+    },
+    {
+      "run": "e2e-1795102861259-48840",
+      "case": "E2E-008",
+      "status": "Fail",
+      "exit_code": 1,
+      "child_exit_code": 1,
+      "fixture_revision": "s08-revision-bound-reviews-v1",
+      "detail": "Timed out waiting for the original comparison and selected review line after leaving Commits. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-008",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "b29793cf68bde11828ea60ab3a397d71ea1439b8",
+      "started_at_utc": "2026-11-19T15:41:01.259Z",
+      "finished_at_utc": "2026-11-19T15:41:30.841Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "1525cf7b501369f6270e2edfe954e7f318bc466d8175115eb4d186310a4d4839",
+        "junit.xml": "70cb8eb7743ab91a72bf0b80873c6ce30c89e833b13e49dbaefe4c13c44011fd",
+        "binary.json": "0009e983b54004ead388bcacc3dfc6c1c83289059d53d66944d228e70e432927",
+        "review-context-native.json": "64ff055432866c07d9aee5f1b4e1bbee38b527144282a2fd5ef689ccf899d12f"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Fail",
+        "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+        "action_count": 23
+      }
+    }
+  ],
+  "full_native_suite": {
+    "status": "Not run",
+    "detail": "Automatic approval rejected the aggregate invocation because it includes the deferred timing test. Targeted functional cases exclude E2E-014.",
+    "most_recent_completed_full_suite": "e2e-1795098785119-4744"
+  }
+}
