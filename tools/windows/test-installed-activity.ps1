@@ -85,10 +85,36 @@ function Get-InstalledProcesses {
         Where-Object { $_.SessionId -eq $report.session_id -and $_.Path -ieq $exe })
 }
 function Close-Installed($Process) {
-    $null = Wait-Activity 'the installed Quit control' { Find-OwnedId (Get-OwnedWindow $Process) $Process.Id 'quit' }
-    if (!(Invoke-OwnedId $Process 'quit') -or !$Process.WaitForExit(12000) -or $Process.ExitCode -ne 0) {
-        throw 'The verified installed window did not quit normally.'
+    if ($Process.HasExited) { return }
+    $null = Wait-Activity 'the installed Quit control' { $Process.HasExited -or (Find-OwnedId (Get-OwnedWindow $Process) $Process.Id 'quit') }
+    if ($Process.HasExited) { return }
+    $requested = $false
+    try { $requested = Invoke-OwnedId $Process 'quit' }
+    catch [Windows.Automation.ElementNotAvailableException] {}
+    if (!$requested -and !$Process.HasExited -and (Get-OwnedWindow $Process)) { $requested = $Process.CloseMainWindow() }
+    if (!$Process.WaitForExit(12000)) { throw 'The installed process remained open after the owned Quit request.' }
+    if ($null -ne $Process.ExitCode -and $Process.ExitCode -ne 0) { throw 'The installed process reported an unsuccessful exit.' }
+}
+
+function Read-NotificationTabs($Process) {
+    $root = Get-OwnedWindow $Process
+    $draft = Find-OwnedId $root $Process.Id 'reader-tab-0-0'
+    $active = Find-OwnedId $root $Process.Id 'reader-tab-0-1'
+    $summary = [ordered]@{ draft_present=($null -ne $draft); active_present=($null -ne $active)
+        draft_label=$null; active_label=$null; destination_selected=$false }
+    if ($draft) { $summary.draft_label = $draft.Current.Name }
+    if ($active) {
+        $summary.active_label = $active.Current.Name
+        $selection = $null
+        if ($active.TryGetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern, [ref]$selection)) {
+            $summary.destination_selected = $selection.Current.IsSelected
+        } else {
+            $summary.destination_selected = $summary.active_label.EndsWith(' Active tab', [StringComparison]::Ordinal)
+        }
     }
+    $report.destination_controls = $summary
+    return $draft -and $active -and $summary.draft_label -match '\bDraft\b' -and
+        $summary.active_label -match '#42(\s|$)' -and $summary.destination_selected
 }
 function Get-ExactHistory([string]$Action) {
     $items = @($toastHistory.GetHistory($identity) | Where-Object {
@@ -210,13 +236,10 @@ try {
                 $state = Read-Fixture inspect
                 if (Test-CallbackResult $state) { return $state }
             }
+            Add-Evidence 'Read the committed callback result before checking the visible controls' $after
             if ($action -ceq 'open') {
                 $null = Wait-Activity 'the active destination alongside the saved draft tab' {
-                    $root = Get-OwnedWindow $child
-                    $first = Find-OwnedId $root $child.Id 'reader-tab-0-0'
-                    $next = Find-OwnedId $root $child.Id 'reader-tab-0-1'
-                    $null -ne $first -and $null -ne $next -and $first.Current.Name -match '#41(\s|$)' -and
-                        $next.Current.Name -match '#42(\s|$)' -and $next.Current.Name.EndsWith(' · Active tab')
+                    Read-NotificationTabs $child
                 }
             }
             if (@(Get-InstalledProcesses).Count -ne 1) { throw 'The callback left multiple installed processes.' }
@@ -242,11 +265,7 @@ try {
             }
             $report.cold_pid = $child.Id
             $null = Wait-Activity 'the selected issue 42 and retained draft tab in the installed window' {
-                $root = Get-OwnedWindow $child
-                $first = Find-OwnedId $root $child.Id 'reader-tab-0-0'
-                $next = Find-OwnedId $root $child.Id 'reader-tab-0-1'
-                $null -ne $first -and $null -ne $next -and $first.Current.Name -match '#41(\s|$)' -and
-                    $next.Current.Name -match '#42(\s|$)' -and $next.Current.Name.EndsWith(' · Active tab')
+                Read-NotificationTabs $child
             }
             Close-Installed $child
             $after = Read-Fixture inspect
@@ -266,7 +285,13 @@ try {
         if ($recipients.Count -eq 1) { $child = $recipients[0] }
     }
     if ($child) {
-        if (!$child.HasExited) { try { Close-Installed $child } catch { $report.cleanup_detail = 'The owned window remained open.' } }
+        if (!$child.HasExited) {
+            try { Close-Installed $child }
+            catch {
+                $report.cleanup_detail = $_.Exception.Message
+                $report.cleanup_process_exited = $child.WaitForExit(1000)
+            }
+        }
         $child.Dispose()
     }
     if ($group -and $null -ne $toastHistory) {
