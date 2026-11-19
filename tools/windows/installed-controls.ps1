@@ -9,7 +9,7 @@ function Get-OwnedWindow([Diagnostics.Process]$Process) {
     return $null
 }
 
-function Find-OwnedId($Root, [int]$ChildId, [string]$Id) {
+function Find-OwnedId($Root, [int]$ChildId, [string]$Id, [switch]$AllowDisabled) {
     if ($null -eq $Root -or $Root.Current.ProcessId -ne $ChildId) { return $null }
     $idCondition = [Windows.Automation.PropertyCondition]::new(
         [Windows.Automation.AutomationElement]::AutomationIdProperty, $Id)
@@ -20,7 +20,7 @@ function Find-OwnedId($Root, [int]$ChildId, [string]$Id) {
     if ($items.Count -ne 1) { return $null }
     $candidate = $items.Item(0)
     if ($candidate.Current.ProcessId -eq $ChildId -and $candidate.Current.AutomationId -ceq $Id -and
-        $candidate.Current.IsEnabled -and !$candidate.Current.IsOffscreen) { return $candidate }
+        ($AllowDisabled -or $candidate.Current.IsEnabled) -and !$candidate.Current.IsOffscreen) { return $candidate }
     return $null
 }
 

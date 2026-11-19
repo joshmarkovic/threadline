@@ -5,10 +5,12 @@ param(
     [Parameter(Mandatory)][ValidatePattern('^[a-fA-F0-9]{64}$')][string]$InstalledSha256,
     [Parameter(Mandatory)][ValidateRange(1,65535)][int]$Schema,
     [Parameter(Mandatory)][string]$ReportDirectory,
-    [switch]$DelayedOnline
+    [switch]$DelayedOnline,
+    [switch]$SignedOutOffline
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
+if ($DelayedOnline -and $SignedOutOffline) { throw 'Run each installed lifecycle mode with its own generated profile.' }
 function Assert-Ordinary([string]$Path) {
     $item=Get-Item -Force -LiteralPath $Path
     while ($item) {
@@ -44,7 +46,7 @@ function Assert-ClosedFixture([string]$Directory) {
         if ([BitConverter]::ToUInt32($version,0) -ne $Schema) { throw 'The profile is outside the selected same-schema check.' }
     } finally { $stream.Dispose() }
 }
-function Invoke-Fixture([string]$Stage,[string]$Name) {
+function Invoke-Fixture([string]$Stage,[string]$Name,[string]$FixtureProfile=$profileDirectory) {
     if ((Get-Digest $LifecycleExecutable) -ine $LifecycleSha256) { throw 'The pinned fixture executable changed.' }
     $path=Join-Path $ReportDirectory ($Name+'.json')
     if (Test-Path -LiteralPath $path) { throw 'Preserve the earlier fixture receipt.' }
@@ -56,7 +58,7 @@ function Invoke-Fixture([string]$Stage,[string]$Name) {
     foreach ($key in @($info.EnvironmentVariables.Keys)) {
         if ($key -like 'THREADLINE_*') { $info.EnvironmentVariables.Remove($key) }
     }
-    $info.EnvironmentVariables['THREADLINE_PROFILE_DIR']=$profileDirectory
+    $info.EnvironmentVariables['THREADLINE_PROFILE_DIR']=$FixtureProfile
     $info.EnvironmentVariables['THREADLINE_TEST_SEED']='12345'
     $info.EnvironmentVariables['THREADLINE_E2E_NATIVE_LIFECYCLE']='1'
     $info.EnvironmentVariables['THREADLINE_E2E_GITHUB_ADDR']=$loopback.LocalEndpoint.ToString()
@@ -92,9 +94,11 @@ $seedArchive=Join-Path $root 'original-seed'
 $moved=$false
 $complete=$false
 $delayed=$null
+$signedOut=$null
 $stage='create isolated fixture'
 $loopback=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0)
-if ($DelayedOnline) { . (Join-Path $PSScriptRoot 'installed-drafts-delay.ps1') }
+if ($DelayedOnline -or $SignedOutOffline) { . (Join-Path $PSScriptRoot 'installed-drafts-delay.ps1') }
+if ($SignedOutOffline) { . (Join-Path $PSScriptRoot 'installed-drafts-signout.ps1') }
 try {
     $null=New-Item -ItemType Directory -Path $root -ErrorAction Stop
     $null=New-Item -ItemType Directory -Path $profileDirectory
@@ -126,6 +130,12 @@ try {
     if ($DelayedOnline) {
         $stage='installed offline and delayed online launches'
         $delayed=Invoke-InstalledDraftDelay
+    } elseif ($SignedOutOffline) {
+        $stage='installed sign out and offline restart'
+        if ($seed.active_account -ne $seed.account -or $seed.access -cne 'Readable') {
+            throw 'The generated protected account is not the active synthetic workspace.'
+        }
+        $signedOut=Invoke-InstalledDraftSignOut $seed.account $seed.credential_generation
     } else {
         $smoke=Join-Path $PSScriptRoot 'smoke-installed.ps1'
         $opened=foreach ($tab in @('reader-tab-0-1','reader-tab-1-1')) {
@@ -141,8 +151,13 @@ try {
     $stage='retained mixed draft verification'
     $after=Invoke-Fixture 'inspect' 'after'
     if ($after.work_offline -ne !$DelayedOnline) { throw 'The installed fixture did not retain the tested connectivity setting.' }
+    if ($after.protected_token_present -ne !$SignedOutOffline) { throw 'The protected fixture key has the wrong state.' }
+    if ($SignedOutOffline -and ($after.access -cne 'SignedOut' -or $after.active_account -ne $seed.account -or
+        $after.credential_generation -ne ($seed.credential_generation + 1))) {
+        throw 'The cached workspace did not retain the original account with one sign-out generation change.'
+    }
     foreach ($field in @('drafts','actions','action_ids','sync_checkpoint','content','schedule','tab_counts','pane_proportions',
-        'pause_queued_actions','protected_reference_matches','protected_token_present','review_anchor_preserved',
+        'pause_queued_actions','protected_reference_matches','review_anchor_preserved',
         'feed_event','feed_count','prior_delivery','delivery_groups','delivery_unchanged_at_ms','first_attempts','first_send_starts')) {
         $beforeValue=$seed.PSObject.Properties[$field].Value | ConvertTo-Json -Depth 8 -Compress
         $afterValue=$after.PSObject.Properties[$field].Value | ConvertTo-Json -Depth 8 -Compress
@@ -176,4 +191,5 @@ $receipt=[ordered]@{status='Pass';installed_app_sha256=$InstalledSha256.ToLowerI
     protected_credential_retained=$after.protected_token_present;protected_fixture_key_removed=$key.protected_fixture_key_removed;
     default_data_absent=$true}
 if ($DelayedOnline) { $receipt['delayed_online']=$delayed }
+if ($SignedOutOffline) { $receipt['signed_out_offline']=$signedOut }
 $receipt | ConvertTo-Json -Depth 8
