@@ -28,6 +28,9 @@ threadline-storage = { path = "../threadline-storage" }
 tokio = { version = "1", features = ["rt-multi-thread", "time", "sync"] }
 zeroize = "1"
 
+[target.'cfg(windows)'.dependencies]
+threadline-installer = { path = "../threadline-installer" }
+
 [dev-dependencies]
 gpui-kit = { version = "=0.10.0", features = ["test-support"] }
 rusqlite = "0.40.2"

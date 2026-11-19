@@ -17,6 +17,7 @@ mod reader;
 mod reader_workspace;
 mod sync_panel;
 mod sync_worker;
+mod updates;
 mod workspace;
 
 #[cfg(feature = "e2e")]
@@ -164,6 +165,7 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
         .build()?;
     // Resolve and migrate the database on a worker before exposing any workspace
     // state. Close the failed launch without showing a substitute workspace.
+    let ordinary_profile = options.profile.is_none() && !cfg!(feature = "e2e");
     let profile = options.profile;
     #[cfg(feature = "e2e")]
     if let Some(startup) = startup.as_mut() {
@@ -284,6 +286,9 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
                 cx.new(|cx| {
                     let mut workspace =
                         Workspace::new(window, cx, seed, handle, open_review, feasibility_fixture);
+                    if ordinary_profile {
+                        workspace.enable_updates(window, cx);
+                    }
                     #[cfg(feature = "e2e")]
                     {
                         workspace.set_observer(observer, cx);

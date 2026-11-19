@@ -116,6 +116,7 @@ pub(crate) struct AccountView {
     pub(crate) profiles: Vec<AccessProfile>,
     pub(crate) repositories: Vec<RepositoryView>,
     pub(crate) offline: bool,
+    pub(crate) background_updates_allowed: Option<bool>,
 }
 
 pub(crate) struct AccountReply {
@@ -273,18 +274,19 @@ impl AccountService {
     fn view(&self) -> Result<AccountView, Problem> {
         let active = self.store.active_github_account()?;
         let profiles = self.store.github_access_profiles()?;
-        let (repositories, offline) = match active {
+        let (repositories, controls) = match active {
             Some(account) => (
                 self.store.github_repository_views(account)?,
-                self.store.dispatch_profile(account)?.offline,
+                self.store.sync_settings(account)?.controls,
             ),
-            None => (Vec::new(), false),
+            None => (Vec::new(), Default::default()),
         };
         Ok(AccountView {
             active,
             profiles,
             repositories,
-            offline,
+            offline: controls.work_offline,
+            background_updates_allowed: Some(!controls.work_offline && !controls.pause_background),
         })
     }
 

@@ -62,6 +62,9 @@ pub(crate) struct ReaderAccount {
     pub repositories: Vec<RepositoryView>,
 }
 
+pub(crate) struct UpdatePolicyChanged(pub bool);
+impl gpui_kit::EventEmitter<UpdatePolicyChanged> for ReaderWorkspace {}
+
 #[cfg(feature = "e2e")]
 #[derive(serde::Serialize)]
 pub(crate) struct ReaderObservation {
@@ -1282,6 +1285,9 @@ impl ReaderWorkspace {
                 window,
                 |this, _, change: &crate::sync_panel::SettingsChanged, window, cx| {
                     let offline = change.current.work_offline;
+                    cx.emit(UpdatePolicyChanged(
+                        !offline && !change.current.pause_background,
+                    ));
                     let offline_changed = change.previous.work_offline != offline;
                     if offline && !this.offline {
                         this.network.cancel();

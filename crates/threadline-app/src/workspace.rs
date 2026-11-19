@@ -175,6 +175,7 @@ pub struct Workspace {
     seed: u64,
     runtime: tokio::runtime::Handle,
     accounts: Option<Entity<AccountPanel>>,
+    updates: Option<Entity<crate::updates::Updates>>,
     reader: Option<Entity<ReaderWorkspace>>,
     accounts_open: bool,
     feasibility_fixture: bool,
@@ -359,6 +360,7 @@ impl Workspace {
             seed,
             runtime,
             accounts,
+            updates: None,
             reader,
             accounts_open: false,
             feasibility_fixture,
@@ -453,6 +455,64 @@ impl Workspace {
             }
         }
         cx.notify();
+    }
+
+    pub(crate) fn enable_updates(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let updates = cx.new(|cx| crate::updates::Updates::new(self.runtime.clone(), window, cx));
+        self._subscriptions.push(cx.subscribe_in(
+            &updates,
+            window,
+            |this, updates, _: &crate::updates::RestartRequested, window, cx| {
+                let updates = updates.clone();
+                if let Some(reader) = this
+                    .reader
+                    .as_ref()
+                    .filter(|reader| reader.read(cx).has_account())
+                {
+                    reader.update(cx, |reader, cx| {
+                        reader.request_departure(
+                            false,
+                            move |_, cx| updates.update(cx, |model, cx| model.launch(cx)),
+                            window,
+                            cx,
+                        );
+                    });
+                } else {
+                    updates.update(cx, |model, cx| model.launch(cx));
+                }
+            },
+        ));
+        self._subscriptions.push(cx.subscribe_in(
+            &updates,
+            window,
+            |this, _, _: &crate::updates::SetupStarted, window, cx| this.request_quit(window, cx),
+        ));
+        if let Some(reader) = &self.reader {
+            let updates = updates.clone();
+            self._subscriptions.push(cx.subscribe(
+                reader,
+                move |_, _, event: &crate::reader_workspace::UpdatePolicyChanged, cx| {
+                    updates.update(cx, |model, cx| model.set_policy(Some(event.0), cx));
+                },
+            ));
+        }
+        if let Some(accounts) = &self.accounts {
+            let updates = updates.clone();
+            let mut last = None;
+            self._subscriptions
+                .push(cx.observe(accounts, move |_, panel, cx| {
+                    let panel = panel.read(cx);
+                    if panel.loaded() {
+                        let view = panel.local_reader_state().0;
+                        let scope = (view.active, view.background_updates_allowed);
+                        if last != Some(scope) {
+                            last = Some(scope);
+                            updates.update(cx, |model, cx| model.set_policy(scope.1, cx));
+                        }
+                    }
+                }));
+        }
+        self.updates = Some(updates);
     }
 
     fn request_quit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -798,6 +858,15 @@ impl Workspace {
                 .border_color(palette.border)
                 .bg(palette.panel)
                 .child(div().text_lg().child("Threadline"))
+                .when_some(self.updates.clone(), |toolbar, updates| {
+                    toolbar.child(
+                        button("open-updates", "Updates")
+                            .accessibility_id("open-updates")
+                            .on_click(move |_, window, cx| {
+                                updates.update(cx, |model, cx| model.toggle(window, cx))
+                            }),
+                    )
+                })
                 .children(connection.map(|(label, color)| {
                     div()
                         .id("reader-toolbar-status")
@@ -1479,6 +1548,7 @@ impl gpui_kit::Render for Workspace {
             .is_some_and(|panel| !panel.read(cx).loaded());
         let window_content = window_content
             .child(self.toolbar(palette, !self.feasibility_fixture, cx))
+            .children(self.updates.clone())
             .when(self.accounts_open, |content| {
                 content.child(div().flex_1().min_h_0().children(self.accounts.clone()))
             })
