@@ -101,9 +101,13 @@ function Invoke-ReviewContextProof([IntPtr]$Window, [string]$Profile) {
     })
 
     Set-WriteFixtureOffline $Window $true
+    Select-FixtureRightReviewLine $Window $head
     Open-FixtureReviewCommits $Window $firstItem $revision $head
     Wait-FixtureCommitCoverage $Window
+    Return-ToFixtureReviewFiles $Window $draftId $head $revision
     Set-WriteFixtureOffline $Window $false
+    Select-FixtureRightReviewLine $Window $head
+    Open-FixtureReviewCommits $Window $firstItem $revision $head
     Wait-For 'the owned PR Commits fetch control' {
         Invoke-OwnedFixtureControl $Window 'pr-0-commits-fetch' $null 'Fetch from GitHub'
     }
@@ -111,7 +115,7 @@ function Invoke-ReviewContextProof([IntPtr]$Window, [string]$Profile) {
     Return-ToFixtureReviewFiles $Window $draftId $head $revision
     Add-Evidence 'Read the native Commits coverage before and after fetch and return to the saved review' ([ordered]@{
         item = $firstItem; revision = $revision; initial_coverage = 'Not checked'; fetched_coverage = 'Downloaded'
-        returned_to_selected_line = $true; draft_retained = $true
+        returned_to_selected_line_before_and_after_fetch = $true; draft_retained = $true
     })
 
     Click-PrContext $Window 0
@@ -176,6 +180,7 @@ function Invoke-ReviewContextProof([IntPtr]$Window, [string]$Profile) {
     if (!$retained.cached_reader.offline -or $retained.cached_reader.active_item -ne $firstItem) {
         throw 'Restart did not restore the original offline review item.'
     }
+    Select-FixtureRightReviewLine $restarted $head
     Open-FixtureReviewCommits $restarted $firstItem $revision $head
     Wait-FixtureCommitCoverage $restarted -Downloaded
     Return-ToFixtureReviewFiles $restarted $draftId $head $revision
