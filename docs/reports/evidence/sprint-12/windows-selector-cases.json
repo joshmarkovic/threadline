@@ -1,0 +1,84 @@
+{
+  "environment": "Windows 11 x64 native development test executables",
+  "windows_source_revision": "c8f241294e2420a827cd09e006ba1b0e8ab05dd1",
+  "windows_receipt": "validation-c8f2412.json",
+  "windows_named_results": [
+    {
+      "executable": "github_writes-c4e43d33750781a7.exe",
+      "executable_sha256": "0c1eff31922f2796c3841611ba7505ac453f8cd960bd79e105fdbdd3248f9f51",
+      "raw_log_sha256": "5267d4088556216c7055149b92d8129a0034ea9fb3daf501e9de500075f68577",
+      "exit_code": 0,
+      "ut_011": [],
+      "it_009": [
+        "it_009_write_rejection_throttle_wrong_identity_and_post_send_loss_are_distinct"
+      ]
+    },
+    {
+      "executable": "merges-9a8fef78ca6d87a8.exe",
+      "executable_sha256": "9ba63360e97be50970a3ddb47eb621dd73e2096656c84555b7628207001844f7",
+      "raw_log_sha256": "c5ecc760f9ddbfe5f4dd272fc4fbf7cf69bb7c4883828851cfa517d8ec1d57e5",
+      "exit_code": 0,
+      "ut_011": [],
+      "it_009": [
+        "it_009_it_014_uncertain_merge_only_reads_back_original_pr_never_replays_or_claims_an_external_merge"
+      ]
+    },
+    {
+      "executable": "threadline_storage-02e9d249567f1630.exe",
+      "executable_sha256": "0db109a896b1fe4b92f063607070d1a55840094e9d1380c79d8270992de21cd7",
+      "raw_log_sha256": "3077018a5fad4ef0756cb67e8394110a6b97cffe5c220767a250c52d749f0837",
+      "exit_code": 0,
+      "ut_011": [
+        "pr::lines::tests::ut_011_source_coordinates_use_immutable_hunk_ranges_instead_of_display_positions",
+        "pr::lines::tests::ut_011_unicode_whitespace_and_line_endings_preserve_each_source_range"
+      ],
+      "it_009": [
+        "writes::tests::it_009_disk_full_after_remote_success_rolls_back_receipt_cache_and_own_action_together"
+      ]
+    },
+    {
+      "executable": "writes-48d204f9b461499c.exe",
+      "executable_sha256": "13af47217a8359bf40b6136d2dcefd57e0c08283cc5ff9c35138d7b5f1de17b4",
+      "raw_log_sha256": "4ab15f4e6b7beea0648c92e6cbae2dbc526884b211522eefbf0947595e0006ac",
+      "exit_code": 0,
+      "ut_011": [],
+      "it_009": [
+        "it_009_credential_repair_releases_only_its_original_exhausted_owner",
+        "it_009_throttle_survives_restart_and_unknown_work_cannot_skip_the_floor_or_resume",
+        "it_009_timeout_and_cancel_never_replay_identity_free_matches_and_accepted_creation_reconciles",
+        "it_009_unreadable_accepted_comment_cannot_starve_another_item_after_restart"
+      ]
+    }
+  ],
+  "windows_four_family_completion": {
+    "source_revision": "b230bbd23d639e447e89a70d7715d2bb10285a2e",
+    "test": "accounts::write_tests::completion::write_dispatch_failed_local_completion_reconciles_without_replay",
+    "exit_code": 0,
+    "receipt": "windows-write-completion.json"
+  },
+  "revised_it_009_selector_check": {
+    "environment": "Linux development runner",
+    "source_base": "993830c8fd609aec4c56e1441ec4806ebba6a8aa",
+    "source_dirty": true,
+    "arguments": [
+      "test",
+      "integration",
+      "--case",
+      "IT-009",
+      "--seed",
+      "12345",
+      "--report-dir",
+      "<report-dir>"
+    ],
+    "run": "integration-1795071805364-2794202",
+    "fixture_revision": "s07-write-engine-v1",
+    "status": "Pass",
+    "exit_code": 0,
+    "tests_passed": 8,
+    "raw_receipt_sha256": {
+      "result.json": "d60cbd6636c28843bdd2fea7a1a0523c26cb1538b29fe1372e4c5e3ac4dcbd13",
+      "junit.xml": "73c325d914838086ed6019cf30add1a23ff8324cc405855f693764fb7e058da7",
+      "IT-009.log": "bc884d69a7b76879e057061587b0f7cce0795e9fe08e68085111b6ae62a17044"
+    }
+  }
+}
