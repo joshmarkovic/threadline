@@ -1415,5 +1415,94 @@
     "status": "Not run",
     "detail": "The selected build uses targeted functional cases. Those cases did not run the deferred E2E-014 timing test.",
     "most_recent_completed_full_suite": "e2e-1795098785119-4744"
-  }
+  },
+  "named_follow_ups": [
+    {
+      "run": "e2e-1795108989088-40160",
+      "case": "E2E-015",
+      "status": "Blocked",
+      "exit_code": 78,
+      "child_exit_code": 78,
+      "fixture_revision": "s01-feasibility-v1",
+      "requirement_ids": [
+        "WORKSPACE-12",
+        "UX-01",
+        "TEST-04",
+        "PORT-06"
+      ],
+      "acceptance_ids": [
+        "AC-38",
+        "AC-49"
+      ],
+      "detail": "Native keyboard, focus, exact Unicode clipboard, high DPI and owned UI Automation passed. Signed human visual and screen-reader observations are pending. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-015",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "64a9a016dd805aa92fa1cc379a97c18686c0ee34",
+      "started_at_utc": "2026-11-19T17:23:09.088Z",
+      "finished_at_utc": "2026-11-19T17:23:42.612Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "bb97fe7492d22de0fee9dee442eb16453636a03afebf2bad287513fa8bf47569",
+        "junit.xml": "63846249c3e8129e8cfaf5518dc4027dabc022e31dd4f5d1716dbfa676df301d",
+        "binary.json": "f87c51eba16d45831b6650f3d9911b2f61aaa4ac3dd1a5e00f10971667d96069",
+        "accessibility-native.json": "019d5c8693ad7b66528871fd85d929880146bc29230ba663119744498467cee3",
+        "launch.png": "97eb03a4eb13de57d6b56fa9e682cf7f362af7f03265b9537e595e44959fac30",
+        "interaction.png": "7e8a79af547bbb27dab35ddb375fd1ebce4be570d7e859a7cddfb83c2e5fb847",
+        "restart-observation.json": "4cccf3918cda78fab50f8ea97339191aa02e16b4b051afa60171bb112b1c6ff8",
+        "ui-observation.json": "eedc054a0f535383e032c0d45fee052c5a70a7d5e14e1fa6783f3e658e6471f2",
+        "native-driver.log": "bad18ab1e6c8db0e947d422fe49c93cfae64a462b6aa0c1b07f1b26064eda09d"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Blocked",
+        "binary_sha256": "feeb2ab3e11029b8051fb155e479aec9f0d554919f144848eb14ecd88688611b",
+        "action_count": 11,
+        "accessibility": {
+          "automated_checks_passed": true,
+          "native_input_verified": true,
+          "high_dpi_verified": true,
+          "accessibility_action_verified": true,
+          "original_clipboard_restored": true,
+          "manual_screen_reader_and_visual": "Pending"
+        },
+        "completed_actions": [
+          "Activate an owned accessibility control",
+          "Launch native window",
+          "Pointer select formatted Markdown and copy",
+          "Type into the right review input while background preview is pending and copy its value",
+          "Change the active tab and return to the same draft target",
+          "Switch context to linked issue",
+          "Resize workspace panes with the pointer",
+          "Resize PR context and code with the pointer",
+          "Forward a second launch through the Windows instance channel",
+          "Quit with the native keyboard shortcut",
+          "Relaunch the same isolated profile and retain its SQLite database"
+        ],
+        "accessibility_controls": [
+          {
+            "automation_id": "load-preview",
+            "input": "UIA InvokePattern"
+          }
+        ],
+        "restarted_in_separate_process": true,
+        "retained_sqlite_sha256": "1abd22dac9e14e86c43234e1eaff5ce13b6a930cfe3fc381a6fae779cd8cf7de"
+      }
+    }
+  ]
 }
