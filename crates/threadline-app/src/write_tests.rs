@@ -5,6 +5,7 @@ use std::{
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::mpsc,
     thread,
     time::Duration,
 };
@@ -27,8 +28,30 @@ struct WriteFixture {
     server: Option<thread::JoinHandle<()>>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum MergeStage {
+    Accepted,
+    Readback,
+}
+
+struct MergeFault {
+    reached: mpsc::Sender<MergeStage>,
+    release: mpsc::Receiver<()>,
+}
+
+impl MergeFault {
+    fn hold(&self, stage: MergeStage) {
+        self.reached.send(stage).unwrap();
+        self.release.recv_timeout(Duration::from_secs(10)).unwrap();
+    }
+}
+
 impl WriteFixture {
     fn start() -> Self {
+        Self::with_merge_fault(None)
+    }
+
+    fn with_merge_fault(fault: Option<MergeFault>) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         listener.set_nonblocking(true).unwrap();
         let address = listener.local_addr().unwrap();
@@ -39,7 +62,7 @@ impl WriteFixture {
             let merged = AtomicBool::new(false);
             while !stopping.load(Ordering::Acquire) {
                 match listener.accept() {
-                    Ok((stream, _)) => serve(stream, &writes, &merged),
+                    Ok((stream, _)) => serve(stream, &writes, &merged, fault.as_ref()),
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                         thread::sleep(Duration::from_millis(2))
                     }
@@ -68,7 +91,12 @@ impl Drop for WriteFixture {
     }
 }
 
-fn serve(mut stream: TcpStream, writes: &AtomicUsize, merged: &AtomicBool) {
+fn serve(
+    mut stream: TcpStream,
+    writes: &AtomicUsize,
+    merged: &AtomicBool,
+    fault: Option<&MergeFault>,
+) {
     stream.set_nonblocking(false).unwrap();
     stream
         .set_read_timeout(Some(Duration::from_secs(2)))
@@ -175,6 +203,10 @@ fn serve(mut stream: TcpStream, writes: &AtomicUsize, merged: &AtomicBool) {
                     "mergeCommitAllowed":true,"squashMergeAllowed":true,"rebaseMergeAllowed":false}
             });
             if query.starts_with("query ThreadlineMergedPull") {
+                assert!(merged.load(Ordering::SeqCst));
+                if let Some(fault) = fault {
+                    fault.hold(MergeStage::Readback);
+                }
                 proof["state"] = "MERGED".into();
                 proof["merged"] = true.into();
                 proof["mergeCommit"] = json!({"oid":"c".repeat(40)});
@@ -203,6 +235,10 @@ fn serve(mut stream: TcpStream, writes: &AtomicUsize, merged: &AtomicBool) {
             );
             assert_eq!(writes.fetch_add(1, Ordering::SeqCst), 0);
             merged.store(true, Ordering::SeqCst);
+            if let Some(fault) = fault {
+                fault.hold(MergeStage::Accepted);
+                return;
+            }
             ("200 OK", json!({"merged":true,"sha":"c".repeat(40)}))
         }
         ("POST", "/repos/fixture-org/private/issues/42/comments") => {
@@ -365,8 +401,22 @@ async fn review_dispatch_preserves_pending_provider_id_and_submits_exact_origina
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn merge_dispatch_rechecks_preflight_and_records_one_exact_head() {
+    check_merge_delivery(false).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn merge_dispatch_reconciles_response_loss_after_in_flight_cancellation() {
+    check_merge_delivery(true).await;
+}
+
+async fn check_merge_delivery(lose_response: bool) {
     const OPERATION: &str = "60000000-0000-4000-8000-000000000076";
-    let fixture = WriteFixture::start();
+    let (reached, events) = mpsc::channel();
+    let (release, resumes) = mpsc::channel();
+    let fixture = WriteFixture::with_merge_fault(lose_response.then_some(MergeFault {
+        reached,
+        release: resumes,
+    }));
     let dir = tempfile::tempdir().unwrap();
     let store = Arc::new(Store::open_profile(dir.path()).unwrap());
     let (accounts, rev) = prepare_fixture_pr(&store, fixture.address).await;
@@ -416,13 +466,38 @@ async fn merge_dispatch_rechecks_preflight_and_records_one_exact_head() {
         .update_sync_settings(account, |settings| settings.controls.work_offline = false)
         .unwrap();
     worker.wake(Some(ProbeTrigger::NetworkChanged));
+    if lose_response {
+        assert_eq!(
+            events.recv_timeout(Duration::from_secs(40)).unwrap(),
+            MergeStage::Accepted
+        );
+        assert_eq!(
+            store.operation(account, OPERATION).unwrap().unwrap().state,
+            State::Sending
+        );
+        assert_eq!(
+            store.cancel_operation(account, OPERATION).unwrap(),
+            threadline_storage::queue::CancelResult::MayAlreadyBeSent
+        );
+        let pending = store.operation(account, OPERATION).unwrap().unwrap();
+        assert!(pending.cancel_requested);
+        assert_eq!(pending.state, State::Sending);
+        release.send(()).unwrap();
+        assert_eq!(
+            events.recv_timeout(Duration::from_secs(40)).unwrap(),
+            MergeStage::Readback
+        );
+        let ambiguous = store.operation(account, OPERATION).unwrap().unwrap();
+        assert!(ambiguous.cancel_requested);
+        assert_eq!(ambiguous.state, State::OutcomeUnknown);
+        assert!(store.confirmed_merge(account, OPERATION).unwrap().is_none());
+        release.send(()).unwrap();
+    }
     tokio::time::timeout(Duration::from_secs(27), async {
         loop {
             let operation = store.operation(account, OPERATION).unwrap().unwrap();
-            assert!(!matches!(
-                operation.state,
-                State::NeedsAttention | State::OutcomeUnknown
-            ));
+            assert_ne!(operation.state, State::NeedsAttention);
+            assert!(lose_response || operation.state != State::OutcomeUnknown);
             if operation.state == State::Confirmed {
                 break;
             }
@@ -434,7 +509,17 @@ async fn merge_dispatch_rechecks_preflight_and_records_one_exact_head() {
     let receipt = store.confirmed_merge(account, OPERATION).unwrap().unwrap();
     assert_eq!(receipt.expected_head.as_str(), rev.head.as_str());
     assert_eq!(receipt.merge_oid.as_str(), "c".repeat(40));
-    assert!(receipt.own_action);
+    assert_eq!(receipt.own_action, !lose_response);
+    if lose_response {
+        let confirmed = store.operation(account, OPERATION).unwrap().unwrap();
+        assert_eq!(confirmed.state, State::Confirmed);
+        assert_eq!(
+            confirmed.reason.as_deref(),
+            Some("merged_observed_origin_unproved")
+        );
+        assert_eq!(store.attempts(account, OPERATION).unwrap().len(), 1);
+        assert_eq!(store.receipts(account, OPERATION).unwrap().len(), 1);
+    }
     worker.wake(Some(ProbeTrigger::CheckNow));
     tokio::time::sleep(Duration::from_millis(180)).await;
     assert_eq!(fixture.sent.load(Ordering::SeqCst), 1);
