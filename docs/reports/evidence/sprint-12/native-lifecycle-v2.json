@@ -165,5 +165,141 @@
       "signed_out": "973ad4078eb740de115bafddcc3728c8f66cae7169b44f61cf3be9daf750c33b",
       "redacted_http_trace": "5bce5c95339778b25b0410a7230ffb191015ab0e07968d40d4c0f955a0971fdd"
     }
+  },
+  "completed_attempt": {
+    "run": "e2e-1795060178040-42136",
+    "source_revision": "4114c34134549d7639122116688aa1b025be9cf5",
+    "source_dirty": false,
+    "fixture_revision": "s12-native-lifecycle-v2",
+    "status": "Pass",
+    "exit_code": 0,
+    "app_revision": "4114c34134549d7639122116688aa1b025be9cf5",
+    "runner_revision": "4114c34134549d7639122116688aa1b025be9cf5",
+    "driver_revision": "4114c34134549d7639122116688aa1b025be9cf5",
+    "started_at_unix_ms": 1795060178040,
+    "finished_at_unix_ms": 1795060549279,
+    "command": {
+      "program": "xtask",
+      "argv": [
+        "test",
+        "e2e",
+        "--suite",
+        "full",
+        "--case",
+        "S12-NATIVE-LIFECYCLE",
+        "--binary",
+        "<binary-path>",
+        "--seed",
+        "12345",
+        "--report-dir",
+        "<report-dir>"
+      ],
+      "redacted": true
+    },
+    "seed": 12345,
+    "host": {
+      "os": "windows",
+      "architecture": "x86_64",
+      "version": "Microsoft Windows [Version 10.0.22631.7652]",
+      "display_session": "Windows desktop availability is checked by native driver"
+    },
+    "requirement_ids": [
+      "AUTH-05",
+      "CACHE-13",
+      "OUTBOX-10",
+      "TEST-04",
+      "TEST-05"
+    ],
+    "acceptance_ids": [
+      "AC-68",
+      "AC-73",
+      "AC-74",
+      "AC-91",
+      "AC-92"
+    ],
+    "dpi": 96,
+    "binary_sha256": "5bb55a61e55943d85647a9c72fc5629e2db49f088409d113cb07746be0cb1131",
+    "executable_bytes": 45476352,
+    "detail": "The mixed workspace restored its offline reader and four unsent draft kinds before the delayed startup response. An interrupted ordinary comment stayed uncertain across restart, sign-out, profile isolation and same-user renewal. The original attempt and its three held dependents remained unchanged, and the prior delivery was not repeated.",
+    "native_actions": 64,
+    "cached_surfaces": {
+      "item": 1,
+      "pr": 3,
+      "head": "000000000000303900000000000000000000000b",
+      "history_head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "local_search_matches": 1,
+      "feed_event": 1,
+      "draft_kinds": [
+        "IssueEdit",
+        "Comment",
+        "Review",
+        "Reply"
+      ],
+      "unfetched_checks": "Missing",
+      "pending_actions": 4
+    },
+    "offline_restarts": 1,
+    "delayed_startup": {
+      "cached_panes": 2,
+      "queued_actions": 4,
+      "protected_credential_reentered": false
+    },
+    "seeded_panes": {
+      "tab_counts": [
+        10,
+        10
+      ],
+      "pane_proportions": [
+        0.43,
+        0.57
+      ],
+      "focused_pane": 1
+    },
+    "before_renewal_and_after_are_same_scope": true,
+    "content_unchanged": true,
+    "drafts_unchanged": true,
+    "checkpoint_unchanged": true,
+    "schedule_unchanged": true,
+    "delivery_unchanged": true,
+    "renewed": {
+      "actions": [
+        "OutcomeUnknown",
+        "Queued",
+        "Queued",
+        "Queued"
+      ],
+      "dependent_holds": [
+        "dependency",
+        "dependency",
+        "dependency"
+      ],
+      "first_attempts": 1,
+      "first_send_starts": 1,
+      "credential_generation": 4,
+      "protected_token_present": true,
+      "protected_reference_matches": true
+    },
+    "fixture_key_removed_on_cleanup": true,
+    "provider": {
+      "requests": 14,
+      "authenticated": true,
+      "offline_requests": 0,
+      "signed_out_requests": 0,
+      "renewal_reads": 5,
+      "interrupted_comment": [
+        {
+          "phase": "lifecycle_crash",
+          "route": "lifecycle_comment",
+          "status": 0
+        }
+      ]
+    },
+    "raw_sha256": {
+      "result": "4c104a0654d3275e403bdc7d2fd8232ecdb1e9c58f8c986f20b8b3bae3319ed7",
+      "native": "8b169174ff8e9b2da5f897d264b8ebe820f895bc080e2707bbafff606f439e83",
+      "redacted_http_trace": "95bfa14a2956864d5e18540123738eb64e243878779119cf13ee5b130752d3bf",
+      "renewed": "f2d045fd65490c1f4c53f832fad838ff594b53bd2f89abad446880b50e981d58",
+      "cleanup": "dcc7ae0c8264f6549354d6538beeaee578907fc1047dfd466e0a5383b3db1580"
+    }
   }
 }
