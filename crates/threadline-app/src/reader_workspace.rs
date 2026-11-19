@@ -82,6 +82,7 @@ pub(crate) struct ReaderObservation {
     pub comments_coverage: Option<String>,
     pub comment_fetch_state: Option<String>,
     pub comment_count: Option<usize>,
+    pub timeline_coverage: Option<String>,
     pub download_state: Option<String>,
     pub active_draft_saved: Option<bool>,
     pub active_draft_chars: Option<usize>,
@@ -540,6 +541,8 @@ impl ReaderWorkspace {
             comment_fetch_state: cached
                 .map(|view| format!("{:?}", view.data.discussion.state.fetch)),
             comment_count: cached.map(|view| view.notes.len()),
+            timeline_coverage: cached
+                .map(|view| format!("{:?}", view.data.timeline.state.coverage)),
             download_state: cached
                 .and_then(|view| view.data.download.as_ref())
                 .map(|download| format!("{:?}", download.state)),

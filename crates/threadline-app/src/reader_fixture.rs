@@ -12,6 +12,7 @@ use threadline_storage::{
 };
 
 mod panes;
+mod recovery;
 
 #[derive(Clone, Copy)]
 enum ReaderFixture {
@@ -24,6 +25,9 @@ enum ReaderFixture {
 pub fn run() -> Option<Result<(), String>> {
     let mut arguments = std::env::args_os().skip(1);
     let action = arguments.next()?;
+    if action == "--e2e-read-recovery" {
+        return Some(recovery::run(arguments));
+    }
     let quiet_notification = action == "--e2e-seed-notification";
     if !quiet_notification && action != "--e2e-seed-reader" {
         return None;

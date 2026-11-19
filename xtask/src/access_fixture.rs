@@ -25,6 +25,7 @@ mod merge;
 mod pr;
 mod pr_pins;
 mod rate_limit;
+mod recovery;
 mod review_decisions;
 mod review_threads;
 mod writes;
@@ -72,6 +73,11 @@ enum Phase {
     HistoricalRemote,
     ReaderFailure,
     ReaderResume,
+    RecoverBaseline,
+    RecoverOffline,
+    RecoverExpired,
+    RecoverRebuild,
+    RecoverResume,
     SyncLive,
     SyncOffline,
     SyncService,
@@ -153,6 +159,11 @@ impl Phase {
             "historical-remote" => Ok(Self::HistoricalRemote),
             "reader-failure" => Ok(Self::ReaderFailure),
             "reader-resume" => Ok(Self::ReaderResume),
+            "recover-baseline" => Ok(Self::RecoverBaseline),
+            "recover-offline" => Ok(Self::RecoverOffline),
+            "recover-expired" => Ok(Self::RecoverExpired),
+            "recover-rebuild" => Ok(Self::RecoverRebuild),
+            "recover-resume" => Ok(Self::RecoverResume),
             "sync-live" => Ok(Self::SyncLive),
             "sync-offline" => Ok(Self::SyncOffline),
             "sync-service" => Ok(Self::SyncService),
@@ -360,6 +371,7 @@ pub enum TraceCheck {
     IssueEditConflict,
     IssueEditPropagation,
     ReaderResume,
+    ReaderCursorRecovery,
     SyncJourney,
     RateLimitedCache,
     NotificationSchedule,
@@ -453,6 +465,7 @@ impl AccessFixture {
             TraceCheck::IssueEditPropagation => writes::issue_propagation_trace(&records),
             TraceCheck::HistoricalReader => historical_reader::trace(&records),
             TraceCheck::ReaderResume => complete_reader_resume(&records),
+            TraceCheck::ReaderCursorRecovery => recovery::trace(&records),
             TraceCheck::SyncJourney => complete_sync_journey(&records),
             TraceCheck::RateLimitedCache => rate_limit::trace(&records),
             TraceCheck::NotificationSchedule => complete_notification_schedule(&records),
@@ -818,7 +831,12 @@ fn answer(
     if phase == Phase::SyncRateThrottle && route == Route::User && reply.status == 429 {
         write!(socket, "Retry-After: {}\r\n", rate_limit::RETRY_SECONDS)?;
     }
-    if phase == Phase::ReaderFailure && route == Route::CommentsFirst && reply.status == 200 {
+    if matches!(
+        phase,
+        Phase::ReaderFailure | Phase::RecoverBaseline | Phase::RecoverRebuild
+    ) && route == Route::CommentsFirst
+        && reply.status == 200
+    {
         let local = socket.local_addr()?;
         write!(
             socket,
@@ -898,7 +916,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
                     | Phase::CredentialReady
                     | Phase::CredentialOther
                     | Phase::CredentialReturn
-            ) =>
+            ) || recovery::active(phase) =>
         {
             Route::ScheduledIssue
         }
@@ -1104,6 +1122,9 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
     }
     if let Some(pin) = pr_pins::response(phase, route) {
         return pin;
+    }
+    if let Some(reply) = recovery::response(phase, route) {
+        return reply;
     }
     if let Some(write) = writes::response(phase, route) {
         return write;

@@ -16,6 +16,9 @@ pub fn scenario_ids() -> impl Iterator<Item = &'static str> {
 }
 
 pub fn fixture_revision(case: &str) -> Option<&'static str> {
+    if case == "S06-READER-CURSOR-RECOVERY" {
+        return Some("s06-reader-cursor-recovery-v1");
+    }
     if case == "S06-SHARED-PR-PANES" {
         return Some("s06-shared-pr-panes-v2");
     }
@@ -236,6 +239,7 @@ pub fn associations(case: &str) -> Associations {
         "S06-SHARED-PR-PANES" => ("WORKSPACE-07;CACHE-02;PR-02;TEST-04", "AC-44"),
         "S06-PR-MERGE-STATE" => ("DATA-07;DATA-09;PR-01;TEST-04", "AC-52"),
         "S06-PR-OFFLINE-PIN" => ("DIFF-07;OFFLINE-03;TEST-04", "AC-23;AC-70"),
+        "S06-READER-CURSOR-RECOVERY" => ("SYNC-11;TEST-04", "AC-76"),
         "S07-ISSUE-CONFLICT" => ("ISSUE-03;ISSUE-05;OUTBOX-03;TEST-04", "AC-13;AC-15"),
         "S07-ISSUE-PROPAGATION" => ("ISSUE-03;ISSUE-05;WORKSPACE-07;TEST-04", "AC-13"),
         "S08-COMMENT-DEPENDENCY" => ("OUTBOX-06;TEST-04;TEST-05", "AC-63;AC-92"),

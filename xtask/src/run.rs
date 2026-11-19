@@ -613,7 +613,7 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
                 "S07-ISSUE-CONFLICT" | "S07-ISSUE-PROPAGATION" | "S08-COMMENT-DEPENDENCY"
             ) {
                 Some(NativeMode::WindowsIssueWrites)
-            } else if id == "S12-HISTORICAL-READER" {
+            } else if matches!(id, "S12-HISTORICAL-READER" | "S06-READER-CURSOR-RECOVERY") {
                 Some(NativeMode::WindowsReaderResume)
             } else if matches!(id, "S12-PANE-POSITIONS" | "S12-PANE-LIFECYCLE") {
                 Some(NativeMode::WindowsReaderOffline)
@@ -879,6 +879,9 @@ fn native_driver(
         NativeMode::WindowsReaderOffline if id == "S12-PANE-LIFECYCLE" => Some("PaneLifecycle"),
         NativeMode::WindowsReaderOffline => Some("Offline"),
         NativeMode::WindowsReaderResume if id == "S12-HISTORICAL-READER" => Some("Historical"),
+        NativeMode::WindowsReaderResume if id == "S06-READER-CURSOR-RECOVERY" => {
+            Some("CursorRecovery")
+        }
         NativeMode::WindowsReaderResume => Some("Resume"),
         NativeMode::WindowsReaderPerformance if id == "S12-PHYSICAL-READER" => {
             Some("PerformancePhysical")
@@ -1017,6 +1020,9 @@ fn native_driver(
         NativeMode::WindowsShell => "platform-native.json",
         NativeMode::WindowsToast => "toast-native.json",
         NativeMode::WindowsGitHubAccess => "github-access-native.json",
+        NativeMode::WindowsReaderResume if id == "S06-READER-CURSOR-RECOVERY" => {
+            "reader-cursor-recovery-native.json"
+        }
         NativeMode::WindowsReaderOffline | NativeMode::WindowsReaderResume => "reader-native.json",
         NativeMode::WindowsReaderPerformance => "reader-performance.json",
         NativeMode::WindowsLargeWorkspace => "large-workspace-native.json",
@@ -1101,6 +1107,11 @@ fn native_driver(
             }
             (Status::Pass, NativeMode::WindowsReaderResume) if id == "S12-HISTORICAL-READER" => {
                 TraceCheck::HistoricalReader
+            }
+            (Status::Pass, NativeMode::WindowsReaderResume)
+                if id == "S06-READER-CURSOR-RECOVERY" =>
+            {
+                TraceCheck::ReaderCursorRecovery
             }
             (Status::Pass, NativeMode::WindowsReaderResume) => TraceCheck::ReaderResume,
             (Status::Pass, NativeMode::WindowsSync) if id == "S05-WINDOWS-RATE-LIMIT" => {

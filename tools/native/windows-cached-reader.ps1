@@ -48,12 +48,18 @@ function Initialize-ReaderProfile([string]$Profile, [string]$Scale) {
     Add-Evidence 'Seed the isolated profile with the application and bundled SQLite' $receipt
 }
 
-function Restart-Reader([string]$Profile, [hashtable]$Startup, [switch]$SeedQuietEvent, [switch]$Backlog, [string]$FixturePhaseAfterQuit) {
+function Restart-Reader([string]$Profile, [hashtable]$Startup, [switch]$SeedQuietEvent, [switch]$Backlog, [string]$FixturePhaseAfterQuit, [ValidateSet('arm','release')][string]$RecoveryStage) {
+    if ($RecoveryStage -and ($ReaderProof -cne 'CursorRecovery' -or $FixturePhaseAfterQuit -cne 'recover-offline')) {
+        throw 'The recovery fault may change only while the isolated reader is stopped and offline.'
+    }
     Stop-ThroughUi
     if ($FixturePhaseAfterQuit) { Set-AccessPhase $FixturePhaseAfterQuit }
     $script:app.Dispose()
     $script:app = $null
     $before = Get-IsolatedSqlite $Profile
+    if ($RecoveryStage) {
+        $null = Read-RecoveryFixture $Profile $RecoveryStage "reader-recovery-$RecoveryStage.json"
+    }
     if ($SeedQuietEvent) {
         if ($ReaderProof -cne 'NotificationSchedule') { throw 'Only the isolated notification schedule can seed this event.' }
         $receipt = Join-Path $script:ReportDir 'notification-schedule-fixture.json'
@@ -74,7 +80,9 @@ function Restart-Reader([string]$Profile, [hashtable]$Startup, [switch]$SeedQuie
             $seeder.Dispose()
         }
     }
-    $observationName = if ($Backlog) {
+    $observationName = if ($RecoveryStage) {
+        "reader-recovery-$RecoveryStage-observation.json"
+    } elseif ($Backlog) {
         'reader-backlog-observation.json'
     } elseif ($FixturePhaseAfterQuit) {
         'reader-dependent-restart-observation.json'
