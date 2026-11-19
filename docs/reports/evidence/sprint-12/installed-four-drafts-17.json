@@ -1,0 +1,298 @@
+{
+  "source_revision": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+  "fixture_revision": "287064229188f6cc5f5d85c86693c0f74bd5e438",
+  "cases": [
+    {
+      "mode": "offline",
+      "driver_revision": "d3cf889",
+      "raw_sha256": "140566170ac68619ae963622785d609cc9e78cf78ccbfe793c17b8a4cee3f171",
+      "status": "Pass",
+      "installed_app_sha256": "7088621d171dc41a6c57f43fe4411a1f486965ec71aa9795de678e5748b364a6",
+      "fixture_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861",
+      "schema": 18,
+      "before_database_sha256": "30eb1bfa8aa9f388742139177f765a049932072c215d5b813c5cabccbb2e9e89",
+      "seed_archive_unchanged": true,
+      "work_offline": true,
+      "outbox_paused": true,
+      "review_anchor_preserved": true,
+      "protected_credential_retained": true,
+      "protected_fixture_key_removed": true,
+      "default_data_absent": true,
+      "drafts": [
+        {
+          "id": "issue-1",
+          "kind": "IssueEdit",
+          "item": 1,
+          "tab": "fixture-tab-0",
+          "version": 1,
+          "body_sha256": "78593127aabea86e9a6fbdcbde17f250e03051af999c5d70cf0afbcab7ce7a62"
+        },
+        {
+          "id": "comment-2",
+          "kind": "Comment",
+          "item": 2,
+          "tab": "fixture-tab-1",
+          "version": 1,
+          "body_sha256": "84a843997a92a0d4ca85583f309abbdc0b8feefd49df8ba38eb4ee8fe9d025be"
+        },
+        {
+          "id": "review-3",
+          "kind": "Review",
+          "item": 3,
+          "tab": "fixture-tab-2",
+          "version": 1,
+          "body_sha256": "fe0366c85242efc552bb929e71a3169117d6deeeebc1284153b32bd4c23311c3"
+        },
+        {
+          "id": "review-reply-3-771",
+          "kind": "Reply",
+          "item": 3,
+          "tab": "fixture-tab-5",
+          "version": 1,
+          "body_sha256": "fc74329d24106be4a4ae3a13af1541a24f3f8dd2f75bfa97e5bad4fabb7d7baf"
+        }
+      ],
+      "queue_states": [
+        "Queued",
+        "Queued",
+        "Queued",
+        "Queued"
+      ],
+      "source_cursor": "2",
+      "prior_delivery": "Delivered",
+      "native_launches": [
+        {
+          "tab_automation_id": "reader-tab-0-1",
+          "selected_before_invocation": false,
+          "tab_invoke_attempts": 1,
+          "tab_activated": true,
+          "owned_window": true,
+          "orderly_exit": true
+        },
+        {
+          "tab_automation_id": "reader-tab-1-1",
+          "selected_before_invocation": false,
+          "tab_invoke_attempts": 1,
+          "tab_activated": true,
+          "owned_window": true,
+          "orderly_exit": true
+        }
+      ],
+      "profile_state": {
+        "access_before": "Readable",
+        "access_after": "Readable",
+        "credential_generation_before": 2,
+        "credential_generation_after": 2,
+        "original_tabs": [
+          10,
+          10
+        ],
+        "restored_tabs": [
+          10,
+          10
+        ],
+        "protected_reference_matches": true,
+        "protected_token_present_after": true,
+        "delivery_groups": 1,
+        "prior_delivery_unchanged": true,
+        "first_send_starts_before": 0,
+        "first_send_starts_after": 0
+      }
+    },
+    {
+      "mode": "delayed",
+      "driver_revision": "d3cf889",
+      "raw_sha256": "5055cc5902f5abc379f8fae9af364ed2bacc71c5ea873992d6703a2544b3f053",
+      "status": "Pass",
+      "installed_app_sha256": "7088621d171dc41a6c57f43fe4411a1f486965ec71aa9795de678e5748b364a6",
+      "fixture_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861",
+      "schema": 18,
+      "before_database_sha256": "043eaab65144ba396811d435d87f1d00562b7d3906d59d82a9c1166252d93028",
+      "seed_archive_unchanged": true,
+      "work_offline": false,
+      "outbox_paused": true,
+      "review_anchor_preserved": true,
+      "protected_credential_retained": true,
+      "protected_fixture_key_removed": true,
+      "default_data_absent": true,
+      "drafts": [
+        {
+          "id": "issue-1",
+          "kind": "IssueEdit",
+          "item": 1,
+          "tab": "fixture-tab-0",
+          "version": 1,
+          "body_sha256": "78593127aabea86e9a6fbdcbde17f250e03051af999c5d70cf0afbcab7ce7a62"
+        },
+        {
+          "id": "comment-2",
+          "kind": "Comment",
+          "item": 2,
+          "tab": "fixture-tab-1",
+          "version": 1,
+          "body_sha256": "84a843997a92a0d4ca85583f309abbdc0b8feefd49df8ba38eb4ee8fe9d025be"
+        },
+        {
+          "id": "review-3",
+          "kind": "Review",
+          "item": 3,
+          "tab": "fixture-tab-2",
+          "version": 1,
+          "body_sha256": "fe0366c85242efc552bb929e71a3169117d6deeeebc1284153b32bd4c23311c3"
+        },
+        {
+          "id": "review-reply-3-771",
+          "kind": "Reply",
+          "item": 3,
+          "tab": "fixture-tab-5",
+          "version": 1,
+          "body_sha256": "fc74329d24106be4a4ae3a13af1541a24f3f8dd2f75bfa97e5bad4fabb7d7baf"
+        }
+      ],
+      "queue_states": [
+        "Queued",
+        "Queued",
+        "Queued",
+        "Queued"
+      ],
+      "source_cursor": "2",
+      "prior_delivery": "Delivered",
+      "checks": {
+        "offline_no_connection": true,
+        "pause_background": true,
+        "pause_outbox": true,
+        "offline_pid": 40800,
+        "orderly_offline_exit": true,
+        "online_pid": 7192,
+        "online_connect": true,
+        "owned_connect": true,
+        "online_pause_background": true,
+        "online_pause_outbox": true,
+        "online_work_offline_off": true,
+        "restored_after_settings": true,
+        "matching_cached_panes_while_held": true,
+        "orderly_online_exit": true,
+        "forwarded": false,
+        "provider_response": false
+      },
+      "profile_state": {
+        "access_before": "Readable",
+        "access_after": "Readable",
+        "credential_generation_before": 2,
+        "credential_generation_after": 2,
+        "original_tabs": [
+          10,
+          10
+        ],
+        "restored_tabs": [
+          10,
+          10
+        ],
+        "protected_reference_matches": true,
+        "protected_token_present_after": true,
+        "delivery_groups": 1,
+        "prior_delivery_unchanged": true,
+        "first_send_starts_before": 0,
+        "first_send_starts_after": 0
+      }
+    },
+    {
+      "mode": "signout",
+      "driver_revision": "351fd52",
+      "raw_sha256": "1d133868262cf8c9167c77394edce534c47f92ceb1b7e7ecca813cc5f5139748",
+      "status": "Pass",
+      "installed_app_sha256": "7088621d171dc41a6c57f43fe4411a1f486965ec71aa9795de678e5748b364a6",
+      "fixture_sha256": "080d87ee71e0d6e510c93a846b034a66d108d9e11a34029916cf85318788e861",
+      "schema": 18,
+      "before_database_sha256": "6a081316e8062ac13dafeb1b15a2751af9b1eefe4bb2e0dcc52ac731e24c178b",
+      "seed_archive_unchanged": true,
+      "work_offline": true,
+      "outbox_paused": true,
+      "review_anchor_preserved": true,
+      "protected_credential_retained": false,
+      "protected_fixture_key_removed": true,
+      "default_data_absent": true,
+      "drafts": [
+        {
+          "id": "issue-1",
+          "kind": "IssueEdit",
+          "item": 1,
+          "tab": "fixture-tab-0",
+          "version": 1,
+          "body_sha256": "78593127aabea86e9a6fbdcbde17f250e03051af999c5d70cf0afbcab7ce7a62"
+        },
+        {
+          "id": "comment-2",
+          "kind": "Comment",
+          "item": 2,
+          "tab": "fixture-tab-1",
+          "version": 1,
+          "body_sha256": "84a843997a92a0d4ca85583f309abbdc0b8feefd49df8ba38eb4ee8fe9d025be"
+        },
+        {
+          "id": "review-3",
+          "kind": "Review",
+          "item": 3,
+          "tab": "fixture-tab-2",
+          "version": 1,
+          "body_sha256": "fe0366c85242efc552bb929e71a3169117d6deeeebc1284153b32bd4c23311c3"
+        },
+        {
+          "id": "review-reply-3-771",
+          "kind": "Reply",
+          "item": 3,
+          "tab": "fixture-tab-5",
+          "version": 1,
+          "body_sha256": "fc74329d24106be4a4ae3a13af1541a24f3f8dd2f75bfa97e5bad4fabb7d7baf"
+        }
+      ],
+      "queue_states": [
+        "Queued",
+        "Queued",
+        "Queued",
+        "Queued"
+      ],
+      "source_cursor": "2",
+      "prior_delivery": "Delivered",
+      "checks": {
+        "sign_out_pid": 44848,
+        "restart_pid": 48056,
+        "original_active_identity": true,
+        "sign_out_invoked": true,
+        "closed_sign_out_database_sha256": "4c6dc0d19b3e2bd3ad387fb61ff7f219cbe49113a7e00780c5c40c6b0ed49fa6",
+        "closed_account_signed_out": true,
+        "fixture_key_absent_before_restart": true,
+        "cached_panes_after_sign_out": true,
+        "original_cached_panes_after_restart": true,
+        "paused_and_offline_after_restart": true,
+        "orderly_sign_out_exit": true,
+        "orderly_restart_exit": true,
+        "loopback_connection": false
+      },
+      "pre_restart_sha256": {
+        "signed-out-closed-before-restart.json": "f6a579e523bc4e36eb1e253f5617d3fee062b9730a7662098e07b9d23f93291c",
+        "signed-out-credential-before-restart.json": "6ed91ec063a605c8875d6d1a101fce4c243d58c43d54caf3e3b7f62056f22bf2"
+      },
+      "profile_state": {
+        "access_before": "Readable",
+        "access_after": "SignedOut",
+        "credential_generation_before": 2,
+        "credential_generation_after": 3,
+        "original_tabs": [
+          10,
+          10
+        ],
+        "restored_tabs": [
+          10,
+          10
+        ],
+        "protected_reference_matches": true,
+        "protected_token_present_after": false,
+        "delivery_groups": 1,
+        "prior_delivery_unchanged": true,
+        "first_send_starts_before": 0,
+        "first_send_starts_after": 0
+      }
+    }
+  ]
+}
