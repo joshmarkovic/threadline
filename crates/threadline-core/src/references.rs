@@ -68,7 +68,16 @@ fn collect_inline(node: &Node, text: &mut String) {
     match node {
         Node::Text(value) => text.push_str(&value.value),
         Node::Break(_) => text.push(' '),
-        Node::InlineCode(_) | Node::InlineMath(_) | Node::Html(_) => text.push('\0'),
+        Node::Link(link) if github_issue_url(&link.url).is_some() => {
+            text.push(' ');
+            text.push_str(&link.url);
+            text.push(' ');
+        }
+        Node::Link(_)
+        | Node::LinkReference(_)
+        | Node::InlineCode(_)
+        | Node::InlineMath(_)
+        | Node::Html(_) => text.push('\0'),
         _ => {
             if let Some(children) = node.children() {
                 for child in children {
@@ -82,38 +91,42 @@ fn collect_inline(node: &Node, text: &mut String) {
 }
 
 fn target(source: &RepositoryName, raw: &str) -> Option<(RepositoryName, ItemNumber)> {
-    let (repository, number) = if let Some(local) = raw.strip_prefix('#') {
-        (source.clone(), local)
-    } else if let Some((scheme, rest)) = raw.split_once("://") {
-        if !scheme.eq_ignore_ascii_case("https") {
-            return None;
-        }
-        let mut path = rest.trim_end_matches('/').split('/');
-        let host = path.next()?;
-        if !host.eq_ignore_ascii_case("github.com") {
-            return None;
-        }
-        let repo = RepositoryName::new(path.next()?, path.next()?).ok()?;
-        if path.next()? != "issues" {
-            return None;
-        }
-        let number = path.next()?;
-        if path.next().is_some() {
-            return None;
-        }
-        (repo, number)
-    } else {
-        let (repo, number) = raw.split_once('#')?;
-        let (owner, name) = repo.split_once('/')?;
-        (RepositoryName::new(owner, name).ok()?, number)
-    };
+    if let Some(local) = raw.strip_prefix('#') {
+        return Some((source.clone(), issue_number(local)?));
+    }
+    if raw.contains("://") {
+        return github_issue_url(raw);
+    }
+    let (repo, number) = raw.split_once('#')?;
+    let (owner, name) = repo.split_once('/')?;
+    Some((
+        RepositoryName::new(owner, name).ok()?,
+        issue_number(number)?,
+    ))
+}
+
+fn github_issue_url(raw: &str) -> Option<(RepositoryName, ItemNumber)> {
+    let (scheme, rest) = raw.split_once("://")?;
+    if !scheme.eq_ignore_ascii_case("https") {
+        return None;
+    }
+    let mut path = rest.trim_end_matches('/').split('/');
+    if !path.next()?.eq_ignore_ascii_case("github.com") {
+        return None;
+    }
+    let repo = RepositoryName::new(path.next()?, path.next()?).ok()?;
+    if path.next()? != "issues" {
+        return None;
+    }
+    let number = issue_number(path.next()?)?;
+    path.next().is_none().then_some((repo, number))
+}
+
+fn issue_number(number: &str) -> Option<ItemNumber> {
     if number.is_empty() || !number.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    Some((
-        repository,
-        ItemNumber::try_from(number.parse::<u64>().ok()?).ok()?,
-    ))
+    ItemNumber::try_from(number.parse::<u64>().ok()?).ok()
 }
 
 #[cfg(test)]
@@ -140,5 +153,61 @@ mod tests {
         );
         assert_eq!(refs[0].keyword, "Resolves");
         assert_eq!(refs[1].raw, "OTHER/Repo#27");
+    }
+
+    #[test]
+    fn ut_012_all_supported_words_extract_distinct_issue_candidates() {
+        let source = RepositoryName::new("Example", "Main").unwrap();
+        let body = "Close #1. CLOSES: #2. Closed #3. Fix #4. FIXES: #5. Fixed #6. \
+                    Resolve #7. Resolves #8. RESOLVED: #9. Closes #1 again.";
+        assert_eq!(
+            closing_references(body, &source)
+                .iter()
+                .map(|candidate| candidate.number.get())
+                .collect::<Vec<_>>(),
+            [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        );
+    }
+
+    #[test]
+    fn ut_012_inline_links_use_the_exact_github_issue_destination() {
+        let source = RepositoryName::new("Example", "Main").unwrap();
+        let body = "Closes [the issue](https://github.com/Other/Repo/issues/41).\n\n\
+            Fixes [#98](https://GitHub.com/Other/Repo/issues/42/).\n\n\
+            Resolve [#77](https://example.org/Example/Main/issues/77).\n\n\
+            Resolve [#78](https://github.com/Example/Main/pull/78).\n\n\
+            Resolve [#79](https://github.com.evil/Example/Main/issues/79).\n\n\
+            Resolve [#80](https://github.com/Example/Main/issues/80#issuecomment-7).\n\n\
+            Resolve [#81](https://github.com/Example/Main/issues/81.).\n\n\
+            Resolve [#82][external].\n\n\
+            [external]: https://example.org/\n\n\
+            `Closes [#83](https://github.com/Example/Main/issues/83)`\n\n\
+            ```\nCloses [#84](https://github.com/Example/Main/issues/84)\n```";
+        let references = closing_references(body, &source);
+        assert_eq!(
+            references
+                .iter()
+                .map(|reference| (
+                    reference.repository.owner(),
+                    reference.repository.name(),
+                    reference.number.get(),
+                    reference.raw.as_str(),
+                ))
+                .collect::<Vec<_>>(),
+            [
+                (
+                    "Other",
+                    "Repo",
+                    41,
+                    "https://github.com/Other/Repo/issues/41"
+                ),
+                (
+                    "Other",
+                    "Repo",
+                    42,
+                    "https://GitHub.com/Other/Repo/issues/42/"
+                ),
+            ]
+        );
     }
 }
