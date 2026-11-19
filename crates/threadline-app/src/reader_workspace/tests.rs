@@ -2297,7 +2297,7 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
         ItemLocator,
         pr::{
             PatchEvidence, PrContextMode, PrFamily, PrHeader, PrInputPage, PrRecord, PrSection,
-            ReferenceObservation, SourceSide,
+            ReferenceObservation, SourceSide, Verification,
         },
         resources::{CommitOid, WalkMode},
     };
@@ -2321,13 +2321,14 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
                 remote_updated_at: UtcMillis(stamp),
                 title: Change::Value("Offline review fixture".into()),
                 body: Change::Value(
-                    "Review introduction\n\nFixes #101. Resolves #102. Closes #103.".into(),
+                    "Review introduction\n\nFixes #101. Resolves #102. Closes #103. Fixed #104."
+                        .into(),
                 ),
                 closed: Change::Value(false),
             },
         )
         .unwrap();
-    let issue_ids = (101..=103)
+    let issue_ids = (101..=104)
         .map(|number| {
             let issue_id =
                 threadline_storage::IssueApiId::new(NonZeroU64::new(6000 + number).unwrap());
@@ -2482,6 +2483,12 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
         setup.open_at(cx, size(px(2200.), px(1450.)))
     } else {
         setup.open(cx)
+    };
+    let reload = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, window, cx| {
+            reader.update(cx, |reader, cx| reader.reload_pr(pr, window, cx));
+        })
+        .unwrap();
     };
     click(cx, window, "pr-0-file-1");
     until(cx, |cx| {
@@ -2668,6 +2675,117 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
                     .is_some_and(|link| link.item.id == issue_ids[1].0)
         })
     });
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.try_find("pr-0-verify-2").is_some());
+        let view = reader.read(cx).tab_views[&tab.id].pr.as_ref().unwrap();
+        assert_eq!(
+            view.data.references.as_ref().unwrap().1[2].verification,
+            Verification::Pending
+        );
+    })
+    .unwrap();
+    if !review {
+        // A completed check for a different candidate refreshes the picker without selecting it.
+        verify(3);
+        reload(cx);
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let view = reader.read(cx).tab_views[&tab.id].pr.as_ref().unwrap();
+                view.data
+                    .references
+                    .as_ref()
+                    .is_some_and(|(_, rows)| rows[3].verified_item == Some(issue_ids[3].0))
+                    && view
+                        .data
+                        .linked
+                        .as_ref()
+                        .is_some_and(|issue| issue.item.id == issue_ids[1].0)
+            })
+        });
+        store
+            .record_pr_reference(
+                account,
+                pr,
+                body_revision,
+                candidates[3].position,
+                ReferenceObservation::Missing,
+                stamp + 2,
+            )
+            .unwrap();
+        reload(cx);
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let view = reader.read(cx).tab_views[&tab.id].pr.as_ref().unwrap();
+                view.data.references.as_ref().is_some_and(|(_, rows)| {
+                    rows[3].verification == Verification::Missing && rows[3].verified_item.is_none()
+                }) && view
+                    .data
+                    .linked
+                    .as_ref()
+                    .is_some_and(|issue| issue.item.id == issue_ids[1].0)
+            })
+        });
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            assert!(window.try_find("pr-0-verify-3").is_some());
+            assert!(window.try_find("pr-0-reference-3-state").is_some());
+            assert!(window.try_find("pr-0-linked-3").is_none());
+        })
+        .unwrap();
+    }
+    if let Some(original_review) = &original_review {
+        for (offset, observation, verification) in [
+            (3, ReferenceObservation::Failed, Verification::Failed),
+            (
+                4,
+                ReferenceObservation::Inaccessible,
+                Verification::Inaccessible,
+            ),
+            (5, ReferenceObservation::Offline, Verification::Offline),
+        ] {
+            store
+                .record_pr_reference(
+                    account,
+                    pr,
+                    body_revision,
+                    candidates[1].position,
+                    observation,
+                    stamp + offset,
+                )
+                .unwrap();
+            reload(cx);
+            until(cx, |cx| {
+                cx.read(|cx| {
+                    reader.read(cx).tab_views[&tab.id]
+                        .pr
+                        .as_ref()
+                        .and_then(|pr| pr.data.references.as_ref())
+                        .is_some_and(|(_, rows)| rows[1].verification == verification)
+                })
+            });
+            cx.update_window(window, |_, window, cx| {
+                window.render_frame(cx);
+                let pr_view = reader.read(cx).tab_views[&tab.id].pr.as_ref().unwrap();
+                let linked = pr_view.data.linked.as_ref().unwrap();
+                assert_eq!(linked.item.id, issue_ids[1].0);
+                assert_eq!(
+                    linked.item.body,
+                    Change::Value("**Cached issue 102 body**".into())
+                );
+                assert!(window.try_find("pr-0-linked-1").is_some());
+                assert!(window.try_find("pr-0-reference-1-state").is_some());
+                assert!(window.try_find("pr-0-linked-access").is_some());
+                assert_eq!(pr_view.diff.as_ref(), Some(&diff));
+                assert!(diff.read(cx).selected_text(cx).contains("new line"));
+            })
+            .unwrap();
+        }
+        assert_eq!(
+            store.review_draft(account, &draft_id).unwrap().as_ref(),
+            Some(original_review)
+        );
+    }
     click(cx, window, "pr-0-context-body");
     until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
     click(cx, window, "pr-0-context-collapse");
@@ -2806,7 +2924,116 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
         assert_eq!(operation.snapshot.base, revision.head.as_str());
         assert_eq!(
             store.review_draft(account, &draft_id).unwrap(),
-            Some(original_review)
+            Some(original_review.clone())
+        );
+
+        click(cx, window, "pr-0-context-collapse");
+        until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+        click(cx, window, "pr-0-context-issue");
+        until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+        click(cx, window, "pr-0-next-change");
+        until(cx, |cx| {
+            cx.read(|cx| !reader.read(cx).layout_busy && diff.read(cx).selected_lines().is_some())
+        });
+        let code_anchor = cx
+            .read(|cx| pr::tab_settings(&reader.read(cx).layout.panes[0].tabs[0]).code_anchor)
+            .unwrap();
+        let selected = cx.read(|cx| diff.read(cx).selected_lines());
+        store
+            .ingest(
+                account,
+                pr_item.locator,
+                ItemUpdate {
+                    representation: ItemRepresentation::Issue(IssueRecord {
+                        id: pr_item.issue_id.unwrap(),
+                        node_id: None,
+                        classification: IssueClassification::PullRequest,
+                    }),
+                    remote_updated_at: UtcMillis(stamp + 10),
+                    title: Change::Missing,
+                    body: Change::Value("Replacement pull request body without references.".into()),
+                    closed: Change::Missing,
+                },
+            )
+            .unwrap();
+        let revised = store
+            .record_pr_revision(
+                account,
+                pr,
+                &revision.base,
+                &revision.head,
+                revision.merge_base.as_ref(),
+                &PrHeader::default(),
+                stamp + 10,
+            )
+            .unwrap();
+        assert_eq!(revised, revision);
+        reload(cx);
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let pr_view = reader.read(cx).tab_views[&tab.id].pr.as_ref().unwrap();
+                pr_view.data.references.is_none() && pr_view.data.linked.is_none()
+            })
+        });
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            assert!(window.try_find("pr-0-reference-state").is_some());
+            assert!(window.try_find("pr-0-linked-1").is_none());
+        })
+        .unwrap();
+        assert!(
+            store
+                .index_pr_body(
+                    account,
+                    pr,
+                    Some(body_revision),
+                    "fixture-pr-body-2",
+                    stamp + 10
+                )
+                .unwrap()
+                .is_empty()
+        );
+        reload(cx);
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let reader = reader.read(cx);
+                reader.tab_views[&tab.id]
+                    .pr
+                    .as_ref()
+                    .and_then(|pr| pr.data.references.as_ref())
+                    .is_some_and(|(revision, rows)| {
+                        revision == "fixture-pr-body-2" && rows.is_empty()
+                    })
+            })
+        });
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            let pr_view = reader.read(cx).tab_views[&tab.id].pr.as_ref().unwrap();
+            assert!(window.try_find("pr-0-reference-state").is_some());
+            assert!(pr_view.data.linked.is_none());
+            assert_eq!(pr_view.diff.as_ref(), Some(&diff));
+            assert_eq!(diff.read(cx).selected_lines(), selected);
+            assert_eq!(
+                pr::tab_settings(&reader.read(cx).layout.panes[0].tabs[0]).code_anchor,
+                Some(code_anchor)
+            );
+        })
+        .unwrap();
+        assert_eq!(
+            store
+                .review_draft(account, &draft_id)
+                .unwrap()
+                .unwrap()
+                .draft,
+            original_review.draft
+        );
+        assert_eq!(
+            store
+                .operation(account, &operation.id)
+                .unwrap()
+                .unwrap()
+                .snapshot,
+            operation.snapshot
         );
     }
     if !review {
@@ -2825,10 +3052,7 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
             })
         });
         verify(2);
-        cx.update_window(window, |_, window, cx| {
-            reader.update(cx, |reader, cx| reader.reload_pr(pr, window, cx));
-        })
-        .unwrap();
+        reload(cx);
         until(cx, |cx| {
             cx.read(|cx| {
                 let reader = reader.read(cx);

@@ -26,6 +26,7 @@ struct Simulator {
     check_arrived: Arc<AtomicBool>,
     hold_check_response: Arc<AtomicBool>,
     probe: Arc<ProbeHold>,
+    linked_issue: Arc<LinkedIssueGate>,
     worker: Option<thread::JoinHandle<()>>,
 }
 
@@ -36,6 +37,12 @@ struct ProbeHold {
     rejected: AtomicBool,
     requests: AtomicUsize,
     latest_request_at_ms: AtomicI64,
+}
+
+#[derive(Default)]
+struct LinkedIssueGate {
+    arrived: AtomicBool,
+    hold_response: AtomicBool,
 }
 
 impl Simulator {
@@ -62,6 +69,8 @@ impl Simulator {
             (check_arrived.clone(), hold_check_response.clone());
         let probe = Arc::new(ProbeHold::default());
         let server_probe = probe.clone();
+        let linked_issue = Arc::new(LinkedIssueGate::default());
+        let server_linked_issue = linked_issue.clone();
         let (server_sso, server_stop, server_requests, server_repository) = (
             sso.clone(),
             stop.clone(),
@@ -85,9 +94,9 @@ impl Simulator {
                                     server_history_phase.as_ref(),
                                 )
                             }),
-                            &server_check_arrived,
-                            &server_check_hold,
+                            (&server_check_arrived, &server_check_hold),
                             &server_probe,
+                            &server_linked_issue,
                         ) {
                             server_user_requests.fetch_add(1, Ordering::Relaxed);
                         }
@@ -111,6 +120,7 @@ impl Simulator {
             check_arrived,
             hold_check_response,
             probe,
+            linked_issue,
             worker: Some(worker),
         }
     }
@@ -119,6 +129,9 @@ impl Simulator {
 impl Drop for Simulator {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
+        self.linked_issue
+            .hold_response
+            .store(false, Ordering::Release);
         if let Some(worker) = self.worker.take() {
             if thread::panicking() {
                 let _ = worker.join();
@@ -134,9 +147,9 @@ fn respond(
     sso: bool,
     repository_id: u64,
     reader: Option<(SocketAddr, bool, &AtomicUsize)>,
-    check_arrived: &AtomicBool,
-    hold_check_response: &AtomicBool,
+    (check_arrived, hold_check_response): (&AtomicBool, &AtomicBool),
     probe: &ProbeHold,
+    linked_issue: &LinkedIssueGate,
 ) -> bool {
     // Windows can inherit the nonblocking listener mode on an accepted socket.
     stream.set_nonblocking(false).unwrap();
@@ -176,6 +189,15 @@ fn respond(
         probe.arrived.store(true, Ordering::Release);
         for _ in 0..500 {
             if !probe.hold.load(Ordering::Acquire) {
+                break;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+    }
+    if target == "/repos/fixture-org/private/issues/12" {
+        linked_issue.arrived.store(true, Ordering::Release);
+        for _ in 0..1000 {
+            if !linked_issue.hold_response.load(Ordering::Acquire) {
                 break;
             }
             thread::sleep(Duration::from_millis(5));
@@ -323,7 +345,7 @@ fn reader_reply(
     const TIME: &str = "2013-09-06T01:01:04Z";
     const NEW_TIME: &str = "2013-09-06T02:01:04Z";
     let open_repo = json!({"id":73,"node_id":"public-repo","name":"public",
-        "owner":{"login":"fixture-org"},"private":false,
+        "owner":{"login":"fixture-org"},"private":false,"default_branch":"main",
         "permissions":{"pull":true,"push":false,"admin":false}});
     let issue = json!({"id":84,"node_id":"issue-84","number":41,"title":"Historical issue",
         "state":"closed","body":null,"created_at":"2012-01-01T00:00:00Z","updated_at":TIME,
@@ -351,6 +373,13 @@ fn reader_reply(
             json!({"id":120,"node_id":"I_12","number":12,"title":"Linked issue","body":"Context fixture",
             "state":"open","updated_at":TIME,"repository_url":"https://api.github.com/repos/fixture-org/private"}),
         ));
+    }
+    if target == "/repos/fixture-org/private/issues/13" {
+        return Some(success(json!({
+            "id":131,"node_id":"I_13","number":13,"title":"Linked number belongs to a PR",
+            "state":"open","updated_at":TIME,"repository_url":"https://api.github.com/repos/fixture-org/private",
+            "pull_request":{"url":"https://api.github.com/repos/fixture-org/private/pulls/13"}
+        })));
     }
     let main = json!({"name":"main","commit":{"sha":"a".repeat(40)}});
     let changed = json!({"name":"main","commit":{"sha":"b".repeat(40)}});
@@ -407,7 +436,7 @@ fn reader_reply(
         return Some(success(
             json!({"id":420,"node_id":"P_42","number":42,"title":"Review fixture","body":"Closes fixture-org/private#12",
             "state":"open","draft":false,"merged":false,"updated_at":if page_two { NEW_TIME } else { TIME },"changed_files":1,
-            "base":{"sha":"a".repeat(40),"ref":"main","repo":{"id":73,"node_id":"public-repo"}},
+            "base":{"sha":"a".repeat(40),"ref":"maintenance","repo":{"id":73,"node_id":"public-repo"}},
             "head":{"sha":if page_two { "d".repeat(40) } else { "b".repeat(40) },"ref":"topic"}}),
         ));
     }
@@ -585,7 +614,7 @@ async fn pr_service_commits_verified_files_context_and_cross_repository_referenc
     assert!(left.unwrap().complete && right.unwrap().complete);
     assert_eq!(fixture.requests.load(Ordering::Relaxed), before + 4);
     let (revision, header) = store.current_pr_revision(account, pr).unwrap().unwrap();
-    assert_eq!(header.base_ref.as_deref(), Some("main"));
+    assert_eq!(header.base_ref.as_deref(), Some("maintenance"));
     assert_eq!(
         revision.merge_base.as_ref().unwrap().as_str(),
         "c".repeat(40)
@@ -856,6 +885,99 @@ async fn pr_service_commits_verified_files_context_and_cross_repository_referenc
     ));
     assert_eq!(fixture.requests.load(Ordering::Relaxed), before + 3);
     assert!(store.pr_file(&revision, "src/lib.rs").unwrap().is_some());
+
+    let (old_body, previous_refs) = store.pr_reference_set(account, pr).unwrap().unwrap();
+    let old_target = previous_refs[0].position;
+    fixture.linked_issue.arrived.store(false, Ordering::Release);
+    fixture
+        .linked_issue
+        .hold_response
+        .store(true, Ordering::Release);
+    let delayed_reader = reader.clone();
+    let delayed = tokio::spawn(async move {
+        delayed_reader
+            .verify_pr_reference(account, pr, &old_body, old_target, &Cancellation::new())
+            .await
+    });
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !fixture.linked_issue.arrived.load(Ordering::Acquire) {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let stamp = UtcMillis::now().unwrap();
+    let source = store.item(account, pr).unwrap().unwrap();
+    store
+        .ingest(
+            account,
+            source.locator,
+            ItemUpdate {
+                representation: ItemRepresentation::Issue(IssueRecord {
+                    id: source.issue_id.unwrap(),
+                    node_id: source.issue_node_id,
+                    classification: IssueClassification::PullRequest,
+                }),
+                remote_updated_at: stamp,
+                title: Change::Missing,
+                body: Change::Value(
+                    "Resolves excluded-owner/private#12. Fixes fixture-org/private#13.".into(),
+                ),
+                closed: Change::Missing,
+            },
+        )
+        .unwrap();
+    let prior = store.pr_reference_set(account, pr).unwrap().unwrap().0;
+    let body_revision = "loopback-replaced-pr-body";
+    let candidates = store
+        .index_pr_body(account, pr, Some(&prior), body_revision, stamp.0)
+        .unwrap();
+    assert_eq!(candidates.len(), 2);
+    assert_eq!(candidates[0].owner, "excluded-owner");
+    assert_eq!(candidates[0].verification, Verification::Pending);
+    assert!(candidates[0].verified_item.is_none());
+
+    fixture
+        .linked_issue
+        .hold_response
+        .store(false, Ordering::Release);
+    assert!(matches!(
+        delayed.await.unwrap(),
+        Err(ReaderError::Storage(error))
+            if matches!(error.as_ref(), threadline_storage::Error::Conflict(_))
+    ));
+    assert_eq!(
+        store.pr_reference_set(account, pr).unwrap(),
+        Some((body_revision.into(), candidates.clone()))
+    );
+    let before = fixture.requests.load(Ordering::Relaxed);
+    assert!(matches!(
+        reader
+            .verify_pr_reference(account, pr, body_revision, candidates[0].position, &cancel)
+            .await,
+        Err(ReaderError::CredentialUnavailable)
+    ));
+    assert_eq!(fixture.requests.load(Ordering::Relaxed), before);
+    let refs = store.pr_body_references(account, pr).unwrap();
+    assert_eq!(refs[0].verification, Verification::Inaccessible);
+    assert!(refs[0].verified_item.is_none());
+    reader
+        .verify_pr_reference(account, pr, body_revision, candidates[1].position, &cancel)
+        .await
+        .unwrap();
+    let refs = store.pr_body_references(account, pr).unwrap();
+    assert_eq!(refs[1].verification, Verification::PullRequest);
+    assert!(refs[1].verified_item.is_none());
+    let repositories = store.github_repository_views(account).unwrap();
+    assert!(repositories.iter().all(|repo| repo.owner == "fixture-org"));
+    assert_eq!(
+        repositories
+            .iter()
+            .filter(|repo| repo.selected)
+            .map(|repo| repo.id)
+            .collect::<Vec<_>>(),
+        [repository]
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
