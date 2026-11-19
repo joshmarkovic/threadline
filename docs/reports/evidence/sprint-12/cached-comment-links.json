@@ -1,0 +1,107 @@
+{
+  "case": "S12-CACHED-COMMENT-LINKS",
+  "host": "Windows 11 x64",
+  "fixture_revision": "s12-cached-comment-links-v1",
+  "seed": 12345,
+  "cargo_lock_sha256": "ba1fa2481ba47ebb082dae4aff8bf1a099cea5775b4196b096aeb3bb094d4efb",
+  "ordinary_comments_in_fixture": 4,
+  "attempts": [
+    {
+      "run": "e2e-1795067841081-12544",
+      "status": "Fail",
+      "exit_code": 1,
+      "child_exit_code": 1,
+      "source_revision": "3584923bdb97b8123deac940c7c1ad73f84a0143",
+      "source_dirty": false,
+      "dpi": 96,
+      "action_count": 14,
+      "requests": 0,
+      "started_at_unix_ms": 1795067841081,
+      "finished_at_unix_ms": 1795067898650,
+      "observations": [
+        {
+          "issue": 1,
+          "issue_anchor": "00000000000000008101",
+          "pull_request": 3,
+          "pull_anchor": "issue-comment:00000000000000008201",
+          "ordinary_results": 2,
+          "issue_review_merge_controls_absent": true
+        }
+      ],
+      "explanation": "The first driver compared the independently edited pane against a baseline without waiting for the exact saved draft and settled focus. It did not identify which baseline comparison failed.",
+      "last_observed_pane": {
+        "item": 31,
+        "tab": "comment-links-editor",
+        "discussion_anchor": "00000000000000008411",
+        "discussion_offset": 0,
+        "saved_draft_sha256": "53b4eee32e9c78b51cf091fe2eaaca2a55b77fbffa9bd3c9e91905a0c2dd24ba"
+      },
+      "app_sha256": "2ab214a6727d37af4001dde5072b3f093dab9c0e6501cfa314da65cca321f50a",
+      "runner_sha256": "6592a2138cba7844a8d585ab726e68940973c3722ddb713b03e104e6112bd9d4",
+      "sha256": {
+        "result.json": "6a9a2eb86d445621d20df9fb4d7a5865a020f87d4cc1a1f37c877485e86b7a01",
+        "cached-comment-links-native.json": "41bc9271760c3098ba2f5cc153fba8d69b8eaa4be075aa70edbec098a6f2e56d",
+        "github-access-trace.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "ui-observation.json": "6fd70193516c618894d932f09973dfe626c8b97997e377ccca646143cb2a14d2"
+      }
+    },
+    {
+      "run": "e2e-1795068159925-18816",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "source_revision": "c8f241294e2420a827cd09e006ba1b0e8ab05dd1",
+      "source_dirty": false,
+      "dpi": 96,
+      "action_count": 18,
+      "requests": 0,
+      "started_at_unix_ms": 1795068159924,
+      "finished_at_unix_ms": 1795068201138,
+      "observations": [
+        {
+          "tab": "comment-links-editor",
+          "anchor": "00000000000000008411",
+          "offset": 0,
+          "exact_saved_text": true
+        },
+        {
+          "issue": 1,
+          "issue_anchor": "00000000000000008101",
+          "pull_request": 3,
+          "pull_anchor": "issue-comment:00000000000000008201",
+          "ordinary_results": 2,
+          "issue_review_merge_controls_absent": true
+        },
+        {
+          "original_tab_counts": true,
+          "same_tab": true,
+          "same_draft": true,
+          "same_anchor": true,
+          "same_offset": true
+        },
+        {
+          "ordinary_comment": 8102,
+          "review_reply": 8302,
+          "source": {
+            "side": "Right",
+            "line": 9,
+            "path": "src/comment-links.rs"
+          },
+          "revision": 1,
+          "unrelated_tab": "comment-links-editor",
+          "unrelated_anchor": "00000000000000008411",
+          "unchanged_draft": true,
+          "unchanged_view": true
+        }
+      ],
+      "app_sha256": "915f528d63723235dbda434a5fe214edb67c7efdb4a96cd29ef9931c84194c1a",
+      "runner_sha256": "f4f155e9b08109ccd0b6c813972910238a88ad8bbb2507e1367ee9002a5c10ca",
+      "sha256": {
+        "result.json": "fd16c274eca37995efddb1d569eb2d9d98ac89f5e6621b7568af59c20a004354",
+        "cached-comment-links-native.json": "e9b818f992eaf2e28af38baccbd2564024d7aaf4203e8825d51bb316542d11f3",
+        "github-access-trace.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "ui-observation.json": "be63c6044044bffc7cf0a7f15b510923f07f3fa7ea8c9af87011c4a36032c0a7"
+      }
+    }
+  ]
+}
