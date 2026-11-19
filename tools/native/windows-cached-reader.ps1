@@ -123,14 +123,17 @@ function Restart-Reader([string]$Profile, [hashtable]$Startup, [switch]$SeedQuie
     return $window
 }
 
-function Test-OfflineDraftFocusReceipt($Snapshot, [int]$Owner, [string]$Id, [long]$Item, [int]$Pane) {
-    if ($null -eq $Snapshot -or $Snapshot.pid -ne $Owner) { return $false }
+function Test-OfflineDraftFocusReceipt($Snapshot, [int]$Owner, [string]$Id, [long]$Item, [int]$Pane, [switch]$NativeFocus) {
+    if ($null -eq $Snapshot) { return $false }
+    $ownerPid = $Snapshot.PSObject.Properties['pid']
+    if ($null -eq $ownerPid -or $ownerPid.Value -ne $Owner) { return $false }
     $cached = $Snapshot.PSObject.Properties['cached_reader']
     if ($null -eq $cached -or $null -eq $cached.Value) { return $false }
     $reader = $cached.Value
     $focus = $reader.PSObject.Properties['active_draft_focus']
-    return $null -ne $focus -and $focus.Value -ceq $Id -and $reader.active_item -eq $Item -and
-        $reader.focused_pane -eq $Pane -and $reader.offline -and $reader.signed_out
+    return $reader.active_item -eq $Item -and $reader.focused_pane -eq $Pane -and
+        $reader.offline -and $reader.signed_out -and
+        ($NativeFocus -or ($null -ne $focus -and $focus.Value -ceq $Id))
 }
 
 function Get-OwnedOfflineDraftFocus([IntPtr]$Window, [string]$Id, [long]$Item, [int]$Pane) {
@@ -140,14 +143,15 @@ function Get-OwnedOfflineDraftFocus([IntPtr]$Window, [string]$Id, [long]$Item, [
     $editor = Find-OwnedFixtureControl $Window $Id 'Local Markdown draft' -Edit
     if ($null -eq $editor) { return $null }
     try {
-        if ($editor.Current.HasKeyboardFocus) { return 'UI Automation' }
         $focused = [Windows.Automation.AndCondition]::new([Windows.Automation.Condition[]]@(
             [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty, [int]$script:app.Id)
             [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::HasKeyboardFocusProperty, $true)
         ))
-        if ($null -ne $editor.FindFirst([Windows.Automation.TreeScope]::Descendants, $focused)) { return 'UI Automation' }
+        $nativeFocus = $editor.Current.HasKeyboardFocus -or
+            $null -ne $editor.FindFirst([Windows.Automation.TreeScope]::Descendants, $focused)
     } catch [Windows.Automation.ElementNotAvailableException] { return $null }
-    if (Test-OfflineDraftFocusReceipt (Read-Observation) $script:app.Id $Id $Item $Pane) {
+    if (Test-OfflineDraftFocusReceipt (Read-Observation) $script:app.Id $Id $Item $Pane -NativeFocus:$nativeFocus) {
+        if ($nativeFocus) { return 'UI Automation' }
         return 'GPUI FocusHandle'
     }
     return $null

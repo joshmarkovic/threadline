@@ -74,12 +74,15 @@ if (!(Test-OfflineDraftFocusReceipt $draftFocus 123 'reader-draft-input-1' 3 1) 
     (Test-OfflineDraftFocusReceipt $draftFocus 123 'reader-draft-input-0' 3 1) -or
     (Test-OfflineDraftFocusReceipt $draftFocus 123 'reader-draft-input-1' 4 1) -or
     (Test-OfflineDraftFocusReceipt $draftFocus 123 'reader-draft-input-1' 3 0) -or
+    (Test-OfflineDraftFocusReceipt $draftFocus 123 'reader-draft-input-1' 4 1 -NativeFocus) -or
+    (Test-OfflineDraftFocusReceipt ([pscustomobject]@{}) 123 'reader-draft-input-1' 3 1 -NativeFocus) -or
     (Test-OfflineDraftFocusReceipt ([pscustomobject]@{ pid = 123 }) 123 'reader-draft-input-1' 3 1)) {
     throw 'The offline draft focus receipt did not require the original child, pane, item and editor.'
 }
 foreach ($field in @('offline', 'signed_out')) {
     $draftFocus.cached_reader.$field = $false
-    if (Test-OfflineDraftFocusReceipt $draftFocus 123 'reader-draft-input-1' 3 1) {
+    if ((Test-OfflineDraftFocusReceipt $draftFocus 123 'reader-draft-input-1' 3 1) -or
+        (Test-OfflineDraftFocusReceipt $draftFocus 123 'reader-draft-input-1' 3 1 -NativeFocus)) {
         throw "The offline draft focus receipt accepted $field false."
     }
     $draftFocus.cached_reader.$field = $true
@@ -87,6 +90,9 @@ foreach ($field in @('offline', 'signed_out')) {
 $draftFocus.cached_reader.PSObject.Properties.Remove('active_draft_focus')
 if (Test-OfflineDraftFocusReceipt $draftFocus 123 'reader-draft-input-1' 3 1) {
     throw 'Draft persistence alone was mistaken for editor focus.'
+}
+if (!(Test-OfflineDraftFocusReceipt $draftFocus 123 'reader-draft-input-1' 3 1 -NativeFocus)) {
+    throw 'Verified native editor focus should be sufficient for the exact offline item and pane.'
 }
 
 $script:AccessPhaseFile = [IO.Path]::GetTempFileName()
