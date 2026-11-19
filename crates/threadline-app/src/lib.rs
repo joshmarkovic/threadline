@@ -109,6 +109,15 @@ fn start_platform(
 }
 
 pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(feature = "e2e")]
+    let mut startup = options
+        .e2e_report
+        .as_ref()
+        .and_then(|_| observation::StartupTiming::enabled(started));
+    #[cfg(feature = "e2e")]
+    if let Some(startup) = startup.as_mut() {
+        startup.mark(observation::StartupStage::OptionsParsed);
+    }
     if options.e2e_report.is_some() && options.profile.is_none() {
         return Err("Native test reports require an isolated profile directory".into());
     }
@@ -130,6 +139,10 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
         Launch::Forwarded => return Ok(()),
         Launch::Primary { controls, events } => (controls, events),
     };
+    #[cfg(feature = "e2e")]
+    if let Some(startup) = startup.as_mut() {
+        startup.mark(observation::StartupStage::PlatformReady);
+    }
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()
@@ -137,9 +150,19 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
     // Resolve and migrate the database on a worker before exposing any workspace
     // state. Close the failed launch without showing a substitute workspace.
     let profile = options.profile;
+    #[cfg(feature = "e2e")]
+    if let Some(startup) = startup.as_mut() {
+        startup.mark(observation::StartupStage::ProfileOpening);
+    }
     let storage = runtime
         .block_on(runtime.spawn_blocking(move || open_profile(profile)))
         .unwrap_or_else(|_| Err("The profile database worker stopped unexpectedly".to_owned()));
+    #[cfg(feature = "e2e")]
+    if storage.is_ok()
+        && let Some(startup) = startup.as_mut()
+    {
+        startup.mark(observation::StartupStage::ProfileOpened);
+    }
     if options.notification_com_server {
         let event = runtime.block_on(async {
             tokio::time::timeout(std::time::Duration::from_secs(30), async {
@@ -173,7 +196,12 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
     #[cfg(feature = "e2e")]
     let (observer, report_writer) = options
         .e2e_report
-        .map(|path| observation::Observer::new(path, started, options.measure, &handle))
+        .map(|path| {
+            let (observer, writer) =
+                observation::Observer::new(path, started, options.measure, &handle);
+            observer.set_startup(startup);
+            (observer, writer)
+        })
         .unzip();
     #[cfg(not(feature = "e2e"))]
     let _ = started;
@@ -186,6 +214,10 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
             bind_shortcuts(cx);
             reader_workspace::bind_shortcuts(cx);
             cx.activate(true);
+            #[cfg(feature = "e2e")]
+            if let Some(observer) = observer.as_ref() {
+                observer.mark_startup(observation::StartupStage::ToolkitReady);
+            }
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
                     None,
@@ -211,6 +243,10 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
                 }
             }
             if let Err(error) = gpui_kit::open_window(options, cx, |window, cx| {
+                #[cfg(feature = "e2e")]
+                if let Some(observer) = observer.as_ref() {
+                    observer.mark_startup(observation::StartupStage::WindowCreated);
+                }
                 cx.new(|cx| {
                     let mut workspace =
                         Workspace::new(window, cx, seed, handle, open_review, feasibility_fixture);

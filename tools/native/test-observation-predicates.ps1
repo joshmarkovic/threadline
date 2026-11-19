@@ -316,12 +316,13 @@ if (!$interrupted -or $script:report.budgets.warm_start_ms.status -cne 'Fail' -o
     throw 'The interrupted benchmark did not retain completed and partial measurements.'
 }
 $frequency = [Diagnostics.Stopwatch]::Frequency
-$startup = [pscustomobject]@{ startup_ms = 1200; first_cached_workspace_paint = [pscustomobject]@{
+$startup = [pscustomobject]@{ startup_ms = 1200; startup_milestones_ms = @{ profile_opened = 500; active_panes_hydrated = 1400 }; first_cached_workspace_paint = [pscustomobject]@{
     qpc = 3 * $frequency; frequency = $frequency; since_app_start_ms = 1500
 } }
 $timing = Get-LargeStartupTiming $startup $frequency (2 * $frequency) (4 * $frequency)
 if ($timing.status -cne 'Correlated' -or $timing.process_start_call_ms -ne 1000 -or
     $timing.app_ready_ms -ne 1200 -or $timing.launch_to_cached_panes_paint_ms -ne 2000 -or
+    $timing.app_milestones_ms.profile_opened -ne 500 -or $timing.app_milestones_ms.active_panes_hydrated -ne 1400 -or
     $timing.app_start_to_cached_panes_paint_ms -ne 1500 -or $timing.paint_to_verified_receipt_ms -ne 1000) {
     throw 'Startup attribution did not keep the external endpoint and the app paint distinct.'
 }

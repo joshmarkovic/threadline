@@ -346,6 +346,20 @@ impl ItemView {
 
 impl ReaderWorkspace {
     #[cfg(feature = "e2e")]
+    fn cached_active_panes(&self) -> usize {
+        self.layout
+            .panes
+            .iter()
+            .filter(|pane| {
+                pane.active
+                    .and_then(|index| pane.tabs.get(index))
+                    .and_then(|tab| self.tab_views.get(&tab.id))
+                    .is_some_and(|view| view.data.item.is_some())
+            })
+            .count()
+    }
+
+    #[cfg(feature = "e2e")]
     pub(crate) fn observation(&self, cx: &gpui_kit::App) -> ReaderObservation {
         use sha2::{Digest, Sha256};
         let active = self
@@ -373,17 +387,7 @@ impl ReaderWorkspace {
             cached_content_ready: active
                 .and_then(|tab| self.tab_views.get(&tab.id))
                 .is_some_and(|view| view.data.item.is_some()),
-            cached_visible_panes: self
-                .layout
-                .panes
-                .iter()
-                .filter(|pane| {
-                    pane.active
-                        .and_then(|index| pane.tabs.get(index))
-                        .and_then(|tab| self.tab_views.get(&tab.id))
-                        .is_some_and(|view| view.data.item.is_some())
-                })
-                .count(),
+            cached_visible_panes: self.cached_active_panes(),
             search_results: self.search_hits.as_ref().map(Vec::len),
             search_generation: self.search_reply,
             performance_timing: self.performance.ready(
@@ -733,6 +737,10 @@ impl ReaderWorkspace {
         }
         if let Some(account) = account {
             if changed {
+                #[cfg(feature = "e2e")]
+                if let Some(observer) = self.observer.as_ref() {
+                    observer.mark_startup(crate::observation::StartupStage::AccountLoaded);
+                }
                 self.launch(
                     window,
                     cx,
@@ -744,6 +752,12 @@ impl ReaderWorkspace {
                                 this.ensure_focus_handles(layout.panes.len(), window, cx);
                                 this.layout = layout;
                                 this.maximized = maximized.is_some();
+                                #[cfg(feature = "e2e")]
+                                if let Some(observer) = this.observer.as_ref() {
+                                    observer.mark_startup(
+                                        crate::observation::StartupStage::LayoutLoaded,
+                                    );
+                                }
                             }
                             Ok(None) => {}
                             Err(_) => {
@@ -1210,6 +1224,13 @@ impl ReaderWorkspace {
                 self.trim_inactive_views();
                 self.restore_review(tab, window, cx);
                 self.resume_visible_pr_downloads(window, cx);
+                #[cfg(feature = "e2e")]
+                if let Some(observer) = self.observer.as_ref()
+                    && self.layout.panes.len() == 2
+                    && self.cached_active_panes() == 2
+                {
+                    observer.mark_startup(crate::observation::StartupStage::ActivePanesHydrated);
+                }
             }
             Err(_) => self.status = Some("The cached item could not be loaded."),
         }

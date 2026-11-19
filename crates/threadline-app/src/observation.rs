@@ -27,6 +27,7 @@ struct Recorder {
     started: Instant,
     startup_ms: Option<f64>,
     cached_workspace_paint: Option<StartupPaint>,
+    startup: Option<StartupTiming>,
     bounds: BTreeMap<Cow<'static, str>, [f32; 4]>,
     measurement: Option<Measurement>,
     reader_timing: Option<performance::PaintTiming>,
@@ -72,6 +73,40 @@ struct StartupPaint {
     since_app_start_ms: f64,
 }
 
+#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum StartupStage {
+    OptionsParsed,
+    PlatformReady,
+    ProfileOpening,
+    ProfileOpened,
+    ToolkitReady,
+    WindowCreated,
+    AccountLoaded,
+    LayoutLoaded,
+    ActivePanesHydrated,
+}
+
+pub(crate) struct StartupTiming {
+    started: Instant,
+    milestones: BTreeMap<StartupStage, f64>,
+}
+
+impl StartupTiming {
+    pub(crate) fn enabled(started: Instant) -> Option<Self> {
+        performance::enabled().then_some(Self {
+            started,
+            milestones: BTreeMap::new(),
+        })
+    }
+
+    pub(crate) fn mark(&mut self, stage: StartupStage) {
+        self.milestones
+            .entry(stage)
+            .or_insert_with(|| self.started.elapsed().as_secs_f64() * 1_000.);
+    }
+}
+
 #[derive(Serialize)]
 pub(crate) struct Snapshot {
     pub ready: bool,
@@ -106,6 +141,8 @@ struct Report<'a> {
     startup_ms: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     first_cached_workspace_paint: Option<StartupPaint>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    startup_milestones_ms: Option<&'a BTreeMap<StartupStage, f64>>,
     bounds: &'a BTreeMap<Cow<'static, str>, [f32; 4]>,
     scroll_frame_times_ms: &'a [f64],
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -138,6 +175,7 @@ impl Observer {
             started,
             startup_ms: None,
             cached_workspace_paint: None,
+            startup: None,
             bounds: BTreeMap::new(),
             measurement,
             reader_timing: None,
@@ -149,6 +187,16 @@ impl Observer {
 
     pub(crate) fn begin_frame(&self) {
         self.0.borrow_mut().bounds.clear();
+    }
+
+    pub(crate) fn set_startup(&self, startup: Option<StartupTiming>) {
+        self.0.borrow_mut().startup = startup;
+    }
+
+    pub(crate) fn mark_startup(&self, stage: StartupStage) {
+        if let Some(startup) = self.0.borrow_mut().startup.as_mut() {
+            startup.mark(stage);
+        }
     }
 
     #[cfg(test)]
@@ -282,6 +330,7 @@ impl Observer {
             bounds,
             measurement,
             cached_workspace_paint,
+            startup,
             ..
         } = &mut *recorder;
         if let Some(opening) = opening {
@@ -300,6 +349,7 @@ impl Observer {
             scale_factor: window.scale_factor(),
             startup_ms,
             first_cached_workspace_paint: *cached_workspace_paint,
+            startup_milestones_ms: startup.as_ref().map(|startup| &startup.milestones),
             bounds,
             scroll_frame_times_ms: measurement.map_or(&[], |data| &data.frame_times),
             scroll_frame_phases: measurement.map(|data| data.frame_phases.as_slice()),
@@ -427,6 +477,25 @@ fn milliseconds(duration: Duration) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn startup_milestones_keep_the_first_observation_for_each_phase() {
+        let mut timing = StartupTiming {
+            started: Instant::now() - Duration::from_secs(1),
+            milestones: BTreeMap::new(),
+        };
+        timing.mark(StartupStage::ProfileOpened);
+        let profile = timing.milestones[&StartupStage::ProfileOpened];
+        timing.started -= Duration::from_secs(1);
+        timing.mark(StartupStage::ProfileOpened);
+        timing.mark(StartupStage::WindowCreated);
+        assert_eq!(timing.milestones[&StartupStage::ProfileOpened], profile);
+        assert!(timing.milestones[&StartupStage::WindowCreated] >= profile + 1_000.);
+        let fields = serde_json::to_value(timing.milestones).unwrap();
+        assert!(fields["profile_opened"].is_number());
+        assert!(fields["window_created"].is_number());
+        assert!(fields.get("active_panes_hydrated").is_none());
+    }
 
     #[test]
     fn finishing_the_writer_persists_the_latest_pending_snapshot() {

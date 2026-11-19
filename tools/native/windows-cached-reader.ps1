@@ -465,10 +465,12 @@ function Wait-LargeWorkspaceReady([IntPtr]$Window) {
 
 function Get-LargeStartupTiming($State, [long]$LaunchBegin, [long]$LaunchReturned, [long]$Observed) {
     $ticksToMs = 1000.0 / [Diagnostics.Stopwatch]::Frequency
+    $milestones = $State.PSObject.Properties['startup_milestones_ms']
     $result = [ordered]@{
         status = 'Unavailable'
         process_start_call_ms = ($LaunchReturned - $LaunchBegin) * $ticksToMs
         app_ready_ms = $State.startup_ms
+        app_milestones_ms = if ($null -ne $milestones) { $milestones.Value } else { $null }
         launch_to_cached_panes_paint_ms = $null
         app_start_to_cached_panes_paint_ms = $null
         paint_to_verified_receipt_ms = $null

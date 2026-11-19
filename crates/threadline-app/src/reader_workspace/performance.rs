@@ -26,13 +26,7 @@ pub(super) struct ReaderTiming {
 
 impl ReaderTiming {
     pub(super) fn new() -> Self {
-        let frequency = if std::env::var_os("THREADLINE_E2E_READER_TIMING").as_deref()
-            == Some(std::ffi::OsStr::new("1"))
-        {
-            frequency()
-        } else {
-            None
-        };
+        let frequency = if enabled() { frequency() } else { None };
         Self {
             frequency,
             pending: None,
@@ -63,6 +57,10 @@ impl ReaderTiming {
             }
         })
     }
+}
+
+pub(crate) fn enabled() -> bool {
+    std::env::var_os("THREADLINE_E2E_READER_TIMING").as_deref() == Some(std::ffi::OsStr::new("1"))
 }
 
 #[cfg(windows)]
