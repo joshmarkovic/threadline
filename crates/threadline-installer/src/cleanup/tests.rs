@@ -104,6 +104,38 @@ fn it_019_preview_counts_active_workspace_and_confirmation_removes_only_managed_
 }
 
 #[test]
+fn it_019_cleanup_covers_the_shipped_schema_and_refuses_a_newer_backup() {
+    assert_eq!(
+        LAST_REVIEWED_SCHEMA,
+        threadline_storage::SCHEMA_VERSION,
+        "Review the cleanup inventory for the current database and its backups."
+    );
+    let dir = synthetic_profile();
+    let data = dir.path();
+    let current = data.join(DATABASE);
+    let future = LAST_REVIEWED_SCHEMA + 1;
+    let backup = data.join(format!("threadline-schema-{future}-Future.sqlite3"));
+    fs::copy(&current, &backup).unwrap();
+    let db = Connection::open(&backup).unwrap();
+    db.pragma_update(None, "user_version", future).unwrap();
+    drop(db);
+    let originals = (fs::read(&current).unwrap(), fs::read(&backup).unwrap());
+    let vault = TestVault::default();
+    let result = run(
+        data,
+        true,
+        true,
+        &mut &b"REMOVE LOCAL WORKSPACE\n"[..],
+        &mut Vec::new(),
+        &vault,
+    );
+    assert_eq!(result, Err(UNRECOGNIZED));
+    assert_eq!(vault.removals.get(), 0);
+    assert_eq!(fs::read(current).unwrap(), originals.0);
+    assert_eq!(fs::read(backup).unwrap(), originals.1);
+}
+
+#[test]
 fn it_019_busy_changed_or_unrecognized_profile_preserves_data_and_credentials() {
     let dir = synthetic_profile();
     let data = dir.path();
