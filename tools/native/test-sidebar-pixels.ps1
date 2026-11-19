@@ -12,6 +12,7 @@ try {
     $bounds = [Drawing.Rectangle]::new(0,0,180,40)
     if ([ThreadlineSidebarPixels]::Measure($image,$bounds).BluePixels -ne 0) { throw 'False positive on a blank row.' }
     $graphics.FillEllipse($blue, 140, 5, 30, 30)
+    $graphics.FillRectangle($blue, 96, 12, 4, 8)
     $graphics.FillRectangle([Drawing.Brushes]::White, 150, 15, 10, 10)
     $sample = [ThreadlineSidebarPixels]::Measure($image,$bounds)
     if ($sample.BluePixels -lt 550 -or $sample.BluePixels -gt 640 -or $sample.WhitePixels -ne 100 -or
@@ -24,5 +25,10 @@ try {
     if ($short.Bottom -ne 28 -or $short.Bottom-$short.Top -ge $short.Right-$short.Left) {
         throw 'Clipping the circle did not reduce its measured height.'
     }
-    Write-Output 'Blank, whole and clipped synthetic software-drawn badge regions measured.'
+    $graphics.FillRectangle($blue, 120, 19, 25, 2)
+    $wide = [ThreadlineSidebarPixels]::Measure($image,$bounds)
+    if ($wide.Left -ne 120 -or $wide.Right-$wide.Left -lt 48) {
+        throw 'An attached extension must remain in the measured badge width.'
+    }
+    Write-Output 'Blank, separated label, centered, clipped and overwide shapes measured.'
 } finally { $blue.Dispose(); $graphics.Dispose(); $image.Dispose() }

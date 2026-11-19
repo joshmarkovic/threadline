@@ -43,9 +43,11 @@ public static class ThreadlineSidebarPixels
         if (row.IsEmpty || !new Rectangle(0, 0, image.Width, image.Height).Contains(row))
             throw new ArgumentException("The sidebar control lies outside the fixture window.");
         var sample = new Sample { Left = row.Right, Top = row.Bottom };
-        // Only the right half contains a badge. Accessible rail labels remain outside this region.
-        for (int y = row.Top; y < row.Bottom; y++) {
-            for (int x = row.Left + row.Width / 2; x < row.Right; x++) {
+        // Measure the rightmost uninterrupted run of blue-bearing columns. Selected
+        // label glyphs can reach the right half of a narrow rail, separated by a gap.
+        for (int x = row.Right - 1; x >= row.Left + row.Width / 2; x--) {
+            int before = sample.BluePixels;
+            for (int y = row.Top; y < row.Bottom; y++) {
                 var c = image.GetPixel(x, y);
                 if (Math.Abs(c.R - 23) > 8 || Math.Abs(c.G - 62) > 8 || Math.Abs(c.B - 112) > 8) continue;
                 sample.BluePixels++;
@@ -54,6 +56,7 @@ public static class ThreadlineSidebarPixels
                 sample.Right = Math.Max(sample.Right, x + 1);
                 sample.Bottom = Math.Max(sample.Bottom, y + 1);
             }
+            if (before != 0 && before == sample.BluePixels) break;
         }
         if (sample.BluePixels == 0) return sample;
         double cx = (sample.Left + sample.Right) / 2.0, cy = (sample.Top + sample.Bottom) / 2.0;

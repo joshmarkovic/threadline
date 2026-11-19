@@ -8,13 +8,18 @@ use serde_json::{Value, json};
 fn measure(bgra: &[[u8; 4]], width: usize, left: i32, top: i32) -> Value {
     let (mut x0, mut y0, mut x1, mut y1) = (i32::MAX, i32::MAX, 0, 0);
     let mut blue = 0;
-    for (i, &[b, g, r, _]) in bgra.iter().enumerate() {
-        if r.abs_diff(23) > 8 || g.abs_diff(62) > 8 || b.abs_diff(112) > 8 {
-            continue;
+    for column in (0..width).rev() {
+        let before = blue;
+        for (row, &[b, g, r, _]) in bgra.iter().skip(column).step_by(width).enumerate() {
+            if r.abs_diff(23) <= 8 && g.abs_diff(62) <= 8 && b.abs_diff(112) <= 8 {
+                let (x, y) = (left + column as i32, top + row as i32);
+                (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x + 1), y1.max(y + 1));
+                blue += 1;
+            }
         }
-        let (x, y) = (left + (i % width) as i32, top + (i / width) as i32);
-        (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x + 1), y1.max(y + 1));
-        blue += 1;
+        if before != 0 && before == blue {
+            break;
+        }
     }
     let (cx, cy) = if blue == 0 {
         x0 = 0;
@@ -349,5 +354,22 @@ mod tests {
         assert_eq!(measured["DigitCenterX"], 0.0);
         assert_eq!(measured["DigitCenterY"], 0.0);
         assert_eq!(super::measure(&[[255; 4]; 9], 3, 0, 0)["BluePixels"], 0);
+    }
+
+    #[test]
+    fn separated_label_and_attached_extension_are_distinguished() {
+        let blue = [112, 62, 23, 255];
+        let mut pixels = vec![[255; 4]; 12 * 5];
+        for row in pixels.as_chunks_mut::<12>().0 {
+            row[1] = blue;
+            row[6..11].fill(blue);
+        }
+        let badge = super::measure(&pixels, 12, 30, 20);
+        assert_eq!(badge["Left"], 36);
+        assert_eq!(badge["BluePixels"], 25);
+        pixels[2 * 12 + 3..2 * 12 + 6].fill(blue);
+        let wide = super::measure(&pixels, 12, 30, 20);
+        assert_eq!(wide["Left"], 33);
+        assert_eq!(wide["BluePixels"], 28);
     }
 }
