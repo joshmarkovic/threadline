@@ -34,6 +34,8 @@ With the approved PAT already provisioned in `THREADLINE_LIVE_PAT`, run the foll
 
 Add `--first-issue-pr-page` to make one all-state issue and pull request list request after repository identity checks. The receipt contains counts, coverage and the oldest reported creation age in days for that page.
 
+Add `--pr-2-activity` to read one page from each of the open PR index, repository inline comment updates and PR 2 activity timeline. The latter two use the previous 24 hours. The receipt records counts, completeness and the identity match when the index contains PR 2. It omits provider content, usernames, individual IDs, cursors and commit digests. The existing CLI OAuth option labels these reads separately from the personal-access-token gate.
+
 ```sh
 cargo run --locked -p threadline-core --example github_live_read -- \
   --read-only --repo joshmarkovic/threadline --expected-user-id 52184130 --credential-env

@@ -8,11 +8,11 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use threadline_core::{
-    domain::{ItemKind, RepositoryApiId, RepositoryName},
+    domain::{ItemKind, ItemNumber, RepositoryApiId, RepositoryName},
     github::{
         AccessError, AccessKind, CancellationToken, GitHubClient, GraphIssue, OwnerScope,
         SecretToken,
-        reader::{IssueSummary, Page},
+        reader::{GitHubReader, IssueSummary, Page, refresh::ReadValidators},
     },
 };
 
@@ -57,6 +57,7 @@ struct Options {
     source: Source,
     allow_cli: bool,
     first_issue_pr_page: bool,
+    pr_2_activity: bool,
 }
 impl Options {
     fn parse(args: impl IntoIterator<Item = String>) -> Result<Self, &'static str> {
@@ -64,6 +65,7 @@ impl Options {
         let (mut repo, mut id, mut read_only, mut source, mut allow_cli) =
             (None, None, false, None, false);
         let mut first_issue_pr_page = false;
+        let mut pr_2_activity = false;
         while let Some(arg) = args.next() {
             match arg.as_str() {
                 "--repo" if repo.is_none() => repo = args.next(),
@@ -75,6 +77,7 @@ impl Options {
                 "--credential-env" if source.is_none() => source = Some(Source::Environment),
                 "--allow-existing-cli-oauth" if !allow_cli => allow_cli = true,
                 "--first-issue-pr-page" if !first_issue_pr_page => first_issue_pr_page = true,
+                "--pr-2-activity" if !pr_2_activity => pr_2_activity = true,
                 _ => return Err("invalid_request"),
             }
         }
@@ -89,6 +92,7 @@ impl Options {
             source,
             allow_cli,
             first_issue_pr_page,
+            pr_2_activity,
         })
     }
     fn credential(&self) -> Result<(Credential, SecretToken), &'static str> {
@@ -209,15 +213,85 @@ async fn probe(
     } else {
         false
     };
+    let activity_failed = if options.pr_2_activity {
+        let mut activity = json!({"pull_request":2,"page_limit":1,"lookback_hours":24});
+        let result = monitor_page(&reader, &cancel, &mut activity).await;
+        activity["status"] = json!(if result.is_ok() { "Pass" } else { "Fail" });
+        if let Err(reason) = result {
+            activity["error"] = reason;
+        }
+        let failed = activity["status"] == "Fail";
+        receipt["pr_activity"] = activity;
+        failed
+    } else {
+        false
+    };
     if credential == Credential::ExistingCliOAuth {
         receipt["reason"] = json!("read_proven_with_cli_oauth_pat_unverified");
         BLOCKED
+    } else if activity_failed {
+        receipt["reason"] = json!("pr_activity_read_incomplete");
+        1
     } else if page_failed {
         receipt["reason"] = json!("issue_pr_page_failed");
         1
     } else {
         0
     }
+}
+
+async fn monitor_page(
+    reader: &GitHubReader<'_>,
+    cancel: &CancellationToken,
+    receipt: &mut Value,
+) -> Result<(), Value> {
+    let since = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .and_then(|clock| i64::try_from(clock.as_millis()).ok())
+        .and_then(|now| now.checked_sub(86_400_000))
+        .ok_or_else(|| json!({"kind":"ClockUnavailable"}))?;
+    let validators = ReadValidators::default();
+    let number = ItemNumber::new(NonZeroU64::new(2).expect("fixed PR 2"));
+    let no_page = || json!({"kind":"UnexpectedNotModified","http_status":304});
+
+    receipt["route"] = json!("GET /repositories/{id}/pulls");
+    let index = reader
+        .open_pull_index(1, &validators, cancel)
+        .await
+        .map_err(|error| observed_error(&error))?
+        .value
+        .ok_or_else(no_page)?;
+    let indexed = index.records.iter().find(|row| row.number == number);
+    receipt["open_index"] = json!({"http_status":200,"records":index.records.len(),"next_page":index.next_page.is_some(),
+        "partial":index.sso_limited,"target_present":indexed.is_some()});
+
+    receipt["route"] = json!("GET /repositories/{id}/pulls/comments");
+    let inline = reader
+        .updated_inline_comments(since, 1, &validators, cancel)
+        .await
+        .map_err(|error| observed_error(&error))?
+        .value
+        .ok_or_else(no_page)?;
+    receipt["inline_comments"] = json!({"http_status":200,"records":inline.records.len(),"next_page":inline.next_page.is_some(),
+        "partial":inline.sso_limited,"target_records":inline.records.iter().filter(|row|row.issue==number).count()});
+
+    receipt["route"] = json!("POST /graphql (ThreadlinePullActivity)");
+    let page = reader
+        .pull_activity(number, since, None, cancel)
+        .await
+        .map_err(|error| observed_error(&error))?;
+    let matched = indexed
+        .map(|candidate| candidate.id == page.identity.id && candidate.node == page.identity.node);
+    receipt["timeline"] = json!({"http_status":200,"events":page.events.len(),"next_page":page.next.is_some(),
+        "partial":page.partial,"permission_limited":page.permission_limited,"index_identity_matched":matched});
+    if matched == Some(false) {
+        return Err(json!({"kind":"TargetIdentityMismatch"}));
+    }
+    if index.sso_limited || inline.sso_limited || page.partial {
+        return Err(json!({"kind":"PartialPage"}));
+    }
+    Ok(())
 }
 
 fn page_receipt(page: &Page<IssueSummary>, now: SystemTime) -> Value {
@@ -312,6 +386,11 @@ mod tests {
         let parse = |s: &str| Options::parse(s.split_ascii_whitespace().map(String::from));
         let expected = "--repo joshmarkovic/threadline --expected-user-id 52184130 --read-only --credential-stdin";
         assert!(parse(expected).is_ok());
+        assert!(
+            parse(&format!("{expected} --pr-2-activity"))
+                .unwrap()
+                .pr_2_activity
+        );
         for bad in [
             expected.replace("joshmarkovic/threadline", "outsider/example"),
             expected.replace("52184130", "42"),
@@ -319,6 +398,8 @@ mod tests {
             expected.replace("--credential-stdin", ""),
             format!("{expected} --credential-env"),
             format!("{expected} --token synthetic-secret"),
+            format!("{expected} --pr-2-activity --pr-2-activity"),
+            format!("{expected} --pr-2-activity --pr 3"),
         ] {
             assert!(parse(&bad).is_err());
         }
