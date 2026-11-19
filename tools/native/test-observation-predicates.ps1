@@ -47,18 +47,19 @@ try {
 
 $script:AccessPhaseFile = [IO.Path]::GetTempFileName()
 try {
-    foreach ($phase in @('issue-edit-baseline', 'issue-edit-remote-change', 'issue-edit-commit')) {
+    foreach ($phase in @('issue-edit-baseline', 'issue-edit-remote-change', 'issue-edit-commit',
+        'merge-cancel-hold', 'merge-cancel-read', 'merge-cancel-finish')) {
         Set-AccessPhase $phase
         if ([IO.File]::ReadAllText($script:AccessPhaseFile) -cne $phase) {
-            throw 'The isolate did not advance to the exact issue edit phase.'
+            throw 'The simulator did not advance to the requested write phase.'
         }
     }
     $refused = $false
     try { Set-AccessPhase 'unlisted-issue-write' } catch {
         $refused = $_.Exception.Message -ceq 'Unknown access fixture phase.'
     }
-    if (!$refused -or [IO.File]::ReadAllText($script:AccessPhaseFile) -cne 'issue-edit-commit') {
-        throw 'An unsupported phase changed the issue edit fixture.'
+    if (!$refused -or [IO.File]::ReadAllText($script:AccessPhaseFile) -cne 'merge-cancel-finish') {
+        throw 'An unsupported phase changed the write fixture.'
     }
 } finally {
     [IO.File]::Delete($script:AccessPhaseFile)

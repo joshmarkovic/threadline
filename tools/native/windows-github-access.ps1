@@ -67,6 +67,7 @@ function Set-AccessPhase([string]$Phase) {
         'backlog-auth', 'backlog-hold', 'backlog-drain', 'backlog-concurrent',
         'pr-load', 'pr-merge-state', 'pr-pin-load', 'pr-pin-offline', 'pr-pin-interrupt', 'pr-pin-continue', 'pr-delay', 'pr-release', 'pr-shared-ready', 'pr-shared-hold', 'pr-shared-release', 'review-send', 'review-changed', 'review-decisions', 'review-predecessor', 'review-resume', 'thread-queue', 'thread-outdated',
         'merge-prepare', 'merge-send', 'merge-wrong-head', 'merge-queue-preflight', 'merge-queue-rejected',
+        'merge-cancel-hold', 'merge-cancel-read', 'merge-cancel-finish',
         'history', 'history-moved', 'history-deleted', 'write-online', 'write-drop',
          'issue-edit-baseline', 'issue-edit-remote-change', 'issue-edit-commit',
         'credential-ready', 'credential-offline', 'credential-other', 'credential-return',
