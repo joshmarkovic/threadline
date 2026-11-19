@@ -1200,31 +1200,10 @@ impl ReaderWorkspace {
             let note = control(id.clone(), "Comment on selected source lines")
                 .disabled(self.review_controls_busy(tab.item))
                 .on_click(cx.listener(move |this, _, window, cx| {
-                    let range = diff.read(cx).selected_lines().or_else(|| {
-                        let anchor = this
-                            .layout
-                            .panes
-                            .iter()
-                            .flat_map(|pane| &pane.tabs)
-                            .find(|tab| tab.id == target.id)?
-                            .view
-                            .pr_reader
-                            .as_ref()?
-                            .code_anchor
-                            .as_ref()?;
-                        if anchor.path != code {
-                            return None;
-                        }
-                        let (side, oid) = match anchor.side {
-                            SourceSide::Left => (DiffSide::Original, revision.merge_base.as_ref()),
-                            SourceSide::Right => (DiffSide::Modified, Some(&revision.head)),
-                        };
-                        if !oid.is_some_and(|oid| oid.as_str() == anchor.original_oid) {
-                            return None;
-                        }
-                        let position = anchor.line as usize;
-                        Some(DiffLineRange::new(code.clone(), side, position, position))
-                    });
+                    let range = diff
+                        .read(cx)
+                        .selected_lines()
+                        .or_else(|| this.saved_diff_selection(&target, &code, &revision));
                     if let Some(range) = range {
                         this.begin_inline(target.clone(), &range, window, cx);
                     } else {
@@ -1459,7 +1438,10 @@ impl ReaderWorkspace {
         if target != (pr.data.revision.id, file.summary.path.as_str()) || file.changes.is_empty() {
             return;
         }
-        let selected = diff.read(cx).selected_lines();
+        let selected = diff
+            .read(cx)
+            .selected_lines()
+            .or_else(|| self.saved_diff_selection(tab, target.1, &pr.data.revision));
         let position_index = file.changes.iter().position(|point| {
             selected.as_ref().is_some_and(|selection| {
                 selection.path() == point.path()
@@ -1485,6 +1467,31 @@ impl ReaderWorkspace {
         });
         let revision = pr.data.revision.clone();
         self.code_selection(tab.clone(), &revision, position, window, cx);
+    }
+
+    fn saved_diff_selection(
+        &self,
+        tab: &Tab,
+        path: &str,
+        revision: &PrRevision,
+    ) -> Option<DiffLineRange> {
+        let saved = self
+            .layout
+            .panes
+            .iter()
+            .flat_map(|pane| &pane.tabs)
+            .find(|saved| saved.id == tab.id && saved.item == tab.item)?;
+        let anchor = saved.view.pr_reader.as_ref()?.code_anchor.as_ref()?;
+        if anchor.path != path {
+            return None;
+        }
+        let (side, oid) = match anchor.side {
+            SourceSide::Left => (DiffSide::Original, revision.merge_base.as_ref()),
+            SourceSide::Right => (DiffSide::Modified, Some(&revision.head)),
+        };
+        let line = anchor.line as usize;
+        oid.filter(|oid| oid.as_str() == anchor.original_oid)
+            .map(|_| DiffLineRange::new(anchor.path.clone(), side, line, line))
     }
 
     fn resize_pr_context(

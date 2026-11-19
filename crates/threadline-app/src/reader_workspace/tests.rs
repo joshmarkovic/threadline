@@ -1201,10 +1201,10 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
                         path: (*path).to_owned(),
                         previous_path: Some("src/old.rs".into()),
                         status: "renamed".into(),
-                        additions: Some(1),
-                        deletions: Some(1),
+                        additions: Some(2),
+                        deletions: Some(2),
                         patch: PatchEvidence::Text(
-                            "@@ -10,2 +20,2 @@\n unchanged\n-old line\n+new line".into(),
+                            "@@ -10,2 +20,2 @@\n unchanged\n-old line\n+new line\n@@ -30 +40 @@\n-old second\n+new second".into(),
                         ),
                     })
                     .collect(),
@@ -1267,6 +1267,22 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
         })
         .unwrap();
     until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+    cx.update_window(window, |_, _, cx| {
+        diff.update(cx, |diff, cx| diff.set_selected_lines(None, cx));
+    })
+    .unwrap();
+    for (action, line) in [("pr-0-next-change", 40), ("pr-0-previous-change", 21)] {
+        click(cx, window, action);
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let reader = reader.read(cx);
+                !reader.layout_busy
+                    && pr::tab_settings(&reader.layout.panes[0].tabs[0])
+                        .code_anchor
+                        .is_some_and(|anchor| anchor.line == line)
+            })
+        });
+    }
     let draft_id = format!("review-{}", pr.0);
     let original_review = if review {
         click(cx, window, "pr-0-review-add-inline");
