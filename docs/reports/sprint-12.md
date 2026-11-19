@@ -185,6 +185,8 @@ The original `e3aec22` named runs recorded 13 passes, two failures and one block
 
 E2E-003 opened the offline draft editor and saved an empty draft. The expected typed text did not reach the draft. E2E-004 kept the first downloaded comment and a Partial checkpoint. The second-page request and recovery assertion were still outstanding when its wait ended. E2E-015 completed its automated Windows checks and returned Blocked for the pending signed human visual and screen-reader record. A supplemental E2E-008 replay at driver `b29793c` failed while returning from Commits to the original review comparison and selected line. The matched `e3aec22` E2E-008 run passed. [Failed and blocked receipts](evidence/sprint-12/native-e3aec22-functional.json)
 
+With driver `3c2da26`, a separate E2E-004 run passed at 144 DPI. The normal Sync control paused background refresh through restart. The first page returned HTTP 200, the second page returned 502, and the same saved second-page request returned 200 after reconnecting. The visible discussion finished with two unique comments. A separate E2E-003 run with driver `1029db7` stopped at the exact owned editor's keyboard-focus check before typing. The original build 17 outcomes are unchanged. [Both named follow-ups and raw hashes](evidence/sprint-12/native-e3aec22-functional.json)
+
 The automatic approval check declined a new full suite because it includes the deferred timing case. The build 17 functional runs excluded E2E-014. The full build 16 results and timing measurements remain below. [Verification scope](evidence/sprint-12/native-e3aec22-functional.json)
 
 ### Connected Windows desktop with installed local build 16

@@ -852,6 +852,142 @@
         "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
         "action_count": 23
       }
+    },
+    {
+      "run": "e2e-1795103250127-40660",
+      "case": "E2E-004",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "fixture_revision": "s04-reader-v1",
+      "detail": "The native reader showed Partial discussion, restored the pending download offline and resumed it automatically after reconnecting. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-004",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "3c2da26bb6d4841f13ad8e3ed419005a0b3df286",
+      "started_at_utc": "2026-11-19T15:47:30.126Z",
+      "finished_at_utc": "2026-11-19T15:48:37.288Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "54de04008592b25359ebd78b0ba24a59dd232eca44097943661d5125d1f5854e",
+        "junit.xml": "da3ece01e5f86448806b9a08b9515c3909b040f105f77283053f27c1bdbaeda1",
+        "binary.json": "0009e983b54004ead388bcacc3dfc6c1c83289059d53d66944d228e70e432927",
+        "reader-native.json": "b3eebe8125aeb6caf4eaf4819cb08f1dddc56a115755491110438d79c65a1ff3",
+        "ui-observation.json": "21df42c7727c80753c6b7fe17c853b4106fb381c1b8a5740c57f5e37200af480",
+        "github-access-trace.json": "745b8d777009210ab25eb578ffedc7f813c27fad1e8ca7dd097c9e22048a7868"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Pass",
+        "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+        "action_count": 17,
+        "final_reader": {
+          "active_number": 41,
+          "offline": true,
+          "active_draft_saved": null,
+          "active_draft_chars": null,
+          "tab_counts": [
+            1
+          ],
+          "comments_coverage": "Partial",
+          "comment_fetch_state": "Failed",
+          "comment_count": 1,
+          "download_state": "Pending"
+        },
+        "discussion_http": [
+          {
+            "phase": "reader_failure",
+            "route": "comments_first",
+            "fixture_authorization": true,
+            "status": 200
+          },
+          {
+            "phase": "reader_failure",
+            "route": "comments_next",
+            "fixture_authorization": true,
+            "status": 502
+          },
+          {
+            "phase": "reader_resume",
+            "route": "comments_next",
+            "fixture_authorization": true,
+            "status": 200
+          }
+        ]
+      }
+    },
+    {
+      "run": "e2e-1795103320550-35900",
+      "case": "E2E-003",
+      "status": "Fail",
+      "exit_code": 1,
+      "child_exit_code": 1,
+      "fixture_revision": "s04-reader-v1",
+      "detail": "Timed out waiting for keyboard focus on the exact owned local Markdown draft editor. See native-driver.log.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-003",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "driver_source": "1029db762adb02cbaf363a4ffc352b3b4d6e4606",
+      "started_at_utc": "2026-11-19T15:48:40.550Z",
+      "finished_at_utc": "2026-11-19T15:49:08.366Z",
+      "application": "optimized test executable",
+      "receipts": {
+        "result.json": "c041f62da8cb2930773b23424635bd0120364424e94715523d8114475913150a",
+        "junit.xml": "8d75d33955a32827e31cd1871f95fdc7ceccfc3391e96ece7f7b16dea312cca2",
+        "binary.json": "0009e983b54004ead388bcacc3dfc6c1c83289059d53d66944d228e70e432927",
+        "reader-native.json": "ebaa38955dc5f61dca1c62ea31e6f440a3423ee2966080c3cad116dc5fab69fe",
+        "ui-observation.json": "9560f2d2b7432e47644eb1f52daff2051a0f611cc9e0e2616e4b5f298d001578"
+      },
+      "native": {
+        "dpi": 144,
+        "status": "Fail",
+        "binary_sha256": "a08643bd8ee7d7c54f832f6d647b8776cae489445ad18cb64526f9e3965d60e9",
+        "action_count": 2,
+        "final_reader": {
+          "active_number": 3,
+          "offline": true,
+          "active_draft_saved": true,
+          "active_draft_chars": 0,
+          "tab_counts": [
+            10,
+            10
+          ],
+          "comments_coverage": "Complete",
+          "comment_fetch_state": "Idle",
+          "comment_count": 2,
+          "download_state": null
+        }
+      }
     }
   ],
   "full_native_suite": {
