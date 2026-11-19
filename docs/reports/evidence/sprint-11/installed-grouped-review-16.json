@@ -1,0 +1,79 @@
+{
+  "scenario": "S11-GROUPED-REVIEW",
+  "status": "Pass",
+  "exit_code": 0,
+  "raw_run": "installed16-grouped-review.DMtiPL",
+  "raw_sha256": "2f1b2f2ccae6def84f45f4f0b7e2db784bd6a9092cd7d144b0f0939b6a65a5eb",
+  "app_source": "287064229188f6cc5f5d85c86693c0f74bd5e438",
+  "app_sha256": "427f00141263d1fe5a123731cc3676c4fbf480e7c8761a7adf38c00a991e4085",
+  "driver_and_helper_source": "e2bf62ec9a1223f0f26dc71ad69cada15d05af1a",
+  "fixture_sha256": "c010232e59998ee80eb875dbc513b2360fa6bf4d712cb1ba81d5e1116a2eb178",
+  "registered_sender": "Threadline.InstallTest",
+  "initial_pid": 32976,
+  "restarted_pid": 42304,
+  "background_and_outbox_paused": true,
+  "source_events": [
+    {
+      "actor_id": 70021,
+      "automation": false,
+      "categories": [
+        "CommentOnlyReview"
+      ],
+      "grouped": false,
+      "key": "github:pr-reviews:812:review_submitted:1795100942746",
+      "kind": "review_submitted",
+      "mode": null,
+      "occurred_at": 1795100942746,
+      "os_disabled": false,
+      "published": false
+    },
+    {
+      "actor_id": 70021,
+      "automation": false,
+      "categories": [
+        "InlineComment"
+      ],
+      "grouped": false,
+      "key": "github:pr-inline-comments:813:inline_comment_created:1795100942746",
+      "kind": "inline_comment_created",
+      "mode": null,
+      "occurred_at": 1795100942746,
+      "os_disabled": false,
+      "published": false
+    }
+  ],
+  "first_delivery": {
+    "feed_modes": [
+      "Popup",
+      "Popup"
+    ],
+    "group_count": 1,
+    "count_from_app_scoped_windows_history": 2,
+    "history_entries_matching_group": 1,
+    "durable_changed_at_ms": 1795100977931
+  },
+  "restart": {
+    "original_source_pages_replayed": true,
+    "original_group_and_timestamp_unchanged": true,
+    "published_events": [
+      {
+        "kind": "review_submitted",
+        "mode": "Popup",
+        "grouped": true
+      },
+      {
+        "kind": "inline_comment_created",
+        "mode": "Popup",
+        "grouped": true
+      },
+      {
+        "kind": "check_completed",
+        "mode": "FeedOnly",
+        "grouped": false
+      }
+    ],
+    "matching_windows_history_entries_after_scoped_removal_and_relaunch": 0
+  },
+  "loopback_proxy_received_connection": false,
+  "synthetic_profile_archived": true
+}
