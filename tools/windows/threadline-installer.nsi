@@ -83,6 +83,7 @@ Page instfiles
 UninstPage uninstConfirm
 UninstPage instfiles
 
+Var UpdateRestart
 Var LockHandle
 !ifdef REGISTER_ACTIVITY
 Var NotificationDetail
@@ -229,6 +230,9 @@ Var RollbackFailed
   !macroend
 !endif
 
+!define THREADLINE_HANDOFF_TIMEOUT 30000
+!include "update-handoff.nsh"
+
 Function .onInit
   ${IfNot} ${IsNativeAMD64}
   ${OrIfNot} ${AtLeastWin11}
@@ -279,6 +283,7 @@ Function .onInit
   ${AndIf} ${PACKAGE_BUILD} < $PendingBuild
     !insertmacro MessageAndStop 12 "A newer setup was interrupted. Use its installer again to recover the installation."
   ${EndIf}
+  Call WaitForUpdateParent
   !insertmacro RefuseRunningApp
   !insertmacro RefuseLockedExecutable
 FunctionEnd
@@ -384,7 +389,15 @@ Section "Install Threadline" SEC_INSTALL
   Delete "$INSTDIR\${Stage}\owner.ini"
   RMDir "$INSTDIR\${Stage}"
   DetailPrint "Installed ${Product} ${PACKAGE_VERSION} to $INSTDIR."
-  DetailPrint "Launch ${Product} from the Start menu."
+  ${If} $UpdateRestart == 1
+    ClearErrors
+    Exec '"$INSTDIR\threadline.exe"'
+    ${If} ${Errors}
+      !insertmacro MessageAndStop 22 "The update was installed. Launch Threadline from the Start menu."
+    ${EndIf}
+  ${Else}
+    DetailPrint "Launch ${Product} from the Start menu."
+  ${EndIf}
   SetErrorLevel 0
   Goto finished
 

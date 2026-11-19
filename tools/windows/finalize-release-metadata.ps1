@@ -19,7 +19,7 @@ try {
 }
 if ($stagePin -ine $ExpectedStageMetadataSha256) { throw 'The staged metadata differs from the reviewed package build.' }
 $stage = [Text.Encoding]::UTF8.GetString($stageBytes) | ConvertFrom-Json
-if ($stage.status -cne 'publication_pending' -or $stage.publisher_certificate_sha256 -ine $ExpectedPublisherSha256) {
+if ($stage.status -cne 'publication_pending' -or $stage.restart_protocol -ne 1 -or $stage.publisher_certificate_sha256 -ine $ExpectedPublisherSha256) {
     throw 'The release staging record does not match the approved publisher configuration.'
 }
 $artifact = Get-Item -LiteralPath $Installer
@@ -35,6 +35,7 @@ $manifest = [ordered]@{
     artifact_url = $stage.artifact_url
     package_build = $stage.package_build
     current_schema = $stage.current_schema
+    restart_protocol = $stage.restart_protocol
     oldest_supported_schema = $stage.oldest_supported_schema
     publisher_certificate_sha256 = $ExpectedPublisherSha256.ToLowerInvariant()
     size = $artifact.Length

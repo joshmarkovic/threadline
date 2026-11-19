@@ -159,7 +159,7 @@ else
         --argjson build "$build" --argjson size "$setup_size" --argjson schema "$schema" \
         --argjson oldest "$oldest_schema" --argjson notificationHash "$notification_hash" '{
             status: "publication_pending", target: "x86_64-pc-windows-msvc", minimum_os: "Windows 11 x64 build 22000",
-            version: $version, channel: $channel, artifact_url: $url, package_build: $build,
+            version: $version, channel: $channel, artifact_url: $url, package_build: $build, restart_protocol: 1,
             publisher_display: $publisher, publisher_certificate_sha256: $pin, signer_reference: $signer,
             current_schema: $schema, oldest_supported_schema: $oldest,
             unsigned_size: $size, unsigned_sha256: $unsignedHash, app_sha256: $appHash,

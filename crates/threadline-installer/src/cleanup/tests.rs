@@ -73,7 +73,16 @@ fn it_019_preview_counts_active_workspace_and_confirmation_removes_only_managed_
     assert_eq!(preview.unresolved, preview.backup_unresolved);
     let vault = TestVault::default();
     let mut printed = Vec::new();
-    run(data, false, false, &mut &b""[..], &mut printed, &vault).unwrap();
+    run(
+        data,
+        false,
+        false,
+        &mut &b""[..],
+        &mut printed,
+        &vault,
+        &CredentialRef::github_releases(),
+    )
+    .unwrap();
     let preview_text = String::from_utf8(printed).unwrap();
     assert!(preview_text.contains(&format!(
         "{} drafts and {} unresolved Outbox operations",
@@ -87,17 +96,27 @@ fn it_019_preview_counts_active_workspace_and_confirmation_removes_only_managed_
             false,
             &mut &b"REMOVE LOCAL WORKSPACE\n"[..],
             &mut Vec::new(),
-            &vault
+            &vault,
+            &CredentialRef::github_releases()
         )
         .is_err()
     );
-    assert!(preview.confirm_removal(data, "remove", &vault).is_err());
+    assert!(
+        preview
+            .confirm_removal(data, "remove", &vault, &CredentialRef::github_releases())
+            .is_err()
+    );
     assert_eq!(vault.removals.get(), 0);
     assert!(current.exists() && backup.exists());
     preview
-        .confirm_removal(data, "REMOVE LOCAL WORKSPACE\r\n", &vault)
+        .confirm_removal(
+            data,
+            "REMOVE LOCAL WORKSPACE\r\n",
+            &vault,
+            &CredentialRef::github_releases(),
+        )
         .unwrap();
-    assert_eq!(vault.removals.get(), 1);
+    assert_eq!(vault.removals.get(), 2);
     assert!(!current.exists() && !backup.exists());
     assert_eq!(fs::read(&notes).unwrap(), b"keep");
     assert!(Preview::inspect(data).unwrap().files.is_empty());
@@ -128,6 +147,7 @@ fn it_019_cleanup_covers_the_shipped_schema_and_refuses_a_newer_backup() {
         &mut &b"REMOVE LOCAL WORKSPACE\n"[..],
         &mut Vec::new(),
         &vault,
+        &CredentialRef::github_releases(),
     );
     assert_eq!(result, Err(UNRECOGNIZED));
     assert_eq!(vault.removals.get(), 0);
@@ -148,7 +168,12 @@ fn it_019_busy_changed_or_unrecognized_profile_preserves_data_and_credentials() 
         .open(&path)
         .unwrap();
     assert_eq!(
-        preview.confirm_removal(data, CONFIRMATION, &vault),
+        preview.confirm_removal(
+            data,
+            CONFIRMATION,
+            &vault,
+            &CredentialRef::github_releases()
+        ),
         Err(BUSY)
     );
     drop(busy);
@@ -161,7 +186,12 @@ fn it_019_busy_changed_or_unrecognized_profile_preserves_data_and_credentials() 
         .unwrap();
     drop(db);
     assert_eq!(
-        preview.confirm_removal(data, CONFIRMATION, &vault),
+        preview.confirm_removal(
+            data,
+            CONFIRMATION,
+            &vault,
+            &CredentialRef::github_releases()
+        ),
         Err(CHANGED)
     );
     assert!(matches!(Preview::inspect(data), Err(UNRECOGNIZED)));
@@ -192,19 +222,29 @@ fn it_019_vault_refusal_leaves_every_database_for_retry() {
     };
     assert!(
         preview
-            .confirm_removal(dir.path(), CONFIRMATION, &denied)
+            .confirm_removal(
+                dir.path(),
+                CONFIRMATION,
+                &denied,
+                &CredentialRef::github_releases()
+            )
             .is_err()
     );
     assert!(path.exists() && backup.exists());
     let vault = TestVault::default();
     preview
-        .confirm_removal(dir.path(), CONFIRMATION, &vault)
+        .confirm_removal(
+            dir.path(),
+            CONFIRMATION,
+            &vault,
+            &CredentialRef::github_releases(),
+        )
         .unwrap();
-    assert_eq!(vault.removals.get(), 2);
+    assert_eq!(vault.removals.get(), 3);
 }
 
 #[test]
-#[ignore = "uses two freshly generated, test-owned native Windows Credential Manager entries"]
+#[ignore = "uses three freshly generated, test-owned native Windows Credential Manager entries"]
 fn it_019_explicit_removal_deletes_only_the_generated_profile_credential() {
     struct Owned<'a>(Vec<&'a CredentialRef>);
     impl Drop for Owned<'_> {
@@ -222,8 +262,9 @@ fn it_019_explicit_removal_deletes_only_the_generated_profile_credential() {
     let (id, owner, key) = plan.credentials.first().unwrap();
     let target = CredentialRef::github_profile(*id, owner, key).unwrap();
     let other = CredentialRef::github_profile(*id, "other-cleanup-fixture", key).unwrap();
+    let release = CredentialRef::github_profile(*id, "release-cleanup-fixture", key).unwrap();
     let mut owned = Owned(Vec::new());
-    for reference in [&target, &other] {
+    for reference in [&target, &other, &release] {
         assert!(NativeCredentialStore.read(reference).unwrap().is_none());
         NativeCredentialStore
             .save(
@@ -240,7 +281,8 @@ fn it_019_explicit_removal_deletes_only_the_generated_profile_credential() {
             true,
             &mut &b"KEEP\n"[..],
             &mut Vec::new(),
-            &NativeCredentialStore
+            &NativeCredentialStore,
+            &release
         )
         .is_err()
     );
@@ -254,12 +296,14 @@ fn it_019_explicit_removal_deletes_only_the_generated_profile_credential() {
         &mut &b"REMOVE LOCAL WORKSPACE\r\n"[..],
         &mut displayed,
         &NativeCredentialStore,
+        &release,
     )
     .unwrap();
     let displayed = String::from_utf8(displayed).unwrap();
     assert!(displayed.contains("Type REMOVE LOCAL WORKSPACE to confirm"));
     assert!(displayed.contains("Removed the previewed Threadline databases"));
     assert!(NativeCredentialStore.read(&target).unwrap().is_none());
+    assert!(NativeCredentialStore.read(&release).unwrap().is_none());
     assert!(NativeCredentialStore.read(&other).unwrap().is_some());
     assert!(!data.join(DATABASE).exists());
     drop(owned);

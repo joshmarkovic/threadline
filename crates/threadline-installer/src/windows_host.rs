@@ -1,5 +1,5 @@
+use crate::{LaunchEnvironment, Platform};
 use std::{mem::size_of, path::Path};
-use threadline_installer::{LaunchEnvironment, Platform};
 use threadline_platform::{NativePaths, PathResolver};
 use windows::Win32::{
     Foundation::HMODULE,
@@ -16,7 +16,10 @@ use windows_sys::{
     Win32::{
         Foundation::{ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND, ERROR_SUCCESS},
         System::{
-            Registry::{HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RRF_SUBKEY_WOW6464KEY, RegGetValueW},
+            Registry::{
+                HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RRF_RT_REG_SZ, RRF_SUBKEY_WOW6464KEY,
+                RegGetValueW,
+            },
             StationsAndDesktops::{CloseDesktop, DESKTOP_READOBJECTS, OpenInputDesktop},
             SystemInformation::{IMAGE_FILE_MACHINE_AMD64, OSVERSIONINFOEXW, OSVERSIONINFOW},
             Threading::{GetCurrentProcess, IsWow64Process2},
@@ -24,7 +27,7 @@ use windows_sys::{
     },
 };
 
-pub(super) fn detect() -> Result<Platform, &'static str> {
+pub fn detect() -> Result<Platform, &'static str> {
     let mut arch = 0;
     let mut native = 0;
     let mut version = OSVERSIONINFOEXW {
@@ -50,7 +53,7 @@ pub(super) fn detect() -> Result<Platform, &'static str> {
     })
 }
 
-pub(super) fn require_launch_ready() -> Result<(), &'static str> {
+pub fn require_launch_ready() -> Result<(), &'static str> {
     let desk = unsafe { OpenInputDesktop(0, 0, DESKTOP_READOBJECTS) };
     let desktop = !desk.is_null();
     if desktop {
@@ -103,13 +106,21 @@ fn schema_of(path: &Path) -> Result<Option<u32>, &'static str> {
     Ok(Some(value))
 }
 fn highest_build() -> Result<u32, &'static str> {
+    Ok(dword(
+        windows_sys::core::w!("Software\\Threadline"),
+        windows_sys::core::w!("HighestBuild"),
+    )?
+    .unwrap_or(0))
+}
+
+fn dword(key: *const u16, name: *const u16) -> Result<Option<u32>, &'static str> {
     let mut value = 0u32;
     let mut bytes = 4u32;
     let result = unsafe {
         RegGetValueW(
             HKEY_CURRENT_USER,
-            windows_sys::core::w!("Software\\Threadline"),
-            windows_sys::core::w!("HighestBuild"),
+            key,
+            name,
             RRF_RT_REG_DWORD | RRF_SUBKEY_WOW6464KEY,
             std::ptr::null_mut(),
             (&raw mut value).cast(),
@@ -117,8 +128,76 @@ fn highest_build() -> Result<u32, &'static str> {
         )
     };
     match result {
-        ERROR_SUCCESS if bytes == 4 => Ok(value),
-        ERROR_FILE_NOT_FOUND | ERROR_PATH_NOT_FOUND => Ok(0),
+        ERROR_SUCCESS if bytes == 4 => Ok(Some(value)),
+        ERROR_FILE_NOT_FOUND | ERROR_PATH_NOT_FOUND => Ok(None),
         _ => Err("Could not read the retained Windows package version."),
     }
+}
+
+const REGISTRATION: *const u16 =
+    windows_sys::core::w!(r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Threadline");
+
+fn registered_string(name: *const u16) -> Result<Option<std::ffi::OsString>, &'static str> {
+    use std::os::windows::ffi::OsStringExt;
+    let mut buffer = vec![0u16; 32768];
+    let mut bytes = (buffer.len() * 2) as u32;
+    let code = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            REGISTRATION,
+            name,
+            RRF_RT_REG_SZ | RRF_SUBKEY_WOW6464KEY,
+            std::ptr::null_mut(),
+            buffer.as_mut_ptr().cast(),
+            &mut bytes,
+        )
+    };
+    match code {
+        ERROR_FILE_NOT_FOUND | ERROR_PATH_NOT_FOUND => Ok(None),
+        ERROR_SUCCESS if bytes >= 2 && bytes.is_multiple_of(2) => {
+            let value = &buffer[..bytes as usize / 2];
+            if value.last() != Some(&0) || value[..value.len() - 1].contains(&0) {
+                return Err("The installed package registration is invalid.");
+            }
+            Ok(Some(std::ffi::OsString::from_wide(
+                &value[..value.len() - 1],
+            )))
+        }
+        _ => Err("Could not read the installed package registration."),
+    }
+}
+
+pub(crate) fn installed() -> Result<Option<crate::github_update::Installed>, &'static str> {
+    use crate::github_update::Installed;
+    let Some(location) = registered_string(windows_sys::core::w!("InstallLocation"))? else {
+        return Ok(None);
+    };
+    let paths = NativePaths
+        .application_paths()
+        .map_err(|_| "Windows could not locate the installed release.")?;
+    let expected = paths.install.join("threadline.exe");
+    let Ok(expected) = expected.canonicalize() else {
+        return Ok(None);
+    };
+    if Path::new(&location)
+        .join("threadline.exe")
+        .canonicalize()
+        .ok()
+        .as_ref()
+        != Some(&expected)
+        || std::env::current_exe()
+            .ok()
+            .and_then(|p| p.canonicalize().ok())
+            .as_ref()
+            != Some(&expected)
+    {
+        return Ok(None);
+    }
+    let version = registered_string(windows_sys::core::w!("DisplayVersion"))?
+        .and_then(|s| semver::Version::parse(s.to_str()?).ok())
+        .ok_or("The installed release version is unavailable.")?;
+    let build = dword(REGISTRATION, windows_sys::core::w!("InstalledBuild"))?
+        .filter(|n| *n != 0)
+        .ok_or("The installed release build is unavailable.")?;
+    Ok(Some(Installed { version, build }))
 }

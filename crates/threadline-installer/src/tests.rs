@@ -10,14 +10,14 @@ use std::{
     thread,
 };
 
-const ASSET: &[u8] = b"synthetic installer fixture";
-fn digest(raw: &[u8]) -> String {
+pub(super) const ASSET: &[u8] = b"synthetic installer fixture";
+pub(super) fn digest(raw: &[u8]) -> String {
     Sha256::digest(raw)
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
 }
-fn platform() -> Platform {
+pub(super) fn platform() -> Platform {
     Platform {
         native_x64: true,
         workstation: true,
@@ -26,7 +26,7 @@ fn platform() -> Platform {
         profile_schema: Some(7),
     }
 }
-fn body(base: &Url) -> Value {
+pub(super) fn body(base: &Url) -> Value {
     json!({"version":"1.2.3","channel":"stable","target":TARGET,"minimum_os":MINIMUM,
         "artifact_url":base.join("v1.2.3/ThreadlineSetup.exe").unwrap().as_str(),
         "package_build":4,"current_schema":15,"oldest_supported_schema":1,"size":ASSET.len(),"sha256":digest(ASSET),
@@ -125,15 +125,16 @@ fn ut_019_selects_exact_version_channel_architecture_schema_and_safe_asset() {
 
 type RouteReplies = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
 
-struct HttpFixture {
-    base: Url,
+pub(super) struct HttpFixture {
+    pub(super) base: Url,
     replies: RouteReplies,
-    requests: Arc<Mutex<Vec<String>>>,
+    pub(super) requests: Arc<Mutex<Vec<String>>>,
+    pub(super) headers: Arc<Mutex<Vec<String>>>,
     stop: Arc<AtomicBool>,
     worker: Option<thread::JoinHandle<()>>,
 }
 impl HttpFixture {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let base = Url::parse(&format!(
             "http://{}/release/",
@@ -146,6 +147,8 @@ impl HttpFixture {
         let stop = Arc::new(AtomicBool::new(false));
         let route_replies = replies.clone();
         let recorded_requests = requests.clone();
+        let headers: Arc<Mutex<Vec<String>>> = Arc::default();
+        let captured = headers.clone();
         let shutting_down = stop.clone();
         let worker = thread::spawn(move || {
             while !shutting_down.load(Ordering::Acquire) {
@@ -159,13 +162,16 @@ impl HttpFixture {
                         let mut line = String::new();
                         reader.read_line(&mut line).unwrap();
                         let route = line.split_whitespace().nth(1).unwrap().to_owned();
+                        let mut request_headers = String::new();
                         loop {
                             line.clear();
                             let n = reader.read_line(&mut line).unwrap();
+                            request_headers.push_str(&line.to_ascii_lowercase());
                             if n == 0 || line == "\r\n" {
                                 break;
                             }
                         }
+                        captured.lock().unwrap().push(request_headers);
                         recorded_requests.lock().unwrap().push(route.clone());
                         let responses = route_replies.lock().unwrap();
                         let response = responses
@@ -186,11 +192,12 @@ impl HttpFixture {
             base,
             replies,
             requests,
+            headers,
             stop,
             worker: Some(worker),
         }
     }
-    fn serve(&self, url: &str, status: &str, advertised: usize, body: &[u8]) {
+    pub(super) fn serve(&self, url: &str, status: &str, advertised: usize, body: &[u8]) {
         let mut bytes = format!(
             "HTTP/1.1 {status}\r\nContent-Length: {advertised}\r\nConnection: close\r\n\r\n"
         )

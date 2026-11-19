@@ -4,7 +4,7 @@ use threadline_installer::{Selection, Source};
 #[cfg(windows)]
 mod cleanup;
 #[cfg(windows)]
-mod windows_host;
+use threadline_installer::windows_host;
 
 struct Request {
     selection: Selection,

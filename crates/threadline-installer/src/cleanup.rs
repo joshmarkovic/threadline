@@ -221,6 +221,7 @@ impl Preview {
         data: &Path,
         answer: &str,
         vault: &impl CredentialStore,
+        release_credential: &CredentialRef,
     ) -> Result<()> {
         if answer.trim_end_matches(['\r', '\n']) != CONFIRMATION {
             return Err("Removal cancelled. The previewed files and credentials were preserved.");
@@ -247,6 +248,9 @@ impl Preview {
                 "Windows could not remove a recorded credential. The databases were preserved. Retry after checking Credential Manager."
             })?;
         }
+        vault.remove(release_credential).map_err(
+            |_| "Windows could not remove the release credential. The databases were preserved.",
+        )?;
         for file in locked {
             let info = FILE_DISPOSITION_INFO { DeleteFile: true };
             // The owned handle identifies the verified file and denies competing writes or renames.
@@ -281,6 +285,7 @@ pub(super) fn command(remove: bool) -> Result<()> {
         &mut input.lock(),
         &mut io::stdout().lock(),
         &NativeCredentialStore,
+        &CredentialRef::github_releases(),
     )
 }
 
@@ -291,6 +296,7 @@ fn run(
     input: &mut impl BufRead,
     output: &mut impl Write,
     vault: &impl CredentialStore,
+    release_credential: &CredentialRef,
 ) -> Result<()> {
     const DISPLAY_ERROR: &str = "Could not display the local workspace removal preview.";
     let plan = Preview::inspect(data)?;
@@ -299,15 +305,12 @@ fn run(
         plan.accounts, plan.drafts, plan.unresolved
     ).map_err(|_| DISPLAY_ERROR)?;
     writeln!(output,
-        "Removal includes {} managed databases and migration backups plus {} recorded credential references. Backups contain {} draft rows and {} unresolved operation rows.",
+        "Removal includes {} managed databases and migration backups plus {} recorded account credential references and the private release credential if saved. Backups contain {} draft rows and {} unresolved operation rows.",
         plan.files.len(),
         plan.credentials.len(),
         plan.backup_drafts,
         plan.backup_unresolved
     ).map_err(|_| DISPLAY_ERROR)?;
-    if plan.files.is_empty() {
-        return Ok(());
-    }
     writeln!(output,
         "Removal permanently discards these accounts' local sign-in credentials, cached content, saved layouts, drafts and Outbox history. Queued work can no longer be sent or reconciled here. Work already submitted may still take effect on GitHub."
     ).map_err(|_| DISPLAY_ERROR)?;
@@ -325,7 +328,7 @@ fn run(
     input
         .read_line(&mut answer)
         .map_err(|_| "Could not read the removal confirmation.")?;
-    plan.confirm_removal(data, &answer, vault)?;
+    plan.confirm_removal(data, &answer, vault, release_credential)?;
     writeln!(
         output,
         "Removed the previewed Threadline databases and protected credential references."

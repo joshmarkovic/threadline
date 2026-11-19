@@ -5,6 +5,14 @@ use crate::{Credential, CredentialRef, CredentialStore, PlatformError};
 pub struct NativeCredentialStore;
 
 impl CredentialRef {
+    /// Separate from every repository account, even for the same GitHub user.
+    pub fn github_releases() -> Self {
+        Self {
+            scope: "updates/github.com/joshmarkovic/threadline".into(),
+            name: "release-contents-read".into(),
+        }
+    }
+
     /// Build a reference after the provider has verified the user and resource owner.
     /// Keep the same local profile key across authorized same-user renewal.
     pub fn github_profile(

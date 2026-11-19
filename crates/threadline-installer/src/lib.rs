@@ -10,6 +10,10 @@ use std::{
     time::Duration,
 };
 
+pub mod github_update;
+#[cfg(windows)]
+pub mod windows_host;
+
 const MAX_INSTALLER: u64 = 512 * 1024 * 1024;
 const MAX_MANIFEST: u64 = 64 * 1024;
 pub const TARGET: &str = "x86_64-pc-windows-msvc";
@@ -57,6 +61,8 @@ pub struct Manifest {
     pub minimum_os: String,
     pub artifact_url: String,
     pub package_build: u32,
+    #[serde(default)]
+    pub restart_protocol: Option<u32>,
     pub current_schema: u32,
     pub oldest_supported_schema: u32,
     pub size: u64,
@@ -245,16 +251,7 @@ impl Source {
             None => self.fetch(manifest_url, &mut raw, MAX_MANIFEST).await?,
         };
         let (manifest, asset) = self.select(&raw, wanted, host)?;
-        let directory = tempfile::Builder::new()
-            .prefix("Threadline-setup-")
-            .tempdir_in(temp)
-            .map_err(|_| "Could not create a private temporary staging directory.")?;
-        let path = directory.path().join("ThreadlineSetup.exe");
-        let mut output = File::options()
-            .write(true)
-            .create_new(true)
-            .open(&path)
-            .map_err(|_| "Could not create the staged installer.")?;
+        let (directory, path, mut output) = new_download(temp)?;
         let length = match offline {
             Some(dir) => read_local(
                 &dir.join(
@@ -268,47 +265,81 @@ impl Source {
             )?,
             None => self.fetch(asset, &mut output, manifest.size).await?,
         };
-        output
-            .sync_all()
-            .map_err(|_| "Could not flush the complete installer. Check available disk space.")?;
-        drop(output);
-        if length != manifest.size {
-            return Err("The installer download was interrupted or had the wrong size.");
-        }
-        let guard = lock_installer(&path)?;
-        verify_bytes(&guard, manifest.size, &pin(&manifest.sha256)?)?;
-        Ok(Staged {
-            manifest,
-            path,
-            _directory: directory,
-            _guard: guard,
-        })
+        finish_download(directory, path, output, length, manifest)
     }
-    async fn fetch(&self, url: Url, out: &mut dyn Write, limit: u64) -> Result<u64> {
-        let mut response = self.client.get(url).send().await.map_err(|_| {
+    async fn fetch(&self, url: Url, out: &mut (dyn Write + Send), limit: u64) -> Result<u64> {
+        let response = self.client.get(url).send().await.map_err(|_| {
             "Could not reach the selected release. Check network access or use a verified offline copy."
         })?;
-        if response.status() != reqwest::StatusCode::OK {
-            return Err("The selected release or installer is unavailable.");
-        }
-        if response.content_length().is_some_and(|n| n > limit) {
+        stream_body(response, out, limit).await
+    }
+}
+
+fn new_download(temp: &Path) -> Result<(tempfile::TempDir, PathBuf, File)> {
+    let directory = tempfile::Builder::new()
+        .prefix("Threadline-setup-")
+        .tempdir_in(temp)
+        .map_err(|_| "Could not create a private temporary staging directory.")?;
+    let path = directory.path().join("ThreadlineSetup.exe");
+    let output = File::options()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .map_err(|_| "Could not create the staged installer.")?;
+    Ok((directory, path, output))
+}
+
+fn finish_download(
+    directory: tempfile::TempDir,
+    path: PathBuf,
+    output: File,
+    length: u64,
+    manifest: Manifest,
+) -> Result<Staged> {
+    output
+        .sync_all()
+        .map_err(|_| "Could not flush the complete installer. Check available disk space.")?;
+    drop(output);
+    if length != manifest.size {
+        return Err("The installer download was interrupted or had the wrong size.");
+    }
+    let guard = lock_installer(&path)?;
+    verify_bytes(&guard, manifest.size, &pin(&manifest.sha256)?)?;
+    Ok(Staged {
+        #[cfg(windows)]
+        restart: None,
+        manifest,
+        path,
+        _directory: directory,
+        _guard: guard,
+    })
+}
+
+async fn stream_body(
+    mut response: reqwest::Response,
+    out: &mut (dyn Write + Send),
+    limit: u64,
+) -> Result<u64> {
+    if response.status() != reqwest::StatusCode::OK {
+        return Err("The selected release or installer is unavailable.");
+    }
+    if response.content_length().is_some_and(|n| n > limit) {
+        return Err("The download exceeded its allowed size.");
+    }
+    let mut count = 0;
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| "The download was interrupted. Rerun setup to start a fresh download.")?
+    {
+        count += chunk.len() as u64;
+        if count > limit {
             return Err("The download exceeded its allowed size.");
         }
-        let mut count = 0;
-        while let Some(chunk) = response
-            .chunk()
-            .await
-            .map_err(|_| "The download was interrupted. Rerun setup to start a fresh download.")?
-        {
-            count += chunk.len() as u64;
-            if count > limit {
-                return Err("The download exceeded its allowed size.");
-            }
-            out.write_all(&chunk)
-                .map_err(|_| "Could not write the staged download. Check available disk space.")?;
-        }
-        Ok(count)
+        out.write_all(&chunk)
+            .map_err(|_| "Could not write the staged download. Check available disk space.")?;
     }
+    Ok(count)
 }
 fn safe_segments(raw: &str) -> bool {
     !raw.contains(['\\', '%']) && !raw.split('/').any(|p| matches!(p, "." | ".."))
@@ -370,6 +401,8 @@ fn verify_bytes(file: &File, size: u64, hash: &[u8; 32]) -> Result<()> {
 pub struct Staged {
     pub manifest: Manifest,
     pub path: PathBuf,
+    #[cfg(windows)]
+    restart: Option<github_update::Restart>,
     // Release the read-only Windows handle before removing its private directory.
     _guard: File,
     _directory: tempfile::TempDir,
