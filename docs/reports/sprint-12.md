@@ -85,8 +85,9 @@ The `d524740` Windows 11 run completed the offline and backlog journeys with 117
 | Budget | <100 ms | <200 ms | <100 ms | <2000 ms |
 | `4700e75`, v1 | 2148.26 ms | 2119.01 ms | 2089.30 ms | 13874.84 ms |
 | `d524740`, v2 | 2154.68 ms | 2165.65 ms | 2108.55 ms | 13236.21 ms |
+| `013044b`, v2, full suite | 2123.79 ms | 2106.26 ms | 2091.91 ms | 3759.24 ms |
 
-Both runs missed the four external timing budgets. The v2 warm process reached its first useful two-pane paint at 13214.56 ms from the driver's start, with 11660.75 ms from app entry. The driver verified the report 23.28 ms after that paint. The v2 run passed the recorded idle redraw, working-set, three GPU counter samples, and local package-size checks at 96 DPI. The 60 samples in the table ran offline. The single tab switch during the held write supplies a separate overlap measurement. [Budget measurements and timing attribution](evidence/sprint-12/reader-performance.json)
+All three runs missed the four external timing budgets. The targeted `d524740` run passed the idle redraw, working-set, GPU counter and local package-size checks at 96 DPI. The 60 samples in each run were measured offline. Each held-write tab switch supplies a separate overlap measurement. [Targeted runs, budget measurements and timing attribution](evidence/sprint-12/reader-performance.json) · [Full suite measurements](evidence/sprint-12/full-native-013044b.json)
 
 ### Windows UI Automation reference
 
@@ -110,6 +111,20 @@ The earlier Windows run on `3dc5b64` recorded 238 passes, two failures and two i
 
 A separate Windows test delivered modeled suspend and resume messages to its own hidden platform window. The broker emitted one normal resume event. Physical sleep still needs target evidence. [Native resume receipt](evidence/sprint-12/local-suite-validation.json)
 
+## Full native Windows suite
+
+The canonical full suite on Windows 11 Enterprise x64 build 22631.7652 finished with **12 Pass, eight Blocked and one Fail**, exit 1. The clean runner, staged driver and optimized E2E app came from `013044b`. E2E-012, E2E-018 and E2E-020 exercised local installed build 11 from `8da02ce`. The receipt records all 21 cases, their fixture revisions and child exits, the build hashes and the exact invocation. [Full native suite receipt](evidence/sprint-12/full-native-013044b.json)
+
+| Result | Scenarios |
+| --- | --- |
+| Pass | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-013, E2E-018, E2E-020 and S05-WINDOWS-SYNC. |
+| Blocked | E2E-001, E2E-002, E2E-003, E2E-012, E2E-015, E2E-019, S01-WINDOWS-SHELL and S01-WINDOWS-TOAST. Windows did not grant foreground focus. In E2E-012 Windows recorded the notification group before the driver stopped. Earlier passes remain recorded against their original builds and desktop conditions. |
+| Fail | E2E-014 completed the offline and backlog journeys and missed all four external timing budgets. |
+
+In E2E-014, the 50,000-item profile restored all 20 tabs and completed all 60 offline timing inputs. The driver recorded 117 native actions and 39 authenticated loopback requests. During a held write it switched a cached tab in 2098.39 ms and cancelled another action in 2396.22 ms. Two cancellations and exactly nine confirmations reduced the unresolved count from 901 to 890. Idle draws and presents stayed at zero for three seconds. Idle and peak working sets and all three GPU samples passed their budgets. Package size came from the targeted `d524740` run and its 11,045,509-byte setup artifact. [Native workload, resource and request evidence](evidence/sprint-12/full-native-013044b.json) · [Targeted package measurement](evidence/sprint-12/reader-performance.json)
+
+The warm process opened its SQLite profile between 12.28 and 18.33 ms from app entry. GPUI was ready at 1480.40 ms, the window was created at 1546.41 ms, the saved layout loaded at 1633.38 ms, and both active panes hydrated at 2210.44 ms. The first useful paint was 2258.83 ms from app entry and 3730.94 ms from the driver's launch. The external warm result was 3759.24 ms against 2000 ms. On initial launch the profile also opened in about 5 ms, while GPUI readiness took 10973.98 ms from app entry. [Initial and warm startup phases](evidence/sprint-12/full-native-013044b.json)
+
 ## Windows closure and remaining checks
 
 The Windows scenario ledger links each covered unit, SQLite and in-process GPUI case to its matching native tests. [Exact tests and receipt hashes](evidence/sprint-12/windows-traceability.json) · [Windows scenario ledger](../spec/test_platform_traceability.csv)
@@ -118,7 +133,7 @@ E2E-015 invoked the owned Load preview control through Windows UI Automation on 
 
 | Local Windows work | Remaining proof |
 | --- | --- |
-| Section 16 performance and Outbox, E2E-014 / AC-35, AC-48, AC-71 | Complete the concurrent drain, navigation and cancellation measurements and record all available GPU samples. Keep the recorded p95 and startup failures visible. The user's earlier scrolling decision still applies to the initial phase. |
+| Section 16 performance and Outbox, E2E-014 / AC-35, AC-48, AC-71 | The full run completed the eligible backlog drain and sampled navigation and cancellation during a held write. Cached open, search, tab-switch p95 and warm startup still exceed their budgets. Complete the matched 60-sample run while scheduled reads are in flight. The earlier scrolling decision applies to the initial phase. [Full suite evidence](evidence/sprint-12/full-native-013044b.json) |
 | Restored private workspace and failure handling, AC-56, AC-68, AC-73, AC-74, AC-91, AC-92 | In one mixed profile, verify useful cached state before a delayed API response, a valid protected credential across restart, safe signed-out isolation, no repeat delivery, and retained drafts, dependencies and receipts across the remaining faults. Sprint 04, 07, 09 and 11 cover constituent paths. |
 | Remaining feature cases, AC-16, AC-18, AC-27, AC-28, AC-29, AC-31, AC-32, AC-39, AC-40, AC-63, AC-65, AC-77 | Exercise multiple submitted inline notes, reviewer attribution, queued thread outcomes and required-merge-queue handling. Verify the app's unopened-item, baseline, grouped-review, reconnect and watched-branch/merge notification paths against the local provider. |
 | Local installer recovery, PKG-003/004/006/009 and AC-96 through AC-98 | Verify protected sign-in and continued synchronization across uninstall and reinstall on the exact release candidate. Local fault runs cover interrupted transfer, denied staging access and incompatible architecture. The separate confirmed cleanup ran on generated profiles. |
