@@ -1,0 +1,50 @@
+{
+  "scenario": "S07-WRITE-WORKER",
+  "acceptance": ["AC-62"],
+  "scope": "Windows production dispatcher and provider client with an isolated SQLite profile and authenticated synthetic HTTP on localhost",
+  "source_revision": "b230bbd23d639e447e89a70d7715d2bb10285a2e",
+  "app_version": "0.1.0",
+  "cargo_lock_sha256": "ba1fa2481ba47ebb082dae4aff8bf1a099cea5775b4196b096aeb3bb094d4efb",
+  "fixture_revision": "s07-write-engine-v1",
+  "test": "accounts::write_tests::completion::write_dispatch_failed_local_completion_reconciles_without_replay",
+  "host": {"os": "Windows 11 Enterprise", "build": "10.0.22631.7652", "architecture": "x86_64"},
+  "executable_sha256": "a9ea6fa29fd2f6bcbb7970b2595c3151109b52555d9c7045cb0d6193893844ce",
+  "argv": [
+    "threadline_app-2ae9192585e4506d.exe",
+    "pr_service_commits_verified_files_context_and_cross_repository_reference",
+    "pr_context",
+    "ui_007_preview_review_author_mute",
+    "write_dispatch_failed_local_completion_reconciles_without_replay",
+    "--test-threads=1"
+  ],
+  "status": "Pass",
+  "exit_code": 0,
+  "tests_passed": 5,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "group_duration_seconds": 72.75,
+  "cases": [
+    {"action": "Edit existing issue", "issue": 55, "number": 42, "state_after_rollback": "OutcomeUnknown", "state_after_restart": "OutcomeUnknown", "mutation_requests": 1, "observed": "The edit response confirmed issue 55 in the healthy control. After rollback the cached title stayed original and no own-action receipt was published. Authenticated restart did not replay the edit or declare success."},
+    {"action": "Create comment", "issue": 55, "number": 42, "comment": 92, "state_after_rollback": "Waiting", "state_after_restart": "Confirmed", "mutation_requests": 1, "observed": "An acknowledged comment ID survived rollback. The restarted worker read back that exact comment on the original issue."},
+    {"action": "Submit review", "pull_request": 420, "number": 42, "review": 91, "state_after_rollback": "OutcomeUnknown", "state_after_restart": "Confirmed", "mutation_requests": 2, "observed": "The original pending review receipt survived. One create and one submit occurred in total. Readback confirmed the same review, actor, event and original head."},
+    {"action": "Direct merge", "pull_request": 420, "number": 42, "state_after_rollback": "Waiting", "state_after_restart": "Confirmed", "mutation_requests": 1, "observed": "The acknowledged merge OID survived the rollback of the authoritative readback transaction. The cached PR stayed unmerged until a second read verified the exact PR, head, original actor and acknowledged OID. It recorded one own merge."}
+  ],
+  "restart_boundary": "The original worker stopped and released its SQLite connections. The fixture reopened the same file and used a fresh HTTP client with the same synthetic credential. Only the elapsed readback deadline was advanced. Immutable intent, item, repository and attempt count stayed unchanged.",
+  "raw_sha256": {
+    "test_stdout": "9fcb6d2d8b215db8b599f97b896f74da4ce9e30053f403ccc72aadae1ccc2b32",
+    "numeric_exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  "portable_regressions": {
+    "scope": "Linux x64 local checkout f8e003d with the applied test patch",
+    "write_tests": {"passed": 8, "sha256": "ba2f3709208e47d24b7c7910c5022766986b79c544a3c38e6665b17283ab1fb0"},
+    "ut_009": {"passed": 3, "sha256": "a04c190d50f9da11a70053a7f1f10e0d32a74c058181b83d413ff50083408a68"},
+    "canonical": {"run": "integration-1795069899810-2755924", "case_passed": 1, "tests_passed": 3, "exit_code": 0, "result_sha256": "c031424839d93941271ae605705cea04b74199ea92b5066401820880b5068960", "case_log_sha256": "b38781cc7acb2f8db0f066b55abb86a792e81de7b9903468235eef196c024e1a"}
+  },
+  "related_evidence": [
+    "../sprint-07/native-editors.json",
+    "native-lifecycle.json",
+    "../sprint-08/review-decisions-native.json",
+    "../sprint-09/merge-cancellation-native.json",
+    "queue-fault-audit.json"
+  ]
+}
