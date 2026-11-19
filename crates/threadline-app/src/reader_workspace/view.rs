@@ -931,6 +931,7 @@ impl ReaderWorkspace {
     ) -> impl IntoElement {
         let focused = index == self.layout.focused_pane;
         let active = pane.active.and_then(|i| pane.tabs.get(i));
+        let tab_width = px(((pane_width - 20.) / 2.).clamp(108., 220.));
         let tabs = div()
             .id(format!("reader-tabs-{index}"))
             .role(Role::Group)
@@ -995,6 +996,8 @@ impl ReaderWorkspace {
                             label.clone()
                         };
                         let button = control(name.clone(), label)
+                            .w(tab_width)
+                            .flex_shrink_0()
                             .selected(selected)
                             .accessibility_label(accessibility_label)
                             .on_click(cx.listener(move |this, _, window, cx| {

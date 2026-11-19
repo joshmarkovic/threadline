@@ -293,3 +293,39 @@ Activate-FixturePr 123 'reader-result-' 42 'First fixture pull request' -Result
 if ($script:fixtureInvocations -ne 2) {
     throw 'The journey did not retry transient pre-activation unavailability within the wait.'
 }
+
+function Measure-ReaderPerformance([IntPtr]$Window, $Samples, $Attribution, [switch]$Physical) {
+    for ($index = 0; $index -lt 20; $index++) { $Samples.cached_open.Add(100.0) }
+    $Samples.cached_tab_switch.Add(90.0)
+    $Attribution.cached_tab_switch.Add([ordered]@{ status = 'Correlated' })
+    throw 'Native test interruption'
+}
+$script:report = [ordered]@{ budgets = [ordered]@{ warm_start_ms = @{ status = 'Fail' } } }
+$interrupted = $false
+try { Invoke-ReaderPerformance 123 -KeepOpen } catch {
+    $interrupted = $_.Exception.Message -ceq 'Native test interruption'
+}
+if (!$interrupted -or $script:report.budgets.warm_start_ms.status -cne 'Fail' -or
+    $script:report.budgets.cached_open.p95_ms -ne 100 -or $script:report.budgets.cached_open.status -cne 'Fail' -or
+    $script:report.budgets.cached_tab_switch.sample_count -ne 1 -or
+    $script:report.budgets.cached_tab_switch.samples_ms[0] -ne 90 -or
+    $null -ne $script:report.budgets.cached_tab_switch.p95_ms -or
+    $script:report.budgets.cached_tab_switch.status -cne 'Blocked' -or
+    $script:report.budgets.local_search.sample_count -ne 0 -or
+    $script:report.attribution.cached_tab_switch[0].status -cne 'Correlated') {
+    throw 'The interrupted benchmark did not retain completed and partial measurements.'
+}
+$frequency = [Diagnostics.Stopwatch]::Frequency
+$startup = [pscustomobject]@{ startup_ms = 1200; first_cached_workspace_paint = [pscustomobject]@{
+    qpc = 3 * $frequency; frequency = $frequency; since_app_start_ms = 1500
+} }
+$timing = Get-LargeStartupTiming $startup $frequency (2 * $frequency) (4 * $frequency)
+if ($timing.status -cne 'Correlated' -or $timing.process_start_call_ms -ne 1000 -or
+    $timing.app_ready_ms -ne 1200 -or $timing.launch_to_cached_panes_paint_ms -ne 2000 -or
+    $timing.app_start_to_cached_panes_paint_ms -ne 1500 -or $timing.paint_to_verified_receipt_ms -ne 1000) {
+    throw 'Startup attribution did not keep the external endpoint and the app paint distinct.'
+}
+$timing = Get-LargeStartupTiming $startup $frequency (2 * $frequency) (2 * $frequency)
+if ($timing.status -cne 'Unavailable' -or $null -ne $timing.launch_to_cached_panes_paint_ms) {
+    throw 'Startup timing accepted an app stamp newer than the external observation.'
+}

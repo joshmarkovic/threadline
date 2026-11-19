@@ -65,13 +65,18 @@ function Restart-Reader([string]$Profile, [hashtable]$Startup, [switch]$SeedQuie
     }
     $observationName = if ($Backlog) { 'reader-backlog-observation.json' } else { 'reader-restart-observation.json' }
     $script:reportFile = Join-Path $script:ReportDir $observationName
-    if ($Startup) { $startupClock = [Diagnostics.Stopwatch]::StartNew() }
+    if ($Startup) {
+        $launchBegin = [Diagnostics.Stopwatch]::GetTimestamp()
+        $startupClock = [Diagnostics.Stopwatch]::StartNew()
+    }
     $script:app = Start-Threadline $Profile $script:reportFile -ReaderIdle:([bool]$Startup) -ReaderBacklog:$Backlog
+    if ($Startup) { $launchReturned = [Diagnostics.Stopwatch]::GetTimestamp() }
     $script:report.restarted_pid = $script:app.Id
     $window = Get-ReadyWindow
     if ($Startup) {
-        Wait-LargeWorkspaceReady $window
+        $ready = Wait-LargeWorkspaceReady $window
         $Startup.warm_start_ms = $startupClock.Elapsed.TotalMilliseconds
+        $Startup.warm_start_timing = Get-LargeStartupTiming $ready $launchBegin $launchReturned ([Diagnostics.Stopwatch]::GetTimestamp())
     }
     if (!$script:UseOwnedUiAutomation) { Set-WindowFocus $window }
     $after = Get-IsolatedSqlite $Profile -Live
@@ -179,16 +184,20 @@ function Invoke-ReaderResumeProof([IntPtr]$Window, [string]$Profile) {
 }
 
 function Get-ReaderBudget([double[]]$Samples, [double]$Limit) {
-    if ($Samples.Count -ne 20) { throw 'The reader workload did not collect twenty samples.' }
-    $ordered = $Samples.Clone()
-    [Array]::Sort($ordered)
-    $p95 = $ordered[[int][Math]::Ceiling(0.95 * $ordered.Count) - 1]
+    $p95 = $null
+    $status = 'Blocked'
+    if ($Samples.Count -eq 20) {
+        $ordered = $Samples.Clone()
+        [Array]::Sort($ordered)
+        $p95 = $ordered[[int][Math]::Ceiling(0.95 * $ordered.Count) - 1]
+        $status = if ($p95 -lt $Limit) { 'Pass' } else { 'Fail' }
+    }
     return [ordered]@{
         sample_count = $Samples.Count
         samples_ms = $Samples
         p95_ms = $p95
         limit_ms = $Limit
-        status = if ($p95 -lt $Limit) { 'Pass' } else { 'Fail' }
+        status = $status
     }
 }
 
@@ -266,7 +275,7 @@ function Get-ReaderTimingAttribution([hashtable]$InputTiming, [object]$State, [s
     return $details
 }
 
-function Invoke-ReaderPerformance([IntPtr]$Window, [switch]$KeepOpen, [switch]$Physical) {
+function Measure-ReaderPerformance([IntPtr]$Window, $Samples, $Attribution, [switch]$Physical) {
     $initial = Wait-Reader 'twenty restored tabs across two offline panes' {
         param($reader)
         $reader.offline -and $reader.signed_out -and $reader.cached_content_ready -and
@@ -277,12 +286,6 @@ function Invoke-ReaderPerformance([IntPtr]$Window, [switch]$KeepOpen, [switch]$P
         Stop-Blocked 'The Section 16 reader workload needs enough logical display area for both native panes.'
     }
     $clock = [Diagnostics.Stopwatch]::new()
-    $search = [System.Collections.Generic.List[double]]::new()
-    $open = [System.Collections.Generic.List[double]]::new()
-    $switch = [System.Collections.Generic.List[double]]::new()
-    $searchTiming = [System.Collections.Generic.List[object]]::new()
-    $openTiming = [System.Collections.Generic.List[object]]::new()
-    $switchTiming = [System.Collections.Generic.List[object]]::new()
     $inputTiming = @{ method = $null; begin = 0L; returned = 0L }
     $generation = 0
     for ($sample = 0; $sample -lt 20; $sample++) {
@@ -303,18 +306,18 @@ function Invoke-ReaderPerformance([IntPtr]$Window, [switch]$KeepOpen, [switch]$P
             $null -ne $reader.search_generation -and $reader.search_generation -gt $generation -and
                 $reader.search_results -gt 0 -and $reader.first_search_item -eq $targetItem
         } 5
-        $search.Add($clock.Elapsed.TotalMilliseconds)
+        $Samples.local_search.Add($clock.Elapsed.TotalMilliseconds)
         $observed = [Diagnostics.Stopwatch]::GetTimestamp()
         $generation = $found.cached_reader.search_generation
-        $searchTiming.Add((Get-ReaderTimingAttribution $inputTiming $found 'search' $generation $observed))
+        $Attribution.local_search.Add((Get-ReaderTimingAttribution $inputTiming $found 'search' $generation $observed))
 
         Click-AccountControl $Window 'reader-result-0' $clock $inputTiming
         $opened = Wait-Reader 'useful cached content in the newly opened item' {
             param($reader) $reader.active_item -eq $targetItem -and $reader.cached_content_ready
         } 5
-        $open.Add($clock.Elapsed.TotalMilliseconds)
+        $Samples.cached_open.Add($clock.Elapsed.TotalMilliseconds)
         $observed = [Diagnostics.Stopwatch]::GetTimestamp()
-        $openTiming.Add((Get-ReaderTimingAttribution $inputTiming $opened 'open' $targetItem $observed))
+        $Attribution.cached_open.Add((Get-ReaderTimingAttribution $inputTiming $opened 'open' $targetItem $observed))
         Click-AccountControl $Window 'reader-close-tab'
         $null = Wait-Reader 'the original twenty tabs after closing the measured item' {
             param($reader) ($reader.tab_counts -join ',') -ceq '10,10'
@@ -333,10 +336,20 @@ function Invoke-ReaderPerformance([IntPtr]$Window, [switch]$KeepOpen, [switch]$P
             $reader.active_item -ne $previous -and $reader.focused_pane -eq 0 -and
                 $reader.cached_content_ready -and ($reader.tab_counts -join ',') -ceq '10,10'
         } 5
-        $switch.Add($clock.Elapsed.TotalMilliseconds)
+        $Samples.cached_tab_switch.Add($clock.Elapsed.TotalMilliseconds)
         $observed = [Diagnostics.Stopwatch]::GetTimestamp()
         $previous = $after.cached_reader.active_item
-        $switchTiming.Add((Get-ReaderTimingAttribution $inputTiming $after 'tab' $previous $observed))
+        $Attribution.cached_tab_switch.Add((Get-ReaderTimingAttribution $inputTiming $after 'tab' $previous $observed))
+    }
+}
+
+function Invoke-ReaderPerformance([IntPtr]$Window, [switch]$KeepOpen, [switch]$Physical) {
+    $limits = [ordered]@{ cached_open = 100; local_search = 200; cached_tab_switch = 100 }
+    $samples = @{}
+    $attribution = @{}
+    foreach ($metric in $limits.Keys) {
+        $samples[$metric] = [System.Collections.Generic.List[double]]::new()
+        $attribution[$metric] = [System.Collections.Generic.List[object]]::new()
     }
     $script:report.timing = if ($Physical) {
         'Owned physical Enter or Win32 click to useful app observation. Query entry verified before timing. Polling requested at 5 ms.'
@@ -345,19 +358,23 @@ function Invoke-ReaderPerformance([IntPtr]$Window, [switch]$KeepOpen, [switch]$P
     }
     $script:report.attribution = [ordered]@{
         source = 'Windows QueryPerformanceCounter. App paint callback precedes platform presentation.'
-        cached_open = $openTiming.ToArray()
-        local_search = $searchTiming.ToArray()
-        cached_tab_switch = $switchTiming.ToArray()
     }
-    $script:report.budgets = [ordered]@{
-        cached_open = Get-ReaderBudget ($open.ToArray()) 100
-        local_search = Get-ReaderBudget ($search.ToArray()) 200
-        cached_tab_switch = Get-ReaderBudget ($switch.ToArray()) 100
+    if ($null -eq $script:report.budgets) { $script:report.budgets = [ordered]@{} }
+    try {
+        Measure-ReaderPerformance $Window $samples $attribution -Physical:$Physical
+    } finally {
+        foreach ($metric in $limits.Keys) {
+            $script:report.budgets[$metric] = Get-ReaderBudget ($samples[$metric].ToArray()) $limits[$metric]
+            $script:report.attribution[$metric] = $attribution[$metric].ToArray()
+        }
     }
     if (!$KeepOpen) { Stop-ThroughUi }
     if (!$KeepOpen) {
         if ($script:report.budgets.Values.status -contains 'Fail') {
             throw 'One or more Section 16 cached-reader p95 budgets failed.'
+        }
+        if ($script:report.budgets.Values.status -contains 'Blocked') {
+            Stop-Blocked 'One or more Section 16 cached-reader timings did not finish.'
         }
         $script:report.detail = 'Cached opening, local search and tab switching passed their Section 16 p95 budgets.'
     }
@@ -375,6 +392,31 @@ function Wait-LargeWorkspaceReady([IntPtr]$Window) {
         $null -eq $state.bounds.PSObject.Properties['reader-tab-1-0']) {
         Stop-Blocked 'Both cached panes need to be visible in the owned Threadline window.'
     }
+    return $state
+}
+
+function Get-LargeStartupTiming($State, [long]$LaunchBegin, [long]$LaunchReturned, [long]$Observed) {
+    $ticksToMs = 1000.0 / [Diagnostics.Stopwatch]::Frequency
+    $result = [ordered]@{
+        status = 'Unavailable'
+        process_start_call_ms = ($LaunchReturned - $LaunchBegin) * $ticksToMs
+        app_ready_ms = $State.startup_ms
+        launch_to_cached_panes_paint_ms = $null
+        app_start_to_cached_panes_paint_ms = $null
+        paint_to_verified_receipt_ms = $null
+    }
+    $paint = $State.PSObject.Properties['first_cached_workspace_paint']
+    if ($null -eq $paint -or $null -eq $paint.Value) { return $result }
+    $stamp = $paint.Value
+    if ($stamp.frequency -ne [Diagnostics.Stopwatch]::Frequency -or
+        $stamp.qpc -le $LaunchBegin -or $stamp.qpc -gt $Observed -or $stamp.since_app_start_ms -lt 0) {
+        return $result
+    }
+    $result.status = 'Correlated'
+    $result.launch_to_cached_panes_paint_ms = ($stamp.qpc - $LaunchBegin) * $ticksToMs
+    $result.app_start_to_cached_panes_paint_ms = $stamp.since_app_start_ms
+    $result.paint_to_verified_receipt_ms = ($Observed - $stamp.qpc) * $ticksToMs
+    return $result
 }
 
 function Get-LargeIdleStatus($Idle, [int]$ProcessId) {
@@ -400,13 +442,15 @@ function Read-LargeIdleSample {
     return [IO.File]::ReadAllText($path) | ConvertFrom-Json
 }
 
-function Invoke-LargeWorkspaceProof([IntPtr]$Window, [string]$Profile, [double]$InitialStartupMs) {
+function Invoke-LargeWorkspaceProof([IntPtr]$Window, [string]$Profile, [double]$InitialStartupMs, $InitialStartupTiming) {
     $script:app.Refresh()
     $startup = @{ warm_start_ms = $null }
     $runtime = [ordered]@{
         initial_offline_start_ms = $InitialStartupMs
+        initial_offline_start_timing = $InitialStartupTiming
         initial_offline_peak_working_set_bytes = $script:app.PeakWorkingSet64
         warm_start_ms = $null
+        warm_start_timing = $null
         warm_process_id = $null
         idle_frames = $null
         idle_working_set_bytes = $null
@@ -416,12 +460,29 @@ function Invoke-LargeWorkspaceProof([IntPtr]$Window, [string]$Profile, [double]$
     $script:report.runtime = $runtime
     $Window = Restart-Reader $Profile $startup
     $runtime.warm_start_ms = $startup.warm_start_ms
+    $runtime.warm_start_timing = $startup.warm_start_timing
     $runtime.warm_process_id = $script:app.Id
     $runtime.idle_frames = Read-LargeIdleSample
     $idleStatus = Get-LargeIdleStatus $runtime.idle_frames $script:app.Id
     $script:app.Refresh()
     $runtime.idle_working_set_bytes = $script:app.WorkingSet64
     $runtime.gpu_memory.idle = Get-GpuProcessMemory $script:app.Id
+    $limits = Get-Content -LiteralPath $BudgetFile -Raw | ConvertFrom-Json
+    $script:report.budgets = [ordered]@{
+        warm_start_ms = [ordered]@{
+            value = $runtime.warm_start_ms
+            limit = 2000
+            status = if ($null -eq $runtime.warm_start_ms) { 'Blocked' }
+                elseif ($runtime.warm_start_ms -gt 0 -and $runtime.warm_start_ms -lt 2000) { 'Pass' }
+                else { 'Fail' }
+        }
+        idle_redraw = [ordered]@{ status = $idleStatus }
+        idle_working_set_bytes = [ordered]@{
+            value = $runtime.idle_working_set_bytes
+            limit = $limits.idle_working_set_bytes
+            status = Compare-Measurement $runtime.idle_working_set_bytes $limits.idle_working_set_bytes
+        }
+    }
     Invoke-ReaderPerformance $Window -KeepOpen
     Click-AccountControl $Window 'reader-outbox'
     $expectedUnresolved = $script:BacklogSeed.unresolved_outbox
@@ -449,22 +510,15 @@ function Invoke-LargeWorkspaceProof([IntPtr]$Window, [string]$Profile, [double]$
     })
     $gpuMaximum = if ($gpuTotals.Count) { ($gpuTotals | Measure-Object -Maximum).Maximum } else { $null }
     $budgets = $script:report.budgets
-    $budgets.warm_start_ms = [ordered]@{
-        value = $runtime.warm_start_ms
-        limit = 2000
-        status = if ($null -eq $runtime.warm_start_ms) { 'Blocked' }
-            elseif ($runtime.warm_start_ms -gt 0 -and $runtime.warm_start_ms -lt 2000) { 'Pass' }
-            else { 'Fail' }
-    }
-    $budgets.idle_redraw = [ordered]@{ status = $idleStatus }
-    $limits = Get-Content -LiteralPath $BudgetFile -Raw | ConvertFrom-Json
-    foreach ($metric in @('idle_working_set_bytes', 'peak_working_set_bytes')) {
-        $budgets[$metric] = [ordered]@{
-            value = $runtime[$metric]; limit = $limits.$metric
-            status = Compare-Measurement $runtime[$metric] $limits.$metric
-        }
+    $budgets.peak_working_set_bytes = [ordered]@{
+        value = $runtime.peak_working_set_bytes
+        limit = $limits.peak_working_set_bytes
+        status = Compare-Measurement $runtime.peak_working_set_bytes $limits.peak_working_set_bytes
     }
     $budgets.gpu_memory_bytes = Get-GpuBudget $gpuMaximum $gpuTotals.Count $limits.gpu_memory_bytes
+    if ($gpuTotals.Count -ne $runtime.gpu_memory.Count -and $budgets.gpu_memory_bytes.status -eq 'Pass') {
+        $budgets.gpu_memory_bytes.status = 'Blocked'
+    }
     if ($Artifact) {
         $packageBytes = (Get-Item -LiteralPath $Artifact).Length
         $runtime.package = [ordered]@{ bytes = $packageBytes; sha256 = Get-FileSha256 $Artifact }

@@ -3,8 +3,9 @@ use gpui_kit::{
     AppContext, Bounds, Point, TestAppContext, WindowBounds, WindowOptions, size,
     test::TestWindowExt,
 };
+use std::num::NonZeroU64;
 use threadline_storage::{
-    IssueClassification, IssueRecord, ItemRepresentation, ItemUpdate, UtcMillis,
+    IssueClassification, IssueRecord, ItemLocator, ItemRepresentation, ItemUpdate, UtcMillis,
     fixtures::{Scale, populate_reader},
     queue::DraftKind,
 };
@@ -899,6 +900,36 @@ fn ui_008_cache_restores_a_tab_selected_during_a_pane_focus_save(cx: &mut TestAp
 #[gpui_kit::test]
 fn ui_008_observed_reader_controls_follow_the_visible_panes(cx: &mut TestAppContext) {
     let setup = ReaderHarness::seeded();
+    let number = NonZeroU64::new(4281).unwrap();
+    let title = "A downloaded title wider than the pane ".repeat(12);
+    let title = title.trim_end();
+    let account = setup.fixture.account;
+    let long_title_item = setup
+        .store
+        .ingest(
+            account,
+            ItemLocator {
+                repository: setup.fixture.repository,
+                number: number.get(),
+            },
+            ItemUpdate {
+                representation: ItemRepresentation::Issue(IssueRecord {
+                    id: threadline_core::domain::IssueApiId::new(number),
+                    node_id: None,
+                    classification: IssueClassification::Issue,
+                }),
+                remote_updated_at: UtcMillis(1_900_000_000_000),
+                title: Change::Value(title.into()),
+                body: Change::Value("Downloaded content".into()),
+                closed: Change::Value(false),
+            },
+        )
+        .unwrap();
+    let mut layout = setup.store.workspace(account).unwrap().unwrap();
+    layout.focused_pane = 0;
+    layout.panes[0].active = Some(0);
+    layout.panes[0].tabs[1].item = long_title_item;
+    setup.store.save_workspace(account, &layout).unwrap();
     let (window, reader) = setup.open(cx);
     until(cx, |cx| {
         cx.read(|cx| !reader.read(cx).list_busy && !reader.read(cx).rows.is_empty())
@@ -922,6 +953,7 @@ fn ui_008_observed_reader_controls_follow_the_visible_panes(cx: &mut TestAppCont
         "reader-search-submit",
         "reader-result-0",
         "reader-tab-0-0",
+        "reader-tab-0-1",
         "reader-tab-1-0",
         "reader-close-tab",
     ] {
@@ -929,6 +961,32 @@ fn ui_008_observed_reader_controls_follow_the_visible_panes(cx: &mut TestAppCont
             .test_control_bounds(control)
             .unwrap_or_else(|| panic!("missing visible {control}"));
         assert!(bounds[2] > 0. && bounds[3] > 0.);
+    }
+    let second_bounds = observation.test_control_bounds("reader-tab-0-1").unwrap();
+    for (control, position) in [("reader-tab-0-1", 1), ("reader-tab-0-0", 0)] {
+        click(cx, window, control);
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let reader = reader.read(cx);
+                !reader.layout_busy && reader.layout.panes[0].active == Some(position)
+            })
+        });
+        cx.update_window(window, |_, window, cx| {
+            observation.begin_frame();
+            window.render_frame(cx);
+            assert_eq!(
+                observation.test_control_bounds("reader-tab-0-1"),
+                Some(second_bounds)
+            );
+            assert!(
+                window
+                    .find("reader-tab-0-1")
+                    .label()
+                    .unwrap()
+                    .contains(title)
+            );
+        })
+        .unwrap();
     }
     click(cx, window, "reader-maximize-pane");
     until(cx, |cx| {

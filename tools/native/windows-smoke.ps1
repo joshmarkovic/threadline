@@ -948,12 +948,17 @@ try {
         . (Join-Path $PSScriptRoot 'windows-app-toast.ps1')
         Register-AppToastFixture
     }
+    $launchBegin = [Diagnostics.Stopwatch]::GetTimestamp()
     $clock = [Diagnostics.Stopwatch]::StartNew()
     $app = Start-Threadline $firstProfile $reportFile
+    $launchReturned = [Diagnostics.Stopwatch]::GetTimestamp()
     $report.app_pid = $app.Id
     $window = Get-ReadyWindow
-    if ($ReaderProof -eq 'LargeWorkspace') { Wait-LargeWorkspaceReady $window }
+    if ($ReaderProof -eq 'LargeWorkspace') { $cachedReady = Wait-LargeWorkspaceReady $window }
     $coldMs = $clock.Elapsed.TotalMilliseconds
+    if ($ReaderProof -eq 'LargeWorkspace') {
+        $initialStartupTiming = Get-LargeStartupTiming $cachedReady $launchBegin $launchReturned ([Diagnostics.Stopwatch]::GetTimestamp())
+    }
     $report.native_window = $window.ToInt64()
     $report.dpi = [ThreadlineWinInput]::GetDpiForWindow($window)
     if ($AccessibilityProof) {
@@ -990,7 +995,7 @@ try {
             Resume { Invoke-ReaderResumeProof $window $firstProfile }
             Performance { Invoke-ReaderPerformance $window }
             PerformancePhysical { Invoke-ReaderPerformance $window -Physical }
-            LargeWorkspace { Invoke-LargeWorkspaceProof $window $firstProfile $coldMs }
+            LargeWorkspace { Invoke-LargeWorkspaceProof $window $firstProfile $coldMs $initialStartupTiming }
             Sync { Invoke-SyncProof $window $firstProfile }
             NotificationSchedule { Invoke-NotificationScheduleProof $window $firstProfile }
             PullRequest { Invoke-PrReaderProof $window }

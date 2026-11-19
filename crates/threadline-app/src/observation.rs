@@ -26,6 +26,7 @@ pub(crate) struct Observer(Rc<RefCell<Recorder>>);
 struct Recorder {
     started: Instant,
     startup_ms: Option<f64>,
+    cached_workspace_paint: Option<StartupPaint>,
     bounds: BTreeMap<Cow<'static, str>, [f32; 4]>,
     measurement: Option<Measurement>,
     reader_timing: Option<performance::PaintTiming>,
@@ -64,6 +65,13 @@ struct FramePhases {
     platform_present_ms: f64,
 }
 
+#[derive(Clone, Copy, Serialize)]
+struct StartupPaint {
+    qpc: Option<i64>,
+    frequency: Option<i64>,
+    since_app_start_ms: f64,
+}
+
 #[derive(Serialize)]
 pub(crate) struct Snapshot {
     pub ready: bool,
@@ -96,6 +104,8 @@ struct Report<'a> {
     pid: u32,
     scale_factor: f32,
     startup_ms: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    first_cached_workspace_paint: Option<StartupPaint>,
     bounds: &'a BTreeMap<Cow<'static, str>, [f32; 4]>,
     scroll_frame_times_ms: &'a [f64],
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -127,6 +137,7 @@ impl Observer {
         let observer = Self(Rc::new(RefCell::new(Recorder {
             started,
             startup_ms: None,
+            cached_workspace_paint: None,
             bounds: BTreeMap::new(),
             measurement,
             reader_timing: None,
@@ -242,16 +253,26 @@ impl Observer {
                 recorder.reader_timing = Some(*timing);
             }
         }
+        let elapsed_ms = recorder.started.elapsed().as_secs_f64() * 1_000.;
         if snapshot.cached_reader.as_ref().is_some_and(|reader| {
             reader.signed_out
                 && reader.offline
                 && reader.cached_visible_panes == 2
                 && reader.tab_counts == [10, 10]
-        }) && let Some(trigger) = recorder.reader_idle.take()
+        }) && recorder.bounds.contains_key("reader-tab-0-0")
+            && recorder.bounds.contains_key("reader-tab-1-0")
         {
-            let _ = trigger.send(window.window_handle().window_id());
+            recorder
+                .cached_workspace_paint
+                .get_or_insert_with(|| StartupPaint {
+                    qpc: performance::counter(),
+                    frequency: performance::frequency(),
+                    since_app_start_ms: elapsed_ms,
+                });
+            if let Some(trigger) = recorder.reader_idle.take() {
+                let _ = trigger.send(window.window_handle().window_id());
+            }
         }
-        let elapsed_ms = recorder.started.elapsed().as_secs_f64() * 1_000.;
         let startup_ms = if snapshot.ready {
             *recorder.startup_ms.get_or_insert(elapsed_ms)
         } else {
@@ -260,6 +281,7 @@ impl Observer {
         let Recorder {
             bounds,
             measurement,
+            cached_workspace_paint,
             ..
         } = &mut *recorder;
         if let Some(opening) = opening {
@@ -277,6 +299,7 @@ impl Observer {
             pid: std::process::id(),
             scale_factor: window.scale_factor(),
             startup_ms,
+            first_cached_workspace_paint: *cached_workspace_paint,
             bounds,
             scroll_frame_times_ms: measurement.map_or(&[], |data| &data.frame_times),
             scroll_frame_phases: measurement.map(|data| data.frame_phases.as_slice()),

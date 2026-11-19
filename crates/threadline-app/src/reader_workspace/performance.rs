@@ -72,7 +72,7 @@ unsafe extern "system" {
     fn QueryPerformanceFrequency(value: *mut i64) -> i32;
 }
 
-fn frequency() -> Option<i64> {
+pub(crate) fn frequency() -> Option<i64> {
     #[cfg(windows)]
     {
         let mut value = 0;
