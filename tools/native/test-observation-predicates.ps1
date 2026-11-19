@@ -45,6 +45,36 @@ try {
 . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
 . (Join-Path $PSScriptRoot 'windows-review-context.ps1')
 
+& {
+    function Find-OwnedFixtureControl($Window, $Id, [switch]$AllowDisabled) {
+        if ($Window -ne 72 -or $Id -cne 'pr-0-commits-coverage' -or !$AllowDisabled) {
+            throw 'The coverage check requested the wrong native status control.'
+        }
+        [pscustomobject]@{ Current = [pscustomobject]@{ Name = $fixtureLabel } }
+    }
+    function Wait-For($Description, [scriptblock]$Probe) {
+        if ((& $Probe) -ne $accepted) { throw "Unexpected result for $Description and fixture label $fixtureLabel." }
+    }
+    $dot = ' ' + [char]0x00b7 + ' '
+    $downloaded = 'Commits' + $dot + 'downloaded' + $dot + 'Last saved '
+    $unchecked = 'Commits' + $dot + 'not checked' + $dot + 'Last saved not yet recorded'
+    $fixtureLabel = $downloaded + '2023-07-12 12:00 UTC (+00:00)'
+    $accepted = $true
+    Wait-FixtureCommitCoverage 72 -Downloaded
+    $fixtureLabel = $unchecked
+    Wait-FixtureCommitCoverage 72
+    $accepted = $false
+    foreach ($candidate in @(
+        $unchecked,
+        ($downloaded + '2023-07-12 12:00 UTC (-05:00)'),
+        ($downloaded + '2023-07-12 08:00 EDT (-04:00)'),
+        ($downloaded + '2023-07-12 12:00 UTC')
+    )) {
+        $fixtureLabel = $candidate
+        Wait-FixtureCommitCoverage 72 -Downloaded
+    }
+}
+
 $account = [pscustomobject]@{
     panel_open = $true
     busy = $false
