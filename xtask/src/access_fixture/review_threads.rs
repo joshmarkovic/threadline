@@ -7,7 +7,10 @@ const BASE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const REPLY: &str = "Threadline synthetic queued thread reply.";
 
 pub(super) fn active(phase: Phase) -> bool {
-    matches!(phase, Phase::ThreadQueue | Phase::ThreadOutdated)
+    matches!(
+        phase,
+        Phase::ThreadQueue | Phase::ThreadOutdated | Phase::ThreadPlacement
+    )
 }
 
 pub(super) fn graphql(phase: Phase, body: &Value) -> Option<Route> {
@@ -24,7 +27,10 @@ pub(super) fn graphql(phase: Phase, body: &Value) -> Option<Route> {
             return Some(Route::QueuedThreadReviewList);
         }
     }
-    if *variables == json!({"id":THREAD}) && query.starts_with("query ThreadlineReviewThread(") {
+    if phase != Phase::ThreadPlacement
+        && *variables == json!({"id":THREAD})
+        && query.starts_with("query ThreadlineReviewThread(")
+    {
         return Some(Route::QueuedThreadTarget);
     }
     if phase == Phase::ThreadQueue
@@ -74,6 +80,10 @@ pub(super) fn response(phase: Phase, route: Route, identifier: Option<&str>) -> 
     let mut node = json!({"id":"PR_42","fullDatabaseId":762,"baseRefOid":BASE,"headRefOid":HEAD,
         "repository":{"id":"R_71","name":"private","owner":{"login":"fixture-org"}}});
     let (status, reason, body) = match route {
+        Route::QueuedThreadList if phase == Phase::ThreadPlacement => {
+            node["reviewThreads"] = placement_threads();
+            (200, "OK", json!({"data":{"node":node}}))
+        }
         Route::QueuedThreadList => {
             node["reviewThreads"] = json!({"pageInfo":info(),"nodes":[{
                 "id":THREAD,"diffSide":"RIGHT","isResolved":outdated,"isOutdated":outdated,
@@ -110,6 +120,62 @@ pub(super) fn response(phase: Phase, route: Route, identifier: Option<&str>) -> 
         body,
         sso: None,
     })
+}
+
+fn placement_threads() -> Value {
+    let page = json!({"hasNextPage":false,"endCursor":null});
+    let comment = |id, reply, who, body| {
+        json!({
+            "id":format!("PRRC_{id}"),"fullDatabaseId":id,"replyTo":reply,
+            "author":{"login":who,"databaseId":75,"__typename":"User"},"body":body,
+            "createdAt":"2021-01-01T00:00:00Z","updatedAt":"2021-01-01T00:00:00Z",
+            "path":"src/earlier.rs","originalLine":3,"originalCommit":{"oid":"d".repeat(40)}
+        })
+    };
+    let thread = |id, side, line, subject, outdated, comments| {
+        json!({
+            "id":id,"path":"src/first.rs","diffSide":side,"line":line,"subjectType":subject,
+            "isResolved":false,"isOutdated":outdated,"comments":{"nodes":comments,"pageInfo":page}
+        })
+    };
+    json!({"pageInfo":page,"nodes":[
+        thread("PRRT_LEFT","LEFT",Some(9),"LINE",false,vec![
+            comment(781, Value::Null, "fixture-left", "Deletion-side root."),
+            comment(782, json!({"fullDatabaseId":781}), "fixture-reply", "Downloaded deletion-side reply.")
+        ]),
+        thread("PRRT_RIGHT","RIGHT",Some(17),"LINE",false,vec![
+            comment(783, Value::Null, "fixture-right", "Moved right-side root."),
+            comment(784, json!({"fullDatabaseId":783}), "fixture-reply", "Downloaded right-side reply.")
+        ]),
+        thread("PRRT_FILE","RIGHT",None,"FILE",false,vec![
+            comment(785, Value::Null, "fixture-file", "File-level review body.")
+        ]),
+        thread("PRRT_OUTDATED","RIGHT",Some(17),"LINE",true,vec![
+            comment(786, Value::Null, "fixture-outdated", "Outdated review body.")
+        ])
+    ]})
+}
+
+pub(super) fn placement_trace(records: &[RequestEvidence]) -> bool {
+    let once = |route| records.iter().filter(|entry| entry.route == route).count() == 1;
+    once(Route::CompareA)
+        && once(Route::QueuedThreadList)
+        && records.iter().all(|entry| {
+            entry.phase == Phase::ThreadPlacement
+                && entry.fixture_authorization
+                && entry.status == 200
+                && matches!(
+                    entry.route,
+                    Route::User
+                        | Route::Repository
+                        | Route::Discovery
+                        | Route::Items
+                        | Route::PullA
+                        | Route::CompareA
+                        | Route::QueuedThreadList
+                        | Route::QueuedThreadReviewList
+                )
+        })
 }
 
 pub(super) fn trace(records: &[RequestEvidence]) -> bool {

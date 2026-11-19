@@ -408,6 +408,7 @@ fn known_case(lane: Lane, case: &str) -> bool {
             | (Lane::E2e, "S09-MERGE-CANCEL")
             | (Lane::E2e, "S08-REVIEW-DECISIONS")
             | (Lane::E2e, "S08-THREAD-QUEUE")
+            | (Lane::E2e, "S08-REVIEW-THREAD-PLACEMENT")
             | (Lane::E2e, "S08-COMMENT-DEPENDENCY")
             | (Lane::E2e, "S07-ISSUE-CONFLICT")
             | (Lane::E2e, "S07-ISSUE-PROPAGATION")
@@ -467,6 +468,7 @@ mod tests {
             "S06-PR-MERGE-STATE",
             "S06-PR-OFFLINE-PIN",
             "S06-READER-CURSOR-RECOVERY",
+            "S08-REVIEW-THREAD-PLACEMENT",
         ] {
             let options = parse(&arguments(&[
                 "test", "e2e", "--suite", "full", "--case", id,

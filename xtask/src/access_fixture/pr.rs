@@ -209,6 +209,9 @@ fn data(phase: Phase, route: Route) -> Option<Value> {
                     "@@ -1 +1 @@\n-original\n+changed\n@@ -3 +3 @@\n-original again\n+changed again"
                 );
             }
+            if phase == Phase::ThreadPlacement {
+                comparison["files"][0]["patch"] = json!("@@ -9 +17 @@\n-original\n+changed");
+            }
             Some(comparison)
         }
         Route::CompareB => Some(compare(B_BASE, B_HEAD, B_MERGE, "src/second.rs")),

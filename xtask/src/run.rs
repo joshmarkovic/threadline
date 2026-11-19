@@ -637,7 +637,10 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
                 Some(NativeMode::WindowsDirectMerge)
             } else if matches!(
                 id,
-                "S08-REVIEW-DECISIONS" | "S08-REVIEW-PREDECESSOR" | "S08-THREAD-QUEUE"
+                "S08-REVIEW-DECISIONS"
+                    | "S08-REVIEW-PREDECESSOR"
+                    | "S08-THREAD-QUEUE"
+                    | "S08-REVIEW-THREAD-PLACEMENT"
             ) {
                 Some(NativeMode::WindowsReviewDraft)
             } else {
@@ -908,6 +911,9 @@ fn native_driver(
             Some("ReviewPredecessor")
         }
         NativeMode::WindowsReviewDraft if id == "S08-THREAD-QUEUE" => Some("ThreadQueue"),
+        NativeMode::WindowsReviewDraft if id == "S08-REVIEW-THREAD-PLACEMENT" => {
+            Some("ThreadPlacement")
+        }
         NativeMode::WindowsReviewDraft => Some("ReviewDraft"),
         NativeMode::WindowsReviewContext => Some("ReviewContext"),
         NativeMode::WindowsDirectMerge if id == "S09-MERGE-QUEUE" => Some("MergeQueue"),
@@ -1034,6 +1040,9 @@ fn native_driver(
         }
         NativeMode::WindowsPullRequest => "pr-native.json",
         NativeMode::WindowsHistory => "history-native.json",
+        NativeMode::WindowsReviewDraft if id == "S08-REVIEW-THREAD-PLACEMENT" => {
+            "review-thread-placement-native.json"
+        }
         NativeMode::WindowsReviewDraft => "review-draft-native.json",
         NativeMode::WindowsReviewContext => "review-context-native.json",
         NativeMode::WindowsDirectMerge => "direct-merge-native.json",
@@ -1140,6 +1149,11 @@ fn native_driver(
             }
             (Status::Pass, NativeMode::WindowsReviewDraft) if id == "S08-THREAD-QUEUE" => {
                 TraceCheck::ReviewThreadsJourney
+            }
+            (Status::Pass, NativeMode::WindowsReviewDraft)
+                if id == "S08-REVIEW-THREAD-PLACEMENT" =>
+            {
+                TraceCheck::ReviewThreadPlacement
             }
             (Status::Pass, NativeMode::WindowsReviewDraft) => TraceCheck::ReviewDraftJourney,
             (Status::Pass, NativeMode::WindowsReviewContext) => TraceCheck::ReviewContextJourney,
