@@ -6,7 +6,7 @@ use threadline_storage::{
     pr::{
         BodyReference, InlineComment, NarrowSurface, PatchEvidence, PrContextMode, PrDiffMode,
         PrDownload, PrFamily, PrHeader, PrPage, PrRecord, PrRevision, PrSection, PrTabView,
-        ReviewAnchor, SourceLine, SourceSide, Verification,
+        ReviewAnchor, SourceLine, SourceSide,
     },
     queue::PrContext,
     resources::ResourceState,
@@ -377,9 +377,7 @@ pub(super) fn verified_reference(
     set.1
         .iter()
         .any(|reference| {
-            reference.provenance == context.provenance
-                && reference.verification == Verification::Verified
-                && reference.verified_item == Some(item)
+            reference.provenance == context.provenance && reference.verified_item == Some(item)
         })
         .then_some(item)
 }
@@ -608,10 +606,10 @@ impl ReaderWorkspace {
                 .get(&tab.id)
                 .and_then(|view| view.pr.as_ref())
             && let Some(set) = pr.data.references.as_ref()
-            && let Some(reference) = set.1.iter().find(|reference| {
-                reference.verification == Verification::Verified
-                    && reference.verified_item.is_some()
-            })
+            && let Some(reference) = set
+                .1
+                .iter()
+                .find(|reference| reference.verified_item.is_some())
         {
             let ratio = tab
                 .view

@@ -1041,20 +1041,20 @@ impl ReaderWorkspace {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let Some(set) = &pr.data.references else {
-            return div()
-                .id(format!("pr-{pane}-reference-state"))
-                .text_sm()
-                .role(Role::Status)
-                .child("Linked issues have not been checked for this body.")
-                .into_any_element();
+            return pr_status(
+                format!("pr-{pane}-reference-state"),
+                "Linked issues have not been checked for this body.",
+                palette,
+            )
+            .into_any_element();
         };
         if set.1.is_empty() {
-            return div()
-                .id(format!("pr-{pane}-reference-state"))
-                .text_sm()
-                .role(Role::Status)
-                .child("This pull request body has no closing issue references.")
-                .into_any_element();
+            return pr_status(
+                format!("pr-{pane}-reference-state"),
+                "This pull request body has no closing issue references.",
+                palette,
+            )
+            .into_any_element();
         }
         let chosen = tab
             .view
@@ -1073,14 +1073,14 @@ impl ReaderWorkspace {
                 Change::Value(title) => title.as_str(),
                 _ => "Title not downloaded",
             };
-            let route = set
+            let reference = set
                 .1
                 .iter()
-                .find(|reference| reference.verified_item == chosen)
-                .map_or_else(
-                    || "Repository unavailable".to_owned(),
-                    |reference| format!("{}/{}", reference.owner, reference.repository),
-                );
+                .find(|reference| reference.verified_item == chosen);
+            let route = reference.map_or_else(
+                || "Repository unavailable".to_owned(),
+                |reference| format!("{}/{}", reference.owner, reference.repository),
+            );
             let state = &link.discussion.state;
             context = context
                 .child(
@@ -1089,16 +1089,29 @@ impl ReaderWorkspace {
                         .child(format!("Issue {route} #{} · {title}", item.locator.number)),
                 )
                 .children(
+                    reference
+                        .filter(|reference| reference.verification != Verification::Verified)
+                        .map(|reference| {
+                            pr_status(
+                                format!("pr-{pane}-linked-access"),
+                                reference_status(reference, self.offline),
+                                palette,
+                            )
+                        }),
+                )
+                .children(
                     link.metadata
                         .as_ref()
                         .map(|metadata| super::view::item_metadata(metadata, palette)),
                 )
                 .child(pr.linked_body.as_ref().map_or_else(
                     || {
-                        div()
-                            .text_sm()
-                            .child("The linked issue body is unavailable in the cache.")
-                            .into_any_element()
+                        pr_status(
+                            format!("pr-{pane}-linked-body-unavailable"),
+                            "The linked issue body is unavailable in the cache.",
+                            palette,
+                        )
+                        .into_any_element()
                     },
                     |body| self.markdown_element(body, Some(item.locator.repository), palette, cx),
                 ))
@@ -1133,22 +1146,22 @@ impl ReaderWorkspace {
             .is_some_and(|context| !context.provenance.is_empty())
             && chosen.is_none()
         {
-            context = context.child(div().id(format!("pr-{pane}-reference-state")).text_sm().role(Role::Status).child(
-                "The previously selected closing reference has changed. Choose a verified issue.",
+            context = context.child(pr_status(
+                format!("pr-{pane}-reference-state"),
+                "The previously selected reference has changed. Choose a verified issue.",
+                palette,
             ));
         } else {
-            context = context.child(
-                div()
-                    .id(format!("pr-{pane}-reference-state"))
-                    .text_sm()
-                    .role(Role::Status)
-                    .child("Choose a verified closing issue."),
-            );
+            context = context.child(pr_status(
+                format!("pr-{pane}-reference-state"),
+                "Choose a verified issue from this pull request body.",
+                palette,
+            ));
         }
         let mut picker = div()
             .id(format!("pr-{pane}-linked-picker"))
             .role(Role::Group)
-            .aria_label("Verified closing references")
+            .aria_label("Issue references from this pull request body")
             .flex()
             .flex_col()
             .gap_1();
@@ -1158,10 +1171,7 @@ impl ReaderWorkspace {
                 reference.owner, reference.repository, reference.number
             );
             let status = reference_status(reference, self.offline);
-            let verified = reference
-                .verified_item
-                .filter(|_| reference.verification == Verification::Verified);
-            let control = match verified {
+            let control = match reference.verified_item {
                 Some(issue) => {
                     let ratio = tab
                         .view
@@ -1200,7 +1210,11 @@ impl ReaderWorkspace {
                     .items_center()
                     .gap_1()
                     .child(control)
-                    .child(div().text_xs().text_color(palette.muted).child(status)),
+                    .child(pr_status(
+                        format!("pr-{pane}-reference-{index}-state"),
+                        status,
+                        palette,
+                    )),
             );
         }
         div()
@@ -1953,10 +1967,21 @@ fn file_counts(file: &FileSummary) -> String {
 }
 
 fn reference_status(reference: &BodyReference, offline: bool) -> &'static str {
+    if reference.verified_item.is_some() {
+        match reference.verification {
+            Verification::Inaccessible => {
+                return "Current repository access unavailable · using verified cached issue";
+            }
+            Verification::Failed => return "Last check failed · using verified cached issue",
+            Verification::Offline => return "Verified cached issue · offline",
+            _ if offline => return "Verified cached issue · offline",
+            _ => {}
+        }
+    }
     match reference.verification {
         Verification::Pending if offline => "Verification pending · offline",
         Verification::Pending => "Verification pending",
-        Verification::Verified => "Verified closing issue",
+        Verification::Verified => "Verified issue from this pull request body",
         Verification::PullRequest => "Target is a pull request",
         Verification::Missing => "Target was not found",
         Verification::Offline => "Target not downloaded · offline",

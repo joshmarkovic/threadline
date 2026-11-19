@@ -51,6 +51,7 @@ pub struct BodyReference {
     pub repository: String,
     pub number: u64,
     pub verification: Verification,
+    /// Prior proof for this account and body-bound route, retained for local reading after a retryable check.
     pub verified_item: Option<ItemId>,
     pub checked_at_ms: Option<i64>,
 }
