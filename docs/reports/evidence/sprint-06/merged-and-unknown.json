@@ -1,0 +1,225 @@
+{
+  "case": "S06-PR-MERGE-STATE",
+  "runs": [
+    {
+      "run": "e2e-1795061073706-32264",
+      "driver_source": "c0e49579a930aa6690b3351f985308832ebf193b",
+      "driver_file": "windows-pr-reader.ps1",
+      "driver_blob_sha256": "f34ce42891f4fbce1e5f65f861bcff031f8cb68db012e321262159970d47ba9d",
+      "application_and_runner_source": "c0e49579a930aa6690b3351f985308832ebf193b",
+      "application_sha256": "d934b66d9f69ac001ff19a3d35a44625095467592bd6b4b8ff68af17c37eb364",
+      "runner_sha256": "89962d7694f40331f6306dde463d57c666a02151f0c87a8bb8b723f97f98e116",
+      "canonical": {
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "e2e",
+            "--suite",
+            "full",
+            "--case",
+            "S06-PR-MERGE-STATE",
+            "--binary",
+            "<binary-path>",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "source_dirty": false,
+        "fixture_revision": "s06-pr-merge-state-v1",
+        "seed": 12345,
+        "status": "Fail",
+        "exit_code": 1,
+        "host": {
+          "os": "windows",
+          "architecture": "x86_64",
+          "version": "Microsoft Windows [Version 10.0.22631.7652]",
+          "display_session": "Windows desktop availability is checked by native driver"
+        }
+      },
+      "detail": "Timed out waiting for activation of fixture PR #42 (reader-tab-0-). See native-driver.log.",
+      "actions": 20,
+      "dpi": 96,
+      "request_count": 12,
+      "fixture_requests": [
+        {
+          "phase": "pr_merge_state",
+          "route": "compare_a",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_merge_state",
+          "route": "items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_merge_state",
+          "route": "pr_state_items_next",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_merge_state",
+          "route": "pull_a",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_merge_state",
+          "route": "repository",
+          "status": 200,
+          "count": 4
+        },
+        {
+          "phase": "pr_merge_state",
+          "route": "user",
+          "status": 200,
+          "count": 4
+        }
+      ],
+      "raw_receipt_sha256": {
+        "result.json": "943ec235b4e50751d876cc382c1090fe07daf9bbcb774a22974d96c33874817a",
+        "junit.xml": "3d54548067ef8cbac79c7e91ded24e623b4b7bad826d3f681d99b31972812a77",
+        "binary.json": "53c240267641aa8acb54fc3fe4a5db9cd36638d7ac2886ad2582653a657890ce",
+        "pr-native.json": "4272c5c01b7462f23cf3a017643365c0ef8b55bd5180cb4c5c7d6267f5d36383",
+        "github-access-trace.json": "af71baeda635c815a952da579adeb105a91c5381a8f51911d1692a0b5e297123",
+        "reader-restart-observation.json": "8b39201855de6bcca6e76252a32958f7bf3c444becd813f67045ad26eca3ba1f"
+      }
+    },
+    {
+      "run": "e2e-1795061559282-45872",
+      "driver_source": "401c4c67a4729671672e73a4a96128ea6203ea61",
+      "driver_file": "windows-pr-reader.ps1",
+      "driver_blob_sha256": "5afd9c10c4e0ffe703b4bd5e4adda331abe7d74330029c283dbf3dfb25d439dc",
+      "application_and_runner_source": "401c4c67a4729671672e73a4a96128ea6203ea61",
+      "application_sha256": "9ed93b4266696c84e1a986865816a39cd4ff4b14c38f73572c5ab2f7ec423db8",
+      "runner_sha256": "46f9d9ce313a8f8e8021d500df9d89d15cb373af2f7d1b81913e427efdd6603e",
+      "canonical": {
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "e2e",
+            "--suite",
+            "full",
+            "--case",
+            "S06-PR-MERGE-STATE",
+            "--binary",
+            "<binary-path>",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "source_dirty": false,
+        "fixture_revision": "s06-pr-merge-state-v1",
+        "seed": 12345,
+        "status": "Pass",
+        "exit_code": 0,
+        "host": {
+          "os": "windows",
+          "architecture": "x86_64",
+          "version": "Microsoft Windows [Version 10.0.22631.7652]",
+          "display_session": "Windows desktop availability is checked by native driver"
+        }
+      },
+      "detail": "The Windows reader kept an authoritative merged pull request and its identities after a newer issue-shaped closed response. A separate closed pull request retained unknown merge status through a SQLite restart. The fixture recorded no mutation or request for the unknown PR details. See native-driver.log.",
+      "actions": 23,
+      "dpi": 96,
+      "request_count": 12,
+      "fixture_requests": [
+        {
+          "phase": "pr_merge_state",
+          "route": "compare_a",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_merge_state",
+          "route": "items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_merge_state",
+          "route": "pr_state_items_next",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_merge_state",
+          "route": "pull_a",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "pr_merge_state",
+          "route": "repository",
+          "status": 200,
+          "count": 4
+        },
+        {
+          "phase": "pr_merge_state",
+          "route": "user",
+          "status": 200,
+          "count": 4
+        }
+      ],
+      "raw_receipt_sha256": {
+        "result.json": "277a5dfb1a4070c239b22fed36774f80d9e8f74d65b2ee967083db1922bced54",
+        "junit.xml": "fd4aea146a2d89af6842debd6b350994976dca7195b9091b2567abbb956202eb",
+        "binary.json": "30c04cfa041c23031bc2afd9ea0c14759de661c12e9c440e65c16bfa88cf1c6f",
+        "pr-native.json": "7ce2b7ab85420109cb004104491f81ebe6184e108e9e0d29bfa64f200e6514cb",
+        "github-access-trace.json": "af71baeda635c815a952da579adeb105a91c5381a8f51911d1692a0b5e297123",
+        "reader-restart-observation.json": "acd16a39a8aada99640dafd94eaf3d56c01a26a18f96de568b8cc2dbd9e30639"
+      },
+      "observations": [
+        {
+          "action": "Read the authoritative merged pull request identity",
+          "observed": {
+            "item": 1,
+            "number": 42,
+            "issue_id": 442,
+            "pull_request_id": 762,
+            "revision": 1,
+            "label": "Merged · Ready for review · fixture-author · topic → main"
+          }
+        },
+        {
+          "action": "Consume the newer issue-shaped closed response and keep the merged label",
+          "observed": {
+            "item": 1,
+            "updated_title_seen": true,
+            "label": "Merged · Ready for review · fixture-author · topic → main"
+          }
+        },
+        {
+          "action": "Display the closed pull request without inventing downloaded merge facts",
+          "observed": {
+            "item": 2,
+            "number": 43,
+            "issue_id": 443,
+            "pull_request_id": null,
+            "label": "Closed · merge state unknown"
+          }
+        },
+        {
+          "action": "Verify both exact merge-state labels and distinct stored identities after offline restart",
+          "observed": {
+            "merged_item": 1,
+            "unknown_item": 2,
+            "merged_revision": 1
+          }
+        }
+      ],
+      "distinct_process_restart": true
+    }
+  ]
+}

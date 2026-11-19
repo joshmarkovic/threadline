@@ -1,0 +1,811 @@
+{
+  "case": "S11-NATIVE-ACTIVITY",
+  "runs": [
+    {
+      "run": "e2e-1795060550252-43000",
+      "driver_source": "4114c34134549d7639122116688aa1b025be9cf5",
+      "driver_file": "windows-native-activity.ps1",
+      "driver_blob_sha256": "506b8fd53a5ac8cfc8108d0e7cbf03cbf6560120814a7ff108cac11d8fc0e7a3",
+      "application_and_runner_source": "4114c34134549d7639122116688aa1b025be9cf5",
+      "application_sha256": "5bb55a61e55943d85647a9c72fc5629e2db49f088409d113cb07746be0cb1131",
+      "runner_sha256": "8d021a31ac38014b728ffef9f236fb44b0d950d4220792369675d7641c93d829",
+      "canonical": {
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "e2e",
+            "--suite",
+            "full",
+            "--case",
+            "S11-NATIVE-ACTIVITY",
+            "--binary",
+            "<binary-path>",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "source_dirty": false,
+        "fixture_revision": "s11-native-activity-v4",
+        "seed": 12345,
+        "status": "Fail",
+        "exit_code": 1,
+        "host": {
+          "os": "windows",
+          "architecture": "x86_64",
+          "version": "Microsoft Windows [Version 10.0.22631.7652]",
+          "display_session": "Windows desktop availability is checked by native driver"
+        }
+      },
+      "detail": "Timed out waiting for the old already-merged pull request and its downloaded comparison. See native-driver.log.",
+      "actions": 10,
+      "dpi": 96,
+      "request_count": 31,
+      "fixture_requests": [
+        {
+          "phase": "activity_baseline",
+          "route": "activity_branches",
+          "status": 200,
+          "count": 3
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "activity_check_runs",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "activity_commit_statuses",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "activity_watched",
+          "status": 200,
+          "count": 4
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "compare_a",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "open_pull_index",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "pull_a",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "pull_activity_a",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "pull_activity_b",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "pull_b",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "repository",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "updated_comments",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "updated_inline_comments",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "updated_items",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "user",
+          "status": 200,
+          "count": 3
+        }
+      ],
+      "raw_receipt_sha256": {
+        "result.json": "06dba05a02ef2bd7647629ca70046525a56f3aa7d37c481fa683b1004ca4ccdf",
+        "junit.xml": "d79e241abaf5a81774e23367da3bf198f2d1d661f9c19ff0403f850e45bb3687",
+        "binary.json": "0df00d6559a646c4734688914cf0635111441244e483560440d0c7acdbc7ebf2",
+        "native-activity.json": "955a981019a776c6f2d3a753a5395e5fd5e8c08d1fdaadbe56ed5cb2b89be53b",
+        "github-access-trace.json": "181d98dd687e1056dc44c4e4a50b401da3effcf1873325572de2ab75b53b0883",
+        "native-activity-seeded.json": "b461450ebcefb1a50d96e39bff4489208786d9690c6f014550785914eaad7c69"
+      }
+    },
+    {
+      "run": "e2e-1795061266558-21960",
+      "driver_source": "e2378228143b65b907b3dafff1e365e67cc1fd7c",
+      "driver_file": "windows-native-activity.ps1",
+      "driver_blob_sha256": "6876b59c1ce3ff97e6bb7e33f7725d486bffd412c4dffef49cca5f4f2b4c208d",
+      "application_and_runner_source": "1f4e998bee0448712d91c3cef4663da54e20e9d5",
+      "application_sha256": "0231c94d865f8e84c413eabd2c8bf47df49699980c78cd38d012a6cebc32d164",
+      "runner_sha256": "9b738174232c3164ba67aecf9b4bcfcb3d3931669f38a29d2b2186d316428e23",
+      "canonical": {
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "e2e",
+            "--suite",
+            "full",
+            "--case",
+            "S11-NATIVE-ACTIVITY",
+            "--binary",
+            "<binary-path>",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "source_dirty": false,
+        "fixture_revision": "s11-native-activity-v4",
+        "seed": 12345,
+        "status": "Pass",
+        "exit_code": 0,
+        "host": {
+          "os": "windows",
+          "architecture": "x86_64",
+          "version": "Microsoft Windows [Version 10.0.22631.7652]",
+          "display_session": "Windows desktop availability is checked by native driver"
+        }
+      },
+      "detail": "Normal native synchronization and reader controls verified a muted bot root with its linked human reply and retained review bodies, baseline silence, unopened activity, human review grouping, offline catch-up, watched-ref movement and a merge transition. The isolated delivery adapter captured requests at the app boundary. See native-driver.log.",
+      "actions": 28,
+      "dpi": 96,
+      "request_count": 135,
+      "fixture_requests": [
+        {
+          "phase": "activity_baseline",
+          "route": "activity_branches",
+          "status": 200,
+          "count": 3
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "activity_check_runs",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "activity_commit_statuses",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "activity_watched",
+          "status": 200,
+          "count": 4
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "compare_a",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "open_pull_index",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "pull_a",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "pull_activity_a",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "pull_activity_b",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "pull_b",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "repository",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "updated_comments",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "updated_inline_comments",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "updated_items",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_baseline",
+          "route": "user",
+          "status": 200,
+          "count": 3
+        },
+        {
+          "phase": "activity_catchup",
+          "route": "activity_branches",
+          "status": 200,
+          "count": 5
+        },
+        {
+          "phase": "activity_catchup",
+          "route": "activity_moved_tip",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_catchup",
+          "route": "activity_watched",
+          "status": 200,
+          "count": 6
+        },
+        {
+          "phase": "activity_catchup",
+          "route": "open_pull_index",
+          "status": 200,
+          "count": 5
+        },
+        {
+          "phase": "activity_catchup",
+          "route": "pull_activity_a",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_catchup",
+          "route": "pull_activity_b",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_catchup",
+          "route": "repository",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_catchup",
+          "route": "updated_comments",
+          "status": 200,
+          "count": 6
+        },
+        {
+          "phase": "activity_catchup",
+          "route": "updated_inline_comments",
+          "status": 200,
+          "count": 6
+        },
+        {
+          "phase": "activity_catchup",
+          "route": "updated_items",
+          "status": 200,
+          "count": 6
+        },
+        {
+          "phase": "activity_catchup",
+          "route": "user",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_fresh",
+          "route": "activity_branches",
+          "status": 200,
+          "count": 4
+        },
+        {
+          "phase": "activity_fresh",
+          "route": "activity_check_runs",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_fresh",
+          "route": "activity_commit_statuses",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_fresh",
+          "route": "activity_reviews",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_fresh",
+          "route": "activity_threads",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_fresh",
+          "route": "activity_watched",
+          "status": 200,
+          "count": 4
+        },
+        {
+          "phase": "activity_fresh",
+          "route": "compare_a",
+          "status": 200,
+          "count": 21
+        },
+        {
+          "phase": "activity_fresh",
+          "route": "open_pull_index",
+          "status": 200,
+          "count": 3
+        },
+        {
+          "phase": "activity_fresh",
+          "route": "pull_a",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_fresh",
+          "route": "pull_activity_a",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_fresh",
+          "route": "updated_comments",
+          "status": 200,
+          "count": 3
+        },
+        {
+          "phase": "activity_fresh",
+          "route": "updated_inline_comments",
+          "status": 200,
+          "count": 3
+        },
+        {
+          "phase": "activity_fresh",
+          "route": "updated_items",
+          "status": 200,
+          "count": 3
+        },
+        {
+          "phase": "activity_fresh",
+          "route": "user",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_replay",
+          "route": "activity_branches",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_replay",
+          "route": "activity_watched",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_replay",
+          "route": "open_pull_index",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_replay",
+          "route": "repository",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_replay",
+          "route": "updated_comments",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_replay",
+          "route": "updated_inline_comments",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "activity_replay",
+          "route": "updated_items",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "activity_replay",
+          "route": "user",
+          "status": 200,
+          "count": 1
+        }
+      ],
+      "raw_receipt_sha256": {
+        "result.json": "c897bd805f32a88d62f113df148153183ee52ae1878cd6d46dc4a11bb45f7108",
+        "junit.xml": "76f90b26bbab93aca0bdb27aaefa16db6d891302218728add397226c3bc72b40",
+        "binary.json": "5169d170fc69206371a2588bea743d2da1aeb947c789bd3a1f1a8ed5840f64bc",
+        "native-activity.json": "d666ce8b2ea68f5503b0f65e36504374da87aab3985c6f48fee3c0558a447ecc",
+        "github-access-trace.json": "d8dbada60b4a2b51ead2198fd39d9f16cc0b2311adf8626062c811f68803d4a1",
+        "native-activity-baseline.json": "1c12b7421365461c1514ba74aafc51a71d24d2486e61d29d8dc01cae5bdabfc2",
+        "native-activity-catchup-seeded.json": "b461450ebcefb1a50d96e39bff4489208786d9690c6f014550785914eaad7c69",
+        "native-activity-catchup.json": "22acc224520cc0b866321435a6a9a28ae714790324049ee9cd209fe445e50fb4",
+        "native-activity-content-bc80a9cd9a334e2fbe1435ede9f1a378.json": "94538434198e4d52bccf8efeb767a81470a9c9430a29f5657552a20b021c8a56",
+        "native-activity-first-closed.json": "94538434198e4d52bccf8efeb767a81470a9c9430a29f5657552a20b021c8a56",
+        "native-activity-fresh.json": "1418469404e4cacc4daa31d9ad0adce5d8119a6b4359983b7d1c71e1011f7218",
+        "native-activity-replay.json": "58a587244a76b77bc64585cae72547dd07d574ba95bb31e050740a28f5beee36",
+        "native-activity-seeded.json": "b461450ebcefb1a50d96e39bff4489208786d9690c6f014550785914eaad7c69"
+      },
+      "observations": [
+        {
+          "action": "Seed only a prior authorized repository, old monitoring checkpoint and bot rule",
+          "observed": {
+            "fixture_revision": "s11-native-activity-v4",
+            "feed": [],
+            "delivered_groups": 0,
+            "suppressed": 0,
+            "opened_tabs": 0,
+            "bot_content": 0,
+            "human_content": 0,
+            "retained_thread": null
+          }
+        },
+        {
+          "action": "Download the old pull request and retain a zero-alert baseline",
+          "observed": {
+            "fixture_revision": "s11-native-activity-v4",
+            "feed": [],
+            "delivered_groups": 0,
+            "suppressed": 0,
+            "opened_tabs": 1,
+            "bot_content": 0,
+            "human_content": 0,
+            "retained_thread": null,
+            "comparison_complete": true
+          }
+        },
+        {
+          "action": "Observe one unopened issue and one two-event human review group with no bot alert",
+          "observed": {
+            "fixture_revision": "s11-native-activity-v4",
+            "feed": [
+              {
+                "kind": "review_submitted",
+                "categories": [
+                  "CommentOnlyReview"
+                ],
+                "target": {
+                  "Item": {
+                    "item": 1,
+                    "thread": null
+                  }
+                },
+                "delivery": "Delivered"
+              },
+              {
+                "kind": "inline_comment_created",
+                "categories": [
+                  "InlineComment"
+                ],
+                "target": {
+                  "Item": {
+                    "item": 1,
+                    "thread": null
+                  }
+                },
+                "delivery": "Delivered"
+              },
+              {
+                "kind": "comment_created",
+                "categories": [
+                  "OrdinaryComment"
+                ],
+                "target": {
+                  "Item": {
+                    "item": 3,
+                    "thread": "issue-comment:6101"
+                  }
+                },
+                "delivery": "Delivered"
+              }
+            ],
+            "delivered_groups": 2,
+            "suppressed": 2,
+            "opened_tabs": 1,
+            "bot_content": 0,
+            "human_content": 0,
+            "retained_thread": null
+          }
+        },
+        {
+          "action": "Preserve the muted bot root, its linked human reply and both formal review bodies after normal exit",
+          "observed": {
+            "fixture_revision": "s11-native-activity-v4",
+            "feed": [
+              {
+                "kind": "review_submitted",
+                "categories": [
+                  "CommentOnlyReview"
+                ],
+                "target": {
+                  "Item": {
+                    "item": 1,
+                    "thread": null
+                  }
+                },
+                "delivery": "Delivered"
+              },
+              {
+                "kind": "inline_comment_created",
+                "categories": [
+                  "InlineComment"
+                ],
+                "target": {
+                  "Item": {
+                    "item": 1,
+                    "thread": null
+                  }
+                },
+                "delivery": "Delivered"
+              },
+              {
+                "kind": "comment_created",
+                "categories": [
+                  "OrdinaryComment"
+                ],
+                "target": {
+                  "Item": {
+                    "item": 3,
+                    "thread": "issue-comment:6101"
+                  }
+                },
+                "delivery": "Delivered"
+              }
+            ],
+            "delivered_groups": 2,
+            "suppressed": 2,
+            "opened_tabs": 2,
+            "bot_content": 1,
+            "human_content": 1,
+            "retained_thread": {
+              "item": 1,
+              "thread": "PRRT_6201",
+              "root": 6201,
+              "reply": 6202,
+              "reply_to": 6201,
+              "root_author": 91,
+              "reply_author": 92,
+              "root_body_retained": true,
+              "reply_body_retained": true
+            }
+          }
+        },
+        {
+          "action": "Seed only a prior authorized repository, old monitoring checkpoint and bot rule",
+          "observed": {
+            "fixture_revision": "s11-native-activity-v4",
+            "feed": [],
+            "delivered_groups": 0,
+            "suppressed": 0,
+            "opened_tabs": 0,
+            "bot_content": 0,
+            "human_content": 0,
+            "retained_thread": null
+          }
+        },
+        {
+          "action": "Deliver one catch-up digest and one exact watched-branch update with no baseline or unwatched alert",
+          "observed": {
+            "fixture_revision": "s11-native-activity-v4",
+            "feed": [
+              {
+                "kind": "branch_commit_observed",
+                "categories": [
+                  "BranchUpdate"
+                ],
+                "target": {
+                  "Comparison": {
+                    "reference": "refs/heads/main",
+                    "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "head": "8888888888888888888888888888888888888888"
+                  }
+                },
+                "delivery": "Delivered"
+              },
+              {
+                "kind": "pr_merged",
+                "categories": [
+                  "PrMerged"
+                ],
+                "target": {
+                  "Item": {
+                    "item": 1,
+                    "thread": null
+                  }
+                },
+                "delivery": "Delivered"
+              },
+              {
+                "kind": "comment_created",
+                "categories": [
+                  "OrdinaryComment"
+                ],
+                "target": {
+                  "Item": {
+                    "item": 4,
+                    "thread": "issue-comment:6103"
+                  }
+                },
+                "delivery": "Delivered"
+              },
+              {
+                "kind": "comment_created",
+                "categories": [
+                  "OrdinaryComment"
+                ],
+                "target": {
+                  "Item": {
+                    "item": 3,
+                    "thread": "issue-comment:6102"
+                  }
+                },
+                "delivery": "Delivered"
+              }
+            ],
+            "delivered_groups": 2,
+            "suppressed": 0,
+            "opened_tabs": 0,
+            "bot_content": 0,
+            "human_content": 0,
+            "retained_thread": null
+          }
+        },
+        {
+          "action": "Open the exact merged pull request from its restored native Activity row",
+          "observed": {
+            "activity_id": 3,
+            "item": 1,
+            "number": 42
+          }
+        },
+        {
+          "action": "Replay overlapping provider updates after restart without repeating activity",
+          "observed": {
+            "fixture_revision": "s11-native-activity-v4",
+            "feed": [
+              {
+                "kind": "branch_commit_observed",
+                "categories": [
+                  "BranchUpdate"
+                ],
+                "target": {
+                  "Comparison": {
+                    "reference": "refs/heads/main",
+                    "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "head": "8888888888888888888888888888888888888888"
+                  }
+                },
+                "delivery": "Delivered"
+              },
+              {
+                "kind": "pr_merged",
+                "categories": [
+                  "PrMerged"
+                ],
+                "target": {
+                  "Item": {
+                    "item": 1,
+                    "thread": null
+                  }
+                },
+                "delivery": "Delivered"
+              },
+              {
+                "kind": "comment_created",
+                "categories": [
+                  "OrdinaryComment"
+                ],
+                "target": {
+                  "Item": {
+                    "item": 4,
+                    "thread": "issue-comment:6103"
+                  }
+                },
+                "delivery": "Delivered"
+              },
+              {
+                "kind": "comment_created",
+                "categories": [
+                  "OrdinaryComment"
+                ],
+                "target": {
+                  "Item": {
+                    "item": 3,
+                    "thread": "issue-comment:6102"
+                  }
+                },
+                "delivery": "Delivered"
+              }
+            ],
+            "delivered_groups": 2,
+            "suppressed": 0,
+            "opened_tabs": 1,
+            "bot_content": 0,
+            "human_content": 0,
+            "retained_thread": null
+          }
+        }
+      ],
+      "delivery_scope": "Fixture delivery adapter at the application boundary."
+    }
+  ]
+}

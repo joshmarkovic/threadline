@@ -4,6 +4,8 @@ Threadline can open a downloaded pull request in independent conversation and fi
 
 ## Reading and verification
 
+On Windows 11, `S06-PR-MERGE-STATE` passed on matched source `401c4c6`. PR 42 kept its **Merged** label and both provider identities after a newer issue response reported only **Closed**. PR 43 showed **Closed · merge state unknown**. Both labels and identities survived an offline process restart. The earlier `c0e4957` run stopped because the inactive restored tab lacked its readable cached title. The passing run reopened PR 42 from its downloaded browse result. [Both native runs and request traces](evidence/sprint-06/merged-and-unknown.json)
+
 GitHub REST and GraphQL reads supply commits, comparison files, checks, statuses, reviews and threaded replies. Each resource has its own completion state and checkpoint. SQLite retains the exact base, head, merge base and source coordinates. A file can report a missing, binary or truncated patch. The reader verifies a closing-style reference against its account, repository and ordinary issue identity. A body refresh invalidates proof from an older body. Reading a linked issue in a different repository preserves the original monitoring selection. [Provider reads](../../crates/threadline-core/src/github/access/reader) · [SQLite PR resources](../../crates/threadline-storage/src/pr.rs) · [Closing-reference parser](../../crates/threadline-core/src/references.rs)
 
 | Environment | Command or scope | Result |

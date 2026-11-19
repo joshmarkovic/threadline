@@ -4,6 +4,8 @@ The Windows and Linux application workers submitted an existing-item mutation th
 
 ## Outbox and editor behavior
 
+On Windows 11, `S07-ISSUE-PROPAGATION` passed on matched source `401c4c6`. Two ordinary panes showed the same existing issue with its original confirmed title and one queued edit while offline. Reconnecting sent one edit to issue 41. Both original tabs then showed the new title and zero pending edits. An earlier run timed out waiting for confirmation across the two panes. The separate conflict run below covers retaining the editor input. [Both native runs and the exact write count](evidence/sprint-07/issue-propagation.json)
+
 Saving a local draft and submitting it are separate actions. Submission captures its account, repository, item identity, original field values and requested changes. A fresh connected preflight verifies the target and touched fields before one transaction reserves the request. Conflicts retain local, original and remote values. Cancellation before reservation prevents the request. An uncertain response keeps the submitted snapshot and blocks automatic replay. An acknowledged comment can be read back by its exact numeric ID. Its own retry deadline lets the worker confirm other accepted comments when one is missing or inaccessible. [Storage and receipts](../../crates/threadline-storage/src/writes.rs) · [Provider requests](../../crates/threadline-core/src/github/access/writer.rs) · [SQLite regressions](../../crates/threadline-storage/tests/writes.rs)
 
 | Environment | Verification | Result |

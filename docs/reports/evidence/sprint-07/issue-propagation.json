@@ -1,0 +1,287 @@
+{
+  "case": "S07-ISSUE-PROPAGATION",
+  "runs": [
+    {
+      "run": "e2e-1795061216907-20636",
+      "driver_source": "e2378228143b65b907b3dafff1e365e67cc1fd7c",
+      "driver_file": "windows-issue-writes.ps1",
+      "driver_blob_sha256": "db2ac94b6ba28fdafa2dbc161c9b60ae6b2fe6d90b8790670f2ccfd2fecd5277",
+      "application_and_runner_source": "1f4e998bee0448712d91c3cef4663da54e20e9d5",
+      "application_sha256": "0231c94d865f8e84c413eabd2c8bf47df49699980c78cd38d012a6cebc32d164",
+      "runner_sha256": "9b738174232c3164ba67aecf9b4bcfcb3d3931669f38a29d2b2186d316428e23",
+      "canonical": {
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "e2e",
+            "--suite",
+            "full",
+            "--case",
+            "S07-ISSUE-PROPAGATION",
+            "--binary",
+            "<binary-path>",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "source_dirty": false,
+        "fixture_revision": "s07-native-issue-propagation-v1",
+        "seed": 12345,
+        "status": "Fail",
+        "exit_code": 1,
+        "host": {
+          "os": "windows",
+          "architecture": "x86_64",
+          "version": "Microsoft Windows [Version 10.0.22631.7652]",
+          "display_session": "Windows desktop availability is checked by native driver"
+        }
+      },
+      "detail": "Timed out waiting for the issue edit is confirmed with both original native panes still open. See native-driver.log.",
+      "actions": 17,
+      "dpi": 96,
+      "request_count": 19,
+      "fixture_requests": [
+        {
+          "phase": "issue_edit_baseline",
+          "route": "items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_baseline",
+          "route": "open_pull_index",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_baseline",
+          "route": "repository",
+          "status": 200,
+          "count": 3
+        },
+        {
+          "phase": "issue_edit_baseline",
+          "route": "scheduled_issue",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "issue_edit_baseline",
+          "route": "updated_comments",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_baseline",
+          "route": "updated_inline_comments",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_baseline",
+          "route": "updated_items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_baseline",
+          "route": "user",
+          "status": 200,
+          "count": 3
+        },
+        {
+          "phase": "issue_edit_commit",
+          "route": "issue_edit_committed",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_commit",
+          "route": "item",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_commit",
+          "route": "repository",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_commit",
+          "route": "scheduled_issue",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_commit",
+          "route": "user",
+          "status": 200,
+          "count": 2
+        }
+      ],
+      "raw_receipt_sha256": {
+        "result.json": "f6c8070d2d413fabd9692e03af8961c29f5b94c86bf43a5bd7391ca3c272c2ad",
+        "junit.xml": "37de89f4144bbbbd0f1a7ca5912dea8c984fcd68068c900bfe4458eb5976a06e",
+        "binary.json": "5169d170fc69206371a2588bea743d2da1aeb947c789bd3a1f1a8ed5840f64bc",
+        "issue-propagation-native.json": "1d808c9766b3cda3709345f9cb93c338f5bfeba80fcfa7e71b92da96d8c17d4c",
+        "github-access-trace.json": "e306b65f6607dd60df175a8cabae2c3139ceb1f0f08af9f84ebcf1dbcea5a047"
+      }
+    },
+    {
+      "run": "e2e-1795061509046-15188",
+      "driver_source": "401c4c67a4729671672e73a4a96128ea6203ea61",
+      "driver_file": "windows-issue-writes.ps1",
+      "driver_blob_sha256": "db2ac94b6ba28fdafa2dbc161c9b60ae6b2fe6d90b8790670f2ccfd2fecd5277",
+      "application_and_runner_source": "401c4c67a4729671672e73a4a96128ea6203ea61",
+      "application_sha256": "9ed93b4266696c84e1a986865816a39cd4ff4b14c38f73572c5ab2f7ec423db8",
+      "runner_sha256": "46f9d9ce313a8f8e8021d500df9d89d15cb373af2f7d1b81913e427efdd6603e",
+      "canonical": {
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "e2e",
+            "--suite",
+            "full",
+            "--case",
+            "S07-ISSUE-PROPAGATION",
+            "--binary",
+            "<binary-path>",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "source_dirty": false,
+        "fixture_revision": "s07-native-issue-propagation-v1",
+        "seed": 12345,
+        "status": "Pass",
+        "exit_code": 0,
+        "host": {
+          "os": "windows",
+          "architecture": "x86_64",
+          "version": "Microsoft Windows [Version 10.0.22631.7652]",
+          "display_session": "Windows desktop availability is checked by native driver"
+        }
+      },
+      "detail": "Two ordinary native panes kept the original confirmed issue title while an edit was queued offline. One scoped edit of the existing issue confirmed on reconnect and updated both visible titles. See native-driver.log.",
+      "actions": 21,
+      "dpi": 96,
+      "request_count": 19,
+      "fixture_requests": [
+        {
+          "phase": "issue_edit_baseline",
+          "route": "items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_baseline",
+          "route": "open_pull_index",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_baseline",
+          "route": "repository",
+          "status": 200,
+          "count": 3
+        },
+        {
+          "phase": "issue_edit_baseline",
+          "route": "scheduled_issue",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "issue_edit_baseline",
+          "route": "updated_comments",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_baseline",
+          "route": "updated_inline_comments",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_baseline",
+          "route": "updated_items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_baseline",
+          "route": "user",
+          "status": 200,
+          "count": 3
+        },
+        {
+          "phase": "issue_edit_commit",
+          "route": "issue_edit_committed",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_commit",
+          "route": "item",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_commit",
+          "route": "repository",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_commit",
+          "route": "scheduled_issue",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "issue_edit_commit",
+          "route": "user",
+          "status": 200,
+          "count": 2
+        }
+      ],
+      "raw_receipt_sha256": {
+        "result.json": "077730a54560311c61afb86c4e367c1a4b927b9e4a2cbdc30987d6b6e2ad722d",
+        "junit.xml": "075c6e796cca7aae0e7efc868a299377fb9b0a97cf24fb2837e104f9d8883e8e",
+        "binary.json": "30c04cfa041c23031bc2afd9ea0c14759de661c12e9c440e65c16bfa88cf1c6f",
+        "issue-propagation-native.json": "d1b1517f5fa5c5f4208fb51f97b5f1feb0c26d68797995142678af59c29a518a",
+        "github-access-trace.json": "e306b65f6607dd60df175a8cabae2c3139ceb1f0f08af9f84ebcf1dbcea5a047"
+      },
+      "observations": [
+        {
+          "action": "Show the same pending issue edit beside the unchanged confirmed title in both native panes",
+          "observed": {
+            "item": 1,
+            "issue_number": 41,
+            "distinct_tabs": 2,
+            "queued_actions": 1
+          }
+        },
+        {
+          "action": "Read the confirmed title on the same issue in both native panes",
+          "observed": {
+            "item": 1,
+            "issue_number": 41,
+            "original_tabs": 2,
+            "pending": 0
+          }
+        }
+      ]
+    }
+  ]
+}
