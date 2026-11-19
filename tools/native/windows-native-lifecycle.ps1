@@ -102,10 +102,27 @@ function Wait-LifecycleDraft($Draft, [switch]$Discussion) {
     }
 }
 
+function Set-LifecycleFocusedPane([IntPtr]$Window, [int]$Pane, [bool]$FocusedOnly) {
+    $label = if ($FocusedOnly) { 'Maximize pane' } else { 'Restore panes' }
+    Wait-For 'the owned cached pane layout action' {
+        Invoke-OwnedFixtureControl $Window 'reader-maximize-pane' $null $label
+    }
+    $nextLabel = if ($FocusedOnly) { 'Restore panes' } else { 'Maximize pane' }
+    Wait-For 'the requested visible pane layout' {
+        $null -ne (Find-OwnedFixtureControl $Window 'reader-maximize-pane' $nextLabel)
+    }
+    $null = Wait-Reader 'preserve both cached panes and their selected focus' {
+        param($reader)
+        $reader.focused_pane -eq $Pane -and $reader.cached_visible_panes -eq 2 -and
+            ($reader.tab_counts -join ',') -ceq '10,10'
+    }
+}
+
 function Invoke-LifecycleCachedSurfaces([IntPtr]$Window) {
     $content = $script:lifecycleSeed.content
     $drafts = $script:lifecycleSeed.drafts
     Wait-LifecycleReview $content.pr
+    Set-LifecycleFocusedPane $Window 1 $true
     Click-AccountControl $Window 'pr-1-review-toggle-editor'
     $null = Wait-AccountControl 'pr-1-diff'
     Click-AccountControl $Window 'pr-1-checks'
@@ -117,13 +134,6 @@ function Invoke-LifecycleCachedSurfaces([IntPtr]$Window) {
     $null = Wait-AccountControl 'pr-1-checks-coverage'
     Click-AccountControl $Window 'pr-1-files'
     Wait-LifecycleReview $content.pr
-
-    Click-AccountControl $Window 'reader-tab-0-0'
-    Wait-LifecycleDraft $drafts[0] -Discussion
-    $null = Wait-AccountControl 'reader-draft-input-0'
-    Click-AccountControl $Window 'reader-tab-0-1'
-    Wait-LifecycleDraft $drafts[1]
-    $null = Wait-AccountControl 'reader-draft-input-0'
     Click-AccountControl $Window 'reader-tab-1-1'
     Wait-LifecycleDraft $drafts[3]
     $null = Wait-PrReader 'the exact downloaded formal review and original thread' {
@@ -132,6 +142,16 @@ function Invoke-LifecycleCachedSurfaces([IntPtr]$Window) {
             $pr.head -ceq $content.pr_head -and $pr.reviews_on_page -eq 1 -and $pr.threads_on_page -eq 1
     }
     Show-FixtureThreadControl $Window $content.pr 'pr-1-thread-0-reply-input' 'Reply to review thread' -1 -Edit -Head $content.pr_head -Pane 1
+    Set-LifecycleFocusedPane $Window 1 $false
+
+    Click-AccountControl $Window 'reader-tab-0-0'
+    Wait-LifecycleDraft $drafts[0] -Discussion
+    Set-LifecycleFocusedPane $Window 0 $true
+    $null = Wait-AccountControl 'reader-draft-input-0'
+    Click-AccountControl $Window 'reader-tab-0-1'
+    Wait-LifecycleDraft $drafts[1]
+    $null = Wait-AccountControl 'reader-draft-input-0'
+    Set-LifecycleFocusedPane $Window 0 $false
 
     Wait-For 'the owned local search field accepts the exact fixture query' {
         Set-OwnedFixtureEditValue $Window 'reader-search' 'Search downloaded content' 'Investigate relay behavior 1'
