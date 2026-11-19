@@ -45,6 +45,7 @@ const COMMENTS_NEXT: &str = "/repos/fixture-org/private/issues/41/comments?per_p
 const TIMELINE: &str = "/repos/fixture-org/private/issues/41/timeline?per_page=20&page=1";
 const SYNC_ITEMS: &str = "/repositories/71/issues?state=all&sort=updated&direction=asc&since=";
 const SYNC_COMMENTS: &str = "/repositories/71/issues/comments?sort=updated&direction=asc&since=";
+const SYNC_INLINE: &str = "/repositories/71/pulls/comments?sort=updated&direction=asc&since=";
 const AUTHORIZATION_URL: &str =
     "https://github.com/orgs/fixture-org/sso?authorization_request=fixture123";
 
@@ -138,6 +139,7 @@ enum Route {
     Timeline,
     UpdatedItems,
     UpdatedComments,
+    UpdatedInlineComments,
     PullA,
     PullB,
     CompareA,
@@ -310,7 +312,10 @@ fn complete_notification_schedule(records: &[RequestEvidence]) -> bool {
         && writes == [(Phase::SyncNotificationSend, Route::CommentCreated, 201)]
         && !records.iter().any(|entry| {
             entry.phase == Phase::SyncNotificationSend
-                && matches!(entry.route, Route::UpdatedItems | Route::UpdatedComments)
+                && matches!(
+                    entry.route,
+                    Route::UpdatedItems | Route::UpdatedComments | Route::UpdatedInlineComments
+                )
         })
         && records.iter().any(|entry| {
             entry.phase == Phase::SyncService && entry.route == Route::User && entry.status == 503
@@ -555,6 +560,9 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool)> {
         (Some("GET"), Some(target), Some("HTTP/1.1")) if sync_since(target, SYNC_COMMENTS) => {
             Route::UpdatedComments
         }
+        (Some("GET"), Some(target), Some("HTTP/1.1")) if sync_since(target, SYNC_INLINE) => {
+            Route::UpdatedInlineComments
+        }
         (Some("POST"), Some("/graphql"), Some("HTTP/1.1")) => Route::Graphql,
         (Some("GET"), Some(target), Some("HTTP/1.1")) => backlog::read_route(phase, target)
             .or_else(|| history::route(phase, target))
@@ -659,6 +667,9 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
     };
     if !authorized || phase == Phase::Revoked {
         return result(401, "Unauthorized", json!({"message":"Bad credentials"}));
+    }
+    if route == Route::UpdatedInlineComments {
+        return result(200, "OK", json!([]));
     }
     if let Some(backlog) = backlog::response(phase, route) {
         return backlog;

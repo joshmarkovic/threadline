@@ -251,10 +251,18 @@ async fn read_bound(
                 ))
             })
         }
-        (ResourceFamily::Comments, None) => {
-            let response = reader
-                .updated_comments(window(claim)?, page(claim)?, &validator, cancel)
-                .await?;
+        (family @ (ResourceFamily::Comments | ResourceFamily::ReviewThreads), None) => {
+            let since = window(claim)?;
+            let page = page(claim)?;
+            let response = if family == ResourceFamily::ReviewThreads {
+                reader
+                    .updated_inline_comments(since, page, &validator, cancel)
+                    .await?
+            } else {
+                reader
+                    .updated_comments(since, page, &validator, cancel)
+                    .await?
+            };
             feed(response, |comments| {
                 Ok((
                     Vec::new(),

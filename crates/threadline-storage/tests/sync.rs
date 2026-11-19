@@ -1062,3 +1062,101 @@ fn it_018_ordinary_bot_comment_can_pass_review_mute_or_match_specific_app_rule()
             .is_some()
     );
 }
+
+#[test]
+fn it_018_repository_inline_feed_finds_an_edit_on_an_unopened_pr_without_fetching_its_threads() {
+    use threadline_storage::notifications::{Category, NotificationTarget};
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open_profile(dir.path()).unwrap();
+    let (account, repo) = install(&store);
+    let target = feed(repo, ResourceFamily::ReviewThreads);
+    store
+        .subscribe_read(account, &target, "activity", ReadPriority::Activity, START)
+        .unwrap();
+    let first = store.claim_sync_read(account, START).unwrap().unwrap();
+    assert!(first.since_ms.is_some());
+    store
+        .commit_observed_page(
+            &first,
+            ObservationPage {
+                comments: vec![comment(44, 4, 10, 11)],
+                ..no_changes()
+            },
+            START,
+            "UTC",
+        )
+        .unwrap();
+    assert_eq!(
+        store
+            .process_notification_events(account, START, "UTC", true, 20)
+            .unwrap(),
+        0
+    );
+    let later = START + 3_600_000;
+    let second = store.claim_sync_read(account, later).unwrap().unwrap();
+    let mut changed = comment(44, 4, 10, later - 1);
+    changed.comment.body = "changed @test".into();
+    store
+        .commit_observed_page(
+            &second,
+            ObservationPage {
+                comments: vec![changed],
+                next_cursor: Some("2"),
+                ..no_changes()
+            },
+            later,
+            "UTC",
+        )
+        .unwrap();
+    drop(store);
+    let store = Store::open_profile(dir.path()).unwrap();
+    let next = store
+        .claim_sync_read(account, later + 1000)
+        .unwrap()
+        .unwrap();
+    assert_eq!(next.cursor.as_deref(), Some("2"));
+    store
+        .commit_observed_page(
+            &next,
+            ObservationPage {
+                comments: vec![comment(44, 4, 10, later - 1)],
+                ..no_changes()
+            },
+            later + 1001,
+            "UTC",
+        )
+        .unwrap();
+    assert_eq!(
+        store
+            .process_notification_events(account, later + 1002, "UTC", true, 20)
+            .unwrap(),
+        1
+    );
+    let events = store.notification_feed(account, None, 10).unwrap();
+    let item = store
+        .resolve(
+            account,
+            ItemLocator {
+                repository: repo,
+                number: 44,
+            },
+        )
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        events[0].event_key,
+        format!(
+            "github:pr-inline-comments:4:inline_comment_edited:{}",
+            later - 1
+        )
+    );
+    assert_eq!(
+        events[0].categories,
+        [Category::InlineComment, Category::DirectMention].into()
+    );
+    assert_eq!(
+        events[0].target,
+        NotificationTarget::Item { item, thread: None }
+    );
+    assert!(store.current_pr_revision(account, item).unwrap().is_none());
+}

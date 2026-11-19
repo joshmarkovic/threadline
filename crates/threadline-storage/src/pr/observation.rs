@@ -113,7 +113,7 @@ fn enrich_text(
         if let Some(thread) = thread {
             facts.target = NotificationTarget::Item {
                 item: rev.pr,
-                thread: Some(thread.into()),
+                thread: Some(format!("thread:{thread}")),
             };
         }
         tx.execute(

@@ -194,6 +194,33 @@ async fn sync_feeds_keep_the_same_bounded_window_and_respect_conditional_headers
     assert_eq!(result.records[0].comment.via_app_id, NonZeroU64::new(93));
     assert!(result.records[0].comment.author_is_bot);
 
+    let inline = "/repositories/71/pulls/comments?sort=updated&direction=asc&since=2013-09-06T01%3A01%3A04Z&per_page=20&page=1";
+    let mut review_comment = old_comment.clone();
+    review_comment.as_object_mut().unwrap().remove("issue_url");
+    review_comment["pull_request_url"] =
+        json!("https://api.github.com/repos/fixture-org/private/pulls/44");
+    sim.enqueue(Method::GET, inline, ok(json!([review_comment.clone()])));
+    let review = reader
+        .updated_inline_comments(SINCE_MS, 1, &ReadValidators::default(), &cancel)
+        .await
+        .unwrap()
+        .value
+        .unwrap();
+    assert_eq!(review.records[0].issue.get(), 44);
+    assert!(review.records[0].comment.author_is_bot);
+    review_comment["pull_request_url"] =
+        json!("https://api.github.com/repos/other/private/pulls/44");
+    sim.enqueue(Method::GET, inline, ok(json!([review_comment])));
+    assert_eq!(
+        reader
+            .updated_inline_comments(SINCE_MS, 1, &ReadValidators::default(), &cancel)
+            .await
+            .err()
+            .unwrap()
+            .kind,
+        AccessKind::IdentityMismatch
+    );
+
     let mut transferred = old_comment;
     transferred["issue_url"] = json!("https://api.github.com/repos/another-org/private/issues/12");
     sim.enqueue(Method::GET, &comments, ok(json!([transferred])));
@@ -219,7 +246,7 @@ async fn sync_feeds_keep_the_same_bounded_window_and_respect_conditional_headers
         outage.rate.unwrap().not_before_ms(SINCE_MS),
         Some(1_378_429_384_000)
     );
-    check_requests(&sim, 8);
+    check_requests(&sim, 10);
 }
 
 fn issue(number: u64, pr: bool) -> Value {

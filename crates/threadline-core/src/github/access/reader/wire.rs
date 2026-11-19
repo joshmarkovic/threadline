@@ -251,19 +251,45 @@ pub(super) struct Comment {
     issue_url: Option<String>,
 }
 
+#[derive(Deserialize)]
+pub(super) struct InlineUpdate {
+    pull_request_url: String,
+    #[serde(flatten)]
+    comment: Comment,
+}
+
+impl InlineUpdate {
+    pub(super) fn into_update(
+        self,
+        reader: &GitHubReader<'_>,
+    ) -> Result<super::refresh::UpdatedComment, AccessError> {
+        let number = parent_number(&self.pull_request_url)?;
+        let suffix = format!("pulls/{}", number.get());
+        reader.validate_named_url(&self.pull_request_url, &suffix)?;
+        Ok(super::refresh::UpdatedComment {
+            issue: number,
+            comment: self.comment.into_comment(reader, &suffix)?,
+        })
+    }
+}
+
+fn parent_number(url: &str) -> Result<ItemNumber, AccessError> {
+    reqwest::Url::parse(url)
+        .map_err(|_| malformed())?
+        .path_segments()
+        .and_then(|mut path| path.next_back())
+        .and_then(|number| number.parse::<NonZeroU64>().ok())
+        .map(ItemNumber::new)
+        .ok_or_else(malformed)
+}
+
 impl Comment {
     pub(super) fn into_update(
         self,
         reader: &GitHubReader<'_>,
     ) -> Result<super::refresh::UpdatedComment, AccessError> {
         let url = self.issue_url.as_deref().ok_or_else(malformed)?;
-        let parsed = reqwest::Url::parse(url).map_err(|_| malformed())?;
-        let issue = parsed
-            .path_segments()
-            .and_then(|mut path| path.next_back())
-            .and_then(|number| number.parse::<NonZeroU64>().ok())
-            .map(ItemNumber::new)
-            .ok_or_else(malformed)?;
+        let issue = parent_number(url)?;
         let suffix = format!("issues/{}", issue.get());
         reader.validate_named_url(url, &suffix)?;
         Ok(super::refresh::UpdatedComment {

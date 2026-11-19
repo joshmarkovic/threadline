@@ -123,6 +123,26 @@ impl GitHubReader<'_> {
         .await
     }
 
+    /// Includes new replies and edits on old threads across the selected repository.
+    pub async fn updated_inline_comments(
+        &self,
+        since_ms: i64,
+        page: u32,
+        validators: &ReadValidators,
+        cancel: &CancellationToken,
+    ) -> Result<Refresh<Page<UpdatedComment>>, AccessError> {
+        let since = since(since_ms)?;
+        self.refresh_page::<wire::InlineUpdate, _>(
+            "pulls/comments",
+            page,
+            &[("sort", "updated"), ("direction", "asc"), ("since", &since)],
+            validators,
+            cancel,
+            |comment| comment.into_update(self),
+        )
+        .await
+    }
+
     pub async fn refresh_issue(
         &self,
         number: ItemNumber,

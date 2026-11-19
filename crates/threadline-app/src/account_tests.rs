@@ -292,6 +292,9 @@ fn reader_reply(
                 json!("https://api.github.com/repos/fixture-org/public/issues/41");
             return Some(success(json!([updated])));
         }
+        if path.starts_with("/pulls/comments?sort=updated&direction=asc&since=") {
+            return Some(success(json!([])));
+        }
     }
     let response = match target.strip_prefix(BASE)? {
         "" => success(open_repo),

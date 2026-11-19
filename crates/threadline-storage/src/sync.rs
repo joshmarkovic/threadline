@@ -190,12 +190,12 @@ pub(super) fn require_claim(tx: &Transaction<'_>, claim: &ReadClaim, now: i64) -
 }
 
 impl Store {
-    /// Coalesce startup, selection and wake signals into one issue and one comment walk per selected repository.
+    /// Coalesce startup, selection and wake signals into one walk per selected repository and stream.
     pub fn schedule_selected_activity(&self, account: AccountId, now: i64) -> Result<()> {
         self.write(|tx| {
             crate::pr::enroll_selected(tx, account, now)?;
             history::enroll(tx, account, now)?;
-            for family in [ResourceFamily::RepositoryItems, ResourceFamily::Comments] {
+            for family in [ResourceFamily::RepositoryItems, ResourceFamily::Comments, ResourceFamily::ReviewThreads] {
                 tx.execute(
                     "INSERT INTO scheduled_reads(account_id,repository_id,family,revision,due_at)
                      SELECT account_id,repository_id,?2,'',?3 FROM github_repository_access
@@ -208,7 +208,7 @@ impl Store {
                  SELECT j.id,'repository-monitor',2 FROM scheduled_reads j
                  JOIN github_repository_access ra USING(account_id,repository_id)
                  WHERE j.account_id=? AND ra.selected=1 AND j.item_id IS NULL AND j.revision=''
-                 AND j.family IN ('repository-items','comments') ON CONFLICT DO NOTHING",
+                 AND j.family IN ('repository-items','comments','review-threads') ON CONFLICT DO NOTHING",
                 [account],
             )?;
             Ok(())
@@ -716,7 +716,9 @@ fn claim_in(tx: &Transaction<'_>, account: AccountId, now: i64) -> Result<Option
         let feed = item.is_none()
             && matches!(
                 family,
-                ResourceFamily::RepositoryItems | ResourceFamily::Comments
+                ResourceFamily::RepositoryItems
+                    | ResourceFamily::Comments
+                    | ResourceFamily::ReviewThreads
             );
         let since_ms = feed.then(|| activity_since(watermark, start));
         if cursor.is_some() || validator_since != since_ms {

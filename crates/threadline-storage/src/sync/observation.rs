@@ -60,6 +60,7 @@ fn apply_page(
     let stream = match (claim.target.family, claim.target.item) {
         (ResourceFamily::RepositoryItems, None) if page.comments.is_empty() => "issues",
         (ResourceFamily::Comments, None) if page.items.is_empty() => "comments",
+        (ResourceFamily::ReviewThreads, None) if page.items.is_empty() => "pr-inline-comments",
         _ => {
             return Err(Error::InvalidInput(
                 "Page does not match this observation stream",
@@ -94,7 +95,12 @@ fn apply_page(
         high = high.max(Some(observe_issue(tx, claim, row, baseline, now)?));
     }
     for row in page.comments {
-        high = high.max(Some(observe_comment(tx, claim, row, baseline, now)?));
+        let updated = if stream == "pr-inline-comments" {
+            observe_inline(tx, claim, row, baseline, now)?
+        } else {
+            observe_comment(tx, claim, row, baseline, now)?
+        };
+        high = high.max(Some(updated));
     }
     let Some(zone) = complete_zone else {
         tx.execute(
@@ -296,7 +302,101 @@ fn observe_comment(
             "Invalid comment feed identity or timestamp",
         ));
     }
-    let number = i64::try_from(row.number)
+    let item = current_comment_item(tx, claim, row.number)?;
+    apply_downloaded_comment(tx, item, &c)?;
+    let object = Object {
+        kind: "comments",
+        id: c.provider_id,
+        item: Some(item),
+        created: Some(c.created_at_ms),
+        updated: c.updated_at_ms,
+        state: None,
+    };
+    if let Some((key, action)) = observe_object(tx, claim, &object, Some(baseline), now)? {
+        ordinary_facts(tx, claim, item, c, row.actor, &key, action)?;
+    }
+    Ok(object.updated)
+}
+
+fn observe_inline(
+    tx: &Transaction<'_>,
+    claim: &ReadClaim,
+    row: ObservedComment,
+    baseline: i64,
+    now: i64,
+) -> Result<i64> {
+    use crate::notifications::{self, Category, EventFacts, NotificationTarget};
+    let comment = row.comment;
+    if comment.provider_id == 0 || comment.updated_at_ms < comment.created_at_ms {
+        return Err(Error::InvalidInput(
+            "Invalid inline comment identity or timestamps",
+        ));
+    }
+    if comment.updated_at_ms <= baseline {
+        return Ok(comment.updated_at_ms);
+    }
+    let item = current_comment_item(tx, claim, row.number)?;
+    let repo = claim.target.repository;
+    let matched = tx.execute(
+        "UPDATE items SET kind='pull_request' WHERE id=? AND account_id=? AND repository_id=?
+         AND kind IN ('unknown','pull_request')",
+        params![item, claim.account, repo],
+    )?;
+    if matched != 1 {
+        return Err(Error::Conflict(
+            "Inline comment targets a different item kind",
+        ));
+    }
+    let login: String = tx.query_row(
+        "SELECT p.login FROM github_access_profiles p JOIN github_repository_access r
+         USING(account_id,owner_scope) WHERE r.account_id=? AND r.repository_id=?",
+        params![claim.account, repo],
+        |row| row.get(0),
+    )?;
+    let mentioned = notifications::mentions_login(&comment.body, &login);
+    let mut categories = BTreeSet::from([Category::InlineComment]);
+    if mentioned {
+        categories.insert(Category::DirectMention);
+    }
+    let id = comment.provider_id.to_string();
+    let thread = tx.query_row(
+        "SELECT record_key FROM pr_revisions rev JOIN pr_family_resources f ON f.revision_id=rev.id
+         JOIN cached_resource_records c USING(resource_id), json_each(c.body,'$.record.Thread.comments') reply
+         WHERE rev.account_id=? AND rev.repository_id=? AND rev.item_id=? AND f.family='threads'
+           AND CAST(json_extract(reply.value,'$.id') AS TEXT)=? ORDER BY rev.updated_at DESC LIMIT 1",
+        params![claim.account,repo,item,id], |row|row.get(0),
+    ).optional()?;
+    let facts = EventFacts {
+        target: NotificationTarget::Item { item, thread },
+        categories,
+        actor: row.actor,
+        involves_me: mentioned,
+        receipt: None,
+    };
+    let changes = [
+        ("inline_comment_created", Some(comment.created_at_ms)),
+        (
+            "inline_comment_edited",
+            (comment.updated_at_ms > comment.created_at_ms).then_some(comment.updated_at_ms),
+        ),
+    ];
+    for (action, occurred) in changes {
+        let Some(at) = occurred.filter(|at| *at > baseline) else {
+            continue;
+        };
+        let key = format!("github:pr-inline-comments:{id}:{action}:{at}");
+        tx.execute(
+            "INSERT INTO activity_events(account_id,event_key,repository_id,item_id,event_kind,revision,occurred_at_ms,observed_at_ms)
+             VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(account_id,event_key) DO NOTHING",
+            params![claim.account,key,repo,item,action,at.to_string(),at,now],
+        )?;
+        notifications::attach_in(tx, claim.account, &key, &facts)?;
+    }
+    Ok(comment.updated_at_ms)
+}
+
+fn current_comment_item(tx: &Transaction<'_>, claim: &ReadClaim, number: u64) -> Result<ItemId> {
+    let number = i64::try_from(number)
         .ok()
         .filter(|n| *n > 0)
         .ok_or(Error::InvalidInput("Invalid item number"))?;
@@ -308,8 +408,8 @@ fn observe_comment(
             |row| row.get(0),
         )
         .optional()?;
-    let item = match item {
-        Some(id) => id,
+    match item {
+        Some(id) => Ok(id),
         None => {
             let moved:bool=tx.query_row(
                 "SELECT EXISTS(SELECT 1 FROM item_aliases WHERE repository_id=? AND account_id=? AND number=?)",
@@ -319,66 +419,66 @@ fn observe_comment(
                     "Updated comment requires a verified current locator",
                 ));
             }
-            tx.query_row(
+            Ok(tx.query_row(
                 "INSERT INTO items(repository_id,account_id,number) VALUES(?,?,?) RETURNING id",
                 params![repo, claim.account, number],
                 |row| row.get(0),
-            )?
+            )?)
         }
-    };
-    apply_downloaded_comment(tx, item, &c)?;
-    let object = Object {
-        kind: "comments",
-        id: c.provider_id,
-        item: Some(item),
-        created: Some(c.created_at_ms),
-        updated: c.updated_at_ms,
-        state: None,
-    };
-    if let Some((key, action)) = observe_object(tx, claim, &object, Some(baseline), now)? {
-        use crate::notifications::{self, Category, EventFacts, NotificationTarget, ReceiptMatch};
-        let login: String = tx.query_row(
-            "SELECT p.login FROM github_access_profiles p JOIN github_repository_access r
+    }
+}
+
+fn ordinary_facts(
+    tx: &Transaction<'_>,
+    claim: &ReadClaim,
+    item: ItemId,
+    c: DiscussionComment,
+    mut actor: crate::notifications::EventActor,
+    key: &str,
+    action: &str,
+) -> Result<()> {
+    let repo = claim.target.repository;
+    use crate::notifications::{self, Category, EventFacts, NotificationTarget, ReceiptMatch};
+    let login: String = tx.query_row(
+        "SELECT p.login FROM github_access_profiles p JOIN github_repository_access r
             USING(account_id,owner_scope) WHERE r.account_id=? AND r.repository_id=?",
-            params![claim.account, repo],
-            |r| r.get(0),
-        )?;
-        let mut actor = row.actor;
-        if actor.user_id.is_none() {
-            let cached: Option<String> = tx.query_row(
+        params![claim.account, repo],
+        |r| r.get(0),
+    )?;
+    if actor.user_id.is_none() {
+        let cached: Option<String> = tx.query_row(
                 "SELECT author_id FROM write_comment_authors WHERE account_id=? AND item_id=? AND comment_id=?",
                 params![claim.account, item, c.provider_id.to_string()], |r| r.get(0)
             ).optional()?;
-            actor.user_id = cached
-                .map(|id| id.parse().map_err(|_| Error::Corrupt))
-                .transpose()?;
-        }
-        let mentioned = notifications::mentions_login(&c.body, &login);
-        let mut categories = std::collections::BTreeSet::from([Category::OrdinaryComment]);
-        if mentioned {
-            categories.insert(Category::DirectMention);
-        }
-        notifications::attach_in(
-            tx,
-            claim.account,
-            &key,
-            &EventFacts {
-                target: NotificationTarget::Item {
-                    item,
-                    thread: Some(format!("issue-comment:{}", c.provider_id)),
-                },
-                categories,
-                actor,
-                involves_me: mentioned,
-                receipt: Some(ReceiptMatch::Ordinary {
-                    action: action.into(),
-                    remote_id: c.provider_id.to_string(),
-                    revision: c.updated_at_ms.to_string(),
-                }),
-            },
-        )?;
+        actor.user_id = cached
+            .map(|id| id.parse().map_err(|_| Error::Corrupt))
+            .transpose()?;
     }
-    Ok(c.updated_at_ms)
+    let mentioned = notifications::mentions_login(&c.body, &login);
+    let mut categories = std::collections::BTreeSet::from([Category::OrdinaryComment]);
+    if mentioned {
+        categories.insert(Category::DirectMention);
+    }
+    notifications::attach_in(
+        tx,
+        claim.account,
+        key,
+        &EventFacts {
+            target: NotificationTarget::Item {
+                item,
+                thread: Some(format!("issue-comment:{}", c.provider_id)),
+            },
+            categories,
+            actor,
+            involves_me: mentioned,
+            receipt: Some(ReceiptMatch::Ordinary {
+                action: action.into(),
+                remote_id: c.provider_id.to_string(),
+                revision: c.updated_at_ms.to_string(),
+            }),
+        },
+    )?;
+    Ok(())
 }
 
 struct Object<'a> {
