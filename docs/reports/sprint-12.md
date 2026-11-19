@@ -115,6 +115,10 @@ In Threadline, the Windows AccessKit provider sends an accessibility action to G
 
 ## Local regression suites
 
+The clean build 13 source, `fda5d91`, passed all three canonical lanes on WSL2 Linux x64. The unit lane ran 124 tests across 23 cases, integration ran 147 across 36, and UI ran 19 across nine. Workspace formatting and strict all-target Clippy passed, including Clippy for Windows x64. [Canonical run IDs, cases and receipt hashes](evidence/sprint-12/validation-fda5d91.json)
+
+On Windows 11 x64, all 32 test executables from the same source exited 0. The default runs recorded 291 passes and three ignored Credential Manager entries. Two explicit fixture runs also passed. They verified protected storage across a process restart and confirmed removal of the generated profile’s bound credential. The first launcher recorded just one executable before consuming the rest of its input list. The totals come from the complete rerun with a separate input stream. [Windows executable hashes, counts and exit codes](evidence/sprint-12/validation-fda5d91.json)
+
 On clean `43bd2fc`, formatting passed in WSL2 Linux x64 and strict Clippy passed for the Linux and Windows x64 targets. Clippy covered all workspace targets with the app's E2E feature enabled. The portable runner used seed 12345. The earlier Windows target Clippy result at `1f9ce05` also passed. [Selected candidate commands and results](evidence/sprint-12/selected-candidate-validation.json)
 
 | Linux test lane | Selectors passed | Test results passed |
