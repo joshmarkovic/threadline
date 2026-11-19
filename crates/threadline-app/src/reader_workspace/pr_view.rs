@@ -337,7 +337,8 @@ impl ReaderWorkspace {
                     .py_1()
                     .flex_shrink_0()
                     .border_b_1()
-                    .border_color(palette.border),
+                    .border_color(palette.border)
+                    .keep_text_selection(format!("pr-{pane}-section-controls")),
             );
         let Some(pr) = pr else {
             return panel
@@ -1669,6 +1670,15 @@ impl ReaderWorkspace {
         }
         match command {
             Command::Section(section) => {
+                if section != PrSection::Files
+                    && tab_settings(tab).section == PrSection::Files
+                    && let Some(pr) = self
+                        .tab_views
+                        .get_mut(&tab.id)
+                        .and_then(|view| view.pr.as_deref_mut())
+                {
+                    pr.retain_selection_for_section_switch(cx);
+                }
                 self.edit_pr_tab(tab, |view| view.section = section, window, cx)
             }
             Command::Mode(mode) => self.set_context_mode(tab.clone(), mode, window, cx),

@@ -58,7 +58,7 @@ pub(super) struct SelectedFile {
     pub problem: Option<&'static str>,
     pub changes: Vec<DiffLinePosition>,
     source_lines: [Vec<u32>; 2],
-    evidence: PatchEvidence,
+    evidence: Arc<PatchEvidence>,
 }
 
 pub(super) struct PullRequestView {
@@ -69,6 +69,8 @@ pub(super) struct PullRequestView {
     pub context_scroll: ScrollHandle,
     pub issue_scroll: ScrollHandle,
     pub diff: Option<Entity<DiffState>>,
+    diff_evidence: Option<Arc<PatchEvidence>>,
+    hidden_selection: Option<DiffLineRange>,
 }
 
 impl PullRequestData {
@@ -208,7 +210,7 @@ impl FilePage {
                 problem,
                 changes,
                 source_lines,
-                evidence,
+                evidence: Arc::new(evidence),
             })
         });
         Ok(Self {
@@ -403,6 +405,7 @@ impl PullRequestView {
         cx: &mut Context<ReaderWorkspace>,
     ) -> Self {
         let mut old = old.filter(|old| old.data.revision == data.revision);
+        let mut hidden_selection = old.as_mut().and_then(|old| old.hidden_selection.take());
         let recipe = tab.view.pr_reader.as_ref().cloned().unwrap_or_default();
         let body = match &data.body {
             Change::Value(body) => old
@@ -453,29 +456,43 @@ impl PullRequestView {
             .files
             .as_ref()
             .and_then(|files| files.selected.as_ref());
-        let diff = if recipe.section != PrSection::Files {
-            old.and_then(|old| old.diff)
+        let (diff, diff_evidence) = if recipe.section != PrSection::Files {
+            old.map(|old| (old.diff, old.diff_evidence))
+                .unwrap_or_default()
         } else {
-            selected.and_then(|selected| {
+            let diff = selected.and_then(|selected| {
                 let patch = selected.patch.as_ref()?;
                 if let Some(old) = old.as_mut()
+                    && old.diff_evidence.as_ref() == Some(&selected.evidence)
                     && old.diff.as_ref().is_some_and(|view| {
                         view.read(cx)
                             .files()
                             .first()
                             .is_some_and(|file| file.path() == patch.path())
                     })
-                    && old
-                        .data
-                        .files
-                        .as_ref()
-                        .and_then(|files| files.selected.as_ref())
-                        .is_none_or(|prior| prior.evidence == selected.evidence)
                 {
-                    return old.diff.take();
+                    let diff = old.diff.take()?;
+                    if old.data.files.is_none()
+                        && let Some(selection) = hidden_selection
+                            .take()
+                            .filter(|range| range.path() == patch.path())
+                    {
+                        diff.update(cx, |state, cx| {
+                            state.set_selected_lines(Some(selection), cx)
+                        });
+                    }
+                    return Some(diff);
                 }
+                hidden_selection = None;
                 Some(new_diff(&data.revision, &recipe, selected, patch, cx))
-            })
+            });
+            if diff.is_none() {
+                hidden_selection = None;
+            }
+            let evidence = selected
+                .filter(|_| diff.is_some())
+                .map(|file| Arc::clone(&file.evidence));
+            (diff, evidence)
         };
         Self {
             data,
@@ -485,7 +502,16 @@ impl PullRequestView {
             context_scroll,
             issue_scroll,
             diff,
+            diff_evidence,
+            hidden_selection,
         }
+    }
+
+    pub(super) fn retain_selection_for_section_switch(&mut self, cx: &gpui_kit::App) {
+        self.hidden_selection = self
+            .diff
+            .as_ref()
+            .and_then(|diff| diff.read(cx).selected_lines());
     }
 
     pub(super) fn visible_code_anchor(
@@ -529,6 +555,10 @@ impl PullRequestView {
                     new_diff(&self.data.revision, &tab_settings(tab), selected, patch, cx)
                 })
             });
+            self.diff_evidence = selected
+                .filter(|_| self.diff.is_some())
+                .map(|file| Arc::clone(&file.evidence));
+            self.hidden_selection = None;
         }
         self.data.files = Some(files);
     }

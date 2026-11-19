@@ -3038,6 +3038,101 @@ fn exercise_pr_context(cx: &mut TestAppContext, journey: PrContextJourney) {
             saved.draft.comments[1].anchor.source_oid,
             revision.head.as_str()
         );
+        if restore {
+            click(cx, window, "pr-0-previous-change");
+            until(cx, |cx| {
+                cx.read(|cx| {
+                    let reader = reader.read(cx);
+                    !reader.layout_busy
+                        && diff
+                            .read(cx)
+                            .selected_lines()
+                            .is_some_and(|line| line.start() == 21)
+                })
+            });
+            let round_trip = |cx: &mut TestAppContext| {
+                click(cx, window, "pr-0-commits");
+                until(cx, |cx| {
+                    cx.read(|cx| {
+                        let reader = reader.read(cx);
+                        !reader.layout_busy
+                            && reader.tab_views[&tab.id].pr.as_ref().is_some_and(|view| {
+                                view.data
+                                    .pages
+                                    .iter()
+                                    .any(|(family, _)| *family == PrFamily::Commits)
+                            })
+                    })
+                });
+                reload(cx);
+                until(cx, |cx| {
+                    cx.read(|cx| !reader.read(cx).pending_tabs.contains_key(&tab.id))
+                });
+                click(cx, window, "pr-0-files");
+                until(cx, |cx| {
+                    cx.read(|cx| {
+                        let reader = reader.read(cx);
+                        !reader.layout_busy
+                            && reader.tab_views[&tab.id]
+                                .pr
+                                .as_ref()
+                                .is_some_and(|view| view.data.files.is_some())
+                    })
+                });
+            };
+            let selected = DiffLineRange::new(filenames[1], DiffSide::Modified, 21, 40);
+            cx.update_window(window, |_, window, cx| {
+                window.render_frame(cx);
+                diff.update(cx, |state, cx| {
+                    state.set_selected_lines(Some(selected.clone()), cx)
+                });
+                assert_eq!(diff.read(cx).selected_lines().as_ref(), Some(&selected));
+            })
+            .unwrap();
+            round_trip(cx);
+            cx.update_window(window, |_, window, cx| {
+                window.render_frame(cx);
+                let view = reader.read(cx).tab_views[&tab.id].pr.as_ref().unwrap();
+                assert_eq!(view.data.revision, revision);
+                let diff = view.diff.as_ref().unwrap().read(cx);
+                assert_eq!(
+                    diff.selected_lines().as_ref(),
+                    Some(&selected),
+                    "the full live source range survives the section change"
+                );
+                assert!(!diff.focus_handle(cx).is_focused(window));
+            })
+            .unwrap();
+            cx.update_window(window, |_, _, cx| {
+                diff.update(cx, |state, cx| state.set_selected_lines(None, cx));
+                assert!(
+                    pr::tab_settings(&reader.read(cx).layout.panes[0].tabs[0])
+                        .code_anchor
+                        .is_some()
+                );
+            })
+            .unwrap();
+            round_trip(cx);
+            cx.update_window(window, |_, window, cx| {
+                window.render_frame(cx);
+                let view = reader.read(cx).tab_views[&tab.id].pr.as_ref().unwrap();
+                assert!(
+                    view.diff
+                        .as_ref()
+                        .unwrap()
+                        .read(cx)
+                        .selected_lines()
+                        .is_none()
+                );
+            })
+            .unwrap();
+            assert_eq!(
+                store.review_draft(account, &draft_id).unwrap(),
+                Some(saved.clone())
+            );
+            click(cx, window, "pr-0-next-change");
+            until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+        }
         if !restore {
             cx.update_window(window, |_, _, cx| {
                 diff.update(cx, |state, cx| {
