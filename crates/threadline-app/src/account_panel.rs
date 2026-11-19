@@ -4,23 +4,46 @@ use gpui_kit::component::button::Button;
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::{Disableable, Sizable};
 use gpui_kit::{
-    App, AppContext, Context, Entity, Focusable, InteractiveElement, IntoElement, ParentElement,
-    Render, Role, StatefulInteractiveElement, Styled, Subscription, TestSupportExt, Window, div,
-    prelude::FluentBuilder,
+    App, AppContext, Context, Entity, EventEmitter, Focusable, InteractiveElement, IntoElement,
+    ParentElement, Render, Role, StatefulInteractiveElement, Styled, Subscription, TestSupportExt,
+    Window, div, prelude::FluentBuilder, px,
 };
 use threadline_core::{
     github::{AccessError, Reachability},
     sync::Cancellation,
 };
-use threadline_storage::access::{AccessProfile, AccessState, DiscoveryState, RepositoryView};
+use threadline_storage::{
+    AccountId,
+    access::{AccessProfile, AccessState, DiscoveryState, RepositoryView},
+};
 
 use crate::{
     accounts::{
-        AccountCommand, AccountReply, AccountService, AccountView, Pat, REPOSITORY_FORMAT,
-        parse_repository,
+        AccessIssueScope, AccountCommand, AccountReply, AccountService, AccountView, Pat,
+        REPOSITORY_FORMAT, parse_repository,
     },
     palette::Palette,
 };
+
+mod pages;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AccountPanelPage {
+    Onboarding,
+    Settings,
+}
+
+pub(crate) enum AccountPanelEvent {
+    OnboardingFinished,
+    RefreshFinished { account: AccountId },
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum OnboardingStep {
+    TimeZone,
+    GitHub,
+    Repository,
+}
 
 #[cfg(feature = "e2e")]
 #[derive(serde::Serialize)]
@@ -49,19 +72,27 @@ pub(crate) struct AccountPanel {
     service: AccountService,
     runtime: tokio::runtime::Handle,
     focus: gpui_kit::FocusHandle,
+    page: AccountPanelPage,
+    onboarding: Option<OnboardingStep>,
+    focus_sign_in: bool,
+    credential_form_open: bool,
     route: Entity<InputState>,
     route_observation: Subscription,
     repository_error: Option<&'static str>,
     display_zone: Entity<InputState>,
+    custom_display_zone: bool,
     display_zone_message: Option<&'static str>,
     saving_display_zone: bool,
     token: Entity<InputState>,
+    updates: Option<Entity<crate::updates::Updates>>,
     renew: Option<AccessProfile>,
     view: AccountView,
     busy: bool,
     loaded: bool,
     message: Option<&'static str>,
     github_error: Option<AccessError>,
+    issue_scope: Option<AccessIssueScope>,
+    home_refresh_status: Option<String>,
     reachability: Reachability,
     cancel: Cancellation,
     #[cfg(feature = "e2e")]
@@ -100,19 +131,27 @@ impl AccountPanel {
             service,
             runtime,
             focus: cx.focus_handle(),
+            page: AccountPanelPage::Settings,
+            onboarding: None,
+            focus_sign_in: false,
+            credential_form_open: false,
             route,
             route_observation,
             repository_error: None,
             display_zone,
+            custom_display_zone: !matches!(value, "system" | "America/New_York" | "UTC"),
             display_zone_message,
             saving_display_zone: false,
             token,
+            updates: None,
             renew: None,
             view: AccountView::default(),
             busy: false,
             loaded: false,
             message: None,
             github_error: None,
+            issue_scope: None,
+            home_refresh_status: None,
             reachability: Reachability::NotAttempted,
             cancel: Cancellation::new(),
             #[cfg(feature = "e2e")]
@@ -130,11 +169,43 @@ impl AccountPanel {
         self.route.focus_handle(cx).focus(window, cx);
     }
 
+    pub(crate) fn needs_onboarding(&self) -> bool {
+        self.onboarding.is_some()
+    }
+
+    pub(crate) fn set_page(
+        &mut self,
+        page: AccountPanelPage,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.page != page {
+            self.clear_token(window, cx);
+        }
+        self.page = page;
+        match (page, self.onboarding) {
+            (AccountPanelPage::Onboarding, Some(OnboardingStep::GitHub)) => {
+                self.focus_form(window, cx);
+            }
+            _ => self.focus.focus(window, cx),
+        }
+        cx.notify();
+    }
+
     pub(crate) fn loaded(&self) -> bool {
         self.loaded
     }
 
-    fn save_display_zone(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn set_updates(
+        &mut self,
+        updates: Entity<crate::updates::Updates>,
+        cx: &mut Context<Self>,
+    ) {
+        self.updates = Some(updates);
+        cx.notify();
+    }
+
+    fn save_display_zone(&mut self, advance: bool, cx: &mut Context<Self>) {
         let Some(clock) = cx
             .try_global::<crate::display_time::DisplayClock>()
             .cloned()
@@ -154,6 +225,10 @@ impl AccountPanel {
                 panel.display_zone_message = Some(match result {
                     Ok(Ok(clock)) => {
                         cx.set_global(clock);
+                        if advance && panel.onboarding == Some(OnboardingStep::TimeZone) {
+                            panel.onboarding = Some(OnboardingStep::GitHub);
+                            panel.focus_sign_in = true;
+                        }
                         cx.refresh_windows();
                         "Display time zone saved."
                     }
@@ -171,7 +246,36 @@ impl AccountPanel {
         self.launch(AccountCommand::Load, None, cx);
     }
 
+    pub(crate) fn home_refresh_status(&self) -> Option<&str> {
+        self.home_refresh_status.as_deref()
+    }
+
+    pub(crate) fn home_refresh_busy(&self) -> bool {
+        self.busy
+    }
+
+    pub(crate) fn refresh_all(&mut self, window: Option<&mut Window>, cx: &mut Context<Self>) {
+        if self.busy {
+            return;
+        }
+        if self.view.offline {
+            self.home_refresh_status = Some("Working offline. GitHub was not checked.".into());
+        } else if let Some(account) = self.view.active {
+            self.home_refresh_status = Some("Checking GitHub repositories…".into());
+            self.launch(AccountCommand::RefreshAll(account), window, cx);
+        } else {
+            self.home_refresh_status = Some("Sign in to refresh GitHub repositories.".into());
+        }
+        cx.notify();
+    }
+
     pub(crate) fn clear_token(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.credential_form_open = false;
+        self.renew = None;
+        self.clear_token_input(window, cx);
+    }
+
+    fn clear_token_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.repository_error = None;
         self.token = password_input(window, cx);
         #[cfg(feature = "e2e")]
@@ -268,12 +372,18 @@ impl AccountPanel {
             return;
         }
         let replacing = matches!(&command, AccountCommand::Connect { renew: Some(_), .. });
+        let connecting = matches!(&command, AccountCommand::Connect { .. });
+        let refresh_account = match &command {
+            AccountCommand::RefreshAll(account) => Some(*account),
+            _ => None,
+        };
         if let Some(window) = window {
             self.focus.focus(window, cx);
         }
         self.busy = true;
         self.message = None;
         self.github_error = None;
+        self.issue_scope = None;
         #[cfg(feature = "e2e")]
         {
             self.input_issue = None;
@@ -287,7 +397,9 @@ impl AccountPanel {
             let result = work.await;
             let _ = panel.update(cx, |panel, cx| {
                 panel.busy = false;
+                let initial_load = !panel.loaded;
                 panel.loaded = true;
+                let cancelled = panel.cancel.is_cancelled();
                 panel.cancel = Cancellation::new();
                 match result {
                     Ok(AccountReply {
@@ -296,13 +408,31 @@ impl AccountPanel {
                         github_error,
                         reachability,
                         succeeded,
+                        issue_scope,
+                        retry_at_ms,
                         #[cfg(feature = "e2e")]
                         input_issue,
                     }) => {
                         panel.view = view;
+                        if initial_load && succeeded && panel.view.active.is_none() {
+                            panel.onboarding = Some(OnboardingStep::TimeZone);
+                        }
+                        let credential_accepted = succeeded
+                            || matches!(
+                                issue_scope,
+                                Some(AccessIssueScope::Repository | AccessIssueScope::Discovery)
+                            );
+                        if connecting && panel.view.active.is_some() {
+                            if panel.page == AccountPanelPage::Onboarding {
+                                panel.onboarding = Some(OnboardingStep::Repository);
+                            }
+                            if credential_accepted {
+                                panel.credential_form_open = false;
+                            }
+                        }
                         if replacing
                             && let Some(renew) = panel.renew.take()
-                            && !succeeded
+                            && !credential_accepted
                         {
                             panel.renew = panel
                                 .view
@@ -318,6 +448,7 @@ impl AccountPanel {
                         }
                         panel.message = message;
                         panel.github_error = github_error;
+                        panel.issue_scope = issue_scope;
                         #[cfg(feature = "e2e")]
                         {
                             panel.input_issue = input_issue;
@@ -325,8 +456,23 @@ impl AccountPanel {
                         if reachability != Reachability::NotAttempted {
                             panel.reachability = reachability;
                         }
+                        if let Some(account) = refresh_account {
+                            let retry = retry_at_ms.map(|at| {
+                                crate::display_time::DisplayClock::current(cx)
+                                    .label(Some(at), "after the server cooldown")
+                            });
+                            panel.finish_home_refresh(succeeded, retry);
+                            if !cancelled && panel.view.active == Some(account) {
+                                cx.emit(AccountPanelEvent::RefreshFinished { account });
+                            }
+                        }
                     }
-                    Err(_) => panel.message = Some("The account check did not finish."),
+                    Err(_) => {
+                        panel.message = Some("The account check did not finish.");
+                        if refresh_account.is_some() {
+                            panel.finish_home_refresh(false, None);
+                        }
+                    }
                 }
                 cx.notify();
             });
@@ -335,20 +481,49 @@ impl AccountPanel {
         cx.notify();
     }
 
+    fn finish_home_refresh(&mut self, succeeded: bool, retry: Option<String>) {
+        let active_profiles = || {
+            self.view
+                .profiles
+                .iter()
+                .filter(|profile| Some(profile.account) == self.view.active)
+        };
+        let sso =
+            active_profiles().any(|profile| profile.discovery == DiscoveryState::RestrictedBySso);
+        let incomplete =
+            active_profiles().any(|profile| profile.discovery == DiscoveryState::Partial);
+        self.home_refresh_status = Some(match (succeeded, retry) {
+            (_, Some(at)) => {
+                format!("GitHub rate-limited repository refresh. Try again after {at}.")
+            }
+            (true, None) if sso => {
+                "Some repositories are hidden by GitHub SSO. See Settings for details.".into()
+            }
+            (true, None) if incomplete => {
+                "Only part of the GitHub repository list was refreshed.".into()
+            }
+            (true, None) => "GitHub repositories refreshed.".into(),
+            (false, None) => self
+                .github_error
+                .as_ref()
+                .map(|error| format!("GitHub refresh is incomplete. {error}."))
+                .or_else(|| self.message.map(str::to_owned))
+                .unwrap_or_else(|| "GitHub refresh did not finish.".into()),
+        });
+    }
+
     fn connect(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.busy {
             return;
         }
         let repository = self.route.read(cx).value();
         if let Some(error) = self.repository_problem(&repository) {
-            self.repository_error = Some(error);
-            self.focus_form(window, cx);
-            cx.notify();
+            self.show_repository_problem(error, window, cx);
             return;
         }
         let pat = Pat::from_input(self.token.read(cx).text().to_string());
         let renew = self.renew.clone();
-        self.clear_token(window, cx);
+        self.clear_token_input(window, cx);
         self.launch(
             AccountCommand::Connect {
                 repository: repository.to_string(),
@@ -358,6 +533,43 @@ impl AccountPanel {
             Some(window),
             cx,
         );
+    }
+
+    fn check_repository(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.busy || self.view.offline {
+            return;
+        }
+        let requested = self.route.read(cx).value();
+        if let Some(error) = self.repository_problem(&requested) {
+            self.show_repository_problem(error, window, cx);
+            return;
+        }
+        let Some(profile) =
+            parse_repository(&requested).and_then(|route| self.profile(route.owner()).cloned())
+        else {
+            return;
+        };
+        self.repository_error = None;
+        self.launch(
+            AccountCommand::Refresh {
+                profile,
+                repository: None,
+                requested: Some(requested.to_string()),
+            },
+            Some(window),
+            cx,
+        );
+    }
+
+    fn show_repository_problem(
+        &mut self,
+        error: &'static str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.repository_error = Some(error);
+        self.focus_form(window, cx);
+        cx.notify();
     }
 
     fn repository_problem(&self, raw: &str) -> Option<&'static str> {
@@ -370,6 +582,12 @@ impl AccountPanel {
             .is_some_and(|profile| !profile.owner_scope.eq_ignore_ascii_case(route.owner()))
         {
             return Some("Enter a repository owned by the account whose token you are replacing.");
+        }
+        let credential_entry = self.credential_form_open
+            || (self.page == AccountPanelPage::Onboarding
+                && self.onboarding == Some(OnboardingStep::GitHub));
+        if !credential_entry && self.profile(route.owner()).is_none() {
+            return Some("Add an account for this repository owner in Settings to check access.");
         }
         None
     }
@@ -422,16 +640,18 @@ impl AccountPanel {
         );
     }
 
-    fn forms(&self, palette: Palette, cx: &mut Context<Self>) -> impl IntoElement {
-        let form = div()
+    fn repository_field(&self, palette: Palette) -> impl IntoElement {
+        div()
             .flex()
             .flex_col()
-            .gap_2()
-            .child(div().text_sm().child(if self.renew.is_some() {
-                "Replace the token for this account"
-            } else {
-                "Connect a GitHub account"
-            }))
+            .gap_1()
+            .child(div().text_sm().child("Repository"))
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(palette.muted)
+                    .child("Use owner/repository, for example octocat/hello-world."),
+            )
             .child(
                 self.control(
                     "account-repository",
@@ -453,15 +673,36 @@ impl AccountPanel {
                     .text_color(palette.accent)
                     .child(error)
             }))
+    }
+
+    fn credential_form(&self, palette: Palette, cx: &mut Context<Self>) -> impl IntoElement {
+        let form = div()
+            .id("account-credential-form")
+            .accessibility_id("account-credential-form")
+            .test_support()
+            .role(Role::Group)
+            .aria_label("GitHub sign-in")
+            .max_w(px(520.))
+            .flex()
+            .flex_col()
+            .gap_3()
+            .child(self.repository_field(palette))
             .child(
-                self.control(
-                    "account-token",
-                    Input::new(&self.token)
-                        .small()
-                        .disabled(self.busy)
-                        .accessibility_id("account-token")
-                        .aria_label("GitHub personal access token"),
-                ),
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .child(div().text_sm().child("Personal access token"))
+                    .child(
+                        self.control(
+                            "account-token",
+                            Input::new(&self.token)
+                                .small()
+                                .disabled(self.busy)
+                                .accessibility_id("account-token")
+                                .aria_label("GitHub personal access token"),
+                        ),
+                    ),
             )
             .child(
                 div()
@@ -481,16 +722,14 @@ impl AccountPanel {
                                 ),
                         ),
                     )
-                    .when(self.renew.is_some(), |row| {
+                    .when(self.page == AccountPanelPage::Settings, |row| {
                         row.child(
-                            Button::new("account-add")
-                                .label("Add another account")
+                            Button::new("account-close-credential")
+                                .label("Cancel")
                                 .small()
                                 .disabled(self.busy)
-                                .on_click(cx.listener(|panel, _, _, cx| {
-                                    panel.renew = None;
-                                    panel.repository_error = None;
-                                    cx.notify();
+                                .on_click(cx.listener(|panel, _, window, cx| {
+                                    panel.clear_token(window, cx);
                                 })),
                         )
                     })
@@ -504,13 +743,7 @@ impl AccountPanel {
                                     panel.cancel.cancel();
                                 })),
                         )
-                    })
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(palette.muted)
-                            .child(if self.busy { "Checking…" } else { "" }),
-                    ),
+                    }),
             );
         #[cfg(feature = "e2e")]
         let form = form.when(
@@ -543,7 +776,20 @@ impl AccountPanel {
         form
     }
 
-    fn profile_controls(&self, palette: Palette, cx: &mut Context<Self>) -> impl IntoElement {
+    fn start_credential_form(
+        &mut self,
+        replacement: Option<AccessProfile>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.clear_token_input(window, cx);
+        self.renew = replacement;
+        self.credential_form_open = true;
+        self.focus_sign_in = true;
+        cx.notify();
+    }
+
+    fn profile_controls(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let mut shown = HashSet::new();
         let rows: Vec<_> = self
             .view
@@ -554,23 +800,20 @@ impl AccountPanel {
                     return None;
                 }
                 let account = profile.account;
-                let active = Some(account) == self.view.active;
+                if Some(account) == self.view.active {
+                    return None;
+                }
                 Some(
                     Button::new(format!("account-switch-{}", account.0))
                         .accessibility_id(format!("account-switch-{}", account.0))
-                        .label(if active {
-                            format!("{} (active)", profile.login)
-                        } else {
-                            profile.login.clone()
-                        })
+                        .label(profile.login.clone())
                         .small()
-                        .disabled(self.busy || active)
+                        .disabled(self.busy)
                         .on_click(cx.listener(move |panel, _, window, cx| {
                             panel.route =
                                 cx.new(|cx| InputState::new(window, cx).placeholder("owner/name"));
                             panel.route_observation = cx.observe(&panel.route, Self::route_changed);
                             panel.clear_token(window, cx);
-                            panel.renew = None;
                             panel.launch(AccountCommand::Switch(account), Some(window), cx)
                         })),
                 )
@@ -624,24 +867,31 @@ impl AccountPanel {
                                     })),
                             ),
                         )
-                        .child(
-                            self.control(
-                                "account-sign-out",
-                                Button::new("account-sign-out")
-                                    .label("Sign out")
-                                    .small()
-                                    .accessibility_id("account-sign-out")
-                                    .disabled(self.busy)
-                                    .on_click(cx.listener(move |panel, _, window, cx| {
-                                        panel.clear_token(window, cx);
-                                        panel.renew = None;
-                                        panel.launch(
-                                            AccountCommand::SignOut(account),
-                                            Some(window),
-                                            cx,
-                                        )
-                                    })),
-                            ),
+                        .when(
+                            self.view.profiles.iter().any(|profile| {
+                                profile.account == account
+                                    && profile.access != AccessState::SignedOut
+                            }),
+                            |row| {
+                                row.child(
+                                    self.control(
+                                        "account-sign-out",
+                                        Button::new("account-sign-out")
+                                            .label("Sign out")
+                                            .small()
+                                            .accessibility_id("account-sign-out")
+                                            .disabled(self.busy)
+                                            .on_click(cx.listener(move |panel, _, window, cx| {
+                                                panel.clear_token(window, cx);
+                                                panel.launch(
+                                                    AccountCommand::SignOut(account),
+                                                    Some(window),
+                                                    cx,
+                                                )
+                                            })),
+                                    ),
+                                )
+                            },
                         ),
                 )
             })
@@ -659,14 +909,8 @@ impl AccountPanel {
                             .child(div().text_sm().child(format!(
                                 "{} · {}",
                                 profile.owner_scope,
-                                access_label(profile.access)
+                                sign_in_label(profile.access)
                             )))
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(palette.muted)
-                                    .child(discovery_label(profile.discovery)),
-                            )
                             .child(
                                 Button::new(format!(
                                     "account-renew-{}-{}",
@@ -681,10 +925,11 @@ impl AccountPanel {
                                 .disabled(self.busy)
                                 .on_click(cx.listener(
                                     move |panel, _, window, cx| {
-                                        panel.renew = Some(target.clone());
-                                        panel.repository_error = None;
-                                        panel.focus_form(window, cx);
-                                        cx.notify();
+                                        panel.start_credential_form(
+                                            Some(target.clone()),
+                                            window,
+                                            cx,
+                                        );
                                     },
                                 )),
                             )
@@ -709,14 +954,10 @@ impl AccountPanel {
             format!("account-select-{index}")
         };
         let can_refresh = profile.is_some() && !self.view.offline;
-        let access = match profile.as_ref().map(|profile| profile.access) {
-            Some(AccessState::Readable)
-                if !repo.verified_current
-                    && matches!(repo.access, AccessState::Readable | AccessState::Unchecked) =>
-            {
+        let access = match repo.access {
+            AccessState::Readable if !repo.verified_current => {
                 "Check access with the current token"
             }
-            Some(state) if state != AccessState::Readable => access_label(state),
             _ => access_label(repo.access),
         };
         let status = if repo.selected {
@@ -805,44 +1046,24 @@ impl Drop for AccountPanel {
     }
 }
 
+impl EventEmitter<AccountPanelEvent> for AccountPanel {}
+
 impl Render for AccountPanel {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if std::mem::take(&mut self.focus_sign_in) {
+            self.focus_form(window, cx);
+        }
         let palette = Palette::current(cx);
-        let timezone_label = format!(
-            "Display time zone · {}",
-            crate::display_time::DisplayClock::current(cx).name()
-        );
-        let status = self
-            .github_error
-            .as_ref()
-            .map(ToString::to_string)
-            .or_else(|| self.message.map(str::to_owned));
-        let authorization = self
-            .github_error
-            .as_ref()
-            .and_then(AccessError::authorization_url);
-        let reachability = match self.reachability {
-            _ if self.view.offline => "Working offline",
-            Reachability::NotAttempted => "GitHub has not been checked in this session",
-            Reachability::NoResponse => "No secure response from GitHub",
-            Reachability::ReceivedResponse => "GitHub responded",
+        let content = match (self.page, self.onboarding) {
+            (AccountPanelPage::Onboarding, Some(step)) => self.onboarding_page(step, palette, cx),
+            _ => self.settings_page(palette, cx),
         };
-        let repos = self
-            .view
-            .repositories
-            .iter()
-            .enumerate()
-            .map(|(index, repo)| {
-                self.repository_row(index, repo, palette, cx)
-                    .into_any_element()
-            })
-            .collect::<Vec<_>>();
         div()
             .id("account-panel")
             .track_focus(&self.focus)
             .tab_stop(true)
             .role(Role::Group)
-            .aria_label("GitHub account and repositories")
+            .aria_label("GitHub settings and setup")
             .w_full()
             .h_full()
             .overflow_y_scroll()
@@ -852,64 +1073,7 @@ impl Render for AccountPanel {
             .gap_4()
             .bg(palette.panel)
             .text_color(palette.ink)
-            .child(div().text_lg().child("GitHub accounts"))
-            .child(self.profile_controls(palette, cx))
-            .child(self.forms(palette, cx))
-            .children(status.map(|status| {
-                div()
-                    .id("account-status")
-                    .accessibility_id("account-status")
-                    .test_support()
-                    .role(Role::Status)
-                    .aria_label(status.clone())
-                    .text_sm()
-                    .child(status)
-            }))
-            .children(authorization.map(|url| {
-                Button::new("account-open-authorization")
-                    .label("Open GitHub authorization")
-                    .small()
-                    .accessibility_id("account-open-authorization")
-                    .on_click(move |_, _, cx| cx.open_url(url.as_str()))
-            }))
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(palette.muted)
-                    .child(reachability),
-            )
-            .child(
-                div()
-                    .id("display-timezone-settings")
-                    .accessibility_id("display-timezone-settings")
-                    .role(Role::Group)
-                    .aria_label("Display time zone")
-                    .flex().flex_col().gap_2()
-                    .child(
-                        div().id("display-timezone-effective")
-                            .accessibility_id("display-timezone-effective")
-                            .role(Role::Status)
-                            .aria_label(timezone_label.clone())
-                            .child(timezone_label)
-                    )
-                    .child("Enter America/New_York, UTC, or another IANA zone. Enter system to follow this device.")
-                    .child(Input::new(&self.display_zone)
-                        .accessibility_id("display-timezone")
-                        .aria_label("Display time zone"))
-                    .child(Button::new("display-timezone-save")
-                        .label("Save time zone")
-                        .small()
-                        .accessibility_id("display-timezone-save")
-                        .disabled(self.saving_display_zone)
-                        .on_click(cx.listener(|panel, _, _, cx| panel.save_display_zone(cx))))
-                    .children(self.display_zone_message.map(|message| {
-                        div().id("display-timezone-message")
-                            .accessibility_id("display-timezone-message")
-                            .role(Role::Status)
-                            .aria_label(message).child(message)
-                    }))
-            )
-            .children(repos)
+            .child(content)
     }
 }
 
@@ -937,7 +1101,7 @@ fn date_label(at_ms: i64) -> String {
 
 fn access_label(state: AccessState) -> &'static str {
     match state {
-        AccessState::Unchecked => "Access not checked",
+        AccessState::Unchecked => "Not checked yet",
         AccessState::Readable => "Read access verified",
         AccessState::SignedOut => "Signed out",
         AccessState::CredentialUnavailable => "Protected token unavailable",
@@ -952,11 +1116,11 @@ fn access_label(state: AccessState) -> &'static str {
     }
 }
 
-fn discovery_label(state: DiscoveryState) -> &'static str {
+fn sign_in_label(state: AccessState) -> &'static str {
     match state {
-        DiscoveryState::Unchecked => "Repositories unchecked",
-        DiscoveryState::Partial => "Repository list incomplete",
-        DiscoveryState::RestrictedBySso => "Repository list incomplete due to SSO",
-        DiscoveryState::Complete => "Repository list checked",
+        AccessState::SignedOut => "Signed out",
+        AccessState::Unauthorized => "Saved token rejected by GitHub",
+        AccessState::CredentialUnavailable => "Saved token unavailable",
+        _ => "Signed in",
     }
 }

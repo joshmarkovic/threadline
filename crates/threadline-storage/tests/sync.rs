@@ -1373,3 +1373,86 @@ fn it_018_unopened_old_pr_discovers_recent_reviews_changes_and_new_head_check_ta
     );
     assert_eq!(store.notification_feed(account, None, 20).unwrap().len(), 3);
 }
+
+#[test]
+fn refresh_monitored_reads_respects_backoff_offline_and_account_scope() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("reader.sqlite3");
+    let store = Store::open(&path).unwrap();
+    let (account, repo) = install(&store);
+    let target = ReadTarget {
+        repository: repo,
+        item: None,
+        family: ResourceFamily::RepositoryItems,
+        revision: "home-test".into(),
+    };
+    store
+        .subscribe_read(
+            account,
+            &target,
+            "home-test",
+            ReadPriority::Activity,
+            10_000,
+        )
+        .unwrap();
+    let inspect = rusqlite::Connection::open(&path).unwrap();
+    let deadline = || {
+        inspect
+            .query_row(
+                "SELECT due_at FROM scheduled_reads WHERE revision='home-test'",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap()
+    };
+    store
+        .update_sync_settings(account, |s| s.controls.work_offline = true)
+        .unwrap();
+    assert_eq!(store.refresh_monitored_reads(account, 5).unwrap(), None);
+    assert_eq!(deadline(), 10_000);
+    store
+        .update_sync_settings(account, |s| {
+            s.controls.work_offline = false;
+            s.controls.pause_background = true;
+        })
+        .unwrap();
+    assert_eq!(store.refresh_monitored_reads(account, 5).unwrap(), None);
+    store
+        .update_sync_settings(account, |s| s.controls.pause_background = false)
+        .unwrap();
+    inspect.execute("UPDATE scheduled_reads SET failures=1, failure='rate', cursor='next' WHERE revision='home-test'", []).unwrap();
+    store.refresh_monitored_reads(account, 5).unwrap();
+    assert_eq!(deadline(), 10_000);
+    inspect
+        .execute(
+            "UPDATE scheduled_reads SET failures=0,failure=NULL WHERE revision='home-test'",
+            [],
+        )
+        .unwrap();
+    store.hold_sync_budget(account, 2_000).unwrap();
+    assert!(store.refresh_monitored_reads(account, 5).unwrap().unwrap() > 0);
+    assert_eq!(deadline(), 5);
+    assert_eq!(store.refresh_monitored_reads(account, 5).unwrap(), Some(0));
+    assert!(store.claim_sync_read(account, 10).unwrap().is_none());
+    assert_eq!(
+        inspect
+            .query_row(
+                "SELECT cursor FROM scheduled_reads WHERE revision='home-test'",
+                [],
+                |row| row.get::<_, String>(0)
+            )
+            .unwrap(),
+        "next"
+    );
+    store
+        .select_github_repository(account, repo, false)
+        .unwrap();
+    inspect
+        .execute(
+            "UPDATE scheduled_reads SET due_at=20000 WHERE revision='home-test'",
+            [],
+        )
+        .unwrap();
+    assert_eq!(store.refresh_monitored_reads(account, 20).unwrap(), None);
+    assert_eq!(deadline(), 20_000);
+}

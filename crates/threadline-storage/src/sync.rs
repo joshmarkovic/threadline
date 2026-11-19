@@ -488,6 +488,38 @@ impl Store {
         })
     }
 
+    /// Bring subscribed reads forward without replacing leases, retry deadlines, or saved cursors.
+    pub fn refresh_monitored_reads(
+        &self,
+        account: AccountId,
+        now_ms: i64,
+    ) -> Result<Option<usize>> {
+        self.write(|tx| {
+            let controls = settings(tx, account)?.controls;
+            if controls.work_offline || controls.pause_background {
+                return Ok(None);
+            }
+            let eligible: bool = tx.query_row(
+                "SELECT EXISTS (SELECT 1 FROM eligible_sync_repositories WHERE account_id=?1)",
+                [account],
+                |row| row.get(0),
+            )?;
+            if !eligible {
+                return Ok(None);
+            }
+            let changed = tx.execute(
+                "UPDATE scheduled_reads AS job SET due_at=?2
+                 WHERE job.account_id=?1 AND job.due_at>?2
+                   AND job.failures=0 AND job.suspended=0 AND job.lease_until IS NULL
+                   AND EXISTS (SELECT 1 FROM sync_subscriptions WHERE read_id=job.id)
+                   AND EXISTS (SELECT 1 FROM eligible_sync_repositories AS repo
+                               WHERE repo.account_id=job.account_id AND repo.repository_id=job.repository_id)",
+                params![account, now_ms],
+            )?;
+            Ok(Some(changed))
+        })
+    }
+
     pub fn sync_status(&self, account: AccountId) -> Result<SyncStatus> {
         self.read(|db|{
             let (count,last,reason):(i64,Option<i64>,Option<String>)=db.query_row(

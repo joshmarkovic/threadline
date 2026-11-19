@@ -2,14 +2,13 @@ use std::{future::Future, pin::Pin, sync::Arc};
 
 use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, InteractiveElement, IntoElement, ParentElement,
-    Render, Role, StatefulInteractiveElement, Styled, Window,
+    Render, Role, StatefulInteractiveElement, Styled, TestSupportExt, Window,
     component::{
         Disableable, Sizable,
         button::Button,
         input::{Input, InputState},
     },
     div,
-    prelude::FluentBuilder,
 };
 use threadline_platform::{Credential, CredentialRef, CredentialStore, NativeCredentialStore};
 use tokio::{runtime::Handle, task::AbortHandle};
@@ -19,6 +18,8 @@ pub(crate) struct RestartRequested;
 impl EventEmitter<RestartRequested> for Updates {}
 pub(crate) struct SetupStarted;
 impl EventEmitter<SetupStarted> for Updates {}
+pub(crate) struct SetupStartFailed;
+impl EventEmitter<SetupStartFailed> for Updates {}
 
 trait VerifiedSetup: Send + Sync {
     fn version(&self) -> &str;
@@ -102,6 +103,7 @@ pub(crate) struct Updates {
     saving: bool,
     launching: bool,
     note: Option<&'static str>,
+    credential_note: Option<&'static str>,
 }
 
 impl Updates {
@@ -150,6 +152,7 @@ impl Updates {
             saving: false,
             launching: false,
             note: None,
+            credential_note: None,
         }
     }
 
@@ -161,8 +164,13 @@ impl Updates {
         })
     }
 
-    pub(crate) fn toggle(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.open = !self.open;
+    pub(crate) fn show_settings(
+        &mut self,
+        open: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.open = open;
         if !self.open {
             self.input = Self::new_input(window, cx);
         }
@@ -229,7 +237,10 @@ impl Updates {
     }
 
     fn edit_credential(&mut self, save: bool, window: &mut Window, cx: &mut Context<Self>) {
-        if self.saving || matches!(self.state, State::Inspecting | State::Unconfigured) {
+        if self.saving
+            || self.launching
+            || matches!(self.state, State::Inspecting | State::Unconfigured)
+        {
             return;
         }
         let value = save.then(|| {
@@ -240,7 +251,7 @@ impl Updates {
         if value.as_ref().is_some_and(|s| {
             s.0.0.is_empty() || s.0.0.len() > 2048 || !s.0.0.iter().all(u8::is_ascii_graphic)
         }) {
-            self.note = Some("Enter a release token without spaces or line breaks.");
+            self.credential_note = Some("Enter a release token without spaces or line breaks.");
             cx.notify();
             return;
         }
@@ -260,7 +271,7 @@ impl Updates {
             let ok = matches!(work.await, Ok(Ok(())));
             let _ = view.update(cx, |model, cx| {
                 model.saving = false;
-                model.note = Some(match (ok, save) {
+                model.credential_note = Some(match (ok, save) {
                     (true, true) => "Private release token saved.",
                     (true, false) => "Private release token removed.",
                     (false, _) => "Windows could not change the release credential.",
@@ -293,8 +304,8 @@ impl Updates {
             ));
             let _ = view.update(cx, |model, cx| {
                 if let Err(error) = result {
-                    model.note = Some(error);
-                    model.launching = false;
+                    model.restart_problem(error, cx);
+                    cx.emit(SetupStartFailed);
                 } else {
                     cx.emit(SetupStarted);
                 }
@@ -302,6 +313,12 @@ impl Updates {
             });
         })
         .detach();
+        cx.notify();
+    }
+
+    pub(crate) fn restart_problem(&mut self, message: &'static str, cx: &mut Context<Self>) {
+        self.note = Some(message);
+        self.launching = false;
         cx.notify();
     }
 }
@@ -334,17 +351,80 @@ impl Render for Updates {
             State::Ready(_) if self.launching => "Starting the verified installer…".into(),
             State::Ready(setup) => format!("Threadline {} is ready to install.", setup.version()),
         };
-        div().when(self.open || ready, |panel| panel.flex().flex_col().gap_2().p_3()
-            .child(div().flex().items_center().gap_2().child(div().id("update-status").accessibility_id("update-status").role(Role::Status).aria_label(status.clone()).child(status))
-                .when(ready, |row| row.child(Button::new("restart-to-update").label("Restart to update").disabled(self.launching).accessibility_id("restart-to-update")
-                    .on_click(cx.listener(|_,_,_,cx| cx.emit(RestartRequested))))))
-            .when(self.open && configured, |panel| panel
-                .child("Private releases only: use a separate token with read access to the contents of joshmarkovic/threadline.")
-                .child(div().flex().items_center().gap_2()
-                    .child(Input::new(&self.input).small().aria_label("Optional private release token").accessibility_id("release-token"))
-                    .child(Button::new("save-release-token").label("Save release token").small().disabled(self.saving).on_click(cx.listener(|model,_,window,cx| model.edit_credential(true,window,cx))))
-                    .child(Button::new("remove-release-token").label("Remove release token").small().disabled(self.saving).on_click(cx.listener(|model,_,window,cx| model.edit_credential(false,window,cx))))))
-            .when_some(self.note, |panel, note| panel.child(div().id("update-note").role(Role::Status).aria_label(note).child(note))))
+        if !self.open && !ready {
+            return div();
+        }
+        let mut panel = div().flex().flex_col().gap_2().p_3();
+        if self.open {
+            panel = panel.child("App updates");
+        }
+        let mut summary = div().flex().items_center().gap_2().child(
+            div()
+                .id("update-status")
+                .accessibility_id("update-status")
+                .role(Role::Status)
+                .aria_label(status.clone())
+                .child(status),
+        );
+        if ready {
+            summary = summary.child(
+                Button::new("updates-restart")
+                    .label("Restart to update")
+                    .accessibility_id("updates-restart")
+                    .disabled(self.launching)
+                    .on_click(cx.listener(|_, _, _, cx| cx.emit(RestartRequested))),
+            );
+        }
+        panel = panel.child(summary);
+        if self.open && configured {
+            let token = Input::new(&self.input)
+                .small()
+                .aria_label("Optional private release token")
+                .accessibility_id("updates-release-token");
+            let save = Button::new("updates-token-save")
+                .label("Save release token")
+                .small()
+                .accessibility_id("updates-token-save")
+                .disabled(self.saving || self.launching)
+                .on_click(
+                    cx.listener(|model, _, window, cx| model.edit_credential(true, window, cx)),
+                );
+            let remove = Button::new("updates-token-remove")
+                .label("Remove release token")
+                .small()
+                .accessibility_id("updates-token-remove")
+                .disabled(self.saving || self.launching)
+                .on_click(
+                    cx.listener(|model, _, window, cx| model.edit_credential(false, window, cx)),
+                );
+            panel = panel
+                .child("For private releases, use a separate token with read access to the contents of joshmarkovic/threadline.")
+                .child(div().flex().items_center().gap_2().child(token).child(save).child(remove));
+        }
+        if self.open
+            && let Some(note) = self.credential_note
+        {
+            panel = panel.child(
+                div()
+                    .id("update-credential-note")
+                    .test_support()
+                    .accessibility_id("update-credential-note")
+                    .role(Role::Status)
+                    .aria_label(note)
+                    .child(note),
+            );
+        }
+        if let Some(note) = self.note {
+            panel = panel.child(
+                div()
+                    .id("update-note")
+                    .accessibility_id("update-note")
+                    .role(Role::Status)
+                    .aria_label(note)
+                    .child(note),
+            );
+        }
+        panel
     }
 }
 

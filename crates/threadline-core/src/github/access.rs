@@ -115,6 +115,7 @@ pub struct RepositoryCursor {
 pub struct RepositoryPage {
     pub repositories: Vec<RepositoryAccess>,
     pub next: Option<RepositoryCursor>,
+    pub rate: RateLimit,
     /// Some, including an empty set, means GitHub withheld results on at least one page.
     pub sso_restricted_organizations: Option<BTreeSet<NonZeroU64>>,
 }
@@ -315,7 +316,8 @@ impl GitHubSession {
             .map(|(repository, _)| repository)
     }
 
-    async fn repository_with_guidance(
+    /// Return the scoped repository and its server retry guidance together.
+    pub async fn repository_with_guidance(
         &self,
         route: &RepositoryName,
         expected: Option<RepositoryApiId>,
@@ -412,6 +414,7 @@ impl GitHubSession {
         Ok(RepositoryPage {
             repositories,
             next,
+            rate: RateLimit::from_headers(&headers),
             sso_restricted_organizations: partial,
         })
     }

@@ -64,6 +64,8 @@ pub(crate) struct ReaderAccount {
 
 pub(crate) struct UpdatePolicyChanged(pub bool);
 impl gpui_kit::EventEmitter<UpdatePolicyChanged> for ReaderWorkspace {}
+pub(crate) struct DepartureRefused(pub &'static str);
+impl gpui_kit::EventEmitter<DepartureRefused> for ReaderWorkspace {}
 
 #[cfg(feature = "e2e")]
 #[derive(serde::Serialize)]
@@ -788,6 +790,40 @@ impl ReaderWorkspace {
         self.account.is_some()
     }
 
+    pub(crate) fn refresh_home(
+        &mut self,
+        account: AccountId,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.account != Some(account) || self.offline {
+            return;
+        }
+        self.launch(
+            window,
+            cx,
+            move |store| store.refresh_monitored_reads(account, now_ms()),
+            |this, result, window, cx| {
+                match result {
+                    Ok(Some(_)) => {
+                        if let Some(worker) = &this.sync_worker {
+                            worker.wake(None);
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(_) => {
+                        this.status = Some("Could not schedule a refresh of monitored items.");
+                    }
+                }
+                if this.surface == Surface::Browse {
+                    this.browse(false, window, cx);
+                }
+                this.refresh_sidebar_counts(window, cx);
+                this.refresh_tab_summaries(window, cx);
+            },
+        );
+    }
+
     pub(crate) fn focus_active(&self, window: &mut Window) {
         let focus = if self.surface == Surface::Browse {
             self.focus
@@ -966,6 +1002,10 @@ impl ReaderWorkspace {
         cx.notify();
     }
 
+    pub(crate) fn departing(&self) -> bool {
+        self.departure.is_some()
+    }
+
     pub(crate) fn request_departure(
         &mut self,
         quit: bool,
@@ -1005,7 +1045,9 @@ impl ReaderWorkspace {
             || self.review_editors.values().any(|editor| editor.failed)
         {
             self.departure.take();
-            self.status = Some("A draft could not be saved. Your text is still in its editor.");
+            let message = "A draft could not be saved. Your text is still in its editor.";
+            self.status = Some(message);
+            cx.emit(DepartureRefused(message));
             cx.notify();
             return;
         }
@@ -1035,8 +1077,9 @@ impl ReaderWorkspace {
                 this.layout_busy = false;
                 if result.is_err() {
                     this.departure.take();
-                    this.status =
-                        Some("Workspace state could not be saved. Your tabs remain open.");
+                    let message = "Workspace state could not be saved. Your tabs remain open.";
+                    this.status = Some(message);
+                    cx.emit(DepartureRefused(message));
                     return;
                 }
                 this.capture_drafts(cx);
@@ -1055,27 +1098,36 @@ impl ReaderWorkspace {
                 };
                 this.status = None;
                 if quit {
-                    let mut handles = this.stop_editors();
-                    handles.extend(this.close_review_editors());
-                    let visibility = this
-                        .visible_subscriptions
-                        .take()
-                        .map(scheduled::VisibleSubscriptions::finish);
-                    cx.spawn_in(window, async move |_, cx| {
-                        for handle in handles {
-                            let _ = handle.await;
-                        }
-                        if let Some(visibility) = visibility {
-                            let _ = visibility.await;
-                        }
-                        let _ = cx.update(after);
-                    })
-                    .detach();
+                    this.finish_saved_departure(window, cx, after);
                 } else {
                     window.defer(cx, after);
                 }
             },
         );
+    }
+
+    pub(crate) fn finish_saved_departure(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        after: impl FnOnce(&mut Window, &mut gpui_kit::App) + 'static,
+    ) {
+        let mut handles = self.stop_editors();
+        handles.extend(self.close_review_editors());
+        let visibility = self
+            .visible_subscriptions
+            .take()
+            .map(scheduled::VisibleSubscriptions::finish);
+        cx.spawn_in(window, async move |_, cx| {
+            for handle in handles {
+                let _ = handle.await;
+            }
+            if let Some(visibility) = visibility {
+                let _ = visibility.await;
+            }
+            let _ = cx.update(after);
+        })
+        .detach();
     }
 
     fn launch<R, F, H>(&self, window: &Window, cx: &mut Context<Self>, operation: F, handle: H)

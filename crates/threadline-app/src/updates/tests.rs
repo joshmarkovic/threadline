@@ -1,5 +1,5 @@
 use super::*;
-use gpui_kit::{TestAppContext, WindowOptions};
+use gpui_kit::{TestAppContext, WindowOptions, test::TestWindowExt};
 use std::sync::{
     Mutex,
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -14,6 +14,7 @@ struct Fixture {
     checks: AtomicUsize,
     with_token: AtomicBool,
     handoffs: AtomicUsize,
+    acknowledge_handoff: AtomicBool,
     release_gate: tokio::sync::Notify,
 }
 impl CredentialStore for Fixture {
@@ -60,7 +61,11 @@ impl VerifiedSetup for TestSetup {
     }
     fn launch(&self) -> Result<(), &'static str> {
         self.0.handoffs.fetch_add(1, Ordering::SeqCst);
-        Err("Synthetic installer failed. Threadline is still open.")
+        if self.0.acknowledge_handoff.load(Ordering::SeqCst) {
+            Ok(())
+        } else {
+            Err("Synthetic installer failed. Threadline is still open.")
+        }
     }
 }
 fn await_model(cx: &mut TestAppContext, mut ready: impl FnMut(&mut TestAppContext) -> bool) {
@@ -121,16 +126,50 @@ fn startup_updates_wait_for_policy_cancel_and_require_explicit_restart(cx: &mut 
         cx.update(|cx| matches!(panel.read(cx).state, State::Ready(_)))
     });
     assert!(fixture.with_token.load(Ordering::SeqCst));
+    cx.update_window(window, |_, window, cx| {
+        panel.update(cx, |model, cx| {
+            model.credential_note = Some("Private release token saved.");
+            model.show_settings(true, window, cx);
+        });
+        window.render_frame(cx);
+        assert!(window.find("update-credential-note").visible());
+        panel.update(cx, |model, cx| model.show_settings(false, window, cx));
+        window.render_frame(cx);
+        assert!(window.try_find("update-credential-note").is_none());
+        assert!(window.find("updates-restart").visible());
+    })
+    .unwrap();
     cx.update(|cx| panel.update(cx, |model, cx| model.set_policy(Some(true), cx)));
     assert_eq!(fixture.checks.load(Ordering::SeqCst), 2);
     assert_eq!(fixture.handoffs.load(Ordering::SeqCst), 0);
-    cx.update_window(window, |_, _, cx| {
-        panel.update(cx, |model, cx| model.launch(cx))
+    let acknowledged = Arc::new(AtomicBool::new(false));
+    let signal = acknowledged.clone();
+    let (_click, _acknowledgement) = cx.update(|cx| {
+        let click = cx.subscribe(&panel, |model, _: &RestartRequested, cx| {
+            model.update(cx, |model, cx| model.launch(cx));
+        });
+        let acknowledgement = cx.subscribe(&panel, move |_, _: &SetupStarted, _| {
+            signal.store(true, Ordering::SeqCst);
+        });
+        (click, acknowledgement)
+    });
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("updates-restart", cx);
     })
     .unwrap();
     await_model(cx, |cx| cx.update(|cx| panel.read(cx).note.is_some()));
     assert_eq!(fixture.handoffs.load(Ordering::SeqCst), 1);
     assert!(cx.update(|cx| matches!(panel.read(cx).state, State::Ready(_))));
+    assert!(!acknowledged.load(Ordering::SeqCst));
+    fixture.acknowledge_handoff.store(true, Ordering::SeqCst);
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        window.click("updates-restart", cx);
+    })
+    .unwrap();
+    await_model(cx, |_| acknowledged.load(Ordering::SeqCst));
+    assert_eq!(fixture.handoffs.load(Ordering::SeqCst), 2);
 }
 
 #[gpui_kit::test]
@@ -159,4 +198,103 @@ fn startup_updates_skip_credential_store_and_network_when_unconfigured(cx: &mut 
     });
     assert_eq!(fixture.reads.load(Ordering::SeqCst), 0);
     assert_eq!(fixture.checks.load(Ordering::SeqCst), 0);
+}
+
+#[cfg(feature = "e2e")]
+#[gpui_kit::test]
+fn startup_update_retries_after_workspace_save_and_installer_failures(cx: &mut TestAppContext) {
+    use crate::workspace::Workspace;
+    use threadline_storage::{
+        Store,
+        fixtures::{Scale, populate_reader},
+    };
+
+    cx.executor().allow_parking();
+    let directory = tempfile::tempdir().unwrap();
+    let db = directory.path().join("update-restart.sqlite3");
+    let store = Arc::new(Store::open(&db).unwrap());
+    let account = populate_reader(&store, 42, Scale::Small).unwrap().account;
+    store
+        .update_sync_settings(account, |settings| {
+            settings.controls.work_offline = true;
+            settings.controls.pause_background = true;
+        })
+        .unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let fixture = Arc::new(Fixture::default());
+    fixture.configured.store(true, Ordering::SeqCst);
+    let ((window, _workspace), model) = cx.update(|cx| {
+        gpui_kit::init(cx);
+        cx.set_global(crate::ProfileStore(store));
+        let mut model = None;
+        let window = gpui_kit::open_window(WindowOptions::default(), cx, |window, cx| {
+            let updates = cx.new(|cx| {
+                Updates::with_source(
+                    runtime.handle().clone(),
+                    Arc::new(TestSource(fixture.clone())),
+                    fixture.clone(),
+                    window,
+                    cx,
+                )
+            });
+            model = Some(updates.clone());
+            cx.new(|cx| {
+                let mut view =
+                    Workspace::new(window, cx, 42, runtime.handle().clone(), false, false);
+                view.attach_updates(updates, window, cx);
+                view
+            })
+        })
+        .unwrap();
+        (window, model.unwrap())
+    });
+    await_model(cx, |cx| {
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            matches!(model.read(cx).state, State::Waiting)
+                && window.try_find("reader-browse").is_some()
+        })
+        .unwrap()
+    });
+    cx.update(|cx| {
+        model.update(cx, |model, cx| {
+            model.state = State::Ready(Arc::new(TestSetup(fixture.clone())));
+            cx.notify();
+        })
+    });
+    let db = rusqlite::Connection::open(db).unwrap();
+    db.execute_batch(
+        "CREATE TRIGGER refuse_layout BEFORE UPDATE OF layout ON workspaces
+        BEGIN SELECT RAISE(ABORT, 'synthetic layout failure'); END;",
+    )
+    .unwrap();
+    let click = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            window.click("updates-restart", cx);
+        })
+        .unwrap()
+    };
+    click(cx);
+    await_model(cx, |cx| {
+        cx.read(|cx| {
+            model.read(cx).note
+                == Some("Workspace state could not be saved. Your tabs remain open.")
+        })
+    });
+    assert_eq!(fixture.handoffs.load(Ordering::SeqCst), 0);
+    db.execute_batch("DROP TRIGGER refuse_layout;").unwrap();
+    click(cx);
+    await_model(cx, |cx| {
+        cx.read(|cx| {
+            model.read(cx).note == Some("Synthetic installer failed. Threadline is still open.")
+        })
+    });
+    assert_eq!(fixture.handoffs.load(Ordering::SeqCst), 1);
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.find("updates-restart").visible());
+        assert!(window.find("reader-browse").visible());
+    })
+    .unwrap();
 }

@@ -177,7 +177,9 @@ pub struct Workspace {
     accounts: Option<Entity<AccountPanel>>,
     updates: Option<Entity<crate::updates::Updates>>,
     reader: Option<Entity<ReaderWorkspace>>,
-    accounts_open: bool,
+    route: WorkspaceRoute,
+    restarting: bool,
+    initial_route_chosen: bool,
     feasibility_fixture: bool,
     platform: Option<PlatformControls>,
     activity_delivery: Option<crate::activity_delivery::ActivityDelivery>,
@@ -202,6 +204,13 @@ pub struct Workspace {
     _subscriptions: Vec<Subscription>,
     #[cfg(feature = "e2e")]
     pub(crate) observer: Option<Observer>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum WorkspaceRoute {
+    Home,
+    Onboarding,
+    Settings,
 }
 
 impl Workspace {
@@ -320,6 +329,22 @@ impl Workspace {
             }));
         }
         if let Some(panel) = accounts.as_ref() {
+            subscriptions.push(cx.subscribe_in(
+                panel,
+                window,
+                |this, _, event: &crate::account_panel::AccountPanelEvent, window, cx| match event {
+                    crate::account_panel::AccountPanelEvent::OnboardingFinished => {
+                        this.navigate(WorkspaceRoute::Home, window, cx)
+                    }
+                    crate::account_panel::AccountPanelEvent::RefreshFinished { account } => {
+                        if let Some(reader) = &this.reader {
+                            reader
+                                .update(cx, |reader, cx| reader.refresh_home(*account, window, cx));
+                        }
+                        cx.notify();
+                    }
+                },
+            ));
             subscriptions.push(cx.observe_in(panel, window, |this, panel, window, cx| {
                 if let Some(reader) = &this.reader {
                     let (view, profile, reachability) = panel.read(cx).local_reader_state();
@@ -331,6 +356,23 @@ impl Workspace {
                         reachability,
                     };
                     reader.update(cx, |reader, cx| reader.set_account(state, window, cx));
+                }
+                if !this.feasibility_fixture
+                    && !this.initial_route_chosen
+                    && panel.read(cx).loaded()
+                {
+                    let panel = panel.read(cx);
+                    if panel
+                        .local_reader_state()
+                        .0
+                        .background_updates_allowed
+                        .is_some()
+                    {
+                        this.initial_route_chosen = true;
+                        if panel.needs_onboarding() && this.route == WorkspaceRoute::Home {
+                            this.navigate(WorkspaceRoute::Onboarding, window, cx);
+                        }
+                    }
                 }
                 cx.notify();
             }));
@@ -362,7 +404,9 @@ impl Workspace {
             accounts,
             updates: None,
             reader,
-            accounts_open: false,
+            route: WorkspaceRoute::Home,
+            restarting: false,
+            initial_route_chosen: false,
             feasibility_fixture,
             platform: None,
             activity_delivery: None,
@@ -399,7 +443,10 @@ impl Workspace {
     }
 
     fn toggle_accounts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.accounts_open
+        if self.route == WorkspaceRoute::Onboarding {
+            return;
+        }
+        if self.route == WorkspaceRoute::Home
             && let Some(reader) = self
                 .reader
                 .as_ref()
@@ -420,25 +467,45 @@ impl Workspace {
             });
             return;
         }
-        self.set_accounts_open(!self.accounts_open, window, cx);
+        self.set_accounts_open(self.route == WorkspaceRoute::Home, window, cx);
     }
 
     fn set_accounts_open(&mut self, open: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let route = if open {
+            WorkspaceRoute::Settings
+        } else {
+            WorkspaceRoute::Home
+        };
+        self.navigate(route, window, cx);
+    }
+
+    fn navigate(&mut self, route: WorkspaceRoute, window: &mut Window, cx: &mut Context<Self>) {
         let Some(panel) = self.accounts.as_ref() else {
             return;
         };
-        self.accounts_open = open;
+        self.route = route;
+        let open = route != WorkspaceRoute::Home;
+        if let Some(updates) = &self.updates {
+            updates.update(cx, |updates, cx| {
+                updates.show_settings(route == WorkspaceRoute::Settings, window, cx)
+            });
+        }
         if let Some(reader) = self.reader.as_ref() {
             reader.update(cx, |reader, cx| {
                 reader.set_workspace_visible(!open);
                 cx.notify();
             });
         }
-        if self.accounts_open {
+        if self.route != WorkspaceRoute::Home {
             panel.update(cx, |this, cx| {
                 #[cfg(feature = "e2e")]
                 this.observe_bounds(self.observer.clone());
-                this.focus_form(window, cx);
+                let page = if route == WorkspaceRoute::Onboarding {
+                    crate::account_panel::AccountPanelPage::Onboarding
+                } else {
+                    crate::account_panel::AccountPanelPage::Settings
+                };
+                this.set_page(page, window, cx);
             });
         } else {
             panel.update(cx, |panel, cx| panel.clear_token(window, cx));
@@ -459,10 +526,38 @@ impl Workspace {
 
     pub(crate) fn enable_updates(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let updates = cx.new(|cx| crate::updates::Updates::new(self.runtime.clone(), window, cx));
+        self.attach_updates(updates, window, cx);
+    }
+
+    pub(crate) fn attach_updates(
+        &mut self,
+        updates: Entity<crate::updates::Updates>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self._subscriptions.push(cx.subscribe_in(
             &updates,
             window,
             |this, updates, _: &crate::updates::RestartRequested, window, cx| {
+                if this.restarting {
+                    return;
+                }
+                if this
+                    .reader
+                    .as_ref()
+                    .is_some_and(|reader| reader.read(cx).departing())
+                {
+                    updates.update(cx, |model, cx| {
+                        model.restart_problem(
+                            "Finish the workspace change, then choose Restart to update.",
+                            cx,
+                        )
+                    });
+                    return;
+                }
+                this.restarting = true;
+                this.shell_focus.focus(window, cx);
+                cx.notify();
                 let updates = updates.clone();
                 if let Some(reader) = this
                     .reader
@@ -485,9 +580,39 @@ impl Workspace {
         self._subscriptions.push(cx.subscribe_in(
             &updates,
             window,
-            |this, _, _: &crate::updates::SetupStarted, window, cx| this.request_quit(window, cx),
+            |this, _, _: &crate::updates::SetupStarted, window, cx| {
+                if let Some(reader) = this
+                    .reader
+                    .as_ref()
+                    .filter(|reader| reader.read(cx).has_account())
+                {
+                    reader.update(cx, |reader, cx| {
+                        reader.finish_saved_departure(window, cx, |_, cx| cx.quit())
+                    });
+                } else {
+                    cx.quit();
+                }
+            },
+        ));
+        self._subscriptions.push(cx.subscribe_in(
+            &updates,
+            window,
+            |this, _, _: &crate::updates::SetupStartFailed, window, cx| {
+                this.restore_after_update_failure(window, cx);
+            },
         ));
         if let Some(reader) = &self.reader {
+            let saved_updates = updates.clone();
+            self._subscriptions.push(cx.subscribe_in(
+                reader,
+                window,
+                move |this, _, event: &crate::reader_workspace::DepartureRefused, window, cx| {
+                    if this.restarting {
+                        saved_updates.update(cx, |model, cx| model.restart_problem(event.0, cx));
+                        this.restore_after_update_failure(window, cx);
+                    }
+                },
+            ));
             let updates = updates.clone();
             self._subscriptions.push(cx.subscribe(
                 reader,
@@ -497,6 +622,7 @@ impl Workspace {
             ));
         }
         if let Some(accounts) = &self.accounts {
+            accounts.update(cx, |panel, cx| panel.set_updates(updates.clone(), cx));
             let updates = updates.clone();
             let mut last = None;
             self._subscriptions
@@ -515,7 +641,16 @@ impl Workspace {
         self.updates = Some(updates);
     }
 
+    fn restore_after_update_failure(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.restarting = false;
+        self.shell_focus.focus(window, cx);
+        cx.notify();
+    }
+
     fn request_quit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.restarting {
+            return;
+        }
         if let Some(reader) = self
             .reader
             .as_ref()
@@ -551,6 +686,9 @@ impl Workspace {
             let Some(view) = view.upgrade() else {
                 return true;
             };
+            if view.read(cx).restarting {
+                return false;
+            }
             if view.read(cx).tray_enabled {
                 window.minimize_window();
                 return false;
@@ -835,18 +973,71 @@ impl Workspace {
         }
     }
 
-    fn toolbar(&self, palette: Palette, cached: bool, cx: &mut Context<Self>) -> AnyElement {
-        if cached {
-            let (name, label) = if self.accounts_open {
-                ("account-close", "Close accounts")
-            } else {
-                ("account-open", "Accounts")
-            };
-            let connection = self
-                .reader
+    fn toolbar(&self, palette: Palette, ordinary: bool, cx: &mut Context<Self>) -> AnyElement {
+        if ordinary {
+            let loaded = self
+                .accounts
                 .as_ref()
-                .filter(|reader| reader.read(cx).has_account())
-                .map(|reader| reader.read(cx).connection_label());
+                .is_some_and(|panel| panel.read(cx).loaded());
+            let show_navigation = loaded && self.route != WorkspaceRoute::Onboarding;
+            let on_home = self.route == WorkspaceRoute::Home;
+            let mut navigation = div().flex().items_center().gap_2().child(
+                div()
+                    .text_lg()
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+                    .child("Threadline"),
+            );
+            if show_navigation {
+                for (id, label, destination) in [
+                    ("account-close", "Home", WorkspaceRoute::Home),
+                    ("account-open", "Settings", WorkspaceRoute::Settings),
+                ] {
+                    let tab = button(id, label)
+                        .accessibility_id(id)
+                        .selected(self.route == destination)
+                        .toggled(self.route == destination)
+                        .when(self.route == destination, |tab| {
+                            tab.bg(palette.accent_bg).text_color(palette.accent)
+                        })
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            if this.route != destination {
+                                this.toggle_accounts(window, cx);
+                            }
+                        }));
+                    navigation = navigation.child(
+                        div()
+                            .relative()
+                            .child(tab)
+                            .children(self.observed_bounds(id)),
+                    );
+                }
+            }
+            let mut actions = div().flex().items_center().gap_3();
+            if show_navigation && on_home {
+                let busy = self
+                    .accounts
+                    .as_ref()
+                    .is_some_and(|panel| panel.read(cx).home_refresh_busy());
+                let refresh = button("home-refresh-all", "Refresh all")
+                    .accessibility_id("home-refresh-all")
+                    .disabled(busy)
+                    .on_click(cx.listener(|workspace, _, window, cx| {
+                        if let Some(panel) = &workspace.accounts {
+                            panel.update(cx, |panel, cx| panel.refresh_all(Some(window), cx));
+                        }
+                    }));
+                actions = actions.child(
+                    div()
+                        .relative()
+                        .child(refresh)
+                        .children(self.observed_bounds("home-refresh-all")),
+                );
+            }
+            actions = actions.child(
+                button("quit", "Quit")
+                    .accessibility_id("quit")
+                    .on_click(cx.listener(|this, _, window, cx| this.request_quit(window, cx))),
+            );
             return div()
                 .flex()
                 .items_center()
@@ -857,39 +1048,8 @@ impl Workspace {
                 .border_b_1()
                 .border_color(palette.border)
                 .bg(palette.panel)
-                .child(div().text_lg().child("Threadline"))
-                .when_some(self.updates.clone(), |toolbar, updates| {
-                    toolbar.child(
-                        button("open-updates", "Updates")
-                            .accessibility_id("open-updates")
-                            .on_click(move |_, window, cx| {
-                                updates.update(cx, |model, cx| model.toggle(window, cx))
-                            }),
-                    )
-                })
-                .children(connection.map(|(label, color)| {
-                    div()
-                        .id("reader-toolbar-status")
-                        .role(Role::Status)
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(div().size(px(9.)).rounded_full().bg(color))
-                        .child(label)
-                }))
-                .child(
-                    div()
-                        .relative()
-                        .child(button(name, label).accessibility_id(name).on_click(
-                            cx.listener(|this, _, window, cx| this.toggle_accounts(window, cx)),
-                        ))
-                        .children(self.observed_bounds(name)),
-                )
-                .child(
-                    button("quit", "Quit")
-                        .accessibility_id("quit")
-                        .on_click(cx.listener(|this, _, window, cx| this.request_quit(window, cx))),
-                )
+                .child(navigation)
+                .child(actions)
                 .into_any_element();
         }
         let capabilities = self.platform.as_ref().map(PlatformControls::capabilities);
@@ -949,12 +1109,12 @@ impl Workspace {
                         div()
                             .relative()
                             .child(
-                                if self.accounts_open {
+                                if self.route != WorkspaceRoute::Home {
                                     button("account-close", "Close accounts")
                                 } else {
                                     button("account-open", "Accounts")
                                 }
-                                .accessibility_id(if self.accounts_open {
+                                .accessibility_id(if self.route != WorkspaceRoute::Home {
                                     "account-close"
                                 } else {
                                     "account-open"
@@ -964,11 +1124,13 @@ impl Workspace {
                                     |this, _, window, cx| this.toggle_accounts(window, cx),
                                 )),
                             )
-                            .children(self.observed_bounds(if self.accounts_open {
-                                "account-close"
-                            } else {
-                                "account-open"
-                            })),
+                            .children(self.observed_bounds(
+                                if self.route != WorkspaceRoute::Home {
+                                    "account-close"
+                                } else {
+                                    "account-open"
+                                },
+                            )),
                     )
                     .child(
                         button("load-preview", "Load preview")
@@ -1414,6 +1576,20 @@ impl Workspace {
 impl gpui_kit::Render for Workspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let palette = Palette::current(cx);
+        if self.restarting {
+            return div()
+                .id("update-handoff")
+                .size_full()
+                .track_focus(&self.shell_focus)
+                .flex()
+                .items_center()
+                .justify_center()
+                .bg(palette.canvas)
+                .text_color(palette.ink)
+                .role(Role::Status)
+                .aria_label("Preparing to restart Threadline")
+                .child("Preparing to restart Threadline…");
+        }
         let cached_reader = self
             .reader
             .as_ref()
@@ -1491,7 +1667,7 @@ impl gpui_kit::Render for Workspace {
                 }
                 if let Some(panel) = this.accounts.as_ref() {
                     panel.update(cx, |panel, cx| {
-                        panel.refresh(this.accounts_open.then_some(window), cx)
+                        panel.refresh((this.route != WorkspaceRoute::Home).then_some(window), cx)
                     });
                 }
             }))
@@ -1548,15 +1724,80 @@ impl gpui_kit::Render for Workspace {
             .is_some_and(|panel| !panel.read(cx).loaded());
         let window_content = window_content
             .child(self.toolbar(palette, !self.feasibility_fixture, cx))
-            .children(self.updates.clone())
-            .when(self.accounts_open, |content| {
+            .when(self.route != WorkspaceRoute::Settings, |content| {
+                content.children(self.updates.clone())
+            })
+            .when(
+                self.route == WorkspaceRoute::Home && cached && !self.feasibility_fixture,
+                |content| {
+                    let Some(panel) = &self.accounts else {
+                        return content;
+                    };
+                    let panel = panel.read(cx);
+                    let account = panel.local_reader_state().0;
+                    let selected = account
+                        .visible_repositories()
+                        .filter(|repo| repo.selected)
+                        .count();
+                    let total = account.visible_repositories().count();
+                    let mut summary = match (selected, total) {
+                        (0, 0) => "No repositories discovered yet. Refresh all to check GitHub."
+                            .to_owned(),
+                        (0, _) => {
+                            format!("No repositories monitored. Choose from {total} in Settings.")
+                        }
+                        _ => format!("Monitoring {selected} of {total} repositories"),
+                    };
+                    if let Some(checked) = account
+                        .profiles
+                        .iter()
+                        .filter(|profile| Some(profile.account) == account.active)
+                        .filter_map(|profile| profile.checked_at_ms)
+                        .max()
+                    {
+                        let time = crate::display_time::DisplayClock::current(cx)
+                            .label(Some(checked), "unknown");
+                        summary.push_str(&format!(" · Last GitHub check {time}"));
+                    }
+                    let mut strip = div()
+                        .flex()
+                        .flex_wrap()
+                        .items_center()
+                        .gap_x_3()
+                        .px_4()
+                        .py_1()
+                        .child(
+                            div()
+                                .id("home-repository-summary")
+                                .test_support()
+                                .accessibility_id("home-repository-summary")
+                                .role(Role::Label)
+                                .aria_value(summary.clone())
+                                .child(summary),
+                        );
+                    if let Some(message) = panel.home_refresh_status() {
+                        let status = message.to_owned();
+                        strip = strip.child(
+                            div()
+                                .id("home-refresh-status")
+                                .test_support()
+                                .accessibility_id("home-refresh-status")
+                                .role(Role::Status)
+                                .aria_label(status.clone())
+                                .child(status),
+                        );
+                    }
+                    content.child(strip)
+                },
+            )
+            .when(self.route != WorkspaceRoute::Home, |content| {
                 content.child(div().flex_1().min_h_0().children(self.accounts.clone()))
             })
-            .when(!self.accounts_open && cached, |content| {
+            .when(self.route == WorkspaceRoute::Home && cached, |content| {
                 content.child(div().flex_1().min_h_0().min_w_0().children(cached_reader))
             })
             .when(
-                !self.accounts_open && !cached && self.feasibility_fixture,
+                self.route == WorkspaceRoute::Home && !cached && self.feasibility_fixture,
                 |content| {
                     content.child(
                         div()
@@ -1572,7 +1813,7 @@ impl gpui_kit::Render for Workspace {
                 },
             )
             .when(
-                !self.accounts_open && !cached && !self.feasibility_fixture,
+                self.route == WorkspaceRoute::Home && !cached && !self.feasibility_fixture,
                 |content| {
                     content.child(
                         div()
@@ -1588,10 +1829,10 @@ impl gpui_kit::Render for Workspace {
                             .child(div().text_lg().child(if loading {
                                 "Opening local profile…"
                             } else {
-                                "Connect your GitHub account"
+                                "No cached workspace yet"
                             }))
                             .children((!loading && self.accounts.is_some()).then(|| {
-                                button("reader-connect-account", "Open accounts")
+                                button("reader-connect-account", "Open Settings")
                                     .accessibility_id("reader-connect-account")
                                     .on_click(cx.listener(|this, _, window, cx| {
                                         this.set_accounts_open(true, window, cx)
@@ -1655,14 +1896,19 @@ impl Workspace {
             notifications_submitted: self.notifications_submitted,
             notification_com_activations: self.notification_com_activations,
             activations: self.activations,
-            account_access: self
-                .accounts
-                .as_ref()
-                .and_then(|panel| panel.read(cx).observation(self.accounts_open, window, cx)),
+            account_access: self.accounts.as_ref().and_then(|panel| {
+                panel
+                    .read(cx)
+                    .observation(self.route != WorkspaceRoute::Home, window, cx)
+            }),
             cached_reader: self
                 .accounts
                 .as_ref()
-                .and_then(|panel| panel.read(cx).observation(self.accounts_open, window, cx))
+                .and_then(|panel| {
+                    panel
+                        .read(cx)
+                        .observation(self.route != WorkspaceRoute::Home, window, cx)
+                })
                 .and_then(|_| {
                     self.reader
                         .as_ref()

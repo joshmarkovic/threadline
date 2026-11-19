@@ -7,7 +7,8 @@ use std::{
 use threadline_core::{
     domain::{RepositoryApiId, RepositoryName},
     github::{
-        AccessError, AccessKind, GitHubClient, GitHubSession, OwnerScope, Reachability, SecretToken,
+        AccessError, AccessKind, GitHubClient, GitHubSession, OwnerScope, RateLimit, Reachability,
+        RepositoryRead, SecretToken,
     },
     sync::Cancellation,
 };
@@ -94,6 +95,7 @@ pub(crate) enum AccountCommand {
         repository: Option<RepositoryView>,
         requested: Option<String>,
     },
+    RefreshAll(AccountId),
     Select {
         profile: AccessProfile,
         repository: RepositoryView,
@@ -119,14 +121,31 @@ pub(crate) struct AccountView {
     pub(crate) background_updates_allowed: Option<bool>,
 }
 
+impl AccountView {
+    pub(crate) fn visible_repositories(&self) -> impl Iterator<Item = &RepositoryView> {
+        self.repositories.iter().filter(|repo| {
+            repo.selected || repo.cached_items > 0 || repo.access != AccessState::NotFoundOrDenied
+        })
+    }
+}
+
 pub(crate) struct AccountReply {
     pub(crate) view: AccountView,
     pub(crate) message: Option<&'static str>,
     pub(crate) github_error: Option<AccessError>,
     pub(crate) reachability: Reachability,
     pub(crate) succeeded: bool,
+    pub(crate) issue_scope: Option<AccessIssueScope>,
+    pub(crate) retry_at_ms: Option<i64>,
     #[cfg(feature = "e2e")]
     pub(crate) input_issue: Option<AccountInputIssue>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AccessIssueScope {
+    SignIn,
+    Repository,
+    Discovery,
 }
 
 #[cfg(feature = "e2e")]
@@ -138,7 +157,7 @@ pub(crate) enum AccountInputIssue {
 
 enum Problem {
     GitHub(AccessError),
-    GitHubCheck(AccessError, Reachability),
+    GitHubCheck(AccessError, Reachability, AccessIssueScope),
     Storage(threadline_storage::Error),
     Credential(PlatformError),
     InvalidRepository,
@@ -147,11 +166,29 @@ enum Problem {
     Offline,
     InactiveProfile,
     Cancelled,
+    ServerCooldown(i64),
 }
 
 struct RepositoryCheck<'a> {
     route: &'a RepositoryName,
     prior: Option<(RepositoryId, RepositoryApiId)>,
+}
+
+enum RefreshTargets<'a> {
+    One {
+        repository: Option<&'a RepositoryView>,
+        requested: Option<&'a str>,
+        select: bool,
+    },
+    All,
+}
+
+enum RepositoryChecks<'a> {
+    One {
+        target: Option<RepositoryCheck<'a>>,
+        select: bool,
+    },
+    All,
 }
 
 impl From<threadline_storage::Error> for Problem {
@@ -264,6 +301,8 @@ impl AccountService {
                 github_error: None,
                 reachability,
                 succeeded: true,
+                issue_scope: None,
+                retry_at_ms: None,
                 #[cfg(feature = "e2e")]
                 input_issue: None,
             },
@@ -311,19 +350,30 @@ impl AccountService {
             } => {
                 self.refresh(
                     &profile,
-                    repository.as_ref(),
-                    requested.as_deref(),
-                    false,
+                    RefreshTargets::One {
+                        repository: repository.as_ref(),
+                        requested: requested.as_deref(),
+                        select: false,
+                    },
                     cancel,
                 )
                 .await
             }
+            AccountCommand::RefreshAll(account) => self.refresh_all(account, cancel).await,
             AccountCommand::Select {
                 profile,
                 repository,
             } => {
-                self.refresh(&profile, Some(&repository), None, true, cancel)
-                    .await
+                self.refresh(
+                    &profile,
+                    RefreshTargets::One {
+                        repository: Some(&repository),
+                        requested: None,
+                        select: true,
+                    },
+                    cancel,
+                )
+                .await
             }
             AccountCommand::Remove {
                 account,
@@ -430,11 +480,13 @@ impl AccountService {
             &profile,
             kind,
             &session,
-            Some(RepositoryCheck {
-                route: &route,
-                prior: known,
-            }),
-            false,
+            RepositoryChecks::One {
+                target: Some(RepositoryCheck {
+                    route: &route,
+                    prior: known,
+                }),
+                select: false,
+            },
             cancel,
         )
         .await
@@ -443,15 +495,15 @@ impl AccountService {
     async fn refresh(
         &self,
         previous: &AccessProfile,
-        repository: Option<&RepositoryView>,
-        requested: Option<&str>,
-        select: bool,
+        targets: RefreshTargets<'_>,
         cancel: &Cancellation,
     ) -> Result<(Option<&'static str>, Reachability), Problem> {
         self.require_active(previous.account)?;
         if self.store.dispatch_profile(previous.account)?.offline {
             return Err(Problem::Offline);
         }
+        let sweep_account = matches!(targets, RefreshTargets::All).then_some(previous.account);
+        self.sweep_budget(sweep_account)?;
         let current = self
             .store
             .github_access_profile(previous.account, &previous.owner_scope)?
@@ -491,16 +543,24 @@ impl AccountService {
         let owner = OwnerScope::new(&profile.owner_scope)?;
         let session = match self
             .github
-            .authenticate(pat.token()?, owner, Some(profile.user_id), cancel)
+            .authenticate_with_guidance(pat.token()?, owner, Some(profile.user_id), cancel)
             .await
         {
-            Ok(session) => session,
+            Ok((session, rate)) => {
+                self.note_sweep_rate(sweep_account, Some(rate), None)?;
+                session
+            }
             Err(error) => {
+                self.note_sweep_rate(sweep_account, error.rate, Some(error.kind))?;
                 if error.kind != AccessKind::Cancelled {
                     self.store.record_access_result(
                         &profile,
                         profile.kind,
-                        access_state(&error),
+                        if sweep_account.is_some() && error.kind == AccessKind::RateLimited {
+                            current.access
+                        } else {
+                            access_state(&error)
+                        },
                         DiscoveryState::Unchecked,
                         now_ms(),
                     )?;
@@ -509,6 +569,16 @@ impl AccountService {
             }
         };
         drop(pat);
+        let RefreshTargets::One {
+            repository,
+            requested,
+            select,
+        } = targets
+        else {
+            return self
+                .check_session(&profile, kind, &session, RepositoryChecks::All, cancel)
+                .await;
+        };
         let typed_route = repository
             .map(|repo| RepositoryName::new(&repo.owner, &repo.name))
             .transpose()
@@ -538,8 +608,56 @@ impl AccountService {
             }),
             (None, None) => None,
         };
-        self.check_session(&profile, kind, &session, checked, select, cancel)
-            .await
+        self.check_session(
+            &profile,
+            kind,
+            &session,
+            RepositoryChecks::One {
+                target: checked,
+                select,
+            },
+            cancel,
+        )
+        .await
+    }
+
+    async fn refresh_all(
+        &self,
+        account: AccountId,
+        cancel: &Cancellation,
+    ) -> Result<(Option<&'static str>, Reachability), Problem> {
+        self.require_active(account)?;
+        if self.store.dispatch_profile(account)?.offline {
+            return Err(Problem::Offline);
+        }
+        self.sweep_budget(Some(account))?;
+        let mut issue = None;
+        let mut reachability = Reachability::NotAttempted;
+        for profile in self
+            .store
+            .github_access_profiles()?
+            .into_iter()
+            .filter(|profile| {
+                profile.account == account && profile.access != AccessState::SignedOut
+            })
+        {
+            check_cancel(cancel)?;
+            self.sweep_budget(Some(account))?;
+            match self.refresh(&profile, RefreshTargets::All, cancel).await {
+                Ok((_, result)) => reachability = result,
+                Err(error) if issue.is_none() => issue = Some(error),
+                Err(_) => {}
+            }
+        }
+        check_cancel(cancel)?;
+        self.sweep_budget(Some(account))?;
+        if let Some(issue) = issue {
+            return Err(issue);
+        }
+        if reachability == Reachability::NotAttempted {
+            return Err(Problem::NoSavedCredential);
+        }
+        Ok((Some("GitHub repositories refreshed."), reachability))
     }
 
     async fn check_session(
@@ -547,42 +665,49 @@ impl AccountService {
         profile: &AccessProfile,
         kind: CredentialKind,
         session: &GitHubSession,
-        target: Option<RepositoryCheck<'_>>,
-        select: bool,
+        checks: RepositoryChecks<'_>,
         cancel: &Cancellation,
     ) -> Result<(Option<&'static str>, Reachability), Problem> {
         let mut issue = None;
         let mut reachability = Reachability::ReceivedResponse;
         let mut access = AccessState::Unchecked;
         let mut checked_repo = None;
-        if let Some(RepositoryCheck { route, prior }) = target.as_ref() {
-            let expected = prior.map(|(_, provider_id)| provider_id);
-            let result = session.repository(route, expected, cancel).await;
-            check_cancel(cancel)?;
-            match result {
-                Ok(repo) => {
-                    checked_repo =
-                        Some(self.observe(profile, &repo, RepositoryObservationSource::Direct)?);
+        let (target, select, sweep) = match checks {
+            RepositoryChecks::One { target, select } => (target, select, false),
+            RepositoryChecks::All => (None, false, true),
+        };
+        let sweep_account = sweep.then_some(profile.account);
+        if let Some(target) = target.as_ref() {
+            match self
+                .check_repository(profile, session, target, true, None, cancel)
+                .await?
+            {
+                Ok(repository) => {
+                    checked_repo = Some(repository);
                     access = AccessState::Readable;
                 }
                 Err(error) => {
                     reachability = error.reachability;
                     access = access_state(&error);
-                    if let Some((id, _)) = prior {
-                        self.store
-                            .mark_repository_access(profile, *id, access, now_ms())?;
-                    }
-                    issue = Some(error);
+                    issue = Some((error, AccessIssueScope::Repository));
                 }
             }
         }
 
         let mut discovery = DiscoveryState::Partial;
+        let mut restricted = false;
+        let mut listed = std::collections::HashSet::new();
         let mut cursor = None;
+        let mut deferred = None;
         for _ in 0..100 {
+            if let Err(error) = self.sweep_budget(sweep_account) {
+                deferred = Some(error);
+                break;
+            }
             match session.discover(cursor.as_ref(), cancel).await {
                 Ok(page) => {
                     reachability = Reachability::ReceivedResponse;
+                    self.note_sweep_rate(sweep_account, Some(page.rate), None)?;
                     check_cancel(cancel)?;
                     for repo in page.repositories {
                         // Keep a direct denial authoritative even if the repository appears in discovery.
@@ -595,9 +720,14 @@ impl AccountService {
                         {
                             continue;
                         }
-                        self.observe(profile, &repo, RepositoryObservationSource::Discovery)?;
+                        let id =
+                            self.observe(profile, &repo, RepositoryObservationSource::Discovery)?;
+                        if sweep {
+                            listed.insert(id);
+                        }
                     }
-                    discovery = if page.sso_restricted_organizations.is_some() {
+                    restricted |= page.sso_restricted_organizations.is_some();
+                    discovery = if restricted {
                         DiscoveryState::RestrictedBySso
                     } else if page.next.is_none() {
                         DiscoveryState::Complete
@@ -611,15 +741,72 @@ impl AccountService {
                 }
                 Err(error) => {
                     reachability = error.reachability;
+                    self.note_sweep_rate(sweep_account, error.rate, Some(error.kind))?;
                     check_cancel(cancel)?;
                     if issue.is_none() {
-                        issue = Some(error);
+                        issue = Some((error, AccessIssueScope::Discovery));
                     }
                     break;
                 }
             }
         }
         check_cancel(cancel)?;
+        let repositories = self.store.github_repository_views(profile.account)?;
+        let scoped = repositories
+            .iter()
+            .filter(|repo| repo.owner.eq_ignore_ascii_case(&profile.owner_scope));
+        let mut readable = false;
+        for repo in scoped {
+            let listed = listed.contains(&repo.id);
+            if sweep
+                && (repo.selected
+                    || (listed && repo.access == AccessState::NotFoundOrDenied)
+                    || (discovery == DiscoveryState::Complete && !listed))
+            {
+                if deferred.is_some() {
+                    readable |= repo.access == AccessState::Readable && repo.verified_current;
+                    continue;
+                }
+                if let Err(error) = self.sweep_budget(sweep_account) {
+                    deferred = Some(error);
+                    readable |= repo.access == AccessState::Readable && repo.verified_current;
+                    continue;
+                }
+                let route = RepositoryName::new(&repo.owner, &repo.name)
+                    .map_err(|_| Problem::InvalidRepository)?;
+                let check = RepositoryCheck {
+                    route: &route,
+                    prior: Some((repo.id, RepositoryApiId::new(repo.provider_id))),
+                };
+                match self
+                    .check_repository(
+                        profile,
+                        session,
+                        &check,
+                        repo.selected,
+                        sweep_account,
+                        cancel,
+                    )
+                    .await?
+                {
+                    Ok(_) => readable = true,
+                    Err(error) if repo.selected => {
+                        if !readable {
+                            access = access_state(&error);
+                        }
+                        if issue.is_none() {
+                            issue = Some((error, AccessIssueScope::Repository));
+                        }
+                    }
+                    Err(_) => {}
+                }
+            } else if repo.access == AccessState::Readable && repo.verified_current {
+                readable = true;
+            }
+        }
+        if readable {
+            access = AccessState::Readable;
+        }
         if !self
             .store
             .record_access_result(profile, kind, access, discovery, now_ms())?
@@ -630,18 +817,100 @@ impl AccountService {
             self.store
                 .select_github_repository(profile.account, id, true)?;
         }
-        if let Some(error) = issue {
-            return Err(Problem::GitHubCheck(error, reachability));
+        if let Some(error) = deferred {
+            return Err(error);
         }
-        let notice = match (checked_repo, select, discovery) {
-            (_, _, DiscoveryState::RestrictedBySso) => {
-                Some("GitHub withheld some repositories because of SSO.")
-            }
-            (Some(_), true, _) => Some("Repository selected. Read access verified."),
-            (Some(_), false, _) => Some("Read access verified. Select a repository to monitor it."),
+        if let Some((error, scope)) = issue {
+            return Err(Problem::GitHubCheck(error, reachability, scope));
+        }
+        let notice = match (checked_repo, select) {
+            (Some(_), true) => Some("Repository selected. Read access verified."),
+            (Some(_), false) => Some("Read access verified. Select a repository to monitor it."),
             _ => Some("Repository list refreshed."),
         };
         Ok((notice, reachability))
+    }
+
+    async fn check_repository(
+        &self,
+        profile: &AccessProfile,
+        session: &GitHubSession,
+        target: &RepositoryCheck<'_>,
+        record_failure: bool,
+        sweep_account: Option<AccountId>,
+        cancel: &Cancellation,
+    ) -> Result<Result<RepositoryId, AccessError>, Problem> {
+        let expected = target.prior.map(|(_, provider_id)| provider_id);
+        let (result, rate) = match session
+            .repository_with_guidance(target.route, expected, None, cancel)
+            .await
+        {
+            Ok((RepositoryRead::Fresh { repository, .. }, rate)) => (Ok(repository), Some(rate)),
+            Ok((RepositoryRead::NotModified, rate)) => (
+                Err(AccessError {
+                    kind: AccessKind::UnexpectedStatus,
+                    reachability: Reachability::ReceivedResponse,
+                    http_status: Some(304),
+                    sso_action: None,
+                    rate: Some(rate),
+                }),
+                Some(rate),
+            ),
+            Err(error) => {
+                let rate = error.rate;
+                (Err(error), rate)
+            }
+        };
+        self.note_sweep_rate(
+            sweep_account,
+            rate,
+            result.as_ref().err().map(|error| error.kind),
+        )?;
+        check_cancel(cancel)?;
+        match result {
+            Ok(repository) => self
+                .observe(profile, &repository, RepositoryObservationSource::Direct)
+                .map(Ok),
+            Err(error) => {
+                if let Some((id, _)) = target.prior
+                    && (record_failure
+                        || (error.kind == AccessKind::MissingOrInaccessible
+                            && error.http_status == Some(404)))
+                {
+                    self.store.mark_repository_access(
+                        profile,
+                        id,
+                        access_state(&error),
+                        now_ms(),
+                    )?;
+                }
+                Ok(Err(error))
+            }
+        }
+    }
+
+    fn sweep_budget(&self, account: Option<AccountId>) -> Result<(), Problem> {
+        if let Some(account) = account
+            && let Some(until) = self.store.server_read_budget(account)?
+            && until > now_ms()
+        {
+            return Err(Problem::ServerCooldown(until));
+        }
+        Ok(())
+    }
+
+    fn note_sweep_rate(
+        &self,
+        account: Option<AccountId>,
+        rate: Option<RateLimit>,
+        reason: Option<AccessKind>,
+    ) -> Result<(), Problem> {
+        if let Some(account) = account
+            && let Some(until) = crate::sync_worker::floor(rate, reason, now_ms())
+        {
+            self.store.hold_sync_budget(account, until)?;
+        }
+        Ok(())
     }
 
     fn observe(
@@ -741,13 +1010,15 @@ fn access_state(error: &AccessError) -> AccessState {
 }
 
 fn problem_reply(view: AccountView, error: Problem) -> AccountReply {
-    if let Problem::GitHubCheck(github_error, reachability) = error {
+    if let Problem::GitHubCheck(github_error, reachability, scope) = error {
         return AccountReply {
             view,
             message: None,
             reachability,
             github_error: Some(github_error),
             succeeded: false,
+            issue_scope: Some(scope),
+            retry_at_ms: None,
             #[cfg(feature = "e2e")]
             input_issue: None,
         };
@@ -759,6 +1030,8 @@ fn problem_reply(view: AccountView, error: Problem) -> AccountReply {
             reachability: github_error.reachability,
             github_error: Some(github_error),
             succeeded: false,
+            issue_scope: Some(AccessIssueScope::SignIn),
+            retry_at_ms: None,
             #[cfg(feature = "e2e")]
             input_issue: None,
         };
@@ -768,6 +1041,11 @@ fn problem_reply(view: AccountView, error: Problem) -> AccountReply {
         Problem::InvalidRepository => Some(AccountInputIssue::InvalidRepository),
         Problem::InvalidPat => Some(AccountInputIssue::InvalidPat),
         _ => None,
+    };
+    let retry_at_ms = if let Problem::ServerCooldown(until) = &error {
+        Some(*until)
+    } else {
+        None
     };
     let message = match error {
         Problem::Storage(error) => {
@@ -786,7 +1064,8 @@ fn problem_reply(view: AccountView, error: Problem) -> AccountReply {
         Problem::Offline => "Connection is paused. Go online before checking GitHub.",
         Problem::InactiveProfile => "The active account changed. Try the account action again.",
         Problem::Cancelled => "GitHub check cancelled.",
-        Problem::GitHub(_) | Problem::GitHubCheck(_, _) => unreachable!(),
+        Problem::ServerCooldown(_) => "GitHub rate-limited repository refresh.",
+        Problem::GitHub(_) | Problem::GitHubCheck(_, _, _) => unreachable!(),
     };
     AccountReply {
         view,
@@ -794,6 +1073,8 @@ fn problem_reply(view: AccountView, error: Problem) -> AccountReply {
         github_error: None,
         reachability: Reachability::NotAttempted,
         succeeded: false,
+        issue_scope: None,
+        retry_at_ms,
         #[cfg(feature = "e2e")]
         input_issue,
     }

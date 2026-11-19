@@ -92,6 +92,10 @@ impl DisplayClock {
         self.selected.unwrap_or(self.system)
     }
 
+    pub(crate) fn device_name(&self) -> &'static str {
+        self.system.name()
+    }
+
     pub(crate) fn install(self, cx: &mut App) {
         let device = self.device;
         cx.set_global(self);

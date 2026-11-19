@@ -27,6 +27,7 @@ struct Simulator {
     hold_check_response: Arc<AtomicBool>,
     probe: Arc<ProbeHold>,
     linked_issue: Arc<LinkedIssueGate>,
+    inventory: Arc<FixtureInventory>,
     worker: Option<thread::JoinHandle<()>>,
 }
 
@@ -43,6 +44,12 @@ struct ProbeHold {
 struct LinkedIssueGate {
     arrived: AtomicBool,
     hold_response: AtomicBool,
+}
+
+#[derive(Default)]
+struct FixtureInventory {
+    phase: AtomicUsize,
+    retired_checks: AtomicUsize,
 }
 
 impl Simulator {
@@ -71,6 +78,8 @@ impl Simulator {
         let server_probe = probe.clone();
         let linked_issue = Arc::new(LinkedIssueGate::default());
         let server_linked_issue = linked_issue.clone();
+        let inventory = Arc::new(FixtureInventory::default());
+        let server_inventory = inventory.clone();
         let (server_sso, server_stop, server_requests, server_repository) = (
             sso.clone(),
             stop.clone(),
@@ -97,6 +106,7 @@ impl Simulator {
                             (&server_check_arrived, &server_check_hold),
                             &server_probe,
                             &server_linked_issue,
+                            &server_inventory,
                         ) {
                             server_user_requests.fetch_add(1, Ordering::Relaxed);
                         }
@@ -121,6 +131,7 @@ impl Simulator {
             hold_check_response,
             probe,
             linked_issue,
+            inventory,
             worker: Some(worker),
         }
     }
@@ -150,6 +161,7 @@ fn respond(
     (check_arrived, hold_check_response): (&AtomicBool, &AtomicBool),
     probe: &ProbeHold,
     linked_issue: &LinkedIssueGate,
+    inventory: &FixtureInventory,
 ) -> bool {
     // Windows can inherit the nonblocking listener mode on an accepted socket.
     stream.set_nonblocking(false).unwrap();
@@ -206,6 +218,19 @@ fn respond(
     let repo = format!(
         r#"{{"id":{repository_id},"node_id":"synthetic-private-repo","name":"private","owner":{{"login":"fixture-org"}},"private":true,"permissions":{{"pull":true,"push":false,"admin":false}}}}"#
     );
+    let inventory_phase = inventory.phase.load(Ordering::Acquire);
+    let other_repo = |id, name: &str| {
+        format!(
+            r#"{{"id":{id},"node_id":"synthetic-{name}","name":"{name}","owner":{{"login":"fixture-org"}},"private":true,"permissions":{{"pull":true,"push":false,"admin":false}}}}"#
+        )
+    };
+    let not_found = || {
+        (
+            "404 Not Found",
+            String::new(),
+            r#"{"message":"Not Found"}"#.into(),
+        )
+    };
     let checked_head = ["b".repeat(40), "d".repeat(40)].into_iter().find(|head| {
         target
             == format!("/repositories/73/commits/{head}/check-runs?filter=all&per_page=20&page=1")
@@ -254,6 +279,38 @@ fn respond(
         "/repos/fixture-org/private" if reader.is_some_and(|(_, _, phase)| phase.load(Ordering::Relaxed) == 7) =>
             ("403 Forbidden", String::new(), r#"{"message":"Fixture repository denied"}"#.into()),
         "/repos/fixture-org/private" => ("200 OK",String::new(),repo.to_owned()),
+        "/repos/fixture-org/missing" => not_found(),
+        "/repos/fixture-org/retired" if inventory_phase > 0 => {
+            inventory.retired_checks.fetch_add(1, Ordering::Release);
+            if inventory_phase == 1 {
+                ("200 OK", String::new(), other_repo(47, "retired"))
+            } else {
+                not_found()
+            }
+        }
+        "/repos/fixture-org/archived" if inventory_phase > 0 => {
+            if inventory_phase == 1 {
+                ("200 OK", String::new(), other_repo(48, "archived"))
+            } else {
+                not_found()
+            }
+        }
+        target if target.starts_with("/user/repos?") && inventory_phase == 4 =>
+            ("429 Too Many Requests", "Retry-After: 90\r\n".into(),
+             r#"{"message":"Synthetic rate limit"}"#.into()),
+        target if target.starts_with("/user/repos?") && inventory_phase > 0 => {
+            let new = if inventory_phase == 1 {
+                format!("{},{}", other_repo(47, "retired"), other_repo(48, "archived"))
+            } else {
+                other_repo(49, "new")
+            };
+            let header = if inventory_phase == 2 {
+                "X-GitHub-SSO: partial-results; organizations=9\r\n".into()
+            } else {
+                String::new()
+            };
+            ("200 OK", header, format!("[{repo},{new}]"))
+        }
         target if target.starts_with("/user/repos?") => ("200 OK",if sso {"X-GitHub-SSO: partial-results; organizations=9\r\n".into()} else {String::new()},format!("[{repo}]")),
         _ => panic!("unexpected local fixture route"),
     }
@@ -524,6 +581,181 @@ fn reader_reply(
         _ => return None,
     };
     Some(response)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn account_refresh_all_adds_new_repositories_and_checks_missing_ones_after_full_discovery() {
+    let fixture = Simulator::start();
+    fixture.inventory.phase.store(1, Ordering::Release);
+    let dir = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open_profile(dir.path()).unwrap());
+    let service = AccountService {
+        store: store.clone(),
+        credentials: Arc::new(FixtureVault::default()),
+        github: GitHubClient::loopback(fixture.address).unwrap(),
+        fixture: true,
+    };
+    let cancel = Cancellation::new();
+    let connected = service
+        .execute(
+            AccountCommand::Connect {
+                repository: "fixture-org/private".into(),
+                pat: Pat::from_input(FIXTURE_PAT.into()),
+                renew: None,
+            },
+            &cancel,
+        )
+        .await;
+    assert!(connected.succeeded);
+    let account = connected.view.active.unwrap();
+    let archived = connected
+        .view
+        .repositories
+        .into_iter()
+        .find(|repo| repo.name == "archived")
+        .unwrap();
+    let selected = service
+        .execute(
+            AccountCommand::Select {
+                profile: connected.view.profiles[0].clone(),
+                repository: archived,
+            },
+            &cancel,
+        )
+        .await;
+    assert!(selected.succeeded);
+
+    fixture.inventory.phase.store(2, Ordering::Release);
+    let partial = service
+        .execute(AccountCommand::RefreshAll(account), &cancel)
+        .await;
+    assert_eq!(
+        partial.view.profiles[0].discovery,
+        DiscoveryState::RestrictedBySso
+    );
+    let row = |reply: &AccountReply, name: &str| {
+        reply
+            .view
+            .repositories
+            .iter()
+            .find(|repo| repo.name == name)
+            .map(|repo| (repo.access, repo.selected))
+    };
+    assert_eq!(
+        row(&partial, "retired"),
+        Some((AccessState::Unchecked, false))
+    );
+    assert_eq!(row(&partial, "new"), Some((AccessState::Unchecked, false)));
+    assert_eq!(fixture.inventory.retired_checks.load(Ordering::Acquire), 0);
+
+    fixture.inventory.phase.store(3, Ordering::Release);
+    let complete = service
+        .execute(AccountCommand::RefreshAll(account), &cancel)
+        .await;
+    assert_eq!(
+        complete.view.profiles[0].discovery,
+        DiscoveryState::Complete
+    );
+    assert_eq!(complete.view.profiles[0].access, AccessState::Readable);
+    assert_eq!(
+        row(&complete, "private"),
+        Some((AccessState::Readable, false))
+    );
+    assert_eq!(
+        row(&complete, "retired"),
+        Some((AccessState::NotFoundOrDenied, false))
+    );
+    assert_eq!(
+        row(&complete, "archived"),
+        Some((AccessState::NotFoundOrDenied, true))
+    );
+    assert_eq!(row(&complete, "new"), Some((AccessState::Unchecked, false)));
+    assert_eq!(fixture.inventory.retired_checks.load(Ordering::Acquire), 1);
+    assert!(
+        complete
+            .view
+            .visible_repositories()
+            .any(|repo| repo.name == "new")
+    );
+    assert!(
+        complete
+            .view
+            .visible_repositories()
+            .any(|repo| repo.name == "archived")
+    );
+    assert!(
+        !complete
+            .view
+            .visible_repositories()
+            .any(|repo| repo.name == "retired")
+    );
+
+    fixture.inventory.phase.store(1, Ordering::Release);
+    fixture.probe.hold.store(true, Ordering::Release);
+    let old = tokio::spawn({
+        let service = service.clone();
+        async move {
+            service
+                .execute(AccountCommand::RefreshAll(account), &Cancellation::new())
+                .await
+        }
+    });
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !fixture.probe.arrived.load(Ordering::Acquire) {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let started = store
+        .github_access_profile(account, "fixture-org")
+        .unwrap()
+        .unwrap();
+    store.begin_access_check(&started).unwrap();
+    fixture.probe.hold.store(false, Ordering::Release);
+    let stale = old.await.unwrap();
+    assert!(!stale.succeeded);
+    assert_eq!(
+        row(&stale, "retired"),
+        Some((AccessState::NotFoundOrDenied, false))
+    );
+    assert_eq!(
+        row(&stale, "archived"),
+        Some((AccessState::NotFoundOrDenied, true))
+    );
+
+    fixture.inventory.phase.store(4, Ordering::Release);
+    let before = fixture.requests.load(Ordering::Acquire);
+    let rate_limited = service
+        .execute(AccountCommand::RefreshAll(account), &cancel)
+        .await;
+    assert!(!rate_limited.succeeded);
+    assert_eq!(fixture.requests.load(Ordering::Acquire), before + 2);
+    let until = rate_limited.retry_at_ms.unwrap();
+    assert!(until >= now_ms() + 80_000);
+    assert_eq!(store.server_read_budget(account).unwrap(), Some(until));
+    let deferred = service
+        .execute(AccountCommand::RefreshAll(account), &cancel)
+        .await;
+    assert_eq!(deferred.retry_at_ms, Some(until));
+    assert_eq!(fixture.requests.load(Ordering::Acquire), before + 2);
+
+    let offline = service
+        .execute(
+            AccountCommand::SetOffline {
+                account,
+                offline: true,
+            },
+            &cancel,
+        )
+        .await;
+    assert!(offline.succeeded);
+    let before = fixture.requests.load(Ordering::Acquire);
+    let held = service
+        .execute(AccountCommand::RefreshAll(account), &cancel)
+        .await;
+    assert!(!held.succeeded);
+    assert_eq!(fixture.requests.load(Ordering::Acquire), before);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -2051,6 +2283,7 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
         gpui_kit::init(cx);
         crate::workspace::bind_shortcuts(cx);
         cx.set_global(ProfileStore(store.clone()));
+        cx.set_global(crate::display_time::DisplayClock::open(Some(profile.path())).unwrap());
         gpui_kit::open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds {
@@ -2088,11 +2321,6 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
             .unwrap();
         read_account().is_some_and(|account| account["busy"] == false)
     });
-    cx.update_window(window, |_, window, cx| {
-        window.press("secondary-shift-a", cx)
-    })
-    .unwrap();
-
     let click = |id: &str, cx: &mut gpui_kit::TestAppContext| {
         cx.update_window(window, |_, window, cx| {
             window.render_frame(cx);
@@ -2134,7 +2362,7 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
         .unwrap();
     };
     let wait_receipt = |field: &str, cx: &mut gpui_kit::TestAppContext| {
-        wait_form(cx, |cx| {
+        wait_form_for(cx, field, |cx| {
             cx.update_window(window, |_, window, cx| window.render_frame(cx))
                 .unwrap();
             read_account().is_some_and(|account| account[field] == true)
@@ -2184,6 +2412,27 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
         assert_eq!(store.active_github_account().unwrap(), active);
         assert_eq!(simulator.requests.load(Ordering::SeqCst), before);
     };
+    wait_form(cx, |cx| {
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            window.try_find("onboarding-zone-continue").is_some()
+                && window.try_find("account-credential-form").is_none()
+        })
+        .unwrap()
+    });
+    click("display-timezone-new-york", cx);
+    click("onboarding-zone-continue", cx);
+    wait_form(cx, |cx| {
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            window.try_find("account-credential-form").is_some()
+        })
+        .unwrap()
+    });
+    assert_eq!(
+        std::fs::read_to_string(profile.path().join("Config/display-timezone")).unwrap(),
+        "America/New_York\n"
+    );
     // Exercise real focus transfer in both directions using the receipt geometry.
     click("account-token", cx);
     wait_receipt("fixture_token_focused", cx);
@@ -2201,8 +2450,7 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
             .unwrap()
             .contains(FIXTURE_PAT)
     );
-    set_route("fixture-org/private", cx);
-    wait_receipt("fixture_route_entered", cx);
+    set_route("fixture-org/missing", cx);
     cx.update_window(window, |_, window, cx| {
         window.render_frame(cx);
         assert!(window.try_find("account-repository-error").is_none());
@@ -2210,11 +2458,32 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
     .unwrap();
     click("account-connect", cx);
     wait_form(cx, |cx| {
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            let identity = window.try_find("account-identity");
+            let status = window.try_find("account-status");
+            identity.is_some_and(|element| element.label() == Some("fixture-user · Signed in"))
+                && status.is_some_and(|element| {
+                    element.label()
+                        == Some("Repository access · GitHub resource is missing or inaccessible")
+                })
+                && window.try_find("account-credential-form").is_none()
+        })
+        .unwrap()
+    });
+    assert_eq!(simulator.user_requests.load(Ordering::SeqCst), 1);
+    assert!(store.active_github_account().unwrap().is_some());
+    click("account-repository", cx);
+    wait_receipt("fixture_route_focused", cx);
+    set_route("fixture-org/private", cx);
+    wait_receipt("fixture_route_entered", cx);
+    click("account-check-repository", cx);
+    wait_form(cx, |cx| {
         cx.update_window(window, |_, window, cx| window.render_frame(cx))
             .unwrap();
         read_account().is_some_and(|account| account["profile_access"] == "Readable")
     });
-    assert_eq!(simulator.user_requests.load(Ordering::SeqCst), 1);
+    assert_eq!(simulator.user_requests.load(Ordering::SeqCst), 2);
     let account = store.active_github_account().unwrap().unwrap();
     let loaded = store.github_repository_views(account).unwrap();
     assert_eq!(loaded.len(), 1);
@@ -2222,6 +2491,20 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
     assert!(loaded[0].verified_current);
     assert_eq!(read_account().unwrap()["active_user_id"], 101);
     assert_eq!(read_account().unwrap()["fixture_token_entered"], false);
+    click("account-select-0", cx);
+    wait_form(cx, |cx| {
+        cx.update_window(window, |_, window, cx| window.render_frame(cx))
+            .unwrap();
+        read_account().is_some_and(|account| account["selected_count"] == 1)
+    });
+    click("onboarding-continue", cx);
+    wait_form(cx, |cx| {
+        cx.update_window(window, |_, window, cx| window.render_frame(cx))
+            .unwrap();
+        read_account().is_some_and(|account| account["panel_open"] == false)
+    });
+    click("account-open", cx);
+    wait_receipt("panel_open", cx);
 
     // The signed-in form retains both the masked input and the intended replacement.
     cx.update_window(window, |_, window, cx| {
@@ -2243,7 +2526,7 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
             window.try_find("account-status").is_some_and(|status| {
                 status.visible()
                     && status.role() == Some(gpui_kit::Role::Status)
-                    && status.label() == Some("GitHub rejected this credential")
+                    && status.label() == Some("GitHub sign-in · GitHub rejected this credential")
             })
         })
         .unwrap()
@@ -2253,7 +2536,7 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
                     && account["busy"] == false
             })
     });
-    assert_eq!(simulator.user_requests.load(Ordering::SeqCst), 2);
+    assert_eq!(simulator.user_requests.load(Ordering::SeqCst), 4);
     assert_eq!(read_account().unwrap()["fixture_token_entered"], false);
     assert_eq!(read_account().unwrap()["fixture_replacement_active"], true);
     assert_eq!(store.active_github_account().unwrap(), Some(account));
@@ -2270,7 +2553,7 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
                 && account["busy"] == false
         })
     });
-    assert_eq!(simulator.user_requests.load(Ordering::SeqCst), 3);
+    assert_eq!(simulator.user_requests.load(Ordering::SeqCst), 5);
 
     simulator.sso.store(true, Ordering::Relaxed);
     click("account-refresh", cx);
@@ -2279,6 +2562,7 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
             .unwrap();
         read_account().is_some_and(|account| account["discovery"] == "RestrictedBySso")
     });
+    click("account-add", cx);
     click("account-token", cx);
     enter_token(cx);
     let before_sign_out = simulator.requests.load(Ordering::SeqCst);
@@ -2291,10 +2575,7 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
         })
     });
     assert_eq!(simulator.requests.load(Ordering::SeqCst), before_sign_out);
-    cx.update_window(window, |_, window, cx| {
-        window.press("secondary-shift-a", cx)
-    })
-    .unwrap();
+    click("account-close", cx);
     wait_form(cx, |cx| {
         cx.update_window(window, |_, window, cx| window.render_frame(cx))
             .unwrap();
@@ -2304,8 +2585,19 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
 }
 
 #[cfg(feature = "e2e")]
+#[track_caller]
 fn wait_form(
     cx: &mut gpui_kit::TestAppContext,
+    condition: impl FnMut(&mut gpui_kit::TestAppContext) -> bool,
+) {
+    wait_form_for(cx, "the expected account state", condition);
+}
+
+#[cfg(feature = "e2e")]
+#[track_caller]
+fn wait_form_for(
+    cx: &mut gpui_kit::TestAppContext,
+    expected: &str,
     mut condition: impl FnMut(&mut gpui_kit::TestAppContext) -> bool,
 ) {
     let deadline = std::time::Instant::now() + Duration::from_secs(8);
@@ -2316,7 +2608,7 @@ fn wait_form(
         }
         thread::sleep(Duration::from_millis(10));
     }
-    panic!("The account form did not finish the isolated identity check");
+    panic!("The isolated account form did not reach {expected}");
 }
 
 #[tokio::test]
