@@ -1,12 +1,16 @@
 //! Runs the shared SQLite read schedule on the application's Tokio runtime.
 
+mod downloads;
 mod reads;
 mod writes;
 pub(crate) use writes::translate_merge_policy;
 
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -27,7 +31,10 @@ use tokio::{
     sync::{Notify, watch},
 };
 
-use crate::{accounts::AccountService, reader::ReaderError};
+use crate::{
+    accounts::AccountService,
+    reader::{ReaderError, ReaderService},
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct SyncUpdate {
@@ -50,6 +57,7 @@ struct Shared {
     changed: Notify,
     started: Instant,
     shutdown: Cancellation,
+    download_updates: AtomicU64,
 }
 
 #[derive(Default)]
@@ -58,6 +66,7 @@ struct Scope {
     ready: bool,
     requested: Option<ProbeTrigger>,
     active: Option<Active>,
+    download: Option<downloads::ActiveDownload>,
 }
 
 struct Active {
@@ -97,6 +106,7 @@ impl SyncWorker {
             changed: Notify::new(),
             started: Instant::now(),
             shutdown: Cancellation::new(),
+            download_updates: AtomicU64::new(0),
         });
         runtime.spawn(run(accounts, core.clone(), sender, network));
         Self { core, updates }
@@ -121,6 +131,9 @@ impl SyncWorker {
         if let Some(active) = &scope.active {
             active.cancel.cancel();
         }
+        if let Some(download) = &scope.download {
+            download.cancel.cancel();
+        }
         drop(scope);
         self.wake(trigger);
     }
@@ -138,6 +151,22 @@ impl SyncWorker {
             active.cancel.cancel();
         }
         self.core.changed.notify_one();
+    }
+
+    pub(crate) fn cancel_pr_download(&self, revision: i64, generation: i64) {
+        if let Some(download) = self
+            .core
+            .scope
+            .lock()
+            .expect("sync scope")
+            .download
+            .as_ref()
+            && download.revision == revision
+            && download.generation == generation
+        {
+            download.cancel.cancel();
+        }
+        self.wake(None);
     }
 
     pub(crate) fn begin_foreground(&self) -> Option<ObservationId> {
@@ -244,6 +273,7 @@ struct Local {
     next_recovery: Option<i64>,
     next_read: Option<i64>,
     next_write: Option<i64>,
+    next_download: Option<i64>,
 }
 
 impl Local {
@@ -291,6 +321,11 @@ impl Local {
             } else {
                 None
             },
+            next_download: if network {
+                store.next_pr_download_due(account)?
+            } else {
+                None
+            },
         }))
     }
 
@@ -316,6 +351,7 @@ async fn run(
     background_enabled: bool,
 ) {
     let store = accounts.reader_store();
+    let download_reader = ReaderService::new(accounts.clone());
     let mut active_account = None;
     let mut bound = BoundReaders::default();
     let mut digest = 0u64;
@@ -327,6 +363,7 @@ async fn run(
     let mut next_write_family = 0;
     let mut was_reachable = false;
     while !core.shutdown.is_cancelled() {
+        digest = digest.wrapping_add(core.download_updates.swap(0, Ordering::AcqRel));
         let Ok(now) = UtcMillis::now() else {
             break;
         };
@@ -403,7 +440,9 @@ async fn run(
             if let Some(profile) = local.probe_profile() {
                 let (chosen, due) = {
                     let mut observer = core.observer.lock().expect("connectivity observer");
-                    let waiting = local.waiting != 0 || local.next_write.is_some();
+                    let waiting = local.waiting != 0
+                        || local.next_write.is_some()
+                        || local.next_download.is_some();
                     let due = if requested.is_some() {
                         Some(floor)
                     } else {
@@ -448,6 +487,29 @@ async fn run(
                 }
             }
             let write_allowed = status != ConnectionStatus::Unreachable;
+            let download_idle = core.scope.lock().expect("sync scope").download.is_none();
+            if write_allowed
+                && let Some(due) = local.next_download
+                && download_idle
+            {
+                let due = due.max(local.status.budget_not_before_ms.unwrap_or(now));
+                if due <= now {
+                    if !downloads::start(
+                        &core,
+                        &store,
+                        &download_reader,
+                        local.account,
+                        generation,
+                        now,
+                    )
+                    .await
+                    {
+                        next = earliest(next, Duration::from_millis(250));
+                    }
+                } else {
+                    next = earliest(next, until(now, due));
+                }
+            }
             let write_ready = write_allowed && local.next_write.is_some_and(|due| due <= now);
             if write_ready && (prefer_write || local.next_read.is_none_or(|due| due > now)) {
                 if writes::execute(

@@ -15,7 +15,7 @@ use tempfile::{Builder, NamedTempFile};
 use crate::{Error, Result, queue::hold_restored_dispatch};
 
 pub const DATABASE_FILENAME: &str = "threadline.sqlite3";
-pub const SCHEMA_VERSION: u32 = 16;
+pub const SCHEMA_VERSION: u32 = 17;
 const APPLICATION_ID: u32 = 0x5448_5244;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(3);
 const BACKUP_TIMEOUT: Duration = Duration::from_secs(30);
@@ -303,6 +303,14 @@ fn migrate(connection: &mut Connection, path: &Path) -> Result<Option<PathBuf>> 
                  DEFAULT 0 CHECK(api_capped IN (0,1));",
             )?;
             tx.pragma_update(None, "user_version", 16)?;
+        }
+        if version < 17 {
+            tx.execute_batch(
+                "ALTER TABLE pr_downloads ADD COLUMN retry_at INTEGER NOT NULL DEFAULT 0;
+                 ALTER TABLE pr_downloads ADD COLUMN lease_until INTEGER;
+                 ALTER TABLE pr_downloads ADD COLUMN lease_token INTEGER NOT NULL DEFAULT 0;",
+            )?;
+            tx.pragma_update(None, "user_version", 17)?;
         }
         check_foreign_keys(tx)?;
         Ok(backup)

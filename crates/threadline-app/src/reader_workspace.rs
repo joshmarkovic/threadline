@@ -158,7 +158,6 @@ pub(crate) struct ReaderWorkspace {
     images: HashMap<media::ImageKey, media::ImageState>,
     downloads: HashMap<ItemId, Cancellation>,
     pr_reads: std::collections::HashSet<pr_view::PrReadKey>,
-    pr_resume_attempts: std::collections::HashSet<(i64, i64)>,
     merge_views: HashMap<String, merge_view::MergeView>,
     account: Option<AccountId>,
     login: String,
@@ -576,7 +575,6 @@ impl ReaderWorkspace {
             images: HashMap::new(),
             downloads: HashMap::new(),
             pr_reads: std::collections::HashSet::new(),
-            pr_resume_attempts: std::collections::HashSet::new(),
             merge_views: HashMap::new(),
             account: None,
             login: String::new(),
@@ -729,7 +727,6 @@ impl ReaderWorkspace {
         let changed = self.account != account;
         let offline_changed = self.offline != offline;
         let previous_access = self.access;
-        let can_fetch_before = self.can_fetch();
         if offline && !self.offline {
             self.network.cancel();
             self.network = Cancellation::new();
@@ -744,12 +741,6 @@ impl ReaderWorkspace {
         self.access = profile.map_or(AccessState::Unchecked, |item| item.access);
         self.actor = profile.map(|profile| profile.user_id);
         self.login = profile.map_or_else(String::new, |item| item.login.clone());
-        if changed || can_fetch_before != self.can_fetch() {
-            self.pr_resume_attempts.clear();
-        }
-        if !changed && !can_fetch_before && self.can_fetch() {
-            self.resume_visible_pr_downloads(window, cx);
-        }
         let checked = profile.and_then(|item| item.checked_at_ms);
         if changed || (reachability != Reachability::NotAttempted && checked >= self.checked) {
             self.reachability = reachability;
@@ -1199,17 +1190,11 @@ impl ReaderWorkspace {
                 |this, _, change: &crate::sync_panel::SettingsChanged, window, cx| {
                     let offline = change.current.work_offline;
                     let offline_changed = change.previous.work_offline != offline;
-                    if offline_changed {
-                        this.pr_resume_attempts.clear();
-                    }
                     if offline && !this.offline {
                         this.network.cancel();
                         this.network = Cancellation::new();
                     }
                     this.offline = offline;
-                    if offline_changed && !offline {
-                        this.resume_visible_pr_downloads(window, cx);
-                    }
                     if let Some(worker) = this.sync_worker.as_ref() {
                         if offline_changed {
                             worker.interrupt((!offline).then_some(
@@ -1393,7 +1378,6 @@ impl ReaderWorkspace {
                 );
                 self.trim_inactive_views();
                 self.restore_review(tab, window, cx);
-                self.resume_visible_pr_downloads(window, cx);
                 #[cfg(feature = "e2e")]
                 if let Some(observer) = self.observer.as_ref()
                     && self.layout.panes.len() == 2

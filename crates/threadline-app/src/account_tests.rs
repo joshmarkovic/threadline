@@ -605,8 +605,10 @@ async fn pr_service_commits_verified_files_context_and_cross_repository_referenc
             .unwrap();
     };
     request_check();
-    let worker =
-        crate::sync_worker::SyncWorker::start_fixture(service, &tokio::runtime::Handle::current());
+    let worker = crate::sync_worker::SyncWorker::start_fixture(
+        service.clone(),
+        &tokio::runtime::Handle::current(),
+    );
     worker.wake(Some(threadline_core::connectivity::ProbeTrigger::Startup));
     let checks = tokio::time::timeout(Duration::from_secs(12), async {
         loop {
@@ -687,13 +689,23 @@ async fn pr_service_commits_verified_files_context_and_cross_repository_referenc
     ));
     settings.controls.work_offline = false;
     store.save_sync_settings(account, &settings).unwrap();
-    assert_eq!(
-        reader
-            .run_pr_download(&revision, job.generation, &cancel)
-            .await
-            .unwrap(),
-        PrDownloadState::Complete
-    );
+    // The ordinary worker owns the persisted request even with no reader workspace or tabs.
+    let worker =
+        crate::sync_worker::SyncWorker::start_fixture(service, &tokio::runtime::Handle::current());
+    worker.wake(Some(threadline_core::connectivity::ProbeTrigger::Startup));
+    tokio::time::timeout(Duration::from_secs(12), async {
+        loop {
+            let downloaded = store.pr_download(&revision).unwrap().unwrap();
+            assert_eq!(downloaded.generation, job.generation);
+            if downloaded.state == PrDownloadState::Complete {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
+    drop(worker);
     assert_eq!(
         store
             .pr_page(&revision, PrFamily::Files, None, 10)

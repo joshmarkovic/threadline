@@ -1,8 +1,9 @@
-use threadline_storage::pr::PrDownloadState;
+use threadline_storage::pr::{PrDownloadClaim, PrDownloadState};
 
 use super::*;
 
 impl ReaderService {
+    #[cfg(test)]
     pub(crate) async fn run_pr_download(
         &self,
         rev: &PrRevision,
@@ -13,6 +14,28 @@ impl ReaderService {
             return Err(ReaderError::Offline);
         }
         self.store.start_pr_download(rev, generation)?;
+        self.run_pr_download_attempt(rev, PrDownloadAttempt::unleased(generation), cancel, || {})
+            .await
+    }
+
+    pub(crate) async fn run_claimed_pr_download(
+        &self,
+        claim: &PrDownloadClaim,
+        cancel: &Cancellation,
+        publish_progress: impl Fn(),
+    ) -> Result<PrDownloadState, ReaderError> {
+        self.run_pr_download_attempt(&claim.revision, claim.attempt, cancel, publish_progress)
+            .await
+    }
+
+    async fn run_pr_download_attempt(
+        &self,
+        rev: &PrRevision,
+        attempt: PrDownloadAttempt,
+        cancel: &Cancellation,
+        publish_progress: impl Fn(),
+    ) -> Result<PrDownloadState, ReaderError> {
+        self.check_pr_download(rev, Some(attempt))?;
         let mut prepared = self.prepare_pr(rev.account, rev.pr, cancel).await?;
         if prepared.revision.id != rev.id
             || prepared.revision.head != rev.head
@@ -24,22 +47,22 @@ impl ReaderService {
         // Bound each run. An interrupted or continued walk keeps all completed pages.
         let mut terminal_families = std::collections::HashSet::new();
         for _ in 0..100 {
+            if cancel.is_cancelled() {
+                return Err(ReaderError::Cancelled);
+            }
+            self.check_pr_download(&prepared.revision, Some(attempt))?;
             let current = self
                 .store
                 .pr_download(&prepared.revision)?
                 .ok_or(ReaderError::ScopeChanged)?;
-            if cancel.is_cancelled()
-                || current.generation != generation
-                || current.state == PrDownloadState::Cancelled
-            {
-                return Err(ReaderError::Cancelled);
-            }
             if current.conversation.coverage != Coverage::Complete {
-                if self
-                    .fetch_comments(rev.account, rev.pr, cancel)
-                    .await?
-                    .has_more
-                {
+                let page = self
+                    .fetch_comments_for(rev.account, rev.pr, Some((rev, attempt)), cancel)
+                    .await?;
+                if page.contacted {
+                    publish_progress();
+                }
+                if page.has_more {
                     continue;
                 }
                 let refreshed = self
@@ -60,8 +83,11 @@ impl ReaderService {
                 }
                 if state.coverage != Coverage::Complete || family == PrFamily::Threads {
                     let page = self
-                        .read_pr_page(&mut prepared, family, Some(generation), cancel)
+                        .read_pr_page(&mut prepared, family, Some(attempt), cancel)
                         .await?;
+                    if page.contacted {
+                        publish_progress();
+                    }
                     advanced |= page.has_more;
                     if !page.has_more {
                         terminal_families.insert(family.name());
@@ -72,8 +98,10 @@ impl ReaderService {
                 break;
             }
         }
-        Ok(self
-            .store
-            .finish_pr_download(&prepared.revision, generation)?)
+        Ok(self.store.finish_pr_download_attempt(
+            &prepared.revision,
+            attempt,
+            UtcMillis::now()?.0,
+        )?)
     }
 }

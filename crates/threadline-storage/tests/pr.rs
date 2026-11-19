@@ -755,6 +755,42 @@ fn it_016_nested_inline_pages_keep_distinct_replies_anchors_and_category_baselin
     let reopened = Store::open_profile(dir.path()).unwrap();
     let restart = reopened.pr_reply_checkpoint(&rev, "T1").unwrap().unwrap();
     assert_eq!(nested, restart);
+
+    let mut settings = store.sync_settings(a).unwrap();
+    settings.controls.work_offline = true;
+    store.save_sync_settings(a, &settings).unwrap();
+    let job = store.request_pr_download(&rev, false, false, 100).unwrap();
+    assert!(reopened.claim_pr_download(a, 100).unwrap().is_none());
+    settings.controls.work_offline = false;
+    store.save_sync_settings(a, &settings).unwrap();
+    let old_claim = store.claim_pr_download(a, 101).unwrap().unwrap();
+    assert_eq!(old_claim.revision, rev);
+    assert_eq!(old_claim.attempt.generation, job.generation);
+    assert!(reopened.claim_pr_download(a, 102).unwrap().is_none());
+    let due = store.next_pr_download_due(a).unwrap().unwrap();
+    let reclaimed = reopened.claim_pr_download(a, due).unwrap().unwrap();
+    let late = || PrRepliesInputPage {
+        comments: vec![reply(8, 80, 80, "late reply to cancelled download")],
+        next: Some("late-cursor"),
+        received_at_ms: due + 1,
+    };
+    assert!(
+        store
+            .commit_pr_reply_page(&rev, &restart, late(), Some(old_claim.attempt))
+            .is_err()
+    );
+    assert!(store.cancel_pr_download(&rev, job.generation).unwrap());
+    assert!(
+        reopened
+            .commit_pr_reply_page(&rev, &restart, late(), Some(reclaimed.attempt))
+            .is_err()
+    );
+    assert_eq!(
+        store.pr_reply_checkpoint(&rev, "T1").unwrap(),
+        Some(restart.clone())
+    );
+    assert!(store.next_pr_download_due(a).unwrap().is_none());
+
     reopened
         .commit_pr_replies(
             &rev,

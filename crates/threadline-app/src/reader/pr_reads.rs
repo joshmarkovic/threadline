@@ -12,7 +12,8 @@ use threadline_core::github::reader::{
     refresh::{ReadValidators, Refresh},
 };
 use threadline_storage::pr::{
-    PrFamily, PrHeader, PrInputPage, PrPageProblem, PrRecord, PrRevision, SourceSide,
+    PrDownloadAttempt, PrFamily, PrHeader, PrInputPage, PrPageProblem, PrRecord,
+    PrRepliesInputPage, PrRevision, SourceSide,
 };
 use threadline_storage::resources::CommitOid;
 
@@ -311,11 +312,14 @@ impl ReaderService {
         &self,
         prepared: &mut Prepared,
         family: PrFamily,
-        download: Option<i64>,
+        download: Option<PrDownloadAttempt>,
         cancel: &Cancellation,
     ) -> Result<PageStatus, ReaderError> {
         let account = prepared.scope.account;
-        if let Some(replied) = self.resume_pr_replies(prepared, family, cancel).await? {
+        if let Some(replied) = self
+            .resume_pr_replies(prepared, family, download, cancel)
+            .await?
+        {
             return Ok(replied);
         }
         let cached = self
@@ -345,6 +349,7 @@ impl ReaderService {
         };
         let result: Result<PageStatus, ReaderError> = async {
             self.admit(account, cancel).await?;
+            self.check_pr_download(&prepared.revision, download)?;
             let fetched = match request_pr_page(
                 &prepared.reader.reader(),
                 &prepared.snapshot,
@@ -421,6 +426,7 @@ impl ReaderService {
         if let Err(error) = &result
             && !matches!(error, ReaderError::Cancelled | ReaderError::ScopeChanged)
         {
+            self.check_pr_download(&prepared.revision, download)?;
             let _ = self.store.record_pr_fetch_error(
                 &prepared.revision,
                 family,
@@ -447,10 +453,27 @@ impl ReaderService {
         Ok(())
     }
 
+    pub(super) fn check_pr_download(
+        &self,
+        revision: &PrRevision,
+        attempt: Option<PrDownloadAttempt>,
+    ) -> Result<(), ReaderError> {
+        if let Some(attempt) = attempt {
+            self.store
+                .check_pr_download(revision, attempt, UtcMillis::now()?.0)
+                .map_err(|error| match error {
+                    threadline_storage::Error::Conflict(_) => ReaderError::Cancelled,
+                    error => error.into(),
+                })?;
+        }
+        Ok(())
+    }
+
     async fn resume_pr_replies(
         &self,
         prepared: &Prepared,
         family: PrFamily,
+        download: Option<PrDownloadAttempt>,
         cancel: &Cancellation,
     ) -> Result<Option<PageStatus>, ReaderError> {
         if family != PrFamily::Threads
@@ -483,6 +506,7 @@ impl ReaderService {
                 };
                 let account = prepared.scope.account;
                 self.admit(account, cancel).await?;
+                self.check_pr_download(&prepared.revision, download)?;
                 let result = self
                     .response(
                         account,
@@ -503,16 +527,19 @@ impl ReaderService {
                 if result.partial && result.next_cursor.is_none() {
                     return Err(ReaderError::IncompleteAccess);
                 }
-                self.store.commit_pr_replies(
+                self.store.commit_pr_reply_page(
                     &prepared.revision,
                     &checkpoint,
-                    result
-                        .records
-                        .into_iter()
-                        .map(convert::inline_comment)
-                        .collect(),
-                    result.next_cursor.as_deref(),
-                    UtcMillis::now()?.0,
+                    PrRepliesInputPage {
+                        comments: result
+                            .records
+                            .into_iter()
+                            .map(convert::inline_comment)
+                            .collect(),
+                        next: result.next_cursor.as_deref(),
+                        received_at_ms: UtcMillis::now()?.0,
+                    },
+                    download,
                 )?;
                 return Ok(Some(PageStatus {
                     has_more: true,

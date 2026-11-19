@@ -310,6 +310,19 @@ impl ReaderService {
         item: ItemId,
         cancel: &Cancellation,
     ) -> Result<PageStatus, ReaderError> {
+        self.fetch_comments_for(account, item, None, cancel).await
+    }
+
+    async fn fetch_comments_for(
+        &self,
+        account: AccountId,
+        item: ItemId,
+        download: Option<(
+            &threadline_storage::pr::PrRevision,
+            threadline_storage::pr::PrDownloadAttempt,
+        )>,
+        cancel: &Cancellation,
+    ) -> Result<PageStatus, ReaderError> {
         let locator = self
             .store
             .item(account, item)?
@@ -327,6 +340,9 @@ impl ReaderService {
         let result = async {
             let binding = self.binding(&scope, cancel).await?;
             self.admit(account, cancel).await?;
+            if let Some((revision, attempt)) = download {
+                self.check_pr_download(revision, Some(attempt))?;
+            }
             let page = self
                 .response(
                     account,
@@ -373,7 +389,15 @@ impl ReaderService {
                 completed_validators: None,
                 fetched_at_ms: observed_at,
             };
-            if page.sso_limited {
+            if let Some((revision, attempt)) = download {
+                self.store.commit_pr_download_discussion(
+                    revision,
+                    attempt,
+                    &progress,
+                    comments,
+                    page.sso_limited.then_some(ResourceError::Forbidden),
+                )?;
+            } else if page.sso_limited {
                 self.store.commit_discussion_partial(
                     account,
                     item,
@@ -396,6 +420,11 @@ impl ReaderService {
             Ok(PageStatus::from_next(page.next_page, page.sso_limited))
         }
         .await;
+        if result.is_err()
+            && let Some((revision, attempt)) = download
+        {
+            self.check_pr_download(revision, Some(attempt))?;
+        }
         self.record_error(key, &progress, result)
     }
 

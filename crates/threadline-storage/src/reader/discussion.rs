@@ -1,4 +1,5 @@
 use super::*;
+use crate::pr::{PrDownloadAttempt, PrRevision, require_pr_download_attempt};
 use crate::resources::ResourceError;
 use crate::resources::{
     ResourcePage, ResourceProgress, ResourceRecord, ResourceState, Validators, commit_page_in,
@@ -45,7 +46,7 @@ impl Store {
         expected: &ResourceProgress,
         page: DiscussionInputPage<'_>,
     ) -> Result<Option<ResourceProgress>> {
-        self.commit_comments(account, item, expected, page, None)
+        self.commit_comments(account, item, expected, page, None, None)
     }
     pub fn commit_discussion_partial(
         &self,
@@ -55,9 +56,28 @@ impl Store {
         page: DiscussionInputPage<'_>,
         reason: ResourceError,
     ) -> Result<()> {
-        self.commit_comments(account, item, expected, page, Some(reason))?;
+        self.commit_comments(account, item, expected, page, Some(reason), None)?;
         Ok(())
     }
+
+    pub fn commit_pr_download_discussion(
+        &self,
+        revision: &PrRevision,
+        attempt: PrDownloadAttempt,
+        expected: &ResourceProgress,
+        page: DiscussionInputPage<'_>,
+        terminal_error: Option<ResourceError>,
+    ) -> Result<Option<ResourceProgress>> {
+        self.commit_comments(
+            revision.account,
+            revision.pr,
+            expected,
+            page,
+            terminal_error,
+            Some((revision, attempt)),
+        )
+    }
+
     fn commit_comments(
         &self,
         account: AccountId,
@@ -65,6 +85,7 @@ impl Store {
         expected: &ResourceProgress,
         page: DiscussionInputPage<'_>,
         terminal_error: Option<ResourceError>,
+        download: Option<(&PrRevision, PrDownloadAttempt)>,
     ) -> Result<Option<ResourceProgress>> {
         if page.comments.len() > 100 {
             return Err(Error::InvalidInput(
@@ -77,6 +98,9 @@ impl Store {
             family: ResourceFamily::Comments,
         };
         self.write(|tx| {
+            if let Some((revision, attempt)) = download {
+                require_pr_download_attempt(tx, revision, attempt, None, page.fetched_at_ms)?;
+            }
             let state = state_in(tx, key)?;
             let rid = expected.resource_id;
             tx.execute("DELETE FROM reader_comment_staging WHERE resource_id=? AND generation!=?", params![rid, expected.generation])?;

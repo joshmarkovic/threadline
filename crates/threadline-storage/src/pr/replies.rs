@@ -8,6 +8,12 @@ pub struct PrReplyCheckpoint {
     revision_id: i64,
 }
 
+pub struct PrRepliesInputPage<'a> {
+    pub comments: Vec<InlineComment>,
+    pub next: Option<&'a str>,
+    pub received_at_ms: i64,
+}
+
 fn checkpoint(
     db: &Connection,
     id: i64,
@@ -70,10 +76,43 @@ impl Store {
         next: Option<&str>,
         received_at_ms: i64,
     ) -> Result<()> {
+        self.commit_pr_reply_page(
+            rev,
+            expected,
+            PrRepliesInputPage {
+                comments,
+                next,
+                received_at_ms,
+            },
+            None,
+        )
+    }
+
+    pub fn commit_pr_reply_page(
+        &self,
+        rev: &PrRevision,
+        expected: &PrReplyCheckpoint,
+        page: PrRepliesInputPage<'_>,
+        download: Option<PrDownloadAttempt>,
+    ) -> Result<()> {
+        let PrRepliesInputPage {
+            comments,
+            next,
+            received_at_ms,
+        } = page;
         if comments.len() > 100 || next == Some("") || next == Some(expected.cursor.as_str()) {
             return Err(Error::InvalidInput("Invalid nested review reply page"));
         }
         self.write(|tx| {
+            if let Some(attempt) = download {
+                require_pr_download_attempt(
+                    tx,
+                    rev,
+                    attempt,
+                    Some(PrFamily::Threads),
+                    received_at_ms,
+                )?;
+            }
             let id = family_id(tx, rev, PrFamily::Threads)?.ok_or(Error::NotFound)?;
             if checkpoint(tx, id, rev, &expected.thread_node)?.as_ref() != Some(expected) {
                 return Err(Error::Conflict(

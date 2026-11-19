@@ -151,9 +151,16 @@ pub(crate) fn record_revision_in(
         |row| row.get(0),
     )?;
     let (revision, _) = revision_in(tx, account, pr, id)?.ok_or(Error::Corrupt)?;
-    if let Some((_, previous_header, observed)) = previous
+    if let Some((previous, previous_header, observed)) = previous
         && updated_at_ms > observed
     {
+        if previous.id != revision.id {
+            tx.execute(
+                "UPDATE pr_downloads SET state='partial',lease_until=NULL
+                 WHERE revision_id=?1 AND state IN ('pending','active')",
+                [previous.id],
+            )?;
+        }
         observation::reviewer_changes(
             tx,
             &revision,
@@ -259,12 +266,12 @@ impl Store {
         expected: &ResourceProgress,
         page: PrInputPage<'_>,
         identity: Option<PrPageIdentity<'_>>,
-        download: Option<i64>,
+        download: Option<PrDownloadAttempt>,
     ) -> Result<PrRevision> {
         self.write(|tx| {
             require_current_revision(tx, rev)?;
-            if let Some(generation) = download {
-                downloads::require_download_page(tx, rev, generation, family)?;
+            if let Some(attempt) = download {
+                require_pr_download_attempt(tx, rev, attempt, Some(family), page.fetched_at_ms)?;
             }
             let rev = attach_page_identity(tx, rev, identity)?;
             publish_page(tx, &rev, family, expected, page)?;

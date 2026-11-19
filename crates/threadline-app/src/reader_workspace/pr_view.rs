@@ -453,9 +453,10 @@ impl ReaderWorkspace {
                             .unwrap_or("Review decision unknown")
                     )))
                 .child(div().text_xs().text_color(palette.muted).child(format!(
-                    "Opened {} · merged {}",
+                    "Opened {} · merged {} · Head {}",
                     time_label(h.created_at_ms),
-                    time_label(h.merged_at_ms)
+                    time_label(h.merged_at_ms),
+                    &pr.data.revision.head.as_str()[..12],
                 )))
                 .child(self.pr_download_header(pane, tab, pr, palette, cx))
                 .child(self.merge_view(pane, tab, pr, palette, cx));
@@ -488,35 +489,58 @@ impl ReaderWorkspace {
                 .filter(|(_, state)| {
                     state.coverage == threadline_storage::resources::Coverage::Complete
                 })
-                .count();
-            controls = controls.child(
-                div()
-                    .id(format!("pr-{pane}-download-state"))
-                    .text_xs()
-                    .text_color(palette.muted)
-                    .role(Role::Status)
-                    .child(format!(
-                        "Offline download {:?} · {complete}/{} resource families complete",
-                        job.state,
-                        job.families.len()
-                    )),
-            );
-        }
-        if let Some(job) = running {
-            controls = controls.child(self.pr_control(
-                &format!("pr-{pane}-cancel-download"),
-                "Cancel download",
-                tab,
-                Command::CancelDownload(job.generation),
-                false,
-                false,
-                cx,
+                .count()
+                + usize::from(job.body_downloaded)
+                + usize::from(
+                    job.conversation.coverage == threadline_storage::resources::Coverage::Complete,
+                );
+            let scope = if job.include_context {
+                " · includes selected source and media"
+            } else if job.include_media {
+                " · includes selected media"
+            } else {
+                ""
+            };
+            let coverage = if job.incomplete_patches_or_threads {
+                " · some patches or replies are unavailable"
+            } else if job.state == PrDownloadState::Partial
+                && job.unselected_optional_resources().next().is_some()
+            {
+                " · select available source or media to keep"
+            } else {
+                ""
+            };
+            controls = controls.child(pr_status(
+                format!("pr-{pane}-download-state"),
+                format!(
+                    "Offline download {:?} · {complete}/{} resources complete{scope}{coverage}",
+                    job.state,
+                    job.families.len() + 2
+                ),
+                palette,
             ));
-        } else if pr
-            .data
-            .download
-            .as_ref()
-            .is_none_or(|job| job.state != PrDownloadState::Complete)
+            if !matches!(job.state, PrDownloadState::Cancelled) {
+                controls = controls.child(self.pr_control(
+                    &format!("pr-{pane}-cancel-download"),
+                    if running.is_some() {
+                        "Cancel download"
+                    } else {
+                        "Release offline pin"
+                    },
+                    tab,
+                    Command::CancelDownload(job.generation),
+                    false,
+                    false,
+                    cx,
+                ));
+            }
+        }
+        if running.is_none()
+            && pr
+                .data
+                .download
+                .as_ref()
+                .is_none_or(|job| job.state != PrDownloadState::Complete)
         {
             controls = controls
                 .child(self.pr_control(
@@ -710,7 +734,7 @@ impl ReaderWorkspace {
             .children(
                 (state.error.is_some()
                     && (!api_capped || state.error != Some(ResourceError::InvalidResponse)))
-                    .then(|| resource_problem(label, state, palette)),
+                .then(|| resource_problem(label, state, palette)),
             )
             .into_any_element()
     }
@@ -2081,8 +2105,8 @@ impl ReaderWorkspace {
         let Some(pr) = self.current_pr(&tab.id) else {
             return;
         };
-        let revision = pr.data.revision.clone();
-        let request = revision.clone();
+        let request = pr.data.revision.clone();
+        let revision_id = request.id;
         let item = tab.item;
         self.launch(
             window,
@@ -2090,98 +2114,26 @@ impl ReaderWorkspace {
             move |store| match action {
                 DownloadAction::Queue { context, media } => store
                     .request_pr_download(&request, context, media, now_ms())
-                    .map(Some),
+                    .map(|_| true),
                 DownloadAction::Cancel(generation) => {
-                    store.cancel_pr_download(&request, generation).map(|_| None)
+                    store.cancel_pr_download(&request, generation)
                 }
             },
             move |this, result, window, cx| {
                 match result {
-                    Ok(job) => {
+                    Ok(true) => {
                         if let Some(worker) = this.sync_worker.as_ref() {
-                            worker.wake(None);
-                        }
-                        if let Some(job) = job
-                            && !job.fully_cached()
-                            && this.can_fetch()
-                        {
-                            this.resume_pr_download(revision, job.generation, window, cx);
+                            match action {
+                                DownloadAction::Queue { .. } => worker.wake(None),
+                                DownloadAction::Cancel(generation) => {
+                                    worker.cancel_pr_download(revision_id, generation);
+                                }
+                            }
                         }
                     }
+                    Ok(false) => {}
                     Err(_) => this.status = Some("The offline download could not be updated."),
                 }
-                this.reload_pr(item, window, cx);
-            },
-        );
-    }
-
-    pub(super) fn resume_visible_pr_downloads(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        use threadline_storage::pr::PrDownloadState;
-        if !self.can_fetch() {
-            return;
-        }
-        let mut candidates = Vec::new();
-        for pane in &self.layout.panes {
-            let Some(tab) = pane.active.and_then(|index| pane.tabs.get(index)) else {
-                continue;
-            };
-            let Some(pr) = self.current_pr(&tab.id) else {
-                continue;
-            };
-            let Some(job) = &pr.data.download else {
-                continue;
-            };
-            let key = (pr.data.revision.id, job.generation);
-            if matches!(
-                job.state,
-                PrDownloadState::Pending | PrDownloadState::Active
-            ) && !self.pr_resume_attempts.contains(&key)
-                && !candidates
-                    .iter()
-                    .any(|(revision, generation): &(PrRevision, i64)| {
-                        (revision.id, *generation) == key
-                    })
-            {
-                candidates.push((pr.data.revision.clone(), job.generation));
-            }
-        }
-        for (revision, generation) in candidates {
-            self.resume_pr_download(revision, generation, window, cx);
-        }
-    }
-
-    fn resume_pr_download(
-        &mut self,
-        revision: PrRevision,
-        generation: i64,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let item = revision.pr;
-        let key = PrReadKey(
-            item,
-            "offline-download",
-            format!("{}:{generation}", revision.id),
-        );
-        if !self.start_pr_read(key.clone()) {
-            return;
-        }
-        self.pr_resume_attempts.insert((revision.id, generation));
-        self.remote(
-            window,
-            cx,
-            move |service, _, cancel| async move {
-                service
-                    .run_pr_download(&revision, generation, &cancel)
-                    .await?;
-                Ok(((), false))
-            },
-            move |this, _, window, cx| {
-                this.pr_reads.remove(&key);
                 this.reload_pr(item, window, cx);
             },
         );
