@@ -1,0 +1,201 @@
+{
+  "acceptance_ids": [
+    "AC-68",
+    "AC-92"
+  ],
+  "scope": "Deterministic recovery matrix. Native test executables and production-path integration on isolated fixtures. Test-build native process and local installer evidence are linked separately.",
+  "windows": {
+    "source_revision": "43bd2fc625043687f9d5fec86637f1243e754739",
+    "host": "Windows 11 Enterprise x64, build 22631.7652",
+    "run": "unit-43bd2fc",
+    "logs": [
+      {
+        "log": "threadline_storage.log",
+        "passed_tests": [
+          "queue::tests::disk_full_rolls_back_enqueue_and_keeps_the_saved_editor",
+          "writes::tests::it_009_disk_full_after_remote_success_rolls_back_receipt_cache_and_own_action_together"
+        ],
+        "sha256": "9d83b1c5c43309823b181be18084ff87516a5daa52d401221d975d9733d155bd",
+        "windows_binary_sha256": "a6d3711806292e1ddebac1c76223e4801b7009050720ea43536fd0001684ba3b"
+      },
+      {
+        "log": "durability.log",
+        "passed_tests": [
+          "older_payloads_migrate_without_losing_snapshots_or_pending_intent",
+          "a_snapshot_from_before_dispatch_cannot_repeat_a_remote_success",
+          "it_019_signout_scope_pause_and_backup_hold_survive_restart",
+          "it_019_workspace_views_drafts_refs_and_preferences_survive_cache_cleanup_and_restart"
+        ],
+        "sha256": "6f27205773559d61783a710e14c1adec8b34c209e5dc08d1026700e64af93134",
+        "windows_binary_sha256": "fc75066b0790500b28e1a8c5c86368fb57b08cfd32a3efd37722844262b8177c"
+      },
+      {
+        "log": "identity.log",
+        "passed_tests": [
+          "it_019_prior_profile_upgrade_backup_restore_transfer_and_cleanup_preserve_durable_state"
+        ],
+        "sha256": "84ab739c18b527e078840ccaa7812838a73a1113806892626ab0d9de52a1e5b2",
+        "windows_binary_sha256": "04963b31b3dc37154f65610d892949801e65052a33df07e9b2ef653819fd23d0"
+      },
+      {
+        "log": "writes.log",
+        "passed_tests": [
+          "it_010_racing_abort_and_dispatch_across_wal_connections_has_one_durable_winner",
+          "it_010_atomic_cancel_before_send_and_changed_credential_reject_stale_preflight",
+          "it_009_timeout_and_cancel_never_replay_identity_free_matches_and_accepted_creation_reconciles",
+          "it_011_pending_comment_edit_uses_confirmed_predecessor_identity_and_updates_one_cached_object"
+        ],
+        "sha256": "1455dfa872fb10f9f1c240b2cca7ff9da00bf5d8a96900faa8cdaa6cf45fb5d7",
+        "windows_binary_sha256": "a0675dc3e30395c51c95d4c4d9fa2e7ab69468550a56a8cdc2dd444b9f0e5a98"
+      },
+      {
+        "log": "reviews.log",
+        "passed_tests": [
+          "it_011_confirmed_pending_review_identity_survives_crash_and_final_event_never_recreates_review",
+          "it_011_cancelled_pending_review_keeps_issued_id_and_holds_dependents_while_other_pr_dispatches",
+          "it_013_review_drafts_keep_original_multiline_anchors_after_eviction_force_push_and_restart",
+          "it_013_approval_rechecks_author_identity_and_rechecks_head_between_preflight_and_send"
+        ],
+        "sha256": "52e1c791eb6c8762ad64ae9b31f98981876bede7f310c786d87740d270cfdd00",
+        "windows_binary_sha256": "f9dfba323a8173514ee1cad2817dd67d894d9caad2730f8cb5ee791993eb9861"
+      },
+      {
+        "log": "merges.log",
+        "passed_tests": [
+          "it_014_changed_head_or_rejected_queue_never_retargets_or_retries_a_different_method",
+          "it_009_it_014_uncertain_merge_only_reads_back_original_pr_never_replays_or_claims_an_external_merge"
+        ],
+        "sha256": "9ed741a721c0a1a83a2f2cf47d8028711a554e6b1dbf1bfc1f75c0d77edbe8d0",
+        "windows_binary_sha256": "9865909dfb658acd0607587858819b94b01b32341991b7d953291a330cc3f3c9"
+      },
+      {
+        "log": "threadline_app.log",
+        "passed_tests": [
+          "accounts::write_tests::write_dispatch_uses_durable_offline_outbox_and_stops_after_lost_response"
+        ],
+        "sha256": "59c319679e02f5340a01f9f64e74216a491601a2381f1481c28542b33d2413fe",
+        "windows_binary_sha256": "1ccdaa74a90f48ed8a7885487686e665bbb9a9d2a4f8e3dd986f860b56c0f4fd"
+      }
+    ]
+  },
+  "portable": {
+    "source_revision": "43bd2fc625043687f9d5fec86637f1243e754739",
+    "host": {
+      "os": "linux",
+      "architecture": "x86_64",
+      "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+      "display_session": "Wayland and X11 environment"
+    },
+    "command": {
+      "program": "xtask",
+      "argv": [
+        "test",
+        "integration",
+        "--seed",
+        "12345",
+        "--report-dir",
+        "<report-dir>"
+      ],
+      "redacted": true
+    },
+    "run": "integration-1795053081202-2401117",
+    "logs": [
+      {
+        "log": "S02-DISK-FULL.log",
+        "passed_tests": [
+          "queue::tests::disk_full_rolls_back_enqueue_and_keeps_the_saved_editor"
+        ],
+        "sha256": "7433eb08477370bceb927941dc795d1c32287645087bd1bf22371153584036bd"
+      },
+      {
+        "log": "IT-009.log",
+        "passed_tests": [
+          "writes::tests::it_009_disk_full_after_remote_success_rolls_back_receipt_cache_and_own_action_together",
+          "it_009_timeout_and_cancel_never_replay_identity_free_matches_and_accepted_creation_reconciles"
+        ],
+        "sha256": "d1e4a1e7030cb46bbb9fc4520fb669dfbb2e00fba4f956ed7139c39cf12cb5fc"
+      },
+      {
+        "log": "IT-010.log",
+        "passed_tests": [
+          "it_010_racing_abort_and_dispatch_across_wal_connections_has_one_durable_winner",
+          "it_010_atomic_cancel_before_send_and_changed_credential_reject_stale_preflight"
+        ],
+        "sha256": "fe5dc0299ad0e686ff4a7cbc466e15d930748cdba36eb0882983d9d66e311b36"
+      },
+      {
+        "log": "IT-011.log",
+        "passed_tests": [
+          "it_011_pending_comment_edit_uses_confirmed_predecessor_identity_and_updates_one_cached_object",
+          "it_011_confirmed_pending_review_identity_survives_crash_and_final_event_never_recreates_review",
+          "it_011_cancelled_pending_review_keeps_issued_id_and_holds_dependents_while_other_pr_dispatches"
+        ],
+        "sha256": "0c8992fd819270b105c9131d4b6258f7d2e722bf7da9bf6efc24c28f63f06d52"
+      },
+      {
+        "log": "IT-013.log",
+        "passed_tests": [
+          "it_013_review_drafts_keep_original_multiline_anchors_after_eviction_force_push_and_restart",
+          "it_013_approval_rechecks_author_identity_and_rechecks_head_between_preflight_and_send"
+        ],
+        "sha256": "c39b3b9a385e6dfe57b60a491c137af4cce0524846b8bb16627e53276fe404fd"
+      },
+      {
+        "log": "IT-014.log",
+        "passed_tests": [
+          "it_014_changed_head_or_rejected_queue_never_retargets_or_retries_a_different_method",
+          "it_009_it_014_uncertain_merge_only_reads_back_original_pr_never_replays_or_claims_an_external_merge"
+        ],
+        "sha256": "64bfc74172c19d424656577a00b6fe44dc750046424b16bb489cd7c2d5e0fb0d"
+      },
+      {
+        "log": "IT-019.log",
+        "passed_tests": [
+          "it_019_prior_profile_upgrade_backup_restore_transfer_and_cleanup_preserve_durable_state",
+          "it_019_signout_scope_pause_and_backup_hold_survive_restart",
+          "it_019_workspace_views_drafts_refs_and_preferences_survive_cache_cleanup_and_restart"
+        ],
+        "sha256": "6e4b0bac7243f73b771b8e90f74fbd1b988fbd833d7767f50024d1f0d98654b6"
+      },
+      {
+        "log": "S07-WRITE-WORKER.log",
+        "passed_tests": [
+          "accounts::write_tests::write_dispatch_uses_durable_offline_outbox_and_stops_after_lost_response"
+        ],
+        "sha256": "b96ca8433c21f8153d99812ddd1beff44054529ffed14e94ebdae1d3886f0754"
+      }
+    ]
+  },
+  "native_journeys": [
+    {
+      "case": "S12-NATIVE-LIFECYCLE",
+      "evidence": "native-lifecycle.json",
+      "proof": "An actual process was interrupted after the original mutation reached the fixture. The reopened process retained uncertainty until the existing lease expired and made no repeat or dependent request."
+    },
+    {
+      "case": "E2E-006",
+      "evidence": "../sprint-07/native-editors.json",
+      "proof": "The native editor kept an unsent draft across restart, cancelled the queued issue edit before transmission and retained a distinct ordinary comment after response loss."
+    },
+    {
+      "case": "S08-REVIEW-PREDECESSOR",
+      "evidence": "../sprint-08/review-decisions-native.json",
+      "proof": "Another process recovered the exact pre-existing pending review after an interrupted read and submitted that same review exactly once."
+    },
+    {
+      "case": "E2E-007",
+      "evidence": "../sprint-08/native-verification.json",
+      "proof": "An approval held on a changed head. The draft and original exact source survived."
+    },
+    {
+      "case": "E2E-009",
+      "evidence": "../sprint-09/native-verification.json",
+      "proof": "The unchanged head merged once. The changed head was held without a second PUT."
+    },
+    {
+      "case": "PKG-003 local predecessor and repair",
+      "evidence": "canonical-local-install.json",
+      "proof": "Staged local upgrade and repair retained seeded durable state under the local package lane."
+    }
+  ]
+}

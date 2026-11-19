@@ -127,6 +127,12 @@ In E2E-014, the 50,000-item profile restored all 20 tabs and completed all 60 of
 
 The warm process opened its SQLite profile between 12.28 and 18.33 ms from app entry. GPUI was ready at 1480.40 ms, the window was created at 1546.41 ms, the saved layout loaded at 1633.38 ms, and both active panes hydrated at 2210.44 ms. The first useful paint was 2258.83 ms from app entry and 3730.94 ms from the driver's launch. The external warm result was 3759.24 ms against 2000 ms. On initial launch the profile also opened in about 5 ms, while GPUI readiness took 10973.98 ms from app entry. [Initial and warm startup phases](evidence/sprint-12/full-native-013044b.json)
 
+## Queue recovery fault matrix
+
+The Windows x64 test executables and the portable SQLite/HTTP integration lane passed the queue-fault checks at `43bd2fc`. The two capped SQLite cases returned `SQLITE_FULL` during enqueue and during publication of a simulated confirmed result. The first retained the saved draft and published no operation or local pending record. The second published no receipt, cached edit or own-action marker and left the attempt available for uncertainty recovery. [Exact tests, binary digests and receipt hashes](evidence/sprint-12/queue-fault-audit.json)
+
+Independent SQLite writer connections raced cancellation against dispatch and produced one durable winner. Restart and stale backup tests retained original payload versions, draft anchors, dependencies and cancellation decisions. Native Windows separately covered an accepted comment with response loss, an interrupted process after dispatch, the recovery of an existing pending review, and held review and merge intents after a changed head. These results cover the AC-92 fault classes and the durable state portion of AC-68. The exact published installer retains its separate release gates. [Fault matrix and native scenario links](evidence/sprint-12/queue-fault-audit.json)
+
 ## Windows closure and remaining checks
 
 The Windows scenario ledger links each covered unit, SQLite and in-process GPUI case to its matching native tests. [Exact tests and receipt hashes](evidence/sprint-12/windows-traceability.json) · [Windows scenario ledger](../spec/test_platform_traceability.csv)
