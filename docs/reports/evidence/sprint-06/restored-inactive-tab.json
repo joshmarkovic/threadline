@@ -1,0 +1,42 @@
+{
+  "source_revision": "6bed83806db73c12a40870f7a88cacfe58c513ff",
+  "run": "e2e-1795062146124-328",
+  "case": "S06-PR-MERGE-STATE",
+  "fixture_revision": "s06-pr-merge-state-v1",
+  "seed": 12345,
+  "status": "Pass",
+  "exit_code": 0,
+  "application_sha256": "723c907ff4618c4c75756c6b48595f5aa43debd46b83da9847c8d2d7d51af8c7",
+  "driver_sha256": "21e6799b8ab7871eddfcb9251355da73d90af0260cdf0a86be5212c79966bba8",
+  "runner_sha256": "aa017dd4ff8913a37aed7b994163ca8c427cfe61eafa8ba7fe4654fdb7e4c40a",
+  "actions": 24,
+  "window_dpi": 96,
+  "distinct_process_restart": true,
+  "restored_inactive_tab": {
+    "automation_id": "reader-tab-0-0",
+    "name": "Pull request fixture-org/private #42 First fixture pull request after issue refresh"
+  },
+  "offline_final_observation": {
+    "merged_item": 1,
+    "unknown_item": 2,
+    "merged_revision": 1
+  },
+  "fixture_http_requests": 12,
+  "offline_requests": 0,
+  "raw_receipt_sha256": {
+    "binary.json": "3cb772e8b12ac7bb491fc09bc5a440ebe4847bc93650f08fccb2e93b82cf52c9",
+    "result.json": "cf695da4b239e5cec3ddb9aefa518f7f9ec0f138a584d0c22c8c4799254dc4ea",
+    "junit.xml": "fd4aea146a2d89af6842debd6b350994976dca7195b9091b2567abbb956202eb",
+    "pr-native.json": "4fecb33a60b8fb8cc6690be50d017e83f0ebea677d6fb5c03142eab4f7ed3e8a",
+    "reader-restart-observation.json": "734741dfe3ca76d93a83e0d48f2122928b8115f4d5cd3a1622852214bfd0ffc9",
+    "github-access-trace.json": "af71baeda635c815a952da579adeb105a91c5381a8f51911d1692a0b5e297123"
+  },
+  "independent_windows_gpui": {
+    "case": "ui_008_inactive_tab_labels_restore_and_follow_cached_title_updates",
+    "status": "Pass",
+    "tests": 1,
+    "seconds": 1.51,
+    "executable_sha256": "dc5b08c5266c4d10b3e3ceaa49f4f42df9f714bfb943e555d7b3d4f7dea06fb9",
+    "log_sha256": "b28476f58e854de749e2760704ba8b04aae91dab2f8e290277c227caaf072737"
+  }
+}
