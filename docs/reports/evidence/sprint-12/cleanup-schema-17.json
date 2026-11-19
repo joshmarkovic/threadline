@@ -1,0 +1,44 @@
+{
+  "target": "Windows 11 x64, generated workspaces and two synthetic Windows Credential Manager records",
+  "initial": {
+    "source": "62691b9ddb9b63e94d0f49a1704c9dc2ad8a787d",
+    "test_executable_sha256": "4cc893bee1f9e874d17919b7215627877c2f652262706b2059012df03267e34e",
+    "database_schema": 17,
+    "highest_reviewed_cleanup_schema": 15,
+    "default": {
+      "status": "Fail",
+      "recorded_exit": 101,
+      "tests_failed": 3,
+      "opt_in_ignored": 1,
+      "log_sha256": "4963e0aea3b807235e2bf1b8919e7d0fefc8e9b2eb25e56d13f9c873d9e64c4e"
+    },
+    "explicit_native_credential": {
+      "status": "Fail",
+      "recorded_exit": 1,
+      "log_sha256": "1557873e5db0e8ed2a744024119b061dc1cbe413d05b5238207db092378b7101"
+    }
+  },
+  "corrected": {
+    "source": "005ef4954522f07607bdfd9e0e506c110a9c5044",
+    "test_executable_sha256": "09436813efb4913a1ef11e062806b59c00d106a9c5f749293de684a705040e94",
+    "database_schema": 17,
+    "highest_reviewed_cleanup_schema": 17,
+    "default": {
+      "status": "Pass",
+      "exit": 0,
+      "tests_passed": 4,
+      "seconds": 1.59,
+      "log_sha256": "fea0a87b2d95ce8cfc9881a9a410abf4220342a4d889b1c10e0585936a7298cb"
+    },
+    "explicit_native_credential": {
+      "status": "Pass",
+      "exit": 0,
+      "tests_passed": 1,
+      "seconds": 0.53,
+      "log_sha256": "570f3c5276a0e47db89497ee4350323e5fa5b763f3787381b7d1c009da25ffab"
+    },
+    "future_schema_backup_refuses_removal": true,
+    "generated_profile_key_removed": true,
+    "other_generated_key_preserved": true
+  }
+}

@@ -1,0 +1,171 @@
+{
+  "scope": "Unsigned local Windows x64 package and synthetic credential. Publication remains pending.",
+  "run": "install-1795065078919-17256",
+  "seed": 12345,
+  "windows_build": "22631",
+  "source_revision": "1668ccc3afc5ff8f0b1b1de182a6ddada5c9b0e6",
+  "package": {
+    "profile": "release",
+    "e2e_feature": false,
+    "target": "x86_64-pc-windows-msvc",
+    "schema": 17,
+    "package_build": 14,
+    "installer_bytes": 11144800,
+    "installer_sha256": "1ca596c9571adedf0b492db15875500780c47521b24f750cbc995928133ca440",
+    "stage_failure_setup_sha256": "7e2cef82e76856e1144dd973720d8aab27855f7d82fd45067893229a8463a9d4",
+    "app_sha256": "e043533d52627c9c273a4ed811c920ec1f39854189d0417afedc26fd24562370",
+    "bootstrap_sha256": "69322e7849a053309d28a03736aa512f7873b54f2f25c5437b84bdc18fe112ef",
+    "fixture_sha256": "31da910f342911104a5a48f316baf98861226f06b195af0af59891f8affd7bb6",
+    "retention_fixture_sha256": "ec4ca611277e57f13042283695d191ccf02e37a8f5dc87647a2855d364749e29",
+    "runtime_inventory_sha256": "077e6ff64f461f12798c5b419bb0ab8e1f6e121924ea403bff90f9500dae9841",
+    "notification_registration_helper_sha256": "2e08784447cff4c1bf2547a878689d72c90d0cc1a7da6295e7126172a062baec"
+  },
+  "predecessor": {
+    "package_build": 13,
+    "schema": 15,
+    "setup_sha256": "77b642f7f4d396f30c526d74619f7ddf08af6aa8902394d7eb1b032b64d4f69a",
+    "fixture_sha256": "62683ec6a2422ea841c9bcc2a55fc3f28bacefec6e85475e89fb889acc21e564",
+    "program_and_profile_absent_before": true
+  },
+  "canonical_status": "Pass",
+  "canonical_exit_code": 0,
+  "native_steps": [
+    {
+      "step": "install_predecessor",
+      "exit_code": 0
+    },
+    {
+      "step": "repair_predecessor",
+      "exit_code": 0
+    },
+    {
+      "step": "refuse_locked_executable",
+      "exit_code": 14
+    },
+    {
+      "step": "fail_staged_write",
+      "exit_code": 16
+    },
+    {
+      "step": "upgrade_after_failures",
+      "exit_code": 0
+    },
+    {
+      "step": "repair_current",
+      "exit_code": 0
+    },
+    {
+      "step": "refuse_installed_downgrade",
+      "exit_code": 12
+    },
+    {
+      "step": "uninstall_retains_profile",
+      "exit_code": 0
+    },
+    {
+      "step": "refuse_downgrade_after_uninstall",
+      "exit_code": 12
+    },
+    {
+      "step": "reinstall_current",
+      "exit_code": 0
+    }
+  ],
+  "checked_profile_at_all_steps": true,
+  "durable_state_before_migration_and_after_uninstall": {
+    "profile_bound": true,
+    "protected_credential_present": true,
+    "work_offline": true,
+    "outbox_paused": true,
+    "drafts": 1,
+    "queued_operations": 8,
+    "step_receipts": 1,
+    "saved_comment_page_cursor": "2",
+    "page_watermark_ms": 1700000499975,
+    "durable_projection_sha256": "ec2b1a22b0566c874607f933434e4396d21c0b729f1325887023ab7f70ed0359"
+  },
+  "database": {
+    "schema_before": 15,
+    "schema_after": 17,
+    "original_sha256": "718aa80726cf0d59b945059656f5ca9fe2a4d8f68900de3a8d24efea01937219",
+    "after_launch_and_uninstall_sha256": "e361b615882297cc9286c5b178e7b08246b546562f690b3c986f36bc7c7e86b9",
+    "backup_schema": 15,
+    "backup_durable_projection_sha256": "ec2b1a22b0566c874607f933434e4396d21c0b729f1325887023ab7f70ed0359",
+    "backup_after_migration_sha256": "c6d359423ef313acf37a026f0261081290a478973ce2dcad6b8617e501e955a3",
+    "backup_after_uninstall_sha256": "c6d359423ef313acf37a026f0261081290a478973ce2dcad6b8617e501e955a3",
+    "backup_after_confirmed_cleanup_sha256": "c6d359423ef313acf37a026f0261081290a478973ce2dcad6b8617e501e955a3"
+  },
+  "native_tab": {
+    "owned_window": true,
+    "tab_automation_id": "reader-tab-0-1",
+    "selected_before_invocation": false,
+    "tab_invoke_attempts": 1,
+    "tab_activated": true,
+    "orderly_exit": true
+  },
+  "checkpoint": {
+    "scheduler_claimed_page": 2,
+    "completed_page_watermark_ms": 1700000500010,
+    "next_cursor_empty": true,
+    "archived_bytes_unchanged": true,
+    "network_requests": 0,
+    "queued_operations": 8,
+    "step_receipts": 1,
+    "queued_payloads_and_step_receipts_unchanged": true
+  },
+  "separate_confirmed_removal": {
+    "normal_preview_exit": 0,
+    "normal_confirmation_exit": 0,
+    "conpty_prompt_verified": true,
+    "actual_confirmation_sent_once": true,
+    "accounts": 1,
+    "drafts": 1,
+    "unresolved_operations": 9,
+    "databases_and_backups": 2,
+    "recorded_credential_references": 1,
+    "current_db_and_backup_removed": true,
+    "bound_protected_credential_removed": true,
+    "independent_export_unchanged": true,
+    "independent_credential_preserved_then_fixture_cleaned": true,
+    "prior_retention_archive_unchanged": true,
+    "default_profile_absent_before_and_after": true
+  },
+  "independently_pinned_prior_archive_files": 9,
+  "identical_install_for_suite": {
+    "highest_build": 14,
+    "exact_install_present": true,
+    "app_sha256": "e043533d52627c9c273a4ed811c920ec1f39854189d0417afedc26fd24562370",
+    "registered_uninstaller_sha256": "8535df871fcbd2108ad69e2c6ad9f2ef17cf2e6a18ce335ce5a35d8159cf3157",
+    "default_data_absent": true
+  },
+  "raw_receipt_sha256": {
+    "build": "5e60a43ff4797627672a48e3550de46a266c951fb3a4fe1d0efb3516cb78228c",
+    "pinned_inputs": "d316561ddd8c5af3bfa89486cd8d0d23155a86b2a21b21dd9ae9e79c0dbfa6f5",
+    "preflight": "13f1d371ebbf7f4265855dbdf1a3aca47c9896aa282af9a940af599e0da695fb",
+    "installed_for_suite": "2c1589bb91a57386e33d44a407e1f1ea95f292a004c80a031d7c0a42dd1c1cd2",
+    "canonical": "4f6d6b1a79d6450c8ffd8102f96273032363429edcb7d1623885a20577569c79",
+    "junit": "b9d3d7dd00adc50c2329db959b11a2a176bf57b36e7414bec9a045f2c65d791b",
+    "matrix": "7117d869f5ecee855f8fe415a7bc446c818d9f10e1708bbe923a12c652b9c147",
+    "retention": "daa528839f14834218ddfd0c55153a0300e91e4db80c46e5470c8f969fb65170",
+    "first_attempt_result": "9dcbeec57515b3b49b1832f5c21e9651709b014a268d41d082740dd06e919416",
+    "first_attempt_failure": "c4e9df2c120adc5e31898a9cb39cb413ad55015be202145fe3ba8f11eb3887d9",
+    "predecessor_recovery": "309a5898a7eb8884f7846cfca2cd5af5dbe540fabdbb618cea25a14c43417816"
+  },
+  "first_attempt": {
+    "run": "install-1795064680735-41360",
+    "status": "Fail",
+    "exit_code": 1,
+    "stage": "ordinary package matrix",
+    "default_data_absent": true,
+    "observed_staged_and_installed_payload": "Both matched the pinned build 13 predecessor. The interrupted operation did not install build 14.",
+    "protected_data": "Driver preserved the owned interrupted fixture and cleared its generated credential.",
+    "subsequent_predecessor_repair_exit": 0,
+    "registered_predecessor_uninstall_passed": true
+  },
+  "sealed_archives": {
+    "earlier_files": 9,
+    "new_files": 3,
+    "all_rehashed": 12,
+    "pin_manifest_sha256": "d8b01b1a5cba3df78256d67638599c9bff642baae20bbd4ba184144ba9c6fd0c"
+  }
+}
