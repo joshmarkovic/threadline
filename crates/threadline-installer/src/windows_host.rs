@@ -226,6 +226,9 @@ pub(crate) fn installed(
     {
         return Ok(None);
     }
+    if dword(key, windows_sys::core::w!("PendingBuild"))?.is_some() {
+        return Err("Windows Setup has not finished registering this installation.");
+    }
     let version = registered_string(key, windows_sys::core::w!("DisplayVersion"))?
         .and_then(|s| semver::Version::parse(s.to_str()?).ok())
         .ok_or("The installed release version is unavailable.")?;
