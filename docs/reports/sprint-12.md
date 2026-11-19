@@ -195,6 +195,8 @@ E2E-003 passed on Windows at 144 DPI with app and runner `5ffb9c1` and driver `e
 
 An E2E-008 development replay at app and runner `ad94129` with driver `31cc7cf` returned from Commits to the selected line both before and after fetching commits. It then restarted offline. The last return kept the exact comparison, file, saved source position and draft. The live source selection was absent and the case exited 1. [Verified stages and remaining failure](evidence/sprint-12/native-reader-after-build17.json)
 
+The matched `e8c9d14` E2E-008 replay passed at 144 DPI. Three fresh native Next change actions each selected modified line 1 in `src/first.rs`. Commits changed from Not checked to Downloaded. The live line survived returning to Files before and after fetching commits. A separate offline process restored the original draft and exactly one cached commit at the expected head. It selected and retained the same live line across Commits and Files. The earlier first-return, offline-return and repeated-selection failures remain recorded. [Exact source, requests and closed-profile evidence](evidence/sprint-12/native-reader-after-build17.json)
+
 ### Connected Windows desktop with installed local build 16
 
 The connected Windows 11 x64 run on clean `2870642` ended with exit 1 after 11 passes, three blocked cases and seven failures. All 18 cases using the optimized test executable recorded 144 DPI. The remaining cases used the ordinary build 16 executable. [All 21 outcomes, source and executable hashes](evidence/sprint-12/full-native-2870642-installed16-connected.json)

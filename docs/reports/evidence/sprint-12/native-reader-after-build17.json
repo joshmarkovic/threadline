@@ -4,6 +4,63 @@
   "seed": 12345,
   "runs": [
     {
+      "run": "e2e-1795104305519-23880",
+      "case": "E2E-008",
+      "state": "Fail",
+      "numeric_exit": 1,
+      "child_exit": 1,
+      "detail": "Timed out waiting for the original comparison and selected review line after leaving Commits. See native-driver.log.",
+      "verified_stage": "first Files return after Commits fetch",
+      "app_source": "ad9412966cfb17a5f00d223ad69d6ed6b42bf655",
+      "driver": "b29793cf68bde11828ea60ab3a397d71ea1439b8",
+      "app_sha256": "0c84cb2871b3b30b6e0bcbff643cf801f85e69f7c4fbcb8c5c812035951e3e34",
+      "runner_sha256": "81f92f29fb61a512ed8f1e9ec2e35c0c366257aaba622d6f8f736525834221d7",
+      "window_dpi": 144,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-008",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_utc": "2026-11-19T16:05:05.518Z",
+      "finished_at_utc": "2026-11-19T16:05:41.793Z",
+      "action_count": 23,
+      "authenticated_requests": 13,
+      "final": {
+        "offline": false,
+        "section": "Files",
+        "revision_id": 1,
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "selected_file": "src/first.rs",
+        "source_anchor": {
+          "side": "Right",
+          "line": 1,
+          "path": "src/first.rs"
+        },
+        "selected_source_line": null
+      },
+      "receipts": {
+        "result.json": "74e58ff5165e1deb6ad5e9d2ef9813b08fe93ba2aa8ee9498f76d0a331875b32",
+        "junit.xml": "70cb8eb7743ab91a72bf0b80873c6ce30c89e833b13e49dbaefe4c13c44011fd",
+        "binary.json": "5fdcc5fe0868e762d704dcc88daea5787a00235860b40dd159aa09ba85e361e0",
+        "review-context-native.json": "c2b675d9885f6aa5976b0c181d5de28c1c43a7bc4d81e739a94644b0c43769a4",
+        "github-access-trace.json": "bcfc1b75cffbbfb532dbacfd935c4371927d1975d673b0c7d9ef7077670e941a",
+        "ui-observation.json": "82da40bddfd3b141b310e689aeccd9d34c02488ed334d8c54e91d31d4bee93ac"
+      }
+    },
+    {
       "run": "e2e-1795104346537-48200",
       "case": "E2E-008",
       "state": "Fail",
@@ -129,6 +186,164 @@
           "offline": true,
           "signed_out": true
         }
+      }
+    },
+    {
+      "run": "e2e-1795105238202-49084",
+      "case": "E2E-008",
+      "state": "Fail",
+      "numeric_exit": 1,
+      "child_exit": 1,
+      "detail": "Timed out waiting for the exact modified source line selected by the native action. See native-driver.log.",
+      "verified_stage": "first Next change after offline restart",
+      "app_source": "b2386d689171fa6f7d6332c4714628c7463a3721",
+      "driver": "b2386d689171fa6f7d6332c4714628c7463a3721",
+      "app_sha256": "e6388f97ce5532da5351930a184af8ca2cd052e3c8b209f50fd5fb3cfbf04b9b",
+      "runner_sha256": "52b354de27c047c595a787b1524b2435986d562c8c9daf61d21c7ad8c33533dc",
+      "window_dpi": 144,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-008",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_utc": "2026-11-19T16:20:38.201Z",
+      "finished_at_utc": "2026-11-19T16:21:21.790Z",
+      "action_count": 57,
+      "authenticated_requests": 25,
+      "final": {
+        "offline": true,
+        "section": "Files",
+        "revision_id": 1,
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "selected_file": "src/first.rs",
+        "source_anchor": {
+          "side": "Right",
+          "line": 1,
+          "path": "src/first.rs"
+        },
+        "selected_source_line": null,
+        "change_navigation": 1
+      },
+      "receipts": {
+        "result.json": "a2870a4af8c8de7b1ba33630049bebb06e2c6189d390447c67d23c7364c420d1",
+        "junit.xml": "e6f110d8da66ff1f9ba60476e4de400afe7a6b0cc1f4f889bcbb3f19f0fdbbaa",
+        "binary.json": "91865f9830548017b57f8e5705a3c93950a43213072899547cb17de8c9bbbc6a",
+        "review-context-native.json": "893fde7484053d43cd2732a8fd87ba2da42fd10c2a1dfab2d99abff72c6204b4",
+        "github-access-trace.json": "48291219bf3d60807b0c3fcddcf2668abdfc678d78405cb0415c154faeb4267c",
+        "reader-restart-observation.json": "6f631e21f8c58631ee654b1f17532e246b94fa68759b0745caa64bad59c54bbc"
+      }
+    },
+    {
+      "run": "e2e-1795105879149-33408",
+      "case": "E2E-008",
+      "state": "Pass",
+      "numeric_exit": 0,
+      "child_exit": 0,
+      "detail": "The Windows review retained its exact source and draft through Commits, linked-issue and layout changes and a separate offline restart. The original comparison retained the verified commit. See native-driver.log.",
+      "verified_stage": "Commits coverage, same-review return and offline restart",
+      "app_source": "e8c9d1479cf150ccbdb4b32959b2b765b7884032",
+      "driver": "e8c9d1479cf150ccbdb4b32959b2b765b7884032",
+      "app_sha256": "6bb118d5afa4680d6585c48a26a1e83b6baa1f527eb3f22ed5c934718d0a7227",
+      "runner_sha256": "51f723d8b1fde27bce1d802a09bb8d86e1d89974b6e7de2d3ec296d8e5dda23a",
+      "window_dpi": 144,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-008",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_utc": "2026-11-19T16:31:19.148Z",
+      "finished_at_utc": "2026-11-19T16:32:11.085Z",
+      "action_count": 62,
+      "authenticated_requests": 25,
+      "final": {
+        "offline": true,
+        "section": "Files",
+        "revision_id": 1,
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "selected_file": "src/first.rs",
+        "source_anchor": {
+          "side": "Right",
+          "line": 1,
+          "path": "src/first.rs"
+        },
+        "selected_source_line": 1,
+        "change_navigation": 1
+      },
+      "receipts": {
+        "result.json": "20e0b167c951e6a8674edb2985729d305a7b6dd27eeb78a57bea8e3fa9ec980a",
+        "junit.xml": "8e9b878f2d91f40c0a12b2000c99f362d19d7e8399ea4b2aca738b2fbb638452",
+        "binary.json": "c806df57c977236e9c020203835424d6a7770f3baee6689435100d7bfafc8111",
+        "review-context-native.json": "4d6d5ca8b144137f21d45e21d8a6390855a179a6595ddd99f60ee0e0706dd18a",
+        "github-access-trace.json": "48291219bf3d60807b0c3fcddcf2668abdfc678d78405cb0415c154faeb4267c",
+        "reader-restart-observation.json": "38a5cf875957e183cc50e9c0ee751f41413b9d8d23a67e1997e5e1472ea6670f"
+      },
+      "verified": {
+        "source_navigation": [
+          {
+            "pid": "first_process",
+            "path": "src/first.rs",
+            "line": 1,
+            "generation_before": 1,
+            "generation_after": 2
+          },
+          {
+            "pid": "first_process",
+            "path": "src/first.rs",
+            "line": 1,
+            "generation_before": 2,
+            "generation_after": 3
+          },
+          {
+            "pid": "restarted_process",
+            "path": "src/first.rs",
+            "line": 1,
+            "generation_before": 0,
+            "generation_after": 1
+          }
+        ],
+        "first_process_commits": {
+          "item": 1,
+          "revision": 1,
+          "initial_coverage": "Not checked",
+          "fetched_coverage": "Downloaded",
+          "returned_to_selected_line_before_and_after_fetch": true,
+          "draft_retained": true
+        },
+        "reopened_cached_commits": {
+          "item": 1,
+          "revision": 1,
+          "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cached_commit_count": 1,
+          "draft_retained": true
+        },
+        "restarted_retained_for_files": true,
+        "separate_offline_process": true
       }
     }
   ]
