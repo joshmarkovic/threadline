@@ -4,7 +4,7 @@ Requirements version 1.7 | November 17 2026
 
 ## Purpose and current status
 
-This self-contained build contract contains 175 requirements, 99 acceptance scenarios, fourteen sprints and 85 concrete test scenarios. It includes no application source, binary, implemented test harness or working public installer. Application test statuses remain Not run. Validation of these documents or ZIP is not validation of the app.
+This build contract contains 175 requirements, 99 acceptance scenarios, fourteen sprints and 85 concrete test scenarios. The Threadline repository also contains the application, test runner and sprint evidence. Windows setup has been tested locally. Public installation remains pending. [Sprint reports](../reports) · [Windows release checks](../reports/sprint-12.md)
 
 ## Changes in version 1.7
 
@@ -41,7 +41,7 @@ The first useful cached reader arrives in Sprint 04, scheduled refreshing in 05,
 
 The pack maps all 175 requirement IDs and 99 acceptance scenarios to an initial implementation/verification owner. The per-platform ledgers separately record applicability, phase gates and evidence. A Windows Verified/Pass does not verify macOS or Linux. Later-phase gaps remain visible and must be resolved before publishing that target; they do not silently block an otherwise complete Windows phase. A defect in shared correctness must still be fixed. AUTH-10 remains Inactive future scope.
 
-Every sprint includes unit/integration/native E2E test work appropriate to its implemented features, reproducible commands and evidence. Add tests with the feature and preserve prior behavior. Native in-process UI tests, native-process test-build E2E, live-provider tests and exact installed published-package smoke are different evidence classes. Current statuses are Planned or Not run: this is a specification pack, not application code or a claim that app tests passed.
+Every sprint includes unit, integration and native end-to-end tests for its implemented features, with reproducible commands and evidence. Add tests with the feature and preserve prior behavior. The ledgers record native in-process UI tests, separate-process test builds, authorized live-provider tests and exact installed published-package smoke at their respective scopes.
 
 An assigned Windows release ends at Sprint 12; an assigned all-platform release includes Sprints 13-14. Continue within the authorized scope without routine reapproval. Missing runners, publisher configuration, signing access or approved GitHub credentials blocks the affected validation/publication, not independent implementation. Never invent a pass, published URL or binary. Use TESTING_PLAN.md, INSTALLATION_PLAN.md, CROSS_PLATFORM_PLAN.md and the scenario/phase ledgers alongside each sprint file.
 
@@ -64,7 +64,8 @@ An assigned Windows release ends at Sprint 12; an assigned all-platform release 
 
 ## Status and scope rules
 
-- Initial requirement status records only its first phase. A common requirement verified on Windows still needs applicable macOS/Linux rows completed before those releases.
+- Initial requirement and acceptance status covers the named phase. Scenario status covers its initial execution phase. Find the build, exact command and source artifact by the same case ID in the platform test ledger. [Initial requirements](requirements_traceability.csv) · [Initial acceptance](acceptance_traceability.csv) · [Scenario catalog](test_scenarios.csv) · [Platform test results](test_platform_traceability.csv)
+- A narrow initial test can pass while its platform requirement remains Partial for release. Each platform row records evidence for that target. [Platform requirements](requirement_platform_traceability.csv) · [Platform acceptance](acceptance_platform_traceability.csv)
 - PORT-07/AC-87 apply only to macOS and PORT-08/AC-88 only to Linux. They do not block Windows completion. Shared correctness defects still require repair; missing later runtime evidence is visible future-phase work.
 - AUTH-10 remains Inactive future OAuth/device scope. GRAPH-07 is optional object-cache work; NOTIFY-20 requires an extensible boundary, not hosted infrastructure.
 - Existing-issue edits, comments, reviews and direct merges remain required. New issue/PR creation, GitHub merge queues and auto-merge are excluded. Preserve tabs/context layout, positive-only sidebar badges, PAT/SSO, offline Outbox safety and incremental local-session restore.

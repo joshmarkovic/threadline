@@ -1,0 +1,301 @@
+{
+  "scenario": "S12-NATIVE-LIFECYCLE",
+  "evidence_class": "Windows native process with optimized test build, real SQLite and Credential Manager, and a synthetic loopback GitHub provider",
+  "fixture_revision": "s12-native-lifecycle-v1",
+  "seed": 12345,
+  "windows": "Windows 11 Enterprise x64 build 22631.7652",
+  "dpi": 96,
+  "runs": [
+    {
+      "id": "e2e-1795049412318-31104",
+      "status": "Fail",
+      "exit_code": 1,
+      "app_revision": "013044b65a11371d3ffb1d80be5f4527bea9cc3c",
+      "runner_binary_revision": "013044b65a11371d3ffb1d80be5f4527bea9cc3c",
+      "source_and_driver_revision": "013044b65a11371d3ffb1d80be5f4527bea9cc3c",
+      "source_dirty": false,
+      "binary_sha256": "76d902a8f6853e887afd263395e3d4d309c6c78875d8b7abf64889062adccc5e",
+      "elapsed_ms": 53804,
+      "action_count": 4,
+      "detail": "Cached panes and the four actions were present. The driver timed out before a verified credential request.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "S12-NATIVE-LIFECYCLE",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "source_sha256": {
+        "result.json": "67341ecc7ed27546aa391541c9d09353bcfcea04649c3f8b743022b6c8e56c8f",
+        "native-lifecycle.json": "e7e9c8cd952fbd346d64c880f2ecd856a10c8ef2830496830b7ad03535278d4b",
+        "binary.json": "1221c3f41f98cc7fac5757e71ded8f6e566440076e80265502aafbedb0819efc",
+        "github-access-trace.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "native-lifecycle-cleanup.json": "dcc7ae0c8264f6549354d6538beeaee578907fc1047dfd466e0a5383b3db1580"
+      }
+    },
+    {
+      "id": "e2e-1795050973227-6328",
+      "status": "Fail",
+      "exit_code": 1,
+      "app_revision": "8f330d64d4ee1b7de461eb06281b7175e6278357",
+      "runner_binary_revision": "8f330d64d4ee1b7de461eb06281b7175e6278357",
+      "source_and_driver_revision": "8f330d64d4ee1b7de461eb06281b7175e6278357",
+      "source_dirty": false,
+      "binary_sha256": "1b50e1f0d803741e8dd535a57ff84a381c1be3f2ff639451db70d34e6aeb48aa",
+      "elapsed_ms": 35864,
+      "action_count": 6,
+      "detail": "Authenticated startup reached the provider without re-entry. The driver then tried to read the queue-pause control before opening the Sync panel.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "S12-NATIVE-LIFECYCLE",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "source_sha256": {
+        "result.json": "3ff8a8cac72979603a681954fd3ce1f632709314cc77e7a0f1d3fa708cdda2b0",
+        "native-lifecycle.json": "5e54e836ef15384c9162baa2f2cc29e528166441243742fad4dc5d9406dbbc3a",
+        "binary.json": "40a6671045b1fcb1b6ee8c5d4181a9f7e655fb9a7b81c190bd338b6535dbf96d",
+        "github-access-trace.json": "f9dffb8a4ed2b464fd51d8820f4568467fc4fb053a19cfaff0fd25381bfbeb94",
+        "native-lifecycle-cleanup.json": "dcc7ae0c8264f6549354d6538beeaee578907fc1047dfd466e0a5383b3db1580"
+      }
+    },
+    {
+      "id": "e2e-1795051502750-28380",
+      "status": "Pass",
+      "exit_code": 0,
+      "app_revision": "8f330d64d4ee1b7de461eb06281b7175e6278357",
+      "runner_binary_revision": "8f330d64d4ee1b7de461eb06281b7175e6278357",
+      "source_and_driver_revision": "525446e675039401bb6ed5f5baaca96d26989ac0",
+      "source_dirty": false,
+      "binary_sha256": "1b50e1f0d803741e8dd535a57ff84a381c1be3f2ff639451db70d34e6aeb48aa",
+      "elapsed_ms": 293070,
+      "action_count": 23,
+      "detail": "Ordered delayed startup, recovery, sign-out and account isolation completed.",
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "S12-NATIVE-LIFECYCLE",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "source_sha256": {
+        "result.json": "dd35ccb70fc58d170c663a2e83aea88f00d4ff913a74b0a75906a2b3b1345c2b",
+        "native-lifecycle.json": "165c41d1d6710818c01d2b33802e7576fe147cab9495a1b5a71f4ab0113fae15",
+        "binary.json": "40a6671045b1fcb1b6ee8c5d4181a9f7e655fb9a7b81c190bd338b6535dbf96d",
+        "github-access-trace.json": "5bce5c95339778b25b0410a7230ffb191015ab0e07968d40d4c0f955a0971fdd",
+        "native-lifecycle-cleanup.json": "dcc7ae0c8264f6549354d6538beeaee578907fc1047dfd466e0a5383b3db1580",
+        "native-lifecycle-seeded.json": "95a54963347a7381c1dd03d8f941bbaf0ba7d1a871a4da43f85af63b1807a5d9",
+        "native-lifecycle-before-delayed-start.json": "044c6a95a408748a288680e3ba93f7c03f269849d879b5779817f3b37a80ccae",
+        "native-lifecycle-after-crash.json": "197bf577c83966dcd2d379f614310cb36a6d26c4c0ecf291628e0f00c33af36a",
+        "native-lifecycle-recovered.json": "6b5046ca5cac32767ea410c87dbfbaba3dcdcf2e1a3d4841b757f4626af3663b",
+        "native-lifecycle-signed-out.json": "d531b7a61539b43a0445469506482376eb78837a19a7efdee8a7cec78e3961b6",
+        "native-lifecycle-final.json": "d531b7a61539b43a0445469506482376eb78837a19a7efdee8a7cec78e3961b6"
+      }
+    }
+  ],
+  "successful_run": {
+    "unchanged_across_checkpoints": {
+      "tab_counts": [
+        10,
+        10
+      ],
+      "pane_proportions": [
+        0.43,
+        0.57
+      ],
+      "focused_pane": 1,
+      "review_anchor_preserved": true,
+      "prior_delivery": "Delivered",
+      "delivery_groups": 1,
+      "delivery_unchanged_at_ms": 1795051553148,
+      "feed_count": 1,
+      "dependents": 3,
+      "alternate_queue": 0,
+      "protected_reference_matches": true
+    },
+    "checkpoints": {
+      "seeded": {
+        "access": "Readable",
+        "work_offline": true,
+        "pause_queued_actions": true,
+        "actions": [
+          "Queued",
+          "Queued",
+          "Queued",
+          "Queued"
+        ],
+        "first_attempts": 0,
+        "first_send_starts": 0,
+        "protected_token_present": true
+      },
+      "before-delayed-start": {
+        "access": "Readable",
+        "work_offline": false,
+        "pause_queued_actions": true,
+        "actions": [
+          "Queued",
+          "Queued",
+          "Queued",
+          "Queued"
+        ],
+        "first_attempts": 0,
+        "first_send_starts": 0,
+        "protected_token_present": true
+      },
+      "after-crash": {
+        "access": "Readable",
+        "work_offline": false,
+        "pause_queued_actions": false,
+        "actions": [
+          "Sending",
+          "Queued",
+          "Queued",
+          "Queued"
+        ],
+        "first_attempts": 1,
+        "first_send_starts": 1,
+        "protected_token_present": true
+      },
+      "recovered": {
+        "access": "Readable",
+        "work_offline": false,
+        "pause_queued_actions": false,
+        "actions": [
+          "OutcomeUnknown",
+          "Queued",
+          "Queued",
+          "Queued"
+        ],
+        "first_attempts": 1,
+        "first_send_starts": 1,
+        "protected_token_present": true
+      },
+      "signed-out": {
+        "access": "SignedOut",
+        "work_offline": false,
+        "pause_queued_actions": false,
+        "actions": [
+          "OutcomeUnknown",
+          "Queued",
+          "Queued",
+          "Queued"
+        ],
+        "first_attempts": 1,
+        "first_send_starts": 1,
+        "protected_token_present": false
+      },
+      "final": {
+        "access": "SignedOut",
+        "work_offline": false,
+        "pause_queued_actions": false,
+        "actions": [
+          "OutcomeUnknown",
+          "Queued",
+          "Queued",
+          "Queued"
+        ],
+        "first_attempts": 1,
+        "first_send_starts": 1,
+        "protected_token_present": false
+      }
+    },
+    "held_startup": {
+      "cached_panes": 2,
+      "queued_actions": 4,
+      "protected_credential_reentered": false
+    },
+    "provider_requests": [
+      {
+        "phase": "lifecycle_ready",
+        "route": "user",
+        "fixture_authorization": true,
+        "status": 200
+      },
+      {
+        "phase": "lifecycle_delay",
+        "route": "user",
+        "fixture_authorization": true,
+        "status": 200
+      },
+      {
+        "phase": "lifecycle_crash",
+        "route": "user",
+        "fixture_authorization": true,
+        "status": 200
+      },
+      {
+        "phase": "lifecycle_crash",
+        "route": "repository",
+        "fixture_authorization": true,
+        "status": 200
+      },
+      {
+        "phase": "lifecycle_crash",
+        "route": "backlog_issue",
+        "fixture_authorization": true,
+        "status": 200
+      },
+      {
+        "phase": "lifecycle_crash",
+        "route": "lifecycle_comment",
+        "fixture_authorization": true,
+        "status": 0
+      },
+      {
+        "phase": "lifecycle_recovery",
+        "route": "user",
+        "fixture_authorization": true,
+        "status": 200
+      },
+      {
+        "phase": "lifecycle_recovery",
+        "route": "user",
+        "fixture_authorization": true,
+        "status": 200
+      },
+      {
+        "phase": "lifecycle_recovery",
+        "route": "user",
+        "fixture_authorization": true,
+        "status": 200
+      }
+    ],
+    "cleanup": {
+      "protected_fixture_key_removed": true
+    }
+  }
+}

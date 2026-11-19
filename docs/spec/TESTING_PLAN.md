@@ -6,7 +6,7 @@ Version 1.7 companion to the Native GitHub Client Requirements
 
 Implement and maintain unit tests, integration tests, and end-to-end tests as part of each sprint. The product is a native Rust desktop application with GPUI and GPUI Kit, a real SQLite cache, direct GitHub APIs, and a durable Outbox. Windows is the first release target. macOS and Linux are later release milestones that reuse the same core behavior and must pass their own native checks before being advertised as supported.
 
-This file specifies the test system that the coding LLM must build. The application, runner commands, fixtures, and tests described here are implementation deliverables. They are not already implemented or passed by this specification pack. Initial rows in `test_scenarios.csv` intentionally say `Not run`.
+This file defines the application's test requirements, runner commands and fixtures. The scenario catalog records initial-phase outcomes. The platform ledger records each target's current result, command and evidence by the same scenario ID. [Scenario catalog](test_scenarios.csv) · [Platform test results](test_platform_traceability.csv)
 
 Read this plan with `github_desktop_requirements.md`, the assigned sprint file, and both acceptance and requirement traceability files. TEST-01 through TEST-08 govern the testing contract. The scenario catalog supplies concrete tests and does not replace the full acceptance requirements.
 
