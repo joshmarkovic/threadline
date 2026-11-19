@@ -1,6 +1,6 @@
 Unicode true
 RequestExecutionLevel user
-SilentInstall silent
+Page instfiles
 !include FileFunc.nsh
 !define PACKAGE_BUILD 2
 !define THREADLINE_HANDOFF_TIMEOUT 2000
@@ -20,8 +20,13 @@ Function .onInit
   StrCpy $PriorLocation "$INSTDIR"
   StrCpy $PriorBuild 1
   Call WaitForUpdateParent
+  ${GetParameters} $0
+  StrCmp $0 "/fixture-fail" 0 startup_ready
+    !insertmacro MessageAndStop 16 "Synthetic setup failure"
+  startup_ready:
 FunctionEnd
 Section
+  Call FinishSuccessfulInstall
   WriteINIStr "$EXEDIR\result.ini" "result" "restart" "$UpdateRestart"
   WriteINIStr "$EXEDIR\result.ini" "result" "code" "0"
 SectionEnd

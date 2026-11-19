@@ -31,10 +31,26 @@ Function WaitForUpdateParent
   System::Call 'kernel32::CloseHandle(p r3)'
   System::Call 'kernel32::CloseHandle(p r4)'
   StrCpy $UpdateRestart 1
-  SetAutoClose true
   Return
   update_refused:
     !insertmacro MessageAndStop 21 "Threadline could not confirm the update and close in time. Open Threadline and try the update again."
   update_manual:
     ClearErrors
+FunctionEnd
+
+Function FinishSuccessfulInstall
+  SetAutoClose true
+  IfSilent finish_silent
+  HideWindow
+  Goto finish_launch
+  finish_silent:
+    StrCmp $UpdateRestart 1 finish_launch
+    Return
+  finish_launch:
+    SetOutPath "$INSTDIR"
+    ClearErrors
+    Exec '"$INSTDIR\threadline.exe"'
+    IfErrors 0 finish_done
+      !insertmacro MessageAndStop 22 "Threadline was installed. Open it from the Start menu."
+  finish_done:
 FunctionEnd

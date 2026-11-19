@@ -389,15 +389,7 @@ Section "Install Threadline" SEC_INSTALL
   Delete "$INSTDIR\${Stage}\owner.ini"
   RMDir "$INSTDIR\${Stage}"
   DetailPrint "Installed ${Product} ${PACKAGE_VERSION} to $INSTDIR."
-  ${If} $UpdateRestart == 1
-    ClearErrors
-    Exec '"$INSTDIR\threadline.exe"'
-    ${If} ${Errors}
-      !insertmacro MessageAndStop 22 "The update was installed. Launch Threadline from the Start menu."
-    ${EndIf}
-  ${Else}
-    DetailPrint "Launch ${Product} from the Start menu."
-  ${EndIf}
+  Call FinishSuccessfulInstall
   SetErrorLevel 0
   Goto finished
 

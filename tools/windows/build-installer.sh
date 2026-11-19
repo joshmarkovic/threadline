@@ -60,6 +60,11 @@ elif [[ ! $schema =~ ^[1-9][0-9]{0,8}$ ]]; then
     fail 'Provide a verified positive schema version. Local packaging-only fixtures also accept unknown.'
 fi
 fault=${THREADLINE_SETUP_FIXTURE_FAULT:-none}
+private_public_key=${THREADLINE_PRIVATE_UPDATE_PUBLIC_KEY:-}
+if [[ -n $private_public_key ]]; then
+    [[ $channel == local-fixture && $private_public_key =~ ^04[0-9A-Fa-f]{128}$ && $fault == none && $schema != null ]] ||
+        fail 'Use the uncompressed P-256 public key with a complete private update build.'
+fi
 compile_defines=()
 if [[ $channel == local-fixture ]]; then
     compile_defines=(-DLOCAL_FIXTURE=1)
@@ -103,6 +108,10 @@ staging=$(mktemp -d -- "$output_parent/.threadline-installer.XXXXXXXX")
 trap 'rm -rf -- "$staging"' EXIT
 cp -- "$payload" "$staging/threadline.exe"
 assert_x64_pe "$staging/threadline.exe"
+if [[ -n $private_public_key ]]; then
+    LC_ALL=C grep -aiFq -- "$private_public_key" "$staging/threadline.exe" ||
+        fail 'Build the Windows app with the same THREADLINE_PRIVATE_UPDATE_PUBLIC_KEY before packaging it.'
+fi
 read -r app_hash _ < <(sha256sum -- "$staging/threadline.exe")
 if [[ $channel != local-fixture ]]; then
     [[ $app_hash == "$expected_app" ]] || fail 'The application does not match the recorded signed digest.'
@@ -145,6 +154,7 @@ if [[ $channel == local-fixture ]]; then
         '  "target": "x86_64-pc-windows-msvc",' \
         '  "minimum_os": "Windows 11 x64 build 22000",' \
         '  "publisher_verification": "unsigned local fixture",' \
+        '  "restart_protocol": 1,' \
         "  \"fixture_fault\": \"$fault\"," \
         "  \"current_schema\": $schema," \
         "  \"notification_helper_sha256\": $notification_hash," \
@@ -152,6 +162,10 @@ if [[ $channel == local-fixture ]]; then
         "  \"sha256\": \"$setup_hash\"," \
         "  \"app_sha256\": \"$app_hash\"" \
         '}' > "$staging/setup.json"
+    if [[ -n $private_public_key ]]; then
+        jq --arg pin "${private_public_key,,}" '. + {private_update_public_key: $pin}' "$staging/setup.json" > "$staging/private.json"
+        mv -- "$staging/private.json" "$staging/setup.json"
+    fi
 else
     jq -n --arg version "$version" --arg channel "$channel" --arg url "$artifact_url" \
         --arg publisher "$publisher" --arg pin "$publisher_pin" --arg signer "$signer_reference" \
