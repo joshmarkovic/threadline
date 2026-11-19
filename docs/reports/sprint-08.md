@@ -26,7 +26,9 @@ The native runs used `cargo xtask test e2e --suite full --case <case> --binary <
 
 ## Reopening a narrow review layout
 
-The `693d592` Windows GPUI run passed four tests. The narrow-layout case reopened the original PR with two distinct nonzero reading positions for its body and linked issue, the split comparison and selected source line, and the same draft with both inline anchors. The diff and editor left focus alone on reopen. Show review editor then focused the editor. The earlier E2E-008 run exercised the real Windows window and its separate offline restart. AC-78 remains Partial for restoring the code reading position after scrolling without selecting a line. [GPUI results and earlier E2E evidence](evidence/sprint-08/review-layout-693d592.json)
+The `693d592` Windows GPUI run restored the split comparison, selected source line, two distinct nonzero context positions and the original inline draft. The later `e3aec22` Windows GPUI run passed all four tests and restored the current file's first visible code row after scrolling without a new selection. This row belonged to the original side at the merge base. The independently selected line stayed on the modified side at the original head. Both context positions and both inline anchors returned in a fresh offline workspace. The editor gained focus when the tester chose Show review editor. [Earlier selected-line result](evidence/sprint-08/review-layout-693d592.json) · [Independent viewport, selection and focus evidence](evidence/sprint-08/review-viewport-e3aec22.json)
+
+Together with the separate-process E2E-008 resize, linked-issue switching, narrow view and offline restart, these results pass AC-78 for local Windows verification. The ordinary app built from a clean relocated checkout using the bundled, checksum-pinned GPUI archive. Two regenerations produced identical bytes from the original upstream archive. [Native E2E-008](evidence/sprint-08/native-verification.json) · [Build and archive verification](evidence/sprint-08/review-viewport-e3aec22.json)
 
 ## Existing threads in unified and split diffs
 

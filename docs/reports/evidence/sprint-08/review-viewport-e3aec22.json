@@ -1,0 +1,89 @@
+{
+  "requirements": ["PR-05", "PR-07"],
+  "acceptance": ["AC-78"],
+  "scenarios": ["UI-001", "UI-004", "E2E-008"],
+  "source_revision": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+  "app_version": "0.1.0",
+  "cargo_lock_sha256": "df7c3e0c8967652f657159205f125964b0bd6a1e5751edf489543bf4d036b13e",
+  "fixtures": ["FX-PR", "FX-DIFF", "s02-storage-v1"],
+  "viewport_regression": {
+    "scope": "In-process GPUI application test with synthetic downloaded pull requests and an isolated SQLite profile",
+    "modeled_window_dip": { "wide": [2200, 1450], "narrow": [1220, 1450] },
+    "observation": "The test scrolled over a rendered code row without selecting a new line. The first visible source row moved to the original side of the current file at the verified merge base. A fresh offline workspace restored that row, the separate selected line on the modified side at the same head, and distinct nonzero PR-body and linked-issue positions.",
+    "ownership": "Both source locations belong to the selected file and exact comparison. The original tab, verified issue, review authoring owner, draft identity and both inline anchors survived the pane and layout changes. The code and editor did not gain focus on reopen. The explicit Show review editor action focused the editor, and the Outbox stayed unchanged.",
+    "storage": "Each PR tab stores one reading anchor for its currently selected file. The anchor carries the file path, side, source line, immutable source commit and comparison revision. The selection is stored independently. A different file or comparison cannot reuse the reading anchor.",
+    "source": "../../../../crates/threadline-app/src/reader_workspace/tests.rs"
+  },
+  "windows": {
+    "host": {"os": "Windows 11 Enterprise", "build": "10.0.22631.7652", "architecture": "x86_64"},
+    "build_command": "cargo test --locked --offline -p threadline-app --lib --features e2e --no-run --target x86_64-pc-windows-msvc --message-format json",
+    "argv": ["threadline_app-db153c5f09bed1e7.exe", "ui_004", "ui_001_pr_context", "--test-threads=1"],
+    "executable_sha256": "a5ef969ffd616b6c8d5a98dd8dddf18788c441632c2988c8a54bb85069e5a75d",
+    "status": "Pass",
+    "exit_code": 0,
+    "tests_passed": 4,
+    "tests_failed": 0,
+    "tests_ignored": 0,
+    "tested": [
+      "ui_001_pr_context_changes_keep_the_immutable_native_diff_and_each_tabs_state",
+      "ui_004_anchored_review_draft_survives_pr_context_changes_and_queues_the_original_head",
+      "ui_004_existing_threads_follow_verified_source_lines_in_both_diff_modes",
+      "ui_004_narrow_pr_layout_restores_context_positions_and_original_review"
+    ],
+    "raw_sha256": {
+      "test_stdout": "5193b848afc700187cda4f3a4d089437c78d9f82bdfa3470e6edd9b952d939d5",
+      "numeric_exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "cargo_build_jsonl": "91acbc5e2c77340ddb725bd594ca0a93ac90431d21cfa489fb8a8862dab13d2b"
+    }
+  },
+  "native_process_journey": {
+    "case": "E2E-008",
+    "status": "Pass",
+    "run": "e2e-1795044411292-20392",
+    "app_source_revision": "43a288a7ea1325ab29d06ad96fea6f1a5f7509e2",
+    "driver_source_revision": "f632434aa882a612f016a62a7a349efe3f381e79",
+    "dpi": 96,
+    "scope": "Separate Windows processes drove both verified linked-issue choices, context resize and collapse, narrow and restored code, independent PR views and offline restart with the original anchored draft.",
+    "receipt": "native-verification.json"
+  },
+  "local_windows_coverage": {
+    "AC-78": "Pass. The actual native E2E-008 journey and the four Windows GPUI checks jointly cover the layout, saved viewport, selection, draft and focus.",
+    "PR-07": "Pass. The native linked-issue and review journeys, delayed response and unavailable-context checks, and saved viewport regression cover the requirement.",
+    "PR-05": "Partial. The default layout, resizing, narrow controls and independent tabs are covered. The PR Commits section lacks an observed navigation action in these Windows receipts."
+  },
+  "related_native_evidence": [
+    "review-layout-693d592.json",
+    "../sprint-06/linked-issue-proof.json",
+    "../sprint-06/shared-pr-panes.json",
+    "../sprint-06/mixed-catchup.json"
+  ],
+  "local_dependency": {
+    "package": "gpui-component 0.10.0",
+    "upstream_source_revision": "f697c3133d55c64fa8a5b67926147fb3dadd276d",
+    "upstream_package_path": "crates/component",
+    "original_archive_sha256": "607c90f6985ac2b96e54102338994eaea143aff521375c6f9e7fc7ecb3ba3646",
+    "original_checksum_verification": "The downloaded crates.io archive, the previous Cargo lock entry and the full published sparse-index record matched the tracked upstream index entry.",
+    "derived_archive_sha256": "23afa0aac16a640d0f7a45599d1076031127c3b7d7495577ac4ade08b58377a7",
+    "derived_archive_bytes": 931508,
+    "patch_sha256": "6b41a72021980ebcf176822973e2b36aeae6fd53e5e97990d292be5a36af5729",
+    "preserved_apache_license_sha256": "d1b0449e5478c574ba4f686c2656df7fe77d66821a61f8b6ed3378a58ed9a811",
+    "repack_attempts": 2,
+    "repack_result": "The tracked regeneration script reproduced the same archive and index bytes twice from the official archive in a clean e3aec22 checkout. The two diff source files were the only changed extracted members.",
+    "changed_members": ["src/diff/selection.rs", "src/diff/state.rs"],
+    "normal_windows_dependency_inventory": {
+      "command": "cargo tree --locked --offline -p threadline-app --target x86_64-pc-windows-msvc --edges normal --prefix none",
+      "unchanged_package_version_rows": 1122,
+      "normalized_sha256_before_and_after": "3e1d97d0a79a1ed82399565f5bd5f8f52ceb3bca46c46bace12a5b517455a8fe"
+    },
+    "source_and_regeneration": "../../../../third_party/gpui-component/README.md"
+  },
+  "relocated_linux_checkout": {
+    "source_revision": "ca332eb9023089407e3f1e8d35219b59d493ab18",
+    "provenance": "Clean clone in a path containing a space. Relevant app, storage and Cargo inputs match e3aec22. The checkout used the repository registry and an existing cache of the ordinary crates.io dependencies. Cargo unpacked the derived package in a separate cache. The checkout used no outside Cargo configuration override.",
+    "ordinary_build": {"command": "cargo build --offline --locked -p threadline-app", "exit_code": 0, "log_sha256": "1ed78fd1d46ba82dea487a551ff33133b7d7a83ea27d8f0a01a51236e872060d"},
+    "viewport_test": {"command": "cargo test --offline --locked -p threadline-app --lib --features e2e -- ui_004_narrow_pr_layout --nocapture", "exit_code": 0, "passed": 1, "log_sha256": "876d617f74f8692d273faa5bec54dc58e0d4b28c4a99cba31130ea2a922864ec"},
+    "adjacent_tests": {"arguments": ["ui_004", "ui_001_pr_context", "--skip", "ui_004_narrow_pr_layout_restores_context_positions_and_original_review", "--test-threads=1"], "exit_code": 0, "passed": 3, "log_sha256": "6a019e10b69332dee97b5c412fa87fe9c0d8e3d6edf2afaf5c0a57ce6caaa5e3"},
+    "clippy": {"command": "cargo clippy --offline --locked -p threadline-app --lib --tests --features e2e -- -D warnings", "exit_code": 0, "log_sha256": "85837bf45b4a4aa09c1aebf830954bb8c820d5fbf59070372837f5f57edd1869"},
+    "format": {"command": "cargo fmt --all --check", "exit_code": 0}
+  }
+}
