@@ -114,6 +114,41 @@ function Get-NotificationChoiceName([string]$Label, [bool]$Selected) {
     return $Label + ' ' + [char]0x00b7 + ' ' + $state
 }
 
+function Add-NotificationCheckpoint([string]$Step) {
+    $receipt = [ordered]@{ step = $Step; at_unix_ms = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() }
+    $line = ($receipt | ConvertTo-Json -Compress) + [Environment]::NewLine
+    [IO.File]::AppendAllText((Join-Path $script:ReportDir 'notification-schedule-checkpoints.jsonl'), $line)
+}
+
+function Open-RestartedFixtureActivity([IntPtr]$Window) {
+    if (!(Test-OwnedFixtureWindow $Window)) { Stop-Blocked 'The restarted activity window is no longer owned and visible.' }
+    Add-NotificationCheckpoint 'request_restarted_activity'
+    $probe = Join-Path $PSScriptRoot 'windows-open-fixture-activity.ps1'
+    $started = $script:app.StartTime.ToUniversalTime().Ticks
+    $info = [Diagnostics.ProcessStartInfo]::new()
+    $info.FileName = Join-Path $PSHOME 'powershell.exe'
+    $info.Arguments = '-NoProfile -NonInteractive -Sta -File "' + $probe + '" -OwnerId ' + $script:app.Id +
+        ' -OwnerStartTicks ' + $started + ' -WindowHandle ' + $Window.ToInt64()
+    $info.UseShellExecute = $false
+    $info.CreateNoWindow = $true
+    $child = [Diagnostics.Process]::Start($info)
+    try {
+        if (!$child.WaitForExit(12000)) {
+            $child.Kill()
+            [void]$child.WaitForExit(2000)
+            Add-NotificationCheckpoint 'activity_accessibility_timed_out'
+            Stop-Blocked 'The restarted process did not return from the owned Activity accessibility action within 12 seconds.'
+        }
+        if ($child.ExitCode -ne 0) {
+            Add-NotificationCheckpoint 'activity_accessibility_unavailable'
+            Stop-Blocked 'The restarted process did not expose the exact owned Activity accessibility action.'
+        }
+    } finally {
+        $child.Dispose()
+    }
+    Add-NotificationCheckpoint 'restarted_activity_invoked'
+}
+
 function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
     Wait-SeededFixtureAccount
     Open-SyncSettings $Window
@@ -149,6 +184,7 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
         throw 'Saving quiet hours changed an independent synchronization control.'
     }
     Add-Evidence 'Save independent notification quiet hours using native fields' $saved.cached_reader.notification.quiet_hours
+    Add-NotificationCheckpoint 'quiet_hours_saved'
     Wait-For 'the native feed and popup default' {
         Invoke-OwnedFixtureControl $Window 'notifications-default-2' $null (Get-NotificationChoiceName 'Feed and popup' $false)
     }
@@ -170,14 +206,17 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
         param($sync) $sync.controls.work_offline -and $sync.connection -ceq 'Offline'
     }
     Set-AccessPhase 'sync-offline'
+    Add-NotificationCheckpoint 'offline_and_paused_before_quit'
     $restarted = Restart-Reader $Profile -SeedQuietEvent
-    Wait-For 'the exact seeded event stays in native Activity because quiet hours suppress popup and sound' {
-        $observed = Read-Observation
-        if ($null -ne $observed -and $null -ne $observed.cached_reader -and
-            $observed.cached_reader.notification.isolated_quiet_event_feed_only) { return $true }
-        $null = Invoke-OwnedFixtureControl $restarted 'reader-activity' $null 'Activity'
-        return $false
-    } 8000 300
+    Add-NotificationCheckpoint 'offline_restart_and_fixture_verified'
+    $null = Wait-Reader 'the restarted profile has its seeded queued item' {
+        param($reader) $reader.offline -and $reader.outbox -eq 1
+    }
+    Open-RestartedFixtureActivity $restarted
+    $null = Wait-Reader 'the exact seeded event is in the real Activity feed because quiet hours suppress popup and sound' {
+        param($reader) $reader.notification.isolated_quiet_event_feed_only
+    }
+    Add-NotificationCheckpoint 'quiet_hours_feed_only_verified'
     Add-Evidence 'Observe the isolated event in the native feed with the exact Quiet Hours decision' ([ordered]@{
         delivery = 'FeedOnly'; popup_suppressed_by = 'QuietHours'; sound = $false
     })
@@ -189,6 +228,7 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
         throw 'The independent quiet-hours and synchronization preferences did not survive a separate process.'
     }
     Add-Evidence 'Restore the quiet schedule and each independent pause after restart' $controls
+    Add-NotificationCheckpoint 'settings_restored'
 
     Open-SyncSettings $restarted
     Set-AccessPhase 'sync-live'
@@ -236,6 +276,7 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
         param($reader) $reader.outbox -eq 0 -and !$reader.offline
     }
     Add-Evidence 'Resume one queued action independently of paused background polling' 'Confirmed'
+    Add-NotificationCheckpoint 'queued_action_confirmed'
     Stop-ThroughUi
     $script:report.detail = 'Windows quiet hours kept the seeded native activity in the feed while independent native synchronization controls held network requests and the queued action. Explicit checking and queue resumption were each verified against saved preferences and loopback requests.'
 }
