@@ -1,0 +1,270 @@
+{
+  "run": "e2e-1795051078866-1312",
+  "runner": {
+    "schema": 1,
+    "lane": "e2e",
+    "suite": "full",
+    "source_revision": "8f330d64d4ee1b7de461eb06281b7175e6278357",
+    "source_dirty": false,
+    "cargo_lock_sha256": "83587d235ce28277e15e3c6e2a0c2ad93f9826339812983027253991e5ebe8ab",
+    "package_version": "0.1.0",
+    "package_version_source": "checkout-app-manifest",
+    "fixture_revision": "s09-required-merge-queue-v1",
+    "seed": 12345,
+    "host": {
+      "os": "windows",
+      "architecture": "x86_64",
+      "version": "Microsoft Windows [Version 10.0.22631.7652]",
+      "display_session": "Windows desktop availability is checked by native driver"
+    },
+    "command": {
+      "program": "xtask",
+      "argv": [
+        "test",
+        "e2e",
+        "--suite",
+        "full",
+        "--case",
+        "S09-MERGE-QUEUE",
+        "--binary",
+        "<binary-path>",
+        "--seed",
+        "12345",
+        "--report-dir",
+        "<report-dir>"
+      ],
+      "redacted": true
+    },
+    "started_at_unix_ms": 1795051078865,
+    "finished_at_unix_ms": 1795051197078,
+    "status": "Pass",
+    "exit_code": 0,
+    "case": {
+      "case": "S09-MERGE-QUEUE",
+      "status": "Pass",
+      "detail": "The native Outbox retained both original unmerged intents when policy required a queue and when GitHub rejected the direct request with a queue requirement. See native-driver.log.",
+      "tests_passed": null,
+      "evidence": "direct-merge-native.json",
+      "requirement_ids": [
+        "MERGE-01",
+        "MERGE-03",
+        "MERGE-04",
+        "OUTBOX-03",
+        "TEST-04"
+      ],
+      "acceptance_ids": [
+        "AC-77"
+      ],
+      "child_exit_code": 0,
+      "fixture_revision": "s09-required-merge-queue-v1"
+    }
+  },
+  "application": {
+    "sha256": "1b50e1f0d803741e8dd535a57ff84a381c1be3f2ff639451db70d34e6aeb48aa",
+    "size_bytes": 45200896,
+    "evidence_class": "test-build native process",
+    "source_revision": "8f330d64d4ee1b7de461eb06281b7175e6278357"
+  },
+  "native": {
+    "driver": "Windows PowerShell / owned UI Automation and guarded Win32 SendInput",
+    "authentication_setup": "Fixed isolated loopback identity, verified by the application",
+    "windows_product": "Microsoft Windows 11 Enterprise",
+    "architecture": "AMD64",
+    "os_version": "10.0.22631",
+    "dpi": 96,
+    "status": "Pass",
+    "action_count": 53,
+    "outbox_observations": [
+      {
+        "phase": "merge-queue-preflight",
+        "number": 42,
+        "expected_head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "needs_attention": true,
+        "expected_direct_puts": 0
+      },
+      {
+        "phase": "merge-queue-rejected",
+        "number": 43,
+        "expected_head": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "needs_attention": true,
+        "expected_direct_puts": 1
+      }
+    ]
+  },
+  "provider": {
+    "count": 37,
+    "all_fixture_authorized": true,
+    "routes": [
+      {
+        "phase": "merge_prepare",
+        "requests": [
+          {
+            "route": "user",
+            "status": 200
+          },
+          {
+            "route": "repository",
+            "status": 200
+          },
+          {
+            "route": "user",
+            "status": 200
+          },
+          {
+            "route": "repository",
+            "status": 200
+          },
+          {
+            "route": "updated_items",
+            "status": 200
+          },
+          {
+            "route": "updated_comments",
+            "status": 200
+          },
+          {
+            "route": "updated_inline_comments",
+            "status": 200
+          },
+          {
+            "route": "user",
+            "status": 200
+          },
+          {
+            "route": "repository",
+            "status": 200
+          },
+          {
+            "route": "items",
+            "status": 200
+          },
+          {
+            "route": "user",
+            "status": 200
+          },
+          {
+            "route": "repository",
+            "status": 200
+          },
+          {
+            "route": "pull_a",
+            "status": 200
+          },
+          {
+            "route": "compare_a",
+            "status": 200
+          },
+          {
+            "route": "user",
+            "status": 200
+          },
+          {
+            "route": "repository",
+            "status": 200
+          },
+          {
+            "route": "pull_a",
+            "status": 200
+          },
+          {
+            "route": "merge_policy_a",
+            "status": 200
+          },
+          {
+            "route": "user",
+            "status": 200
+          },
+          {
+            "route": "repository",
+            "status": 200
+          },
+          {
+            "route": "pull_b",
+            "status": 200
+          },
+          {
+            "route": "compare_b",
+            "status": 200
+          },
+          {
+            "route": "user",
+            "status": 200
+          },
+          {
+            "route": "repository",
+            "status": 200
+          },
+          {
+            "route": "pull_b",
+            "status": 200
+          },
+          {
+            "route": "merge_policy_b",
+            "status": 200
+          }
+        ]
+      },
+      {
+        "phase": "merge_queue_preflight",
+        "requests": [
+          {
+            "route": "user",
+            "status": 200
+          },
+          {
+            "route": "user",
+            "status": 200
+          },
+          {
+            "route": "repository",
+            "status": 200
+          },
+          {
+            "route": "pull_a",
+            "status": 200
+          },
+          {
+            "route": "merge_policy_a",
+            "status": 200
+          }
+        ]
+      },
+      {
+        "phase": "merge_queue_rejected",
+        "requests": [
+          {
+            "route": "user",
+            "status": 200
+          },
+          {
+            "route": "user",
+            "status": 200
+          },
+          {
+            "route": "repository",
+            "status": 200
+          },
+          {
+            "route": "pull_b",
+            "status": 200
+          },
+          {
+            "route": "merge_policy_b",
+            "status": 200
+          },
+          {
+            "route": "merge_queue_denied_put",
+            "status": 405
+          }
+        ]
+      }
+    ],
+    "direct_merge_requests": 1
+  },
+  "receipt_sha256": {
+    "result.json": "044fa35726b19e155855bcce591903cf6630c6a673b66099d7e9616f9b094cde",
+    "binary.json": "40a6671045b1fcb1b6ee8c5d4181a9f7e655fb9a7b81c190bd338b6535dbf96d",
+    "direct-merge-native.json": "0ca710135c2a9d7f248b21507efe914654a8faf9c83ff057c61511d9ce368877",
+    "github-access-trace.json": "b93086c07e8dc0e462aaf46436f4c3b20e4d5c9389acd2242247c182c3d6a9e5"
+  }
+}
