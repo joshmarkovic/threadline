@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([Parameter(Mandatory=$true)][string]$Report, [ValidateRange(1,12)][int]$Samples=6)
+param([Parameter(Mandatory=$true)][string]$Report, [ValidateRange(1,12)][int]$Samples=6, [switch]$CompileOnly)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if (Test-Path -LiteralPath $Report) { throw 'Choose a new receipt file.' }
@@ -34,11 +34,15 @@ function Wait-Record([string]$Name) {
 }
 function Delta([long]$A,[long]$B) { [Math]::Round(1000.0*($B-$A)/$receipt.frequency,4) }
 try {
-    $refs = @([Windows.Automation.Provider.AutomationInteropProvider],[Windows.Automation.ControlType],
-        [Windows.Threading.Dispatcher],[Windows.Forms.Form],[Drawing.Size]) | ForEach-Object { '/r:' + $_.Assembly.Location } | Select-Object -Unique
+    $refs = @([System.ComponentModel.Component],[Windows.Automation.Provider.AutomationInteropProvider],
+        [Windows.Automation.ControlType],[Windows.Threading.Dispatcher],[Windows.Forms.Form],[Drawing.Size]) |
+        ForEach-Object { '/r:' + $_.Assembly.Location } | Select-Object -Unique
     $csc = Join-Path ([Runtime.InteropServices.RuntimeEnvironment]::GetRuntimeDirectory()) 'csc.exe'
-    & $csc /nologo /warnaserror /target:winexe /platform:x64 ("/out:"+$program) @refs $source
+    & $csc /nologo /noconfig /warnaserror /target:winexe /platform:x64 ("/out:"+$program) @refs $source
     if ($LASTEXITCODE -ne 0) { throw 'Failed to compile the owned UI Automation provider.' }
+    $receipt.compiled_sha256 = (Get-FileHash -LiteralPath $program).Hash.ToLowerInvariant()
+    $receipt.compile_only = [bool]$CompileOnly
+    if ($CompileOnly) { $receipt.status = 'Pass'; return }
     $target = Start-Process -FilePath $program -ArgumentList ('"'+$scratch+'"') -PassThru
     $ready = (Wait-Record 'ready').Split(',')
     $window = [IntPtr]([long]$ready[0])
