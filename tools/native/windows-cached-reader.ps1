@@ -1,9 +1,9 @@
-function Wait-Reader([string]$Description, [scriptblock]$ReaderCheck, [int]$PollInterval = 45) {
+function Wait-Reader([string]$Description, [scriptblock]$ReaderCheck, [int]$PollInterval = 45, [int]$Timeout = 8000) {
     return Wait-State $Description {
         param($state)
         $cached = $state.PSObject.Properties['cached_reader']
         $null -ne $cached -and $null -ne $cached.Value -and (& $ReaderCheck $cached.Value)
-    } $PollInterval
+    } $PollInterval $Timeout
 }
 
 function Initialize-ReaderProfile([string]$Profile, [string]$Scale) {
@@ -184,28 +184,38 @@ function Invoke-ReaderResumeProof([IntPtr]$Window, [string]$Profile) {
         downloaded_comments = 1
     })
 
+    Open-SyncSettings $Window
+    Click-AccountControl $Window 'sync-work-offline'
+    $null = Wait-Sync 'the saved download held while Work Offline is enabled' {
+        param($sync) $sync.controls.work_offline -and $sync.connection -ceq 'Offline'
+    }
+    Set-AccessPhase 'sync-offline'
     $restarted = Restart-Reader $Profile
     $null = Wait-Reader 'restored Partial coverage with the same pending download' {
         param($reader)
-        $reader.cached_content_ready -and $reader.active_item -eq $item -and
+        $reader.offline -and $reader.cached_content_ready -and $reader.active_item -eq $item -and
             $reader.comments_coverage -ceq 'Partial' -and $reader.comment_count -eq 1 -and
             $reader.download_state -cin @('Active', 'Pending')
     }
+    Open-SyncSettings $restarted
     Set-AccessPhase 'reader-resume'
+    Click-AccountControl $restarted 'sync-work-offline'
+    $null = Wait-Sync 'leave Work Offline through the native settings' {
+        param($sync) !$sync.controls.work_offline
+    }
     Wait-SeededFixtureAccount
-    Click-AccountControl $restarted 'reader-resume-download-0'
-    $null = Wait-Reader 'the resumed offline download completed with two unique comments' {
+    $null = Wait-Reader 'the worker resumes the original download with two unique comments' {
         param($reader)
         $reader.active_item -eq $item -and $reader.comments_coverage -ceq 'Complete' -and
             $reader.comment_count -eq 2 -and $reader.download_state -ceq 'Complete'
-    }
-    Add-Evidence 'Resume the original download after reconnecting the isolated account' ([ordered]@{
+    } -Timeout 45000
+    Add-Evidence 'Automatically resume the saved download after reconnecting the isolated account' ([ordered]@{
         item = $item
         discussion = 'Complete'
         downloaded_comments = 2
     })
     Stop-ThroughUi
-    $script:report.detail = 'The native reader showed a Partial discussion and resumed its saved offline download after a separate-process restart.'
+    $script:report.detail = 'The native reader showed Partial discussion, restored the pending download offline and resumed it automatically after reconnecting.'
 }
 
 function Get-ReaderBudget([double[]]$Samples, [double]$Limit) {

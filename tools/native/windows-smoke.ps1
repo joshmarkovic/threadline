@@ -186,11 +186,11 @@ function Read-Observation {
     }
 }
 
-function Wait-State([string]$Description, [scriptblock]$Check, [int]$Interval = 45) {
+function Wait-State([string]$Description, [scriptblock]$Check, [int]$Interval = 45, [int]$Timeout = 8000) {
     Wait-For $Description {
         $state = Read-Observation
         $null -ne $state -and (& $Check $state)
-    } 8000 $Interval
+    } $Timeout $Interval
     return Read-Observation
 }
 
@@ -268,7 +268,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
         $info.EnvironmentVariables['THREADLINE_E2E_ACCOUNT_FORM'] = '1'
     }
     if ($ReaderBacklog) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
-    if ($ReaderProof -in @('CursorRecovery', 'Historical', 'Sync', 'RateLimit', 'NotificationSchedule', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'CredentialBoundary', 'CommentDependency', 'IssueConflict', 'IssuePropagation', 'Writes', 'WriteSurface', 'PerformanceConcurrent')) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
+    if ($ReaderProof -in @('Resume', 'CursorRecovery', 'Historical', 'Sync', 'RateLimit', 'NotificationSchedule', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'CredentialBoundary', 'CommentDependency', 'IssueConflict', 'IssuePropagation', 'Writes', 'WriteSurface', 'PerformanceConcurrent')) { $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1' }
     if ($script:UsesNativeLifecycleFixture) {
         $info.EnvironmentVariables['THREADLINE_E2E_NATIVE_LIFECYCLE'] = '1'
         $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1'

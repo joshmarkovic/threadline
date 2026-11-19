@@ -515,12 +515,13 @@ fn complete_reader_resume(records: &[RequestEvidence]) -> bool {
         .filter(|entry| matches!(entry.route, Route::CommentsFirst | Route::CommentsNext))
         .map(|entry| (entry.phase, entry.route, entry.status))
         .collect();
-    records
+    records.iter().all(|entry| {
+        entry.route != Route::Unexpected
+            && entry.fixture_authorization
+            && entry.phase != Phase::SyncOffline
+    }) && records
         .iter()
-        .all(|entry| entry.route != Route::Unexpected && entry.fixture_authorization)
-        && records
-            .iter()
-            .any(|entry| entry.route == Route::Items && entry.status == 200)
+        .any(|entry| entry.route == Route::Items && entry.status == 200)
         && discussion
             == [
                 (Phase::ReaderFailure, Route::CommentsFirst, 200),
@@ -1202,7 +1203,8 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
         (phase, Route::UpdatedItems | Route::UpdatedComments)
             if merge::applies(phase)
                 || review_decisions::active(phase)
-                || review_threads::active(phase) =>
+                || review_threads::active(phase)
+                || matches!(phase, Phase::ReaderFailure | Phase::ReaderResume) =>
         {
             result(200, "OK", json!([]))
         }
@@ -1351,6 +1353,14 @@ mod tests {
         })
         .collect();
         assert!(complete_reader_resume(&records));
+        records.push(RequestEvidence {
+            phase: Phase::SyncOffline,
+            route: Route::User,
+            status: 200,
+            fixture_authorization: true,
+        });
+        assert!(!complete_reader_resume(&records));
+        records.pop();
         records.push(RequestEvidence {
             phase: Phase::ReaderResume,
             route: Route::CommentsFirst,
