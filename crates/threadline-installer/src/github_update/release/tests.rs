@@ -8,7 +8,10 @@ const META: &str = "/release/releases/assets/11";
 const SETUP: &str = "/release/releases/assets/12";
 
 fn client(server: &HttpFixture) -> Github {
-    let mut github = Github::new(&digest(b"fixture publisher")).unwrap();
+    let mut github = Github::new(Trust::Authenticode(
+        pin(&digest(b"fixture publisher")).unwrap(),
+    ))
+    .unwrap();
     github.api = server.base.clone();
     github
 }
@@ -199,7 +202,7 @@ async fn rejects_ambiguous_unsigned_or_corrupt_assets_before_handoff() {
 }
 
 #[tokio::test]
-async fn checks_repo_visibility_when_latest_release_is_missing() {
+async fn checks_release_visibility_when_latest_stable_release_is_missing() {
     let server = HttpFixture::new();
     let github = client(&server);
     let tmp = tempfile::tempdir().unwrap();
@@ -210,6 +213,13 @@ async fn checks_repo_visibility_when_latest_release_is_missing() {
             .is_err()
     );
     server.serve("/release", "200 OK", 2, b"{}");
+    assert!(matches!(
+        github
+            .stage(&current(), &platform(), tmp.path(), Some("fixture"))
+            .await,
+        Err(ACCESS)
+    ));
+    server.serve("/release/releases?per_page=1", "200 OK", 2, b"[]");
     assert!(
         github
             .stage(&current(), &platform(), tmp.path(), Some("fixture"))
@@ -245,7 +255,10 @@ fn rejects_untrusted_redirect_targets() {
 
 #[test]
 fn asset_redirects_discard_api_authorization_and_accept_headers() {
-    let github = Github::new(&digest(b"fixture publisher")).unwrap();
+    let github = Github::new(Trust::Authenticode(
+        pin(&digest(b"fixture publisher")).unwrap(),
+    ))
+    .unwrap();
     let url = header::HeaderValue::from_static(
         "https://release-assets.githubusercontent.com/download?signed=opaque",
     );
@@ -253,4 +266,252 @@ fn asset_redirects_discard_api_authorization_and_accept_headers() {
     assert!(!request.headers().contains_key(header::AUTHORIZATION));
     assert!(!request.headers().contains_key(header::ACCEPT));
     assert!(github.cdn_download(None).is_err());
+}
+
+const PRIVATE_LIST: &str = "/release/releases?per_page=20&page=1";
+const SIGNATURE: &str = "/release/releases/assets/13";
+
+fn private_manifest() -> Value {
+    let mut m = manifest();
+    m.as_object_mut()
+        .unwrap()
+        .remove("publisher_certificate_sha256");
+    m["version"] = json!("0.1.0-local.22");
+    m["channel"] = json!("private-preview");
+    m["package_build"] = json!(22);
+    m["artifact_url"] = json!(format!(
+        "{DOWNLOADS}v0.1.0-local.22/Threadline-Setup-22.exe"
+    ));
+    m
+}
+
+fn github_signer(server: &HttpFixture) -> (Github, ring::signature::EcdsaKeyPair) {
+    use ring::{
+        rand::SystemRandom,
+        signature::{ECDSA_P256_SHA256_FIXED_SIGNING, EcdsaKeyPair, KeyPair},
+    };
+    let rng = SystemRandom::new();
+    let doc = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, &rng).unwrap();
+    let pair =
+        EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_FIXED_SIGNING, doc.as_ref(), &rng).unwrap();
+    let hex = pair
+        .public_key()
+        .as_ref()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<String>();
+    let mut github = Github::new(Trust::Private(private_key(&hex).unwrap())).unwrap();
+    github.api = server.base.clone();
+    (github, pair)
+}
+
+fn private_current(build: u32) -> Installed {
+    Installed {
+        version: Version::parse(&format!("0.1.0-local.{build}")).unwrap(),
+        build,
+    }
+}
+
+fn publish_private(
+    server: &HttpFixture,
+    build: u32,
+    raw: &[u8],
+    sig: &[u8],
+    setup: &[u8],
+) -> Value {
+    let tag = format!("v0.1.0-local.{build}");
+    let asset = |id: usize, name: &str, bytes: &[u8], route| {
+        server.serve(route, "200 OK", bytes.len(), bytes);
+        json!({"id": id, "name": name, "state": "uploaded", "size": bytes.len(),
+               "digest": format!("sha256:{}", digest(bytes)), "browser_download_url":format!("{DOWNLOADS}{tag}/{name}")})
+    };
+    let rel = json!({"tag_name":tag,"draft":false,"prerelease":true,"assets":[
+        asset(11, PRIVATE_MANIFEST, raw, META), asset(13, PRIVATE_SIGNATURE, sig, SIGNATURE),
+        asset(12, &format!("Threadline-Setup-{build}.exe"), setup, SETUP)
+    ]});
+    let page = serde_json::to_vec(&[&rel]).unwrap();
+    server.serve(PRIVATE_LIST, "200 OK", page.len(), &page);
+    rel
+}
+
+#[tokio::test]
+async fn stages_only_an_independently_signed_private_update() {
+    let server = HttpFixture::new();
+    let (github, pair) = github_signer(&server);
+    let (_, other) = github_signer(&server);
+    let tmp = tempfile::tempdir().unwrap();
+    let original = serde_json::to_vec(&private_manifest()).unwrap();
+    let rng = ring::rand::SystemRandom::new();
+    let signature = pair.sign(&rng, &original).unwrap();
+    publish_private(&server, 22, &original, signature.as_ref(), ASSET);
+    let staged = github
+        .stage(
+            &private_current(21),
+            &platform(),
+            tmp.path(),
+            Some("synthetic"),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(fs::read(&staged.path).unwrap(), ASSET);
+    drop(staged);
+    // Replacing the GitHub release and all of its SHA-256 metadata must not confer signing authority.
+    let mut changed = original.clone();
+    changed.push(b' ');
+    let wrong_key = other.sign(&rng, &original).unwrap();
+    for (raw, sig) in [
+        (&changed, signature.as_ref()),
+        (&original, wrong_key.as_ref()),
+        (&original, &[0; 63][..]),
+    ] {
+        server.requests.lock().unwrap().clear();
+        publish_private(&server, 22, raw, sig, ASSET);
+        assert!(
+            github
+                .stage(&private_current(21), &platform(), tmp.path(), None)
+                .await
+                .is_err()
+        );
+        assert!(!server.requests.lock().unwrap().iter().any(|r| r == SETUP));
+    }
+    publish_private(&server, 22, &original, signature.as_ref(), ASSET);
+    server.serve(SETUP, "200 OK", ASSET.len(), &vec![0; ASSET.len()]);
+    assert!(
+        github
+            .stage(&private_current(21), &platform(), tmp.path(), None)
+            .await
+            .is_err()
+    );
+    assert_eq!(fs::read_dir(tmp.path()).unwrap().count(), 0);
+}
+
+#[tokio::test]
+async fn signed_private_metadata_must_bind_the_build_installer_schema_channel_and_target() {
+    let server = HttpFixture::new();
+    let (github, pair) = github_signer(&server);
+    let tmp = tempfile::tempdir().unwrap();
+    for (field, value) in [
+        ("package_build", json!(23)),
+        ("current_schema", json!(1)),
+        ("target", json!("aarch64-pc-windows-msvc")),
+        (
+            "artifact_url",
+            json!(format!("{DOWNLOADS}v0.1.0-local.22/Other.exe")),
+        ),
+        (
+            "artifact_url",
+            json!(
+                "https://github.com/elsewhere/threadline/releases/download/v0.1.0-local.22/Threadline-Setup-22.exe"
+            ),
+        ),
+        ("channel", json!("stable")),
+        ("version", json!("0.1.0-local.23")),
+        ("sha256", json!(digest(b"other"))),
+        ("restart_protocol", json!(2)),
+    ] {
+        let mut m = private_manifest();
+        m[field] = value;
+        let raw = serde_json::to_vec(&m).unwrap();
+        let sig = pair.sign(&ring::rand::SystemRandom::new(), &raw).unwrap();
+        publish_private(&server, 22, &raw, sig.as_ref(), ASSET);
+        assert!(
+            !matches!(
+                github
+                    .stage(&private_current(21), &platform(), tmp.path(), None)
+                    .await,
+                Ok(Some(_))
+            ),
+            "{field}"
+        );
+    }
+    assert!(!server.requests.lock().unwrap().iter().any(|r| r == SETUP));
+}
+
+#[tokio::test]
+async fn private_feed_requires_contents_access_and_skips_older_unsigned_prereleases() {
+    let server = HttpFixture::new();
+    let (github, pair) = github_signer(&server);
+    let tmp = tempfile::tempdir().unwrap();
+    server.serve("/release", "200 OK", 2, b"{}");
+    assert!(matches!(
+        github
+            .stage(&private_current(21), &platform(), tmp.path(), None)
+            .await,
+        Err(ACCESS)
+    ));
+    let old = json!({"tag_name":"v0.1.0-local.20","prerelease":true,"draft":false,"assets":[]});
+    let mut draft = old.clone();
+    draft["tag_name"] = json!("v0.1.0-local.55");
+    draft["draft"] = json!(true);
+    let mut foreign = old.clone();
+    foreign["tag_name"] = json!("v1.0.0-rc.999");
+    let mut stable = old.clone();
+    stable["tag_name"] = json!("v2.0.0");
+    stable["prerelease"] = json!(false);
+    let mut page = vec![old, draft, foreign, stable];
+    let serve = |route, items: &[Value]| {
+        let bytes = serde_json::to_vec(items).unwrap();
+        server.serve(route, "200 OK", bytes.len(), &bytes);
+    };
+    serve(PRIVATE_LIST, &page);
+    assert!(
+        github
+            .stage(&private_current(21), &platform(), tmp.path(), None)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        server
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|r| r == PRIVATE_LIST)
+    );
+    let raw = serde_json::to_vec(&private_manifest()).unwrap();
+    let sig = pair.sign(&ring::rand::SystemRandom::new(), &raw).unwrap();
+    let valid = publish_private(&server, 22, &raw, sig.as_ref(), ASSET);
+    page.resize(PAGE_SIZE, page[0].clone());
+    serve(PRIVATE_LIST, &page);
+    serve("/release/releases?per_page=20&page=2", &[valid]);
+    assert!(
+        github
+            .stage(&private_current(21), &platform(), tmp.path(), None)
+            .await
+            .unwrap()
+            .is_some()
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires locally downloaded release assets and their trusted public key"]
+async fn verify_downloaded_private_release() {
+    let dir = std::path::PathBuf::from(std::env::var_os("THREADLINE_VERIFY_RELEASE_DIR").unwrap());
+    let build: u32 = std::env::var("THREADLINE_VERIFY_RELEASE_BUILD")
+        .unwrap()
+        .parse()
+        .unwrap();
+    let key = private_key(&std::env::var("THREADLINE_VERIFY_RELEASE_PUBLIC_KEY").unwrap()).unwrap();
+    let setup = fs::read(dir.join(format!("Threadline-Setup-{build}.exe"))).unwrap();
+    let raw = fs::read(dir.join(PRIVATE_MANIFEST)).unwrap();
+    let signature = fs::read(dir.join(PRIVATE_SIGNATURE)).unwrap();
+    let server = HttpFixture::new();
+    publish_private(&server, build, &raw, &signature, &setup);
+    let mut github = Github::new(Trust::Private(key)).unwrap();
+    github.api = server.base.clone();
+    let tmp = tempfile::tempdir().unwrap();
+    let host = Platform {
+        profile_schema: None,
+        highest_build: build - 1,
+        ..platform()
+    };
+    let staged = github
+        .stage(&private_current(build - 1), &host, tmp.path(), None)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(staged.manifest.package_build, build);
+    assert_eq!(fs::read(&staged.path).unwrap(), setup);
 }

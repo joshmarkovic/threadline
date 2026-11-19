@@ -1,4 +1,4 @@
-//! Automatic stable releases for the registered Windows installation.
+//! Automatic releases for the registered Windows installation.
 use crate::{Result, Staged};
 
 #[cfg(any(windows, test))]
@@ -10,11 +10,24 @@ mod windows;
 #[cfg(windows)]
 pub(crate) use windows::Restart;
 
-/// An unconfigured build or a source/fixture executable stays offline.
+/// Whether the running program is installed and configured for verified updates.
 pub fn configured() -> bool {
     #[cfg(windows)]
     {
         matches!(windows::verified_install(), Ok(Some(_)))
+    }
+    #[cfg(not(windows))]
+    false
+}
+
+/// Whether the running program is registered for signed private prereleases.
+pub fn private_channel() -> bool {
+    #[cfg(windows)]
+    {
+        matches!(
+            windows::verified_install(),
+            Ok(Some((_, release::Trust::Private(_))))
+        )
     }
     #[cfg(not(windows))]
     false

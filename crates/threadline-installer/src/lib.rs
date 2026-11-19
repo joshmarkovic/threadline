@@ -67,6 +67,7 @@ pub struct Manifest {
     pub oldest_supported_schema: u32,
     pub size: u64,
     pub sha256: String,
+    #[serde(default)]
     pub publisher_certificate_sha256: String,
 }
 #[derive(Clone, Copy, Debug)]
@@ -164,62 +165,70 @@ impl Source {
             .map_err(|_| "Could not locate the selected release.")
     }
     fn select(&self, raw: &[u8], wanted: &Selection, host: &Platform) -> Result<(Manifest, Url)> {
-        host.check()?;
-        if raw.len() > MAX_MANIFEST as usize
-            || Sha256::digest(raw).as_slice() != wanted.manifest_hash
-        {
-            return Err("The release manifest failed its independently supplied digest.");
-        }
-        let m: Manifest = serde_json::from_slice(raw)
-            .map_err(|_| "The trusted manifest does not describe a signed release installer.")?;
-        if m.version != wanted.version.to_string()
-            || m.channel != wanted.channel
-            || m.target != TARGET
-            || m.minimum_os != MINIMUM
-        {
-            return Err(
-                "The manifest does not match the exact requested version, channel and Windows target.",
-            );
-        }
-        if m.package_build == 0 || m.package_build < host.highest_build {
-            return Err("The installed profile requires the same or a newer build.");
-        }
-        if m.oldest_supported_schema == 0
-            || m.oldest_supported_schema > m.current_schema
-            || host
-                .profile_schema
-                .is_some_and(|s| s < m.oldest_supported_schema || s > m.current_schema)
-        {
-            return Err("This installer is incompatible with the retained profile schema.");
-        }
-        if m.size == 0
-            || m.size > MAX_INSTALLER
-            || pin(&m.sha256).is_err()
-            || pin(&m.publisher_certificate_sha256)? != self.publisher
-        {
+        let (manifest, url) = select_manifest(&self.version_dir(wanted)?, raw, wanted, host)?;
+        if pin(&manifest.publisher_certificate_sha256)? != self.publisher {
             return Err("The approved release size, digest or publisher is invalid.");
         }
-        let url = Url::parse(&m.artifact_url).map_err(|_| "The installer asset URL is invalid.")?;
-        let dir = self.version_dir(wanted)?;
-        let leaf = url.path().strip_prefix(dir.path()).unwrap_or_default();
-        if !safe_segments(&m.artifact_url)
-            || url.origin() != dir.origin()
-            || !url.username().is_empty()
-            || url.password().is_some()
-            || url.fragment().is_some()
-            || url.query().is_some()
-            || leaf.is_empty()
-            || leaf.contains('/')
-            || !leaf.ends_with(".exe")
-            || !safe_filename(leaf)
-            || !leaf
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_'))
-        {
-            return Err("The installer asset is outside the configured release directory.");
-        }
-        Ok((m, url))
+        Ok((manifest, url))
     }
+}
+
+fn select_manifest(
+    dir: &Url,
+    raw: &[u8],
+    wanted: &Selection,
+    host: &Platform,
+) -> Result<(Manifest, Url)> {
+    host.check()?;
+    if raw.len() > MAX_MANIFEST as usize || Sha256::digest(raw).as_slice() != wanted.manifest_hash {
+        return Err("The release manifest failed its independently supplied digest.");
+    }
+    let m: Manifest = serde_json::from_slice(raw)
+        .map_err(|_| "The trusted manifest does not describe a signed release installer.")?;
+    if m.version != wanted.version.to_string()
+        || m.channel != wanted.channel
+        || m.target != TARGET
+        || m.minimum_os != MINIMUM
+    {
+        return Err(
+            "The manifest does not match the exact requested version, channel and Windows target.",
+        );
+    }
+    if m.package_build == 0 || m.package_build < host.highest_build {
+        return Err("The installed profile requires the same or a newer build.");
+    }
+    if m.oldest_supported_schema == 0
+        || m.oldest_supported_schema > m.current_schema
+        || host
+            .profile_schema
+            .is_some_and(|s| s < m.oldest_supported_schema || s > m.current_schema)
+    {
+        return Err("This installer is incompatible with the retained profile schema.");
+    }
+    if m.size == 0 || m.size > MAX_INSTALLER || pin(&m.sha256).is_err() {
+        return Err("The approved release size, digest or publisher is invalid.");
+    }
+    let url = Url::parse(&m.artifact_url).map_err(|_| "The installer asset URL is invalid.")?;
+    let leaf = url.path().strip_prefix(dir.path()).unwrap_or_default();
+    if !safe_segments(&m.artifact_url)
+        || url.origin() != dir.origin()
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.fragment().is_some()
+        || url.query().is_some()
+        || leaf.is_empty()
+        || leaf.contains('/')
+        || !leaf.ends_with(".exe")
+        || !safe_filename(leaf)
+        || !leaf
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_'))
+    {
+        return Err("The installer asset is outside the configured release directory.");
+    }
+    Ok((m, url))
+}
+impl Source {
     pub async fn stage(
         &self,
         wanted: &Selection,

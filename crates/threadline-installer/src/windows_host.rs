@@ -28,6 +28,36 @@ use windows_sys::{
 };
 
 pub fn detect() -> Result<Platform, &'static str> {
+    detect_for(Registration::Stable)
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum Registration {
+    Stable,
+    Private,
+}
+
+impl Registration {
+    fn uninstall_key(self) -> *const u16 {
+        match self {
+            Self::Stable => windows_sys::core::w!(
+                r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Threadline"
+            ),
+            Self::Private => windows_sys::core::w!(
+                r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Threadline.InstallTest"
+            ),
+        }
+    }
+
+    fn history_key(self) -> *const u16 {
+        match self {
+            Self::Stable => windows_sys::core::w!(r"Software\Threadline"),
+            Self::Private => windows_sys::core::w!(r"Software\Threadline.InstallTest"),
+        }
+    }
+}
+
+pub(crate) fn detect_for(registration: Registration) -> Result<Platform, &'static str> {
     let mut arch = 0;
     let mut native = 0;
     let mut version = OSVERSIONINFOEXW {
@@ -48,7 +78,11 @@ pub fn detect() -> Result<Platform, &'static str> {
         native_x64: native == IMAGE_FILE_MACHINE_AMD64,
         workstation: version.wProductType == 1,
         build: version.dwBuildNumber,
-        highest_build: highest_build()?,
+        highest_build: dword(
+            registration.history_key(),
+            windows_sys::core::w!("HighestBuild"),
+        )?
+        .unwrap_or(0),
         profile_schema,
     })
 }
@@ -105,14 +139,6 @@ fn schema_of(path: &Path) -> Result<Option<u32>, &'static str> {
         .map_err(|_| "Could not verify the existing database schema.")?;
     Ok(Some(value))
 }
-fn highest_build() -> Result<u32, &'static str> {
-    Ok(dword(
-        windows_sys::core::w!("Software\\Threadline"),
-        windows_sys::core::w!("HighestBuild"),
-    )?
-    .unwrap_or(0))
-}
-
 fn dword(key: *const u16, name: *const u16) -> Result<Option<u32>, &'static str> {
     let mut value = 0u32;
     let mut bytes = 4u32;
@@ -134,17 +160,17 @@ fn dword(key: *const u16, name: *const u16) -> Result<Option<u32>, &'static str>
     }
 }
 
-const REGISTRATION: *const u16 =
-    windows_sys::core::w!(r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Threadline");
-
-fn registered_string(name: *const u16) -> Result<Option<std::ffi::OsString>, &'static str> {
+fn registered_string(
+    key: *const u16,
+    name: *const u16,
+) -> Result<Option<std::ffi::OsString>, &'static str> {
     use std::os::windows::ffi::OsStringExt;
     let mut buffer = vec![0u16; 32768];
     let mut bytes = (buffer.len() * 2) as u32;
     let code = unsafe {
         RegGetValueW(
             HKEY_CURRENT_USER,
-            REGISTRATION,
+            key,
             name,
             RRF_RT_REG_SZ | RRF_SUBKEY_WOW6464KEY,
             std::ptr::null_mut(),
@@ -167,15 +193,22 @@ fn registered_string(name: *const u16) -> Result<Option<std::ffi::OsString>, &'s
     }
 }
 
-pub(crate) fn installed() -> Result<Option<crate::github_update::Installed>, &'static str> {
+pub(crate) fn installed(
+    registration: Registration,
+) -> Result<Option<crate::github_update::Installed>, &'static str> {
     use crate::github_update::Installed;
-    let Some(location) = registered_string(windows_sys::core::w!("InstallLocation"))? else {
+    let key = registration.uninstall_key();
+    let Some(location) = registered_string(key, windows_sys::core::w!("InstallLocation"))? else {
         return Ok(None);
     };
     let paths = NativePaths
         .application_paths()
         .map_err(|_| "Windows could not locate the installed release.")?;
-    let expected = paths.install.join("threadline.exe");
+    let expected = match registration {
+        Registration::Stable => paths.install,
+        Registration::Private => paths.install.with_file_name("Threadline Installer Test"),
+    }
+    .join("threadline.exe");
     let Ok(expected) = expected.canonicalize() else {
         return Ok(None);
     };
@@ -193,10 +226,10 @@ pub(crate) fn installed() -> Result<Option<crate::github_update::Installed>, &'s
     {
         return Ok(None);
     }
-    let version = registered_string(windows_sys::core::w!("DisplayVersion"))?
+    let version = registered_string(key, windows_sys::core::w!("DisplayVersion"))?
         .and_then(|s| semver::Version::parse(s.to_str()?).ok())
         .ok_or("The installed release version is unavailable.")?;
-    let build = dword(REGISTRATION, windows_sys::core::w!("InstalledBuild"))?
+    let build = dword(key, windows_sys::core::w!("InstalledBuild"))?
         .filter(|n| *n != 0)
         .ok_or("The installed release build is unavailable.")?;
     Ok(Some(Installed { version, build }))

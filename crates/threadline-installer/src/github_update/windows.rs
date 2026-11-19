@@ -1,4 +1,7 @@
-use super::{Installed, release::Github};
+use super::{
+    Installed,
+    release::{Github, Trust, private_build, private_key},
+};
 use crate::{Platform, Result, Staged, lock_installer, pin, verify_bytes, windows_host};
 use semver::Version;
 use std::{
@@ -17,11 +20,17 @@ use windows_sys::Win32::Storage::FileSystem::{
     FILE_READ_ATTRIBUTES, FILE_SHARE_READ, FILE_SHARE_WRITE,
 };
 
-pub(super) fn publisher() -> Option<&'static str> {
-    option_env!("THREADLINE_RELEASE_PUBLISHER_SHA256").filter(|p| pin(p).is_ok())
+impl Trust {
+    fn registration(self) -> windows_host::Registration {
+        match self {
+            Self::Authenticode(_) => windows_host::Registration::Stable,
+            Self::Private(_) => windows_host::Registration::Private,
+        }
+    }
 }
 
 pub(crate) struct Restart {
+    trust: Trust,
     version: Version,
     build: u32,
     oldest_schema: u32,
@@ -99,18 +108,20 @@ fn cache() -> Result<(PathBuf, Vec<File>)> {
     Ok((cache, directories))
 }
 
-fn verify_setup(path: &Path, size: u64, hash: &[u8; 32], pin: [u8; 32]) -> Result<File> {
+fn verify_setup(path: &Path, size: u64, hash: &[u8; 32], trust: Trust) -> Result<File> {
     let guard = lock_installer(path)?;
     verify_bytes(&guard, size, hash)?;
-    verify(path, pin)
-        .map_err(|_| "Windows could not verify the update's signature and approved publisher.")?;
+    if let Trust::Authenticode(publisher) = trust {
+        verify(path, publisher).map_err(
+            |_| "Windows could not verify the update's signature and approved publisher.",
+        )?;
+    }
     Ok(guard)
 }
 
 impl Restart {
     fn hold_verified_file(&self, path: &Path) -> Result<File> {
-        let pin = pin(publisher().ok_or("This build has no approved update publisher.")?)?;
-        verify_setup(path, self.size, &self.sha256, pin)
+        verify_setup(path, self.size, &self.sha256, self.trust)
     }
     fn eligible(&self, installed: &Installed, host: &Platform) -> bool {
         self.version.cmp_precedence(&installed.version).is_gt()
@@ -121,27 +132,42 @@ impl Restart {
     }
 }
 
-pub(super) fn verified_install() -> Result<Option<(Installed, &'static str)>> {
-    let Some(publisher) = publisher() else {
+pub(super) fn verified_install() -> Result<Option<(Installed, Trust)>> {
+    let trust = match (
+        option_env!("THREADLINE_RELEASE_PUBLISHER_SHA256"),
+        option_env!("THREADLINE_PRIVATE_UPDATE_PUBLIC_KEY"),
+    ) {
+        (Some(publisher), None) => Trust::Authenticode(pin(publisher)?),
+        (None, Some(key)) => Trust::Private(private_key(key)?),
+        (None, None) => return Ok(None),
+        (Some(_), Some(_)) => return Err("This build has conflicting Windows update channels."),
+    };
+    let Some(current) = windows_host::installed(trust.registration())? else {
         return Ok(None);
     };
-    let Some(current) = windows_host::installed()? else {
-        return Ok(None);
-    };
-    let exe = std::env::current_exe().map_err(|_| "Could not locate the installed release.")?;
-    verify(&exe, pin(publisher)?)
-        .map_err(|_| "Windows could not verify the installed release publisher.")?;
-    Ok(Some((current, publisher)))
+    match trust {
+        Trust::Authenticode(publisher) => {
+            let exe =
+                std::env::current_exe().map_err(|_| "Could not locate the installed release.")?;
+            verify(&exe, publisher)
+                .map_err(|_| "Windows could not verify the installed release publisher.")?;
+        }
+        Trust::Private(_) if private_build(&current.version) != Some(current.build) => {
+            return Err("The installed private release version and build do not match.");
+        }
+        _ => {}
+    }
+    Ok(Some((current, trust)))
 }
 
 pub(super) async fn check(token: Option<&str>) -> Result<Option<Staged>> {
-    let Some((current, publisher)) = verified_install()? else {
+    let Some((current, trust)) = verified_install()? else {
         return Ok(None);
     };
-    let host = windows_host::detect()?;
+    let host = windows_host::detect_for(trust.registration())?;
     host.check()?;
     let (cache, mut directories) = cache()?;
-    let Some(mut staged) = Github::new(publisher)?
+    let Some(mut staged) = Github::new(trust)?
         .stage(&current, &host, &cache, token)
         .await?
     else {
@@ -150,6 +176,7 @@ pub(super) async fn check(token: Option<&str>) -> Result<Option<Staged>> {
     directories.push(lock_directory(staged._directory.path())?);
     let manifest = &staged.manifest;
     let restart = Restart {
+        trust,
         version: Version::parse(&manifest.version)
             .map_err(|_| "The staged release version is invalid.")?,
         build: manifest.package_build,
@@ -183,15 +210,16 @@ fn event(name: &str) -> Result<OwnedHandle> {
 }
 
 impl Staged {
-    /// Launch the verified interactive installer; the caller exits after this succeeds.
+    /// Launch the verified silent installer. The caller exits after setup confirms the handoff.
     pub fn launch_for_restart(&self) -> Result<()> {
         let restart = self
             .restart
             .as_ref()
             .ok_or("No verified automatic update is ready.")?;
-        let current =
-            windows_host::installed()?.ok_or("The registered release installation changed.")?;
-        let host = windows_host::detect()?;
+        let (current, trust) = verified_install()?
+            .filter(|(_, trust)| *trust == restart.trust)
+            .ok_or("The registered release installation changed.")?;
+        let host = windows_host::detect_for(trust.registration())?;
         host.check()?;
         if !restart.eligible(&current, &host) {
             return Err("This update is no longer compatible with the installed release.");
@@ -214,6 +242,7 @@ impl Staged {
         let ready = event(&format!("{name}.Ready"))?;
         let proceed = event(&format!("{name}.Proceed"))?;
         let child = Command::new(path)
+            .arg("/S")
             .arg(format!("/THREADLINEUPDATE={pid}"))
             .spawn()
             .map_err(|_| "Windows could not start the verified update installer.")?;
@@ -243,7 +272,7 @@ mod tests {
                 &path,
                 bytes.len() as u64,
                 &Sha256::digest(bytes).into(),
-                [7; 32]
+                Trust::Authenticode([7; 32])
             ),
             Err("Windows could not verify the update's signature and approved publisher.")
         ));

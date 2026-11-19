@@ -1,17 +1,51 @@
 use crate::{
-    MAX_MANIFEST, Platform, Result, Selection, Source, Staged, finish_download, new_download, pin,
-    stream_body,
+    MAX_MANIFEST, Platform, Result, Selection, Staged, finish_download, new_download, pin,
+    select_manifest, stream_body,
 };
 use reqwest::{Client, Response, StatusCode, Url, header, redirect::Policy};
 use semver::Version;
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use std::{io::Write, path::Path, time::Duration};
 
 const GITHUB: &str = "https://api.github.com/repos/joshmarkovic/threadline/";
 const DOWNLOADS: &str = "https://github.com/joshmarkovic/threadline/releases/download/";
 const MANIFEST_NAME: &str = "threadline-windows-x64.json";
+const PRIVATE_MANIFEST: &str = "threadline-private-windows-x64.json";
+const PRIVATE_SIGNATURE: &str = "threadline-private-windows-x64.json.sig";
+const PAGE_SIZE: usize = 20;
 const MAX_RELEASE: u64 = 1024 * 1024;
 const INVALID: &str = "GitHub returned an incomplete or ambiguous Windows release.";
+const ACCESS: &str = "GitHub denied access to Windows releases. In Settings, use a release credential with Contents read access to joshmarkovic/threadline, or retry later.";
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum Trust {
+    Authenticode([u8; 32]),
+    Private([u8; 65]),
+}
+
+pub(super) fn private_key(hex: &str) -> Result<[u8; 65]> {
+    let coordinates = hex
+        .strip_prefix("04")
+        .filter(|c| c.len() == 128 && c.is_ascii())
+        .ok_or("The embedded private update key is invalid.")?;
+    let mut key = [0; 65];
+    key[0] = 4;
+    key[1..33].copy_from_slice(&pin(&coordinates[..64])?);
+    key[33..].copy_from_slice(&pin(&coordinates[64..])?);
+    Ok(key)
+}
+
+pub(super) fn private_build(version: &Version) -> Option<u32> {
+    let build = version
+        .pre
+        .as_str()
+        .strip_prefix("local.")?
+        .parse::<u32>()
+        .ok()?;
+    (build != 0 && version.build.is_empty() && version.pre.as_str() == format!("local.{build}"))
+        .then_some(build)
+}
 
 pub(crate) struct Installed {
     pub version: Version,
@@ -62,7 +96,7 @@ impl Release {
 pub(super) struct Github {
     api: Url,
     client: Client,
-    source: Source,
+    trust: Trust,
 }
 
 fn allowed_cdn(to: &Url) -> bool {
@@ -75,7 +109,7 @@ fn allowed_cdn(to: &Url) -> bool {
 }
 
 impl Github {
-    pub(super) fn new(publisher: &str) -> Result<Self> {
+    pub(super) fn new(trust: Trust) -> Result<Self> {
         Ok(Self {
             api: Url::parse(GITHUB).map_err(|_| INVALID)?,
             client: Client::builder()
@@ -85,7 +119,7 @@ impl Github {
                 .timeout(Duration::from_secs(120))
                 .build()
                 .map_err(|_| "Could not initialize HTTPS for Windows updates.")?,
-            source: Source::https(DOWNLOADS, publisher)?,
+            trust,
         })
     }
 
@@ -95,7 +129,7 @@ impl Github {
         accept: &'static str,
         token: Option<&str>,
     ) -> Result<Response> {
-        // Only internal constant routes and decimal asset IDs enter this request.
+        // Only fixed routes with decimal page numbers or asset IDs enter this request.
         let url = if route.is_empty() {
             Url::parse(self.api.as_str().trim_end_matches('/'))
         } else {
@@ -165,6 +199,72 @@ impl Github {
         Ok(())
     }
 
+    async fn json<T: serde::de::DeserializeOwned>(response: Response) -> Result<T> {
+        if matches!(
+            response.status(),
+            StatusCode::NOT_FOUND | StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN
+        ) {
+            return Err(ACCESS);
+        }
+        let mut raw = Vec::new();
+        stream_body(response, &mut raw, MAX_RELEASE).await?;
+        serde_json::from_slice(&raw).map_err(|_| INVALID)
+    }
+
+    async fn release(&self, token: Option<&str>) -> Result<Option<(Version, Release)>> {
+        let accept = "application/vnd.github+json";
+        if matches!(self.trust, Trust::Authenticode(_)) {
+            let response = self.request("releases/latest", accept, token).await?;
+            if response.status() == StatusCode::NOT_FOUND {
+                // Metadata access alone cannot distinguish a missing release from denied Contents access.
+                Self::json::<Vec<Release>>(
+                    self.request("releases?per_page=1", accept, token).await?,
+                )
+                .await?;
+                return Ok(None);
+            }
+            let release: Release = Self::json(response).await?;
+            let version = release
+                .tag_name
+                .strip_prefix('v')
+                .and_then(|v| Version::parse(v).ok())
+                .ok_or(INVALID)?;
+            return Ok(
+                (!release.draft && !release.prerelease && version.pre.is_empty())
+                    .then_some((version, release)),
+            );
+        }
+
+        let mut latest: Option<(Version, Release)> = None;
+        for page in 1..=100 {
+            let route = format!("releases?per_page={PAGE_SIZE}&page={page}");
+            let releases: Vec<Release> =
+                Self::json(self.request(&route, accept, token).await?).await?;
+            let last = releases.len() < PAGE_SIZE;
+            for release in releases {
+                if !release.prerelease || release.draft {
+                    continue;
+                }
+                let Some(version) = release
+                    .tag_name
+                    .strip_prefix('v')
+                    .and_then(|v| Version::parse(v).ok())
+                else {
+                    continue;
+                };
+                if private_build(&version).is_some()
+                    && latest.as_ref().is_none_or(|(v, _)| &version > v)
+                {
+                    latest = Some((version, release));
+                }
+            }
+            if last {
+                return Ok(latest);
+            }
+        }
+        Err("GitHub returned too many release pages to select an update.")
+    }
+
     pub(super) async fn stage(
         &self,
         current: &Installed,
@@ -173,61 +273,62 @@ impl Github {
         token: Option<&str>,
     ) -> Result<Option<Staged>> {
         host.check()?;
-        let response = self
-            .request("releases/latest", "application/vnd.github+json", token)
-            .await?;
-        match response.status() {
-            // GitHub also conceals private repositories from unauthorized readers with a 404.
-            StatusCode::NOT_FOUND => {
-                let repo = self
-                    .request("", "application/vnd.github+json", token)
-                    .await?;
-                if repo.status() == StatusCode::OK {
-                    return Ok(None);
-                }
-                return Err(
-                    "The release repository is unavailable. Private releases require a release credential with Contents read access.",
-                );
+        let Some((version, release)) = self.release(token).await? else {
+            return Ok(None);
+        };
+        if !version.cmp_precedence(&current.version).is_gt() {
+            return Ok(None);
+        }
+        let dir = Url::parse(DOWNLOADS)
+            .map_err(|_| INVALID)?
+            .join(&format!("v{version}/"))
+            .map_err(|_| INVALID)?;
+        let (name, channel) = match self.trust {
+            Trust::Authenticode(_) => (MANIFEST_NAME, "stable"),
+            Trust::Private(_) => (PRIVATE_MANIFEST, "private-preview"),
+        };
+        let (manifest_asset, manifest_hash) =
+            release.asset(name, &dir.join(name).map_err(|_| INVALID)?, MAX_MANIFEST)?;
+        let selection = Selection {
+            version,
+            channel: channel.into(),
+            manifest_hash,
+        };
+        let mut raw = Vec::new();
+        self.asset_bytes(manifest_asset, &mut raw, token).await?;
+        if let Trust::Private(key) = self.trust {
+            let sig_url = dir.join(PRIVATE_SIGNATURE).map_err(|_| INVALID)?;
+            let (sig_asset, sig_hash) = release.asset(PRIVATE_SIGNATURE, &sig_url, 64)?;
+            let mut signature = Vec::new();
+            self.asset_bytes(sig_asset, &mut signature, token).await?;
+            if signature.len() != 64 || Sha256::digest(&signature).as_slice() != sig_hash {
+                return Err("The private update signature is incomplete or corrupt.");
             }
-            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
-                return Err(
-                    "GitHub denied the Windows release check. Check release access or retry later.",
-                );
+            ring::signature::UnparsedPublicKey::new(&ring::signature::ECDSA_P256_SHA256_FIXED, key)
+                .verify(&raw, &signature)
+                .map_err(|_| "The private update manifest failed signature verification.")?;
+        }
+        let (manifest, url) = select_manifest(&dir, &raw, &selection, host)?;
+        match self.trust {
+            Trust::Authenticode(publisher)
+                if pin(&manifest.publisher_certificate_sha256)? != publisher =>
+            {
+                return Err("The update manifest names a different publisher.");
+            }
+            Trust::Private(_) => {
+                let expected_url = dir
+                    .join(&format!("Threadline-Setup-{}.exe", manifest.package_build))
+                    .map_err(|_| INVALID)?;
+                if private_build(&selection.version) != Some(manifest.package_build)
+                    || url != expected_url
+                {
+                    return Err(
+                        "The private update does not match its release tag and installer name.",
+                    );
+                }
             }
             _ => {}
         }
-        let mut raw = Vec::new();
-        stream_body(response, &mut raw, MAX_RELEASE).await?;
-        let release: Release = serde_json::from_slice(&raw).map_err(|_| INVALID)?;
-        if release.draft || release.prerelease {
-            return Ok(None);
-        }
-        let version = release
-            .tag_name
-            .strip_prefix('v')
-            .and_then(|v| Version::parse(v).ok())
-            .ok_or(INVALID)?;
-        if !version.pre.is_empty() || !version.cmp_precedence(&current.version).is_gt() {
-            return Ok(None);
-        }
-        let dir = self
-            .source
-            .base
-            .join(&format!("v{version}/"))
-            .map_err(|_| INVALID)?;
-        let (manifest_asset, manifest_hash) = release.asset(
-            MANIFEST_NAME,
-            &dir.join(MANIFEST_NAME).map_err(|_| INVALID)?,
-            MAX_MANIFEST,
-        )?;
-        let selection = Selection {
-            version,
-            channel: "stable".into(),
-            manifest_hash,
-        };
-        raw.clear();
-        self.asset_bytes(manifest_asset, &mut raw, token).await?;
-        let (manifest, url) = self.source.select(&raw, &selection, host)?;
         if manifest.restart_protocol != Some(1)
             || manifest.package_build <= current.build.max(host.highest_build)
         {
