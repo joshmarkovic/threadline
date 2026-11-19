@@ -2,31 +2,29 @@
 
 Threadline is a native desktop client for GitHub issues and pull requests. It keeps downloaded conversations, reviews, tabs, and drafts in a local SQLite profile. You can reopen cached work offline and inspect queued changes in the Outbox.
 
-## Install the private Windows test build
+## Install the Windows preview
 
-On Windows 11 x64, run the installer once. If you already use build 20 or earlier, close Threadline and run this installer to turn on automatic updates. Setup closes and opens the app. Sign in to GitHub with an account that can read `joshmarkovic/threadline` to download it. [Download Threadline-Setup-21.exe](https://github.com/joshmarkovic/threadline/releases/download/v0.1.0-local.21/Threadline-Setup-21.exe)
+On Windows 11 x64, download and run the installer. Setup closes and opens Threadline. Downloads and automatic updates work without a GitHub account or personal access token (PAT). [Download Threadline for Windows (build 22)](https://github.com/joshmarkovic/threadline/releases/download/v0.1.0-local.22/Threadline-Setup-22.exe)
 
-You can also download the installer with GitHub CLI. If you need the CLI, install it with `winget install --id GitHub.cli --exact` and open a new PowerShell window.
-
-Run these commands from the folder where you want to keep the installer. Skip the first line if you're already signed in.
+To download and open the same installer from PowerShell, paste this block.
 
 ```powershell
-gh auth login --hostname github.com --web
-gh release download v0.1.0-local.21 --repo joshmarkovic/threadline --pattern Threadline-Setup-21.exe --dir . --clobber
-if ($LASTEXITCODE -eq 0) { & .\Threadline-Setup-21.exe }
+& {
+    $setup = Join-Path $env:TEMP 'Threadline-Setup-22.exe'
+    Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/joshmarkovic/threadline/releases/download/v0.1.0-local.22/Threadline-Setup-22.exe' -OutFile $setup -ErrorAction Stop
+    Start-Process -FilePath $setup
+}
 ```
 
-To enable private release downloads, choose **Set up updates** on Home or open **Settings → App updates**. Save a GitHub token with **Contents: Read** for `joshmarkovic/threadline` once. You may enter an existing token with that access or create a dedicated fine-grained token. Windows Credential Manager remembers it separately from your workspace sign-in.
+**Upgrading an older installation?** If you have build 20 or earlier, or build 21 still asks you to set up release access, close Threadline and run the build 22 installer once. Setup preserves your workspace and settings.
 
-After that, open **Threadline Installer Test** from Start. It checks for newer private test builds, verifies the download, saves your workspace, installs the update quietly, and reopens. If you start working while the download runs, you can keep working and choose **Restart to update** when convenient, or let it install the next time you open the app. **Work offline** and **Pause background refresh** also pause automatic update checks.
+After setup, open **Threadline Installer Test** from Start. It checks for a newer preview, verifies the manifest signature and checks the installer against it. Threadline then saves your workspace, installs the update quietly, and reopens. If you start working during the download, choose **Restart to update** when convenient or let it install the next time you open the app. **Work offline** and **Pause background refresh** also pause update checks.
 
-For unattended deployment, run `Start-Process .\Threadline-Setup-21.exe -ArgumentList '/S' -Wait` in PowerShell. A standalone silent install exits when setup finishes. Open the app from Start when you're ready.
+For unattended deployment, download the installer and run `Start-Process .\Threadline-Setup-22.exe -ArgumentList '/S' -Wait` from its folder in PowerShell. A standalone silent install exits when setup finishes. Open the app from Start when you're ready.
 
 ## Install from source
 
-You need Git, Rust 1.98 or later, and a GitHub account with access to the private Threadline repository. Make sure Cargo's bin directory is on your `PATH`.
-
-If Git Credential Manager opens a sign-in window, choose the browser sign-in option and use your GitHub account with repository access. If you're already signed in with GitHub CLI, you can run `gh auth setup-git` once before cloning. [GitHub CLI credential setup](https://cli.github.com/manual/gh_auth_setup-git)
+You need Git and Rust 1.98 or later. Make sure Cargo’s bin directory is on your `PATH`. Anyone can clone the public repository over HTTPS.
 
 On Windows, use the x64 MSVC toolchain, Visual Studio 2022 Build Tools with the Desktop development with C++ workload, a Windows SDK that includes `fxc.exe`, and CMake. See the [GPUI Kit installation guide](https://gpui-kit.com/docs/installation/) for the development prerequisites on other hosts.
 
@@ -39,25 +37,17 @@ cargo install --locked --path crates/threadline-app
 threadline
 ```
 
-On Windows, if the clone reports a missing credential helper or prompts for a password in the terminal, cancel with **Ctrl+C**. If Git Credential Manager is installed, use it for this clone only.
-
-```powershell
-git -c credential.helper= -c credential.helper=manager clone https://github.com/joshmarkovic/threadline.git
-```
-
-Sign in through the browser if prompted, then continue with `cd threadline` above.
-
 From an existing checkout, use `cargo run --locked -p threadline-app` to build and run a development copy.
 
 ## Open your workspace
 
-On the Welcome screen, choose your display time zone and continue to GitHub. For New York, choose **New York (Eastern Time)**. Enter the full repository name, such as `joshmarkovic/threadline`, paste a GitHub personal access token, and choose **Check access**. A fine-grained token needs access to that repository and the permissions for the features you use. Select the repositories you want to monitor, then choose **Continue to Home**. Windows Credential Manager protects the token. [Account setup and endpoint permissions](docs/architecture/github-api.md)
+On the Welcome screen, choose your display time zone and continue to GitHub. For New York, choose **New York (Eastern Time)**. To connect your workspace, enter a repository as `owner/name`, paste your GitHub personal access token, and choose **Check access**. A fine-grained token needs access to each private repository you want to monitor and the permissions for features you use, such as posting comments or reviews. Select the repositories to monitor, then choose **Continue to Home**. Windows Credential Manager protects the workspace token. [Account setup and endpoint permissions](docs/architecture/github-api.md)
 
 **Home** shows the cached workspace. Use **Refresh all** to request fresh data for monitored repositories. **Settings** lets you add an account, replace a token, change the repositories you monitor, or work offline.
 
 Windows stores the workspace in `%LOCALAPPDATA%\Threadline\Data\threadline.sqlite3` and the display preference in `%LOCALAPPDATA%\Threadline\Config\display-timezone`. Threadline stores timestamps in UTC. Change how they appear under **Settings → Display time zone**. Choose a preset or enter an IANA name such as `America/New_York` and save it. Use `system` to follow the device. Calendar-day filters use your selected zone. Existing saved filters retain their UTC cutoffs. You can also set the preference before opening a workspace with `threadline --display-timezone America/New_York`. [Time-zone and storage behavior](docs/architecture/synchronization.md#time-zones)
 
-The stable Windows installation opens as **Threadline** in Start and follows signed stable releases. The private test installation follows its own release channel and verifies updates with its pinned release key. Public release downloads do not require a GitHub token. Source builds use the source installation commands above. [Windows packaging guide](tools/windows/README.md) · [Package evidence](docs/reports/sprint-12.md)
+The Windows preview follows GitHub prereleases and verifies updates with a public key built into the app. For a source build, rerun the source install command after updating your checkout. [Windows packaging guide](tools/windows/README.md) · [Package evidence](docs/reports/sprint-12.md)
 
 Uninstall preserves your local workspace and sign-in credentials. To preview or permanently remove the retained data, use the separate Windows cleanup command. [Remove a retained local workspace](tools/windows/README.md#remove-a-retained-local-workspace)
 

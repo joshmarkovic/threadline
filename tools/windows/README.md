@@ -98,34 +98,34 @@ For a schema change, the runner seeds with the predecessor binary and checks bot
 
 `verify-local-signed-manifest.ps1` accepts a local fixture and attached CMS metadata with its own separately recorded signer pin. It checks the signature, publisher pin, exact setup digest and byte size. Developers can create a disposable signer and use `openssl cms -sign -binary -nodetach -outform DER` to exercise a matching fixture, changed bytes and a different signer without changing Windows certificate trust. This local proof leaves the Authenticode release gate open.
 
-## Sign a private preview for startup updates
+## Sign a Windows preview for startup updates
 
-Use Windows PowerShell on the release machine to provision the per-user private preview signing key once. Windows keeps this nonexportable ECDSA P-256 key in its Software Key Storage Provider. Running the command again returns the existing public key. Future releases need access to that Windows profile and key. If the key is lost, distribute a new bootstrap installer with a new public key.
+Use Windows PowerShell on the release machine to provision the per-user preview signing key once. Windows keeps this nonexportable ECDSA P-256 key in its Software Key Storage Provider. Running the command again returns the existing public key. Future releases need access to that Windows profile and key. If the key is lost, distribute a new bootstrap installer with a new public key.
 
 ```powershell
 .\tools\windows\private-release.ps1 -Action Provision
 ```
 
-Build the app with the printed public key in `THREADLINE_PRIVATE_UPDATE_PUBLIC_KEY`, then run the installer recipe with the same environment. The recipe checks that the app contains the public key. Private builds use the existing **Threadline Installer Test** installation, shortcut and build history. The example uses build 21, schema 18 and a Windows PowerShell session launched from WSL for reading the public key.
+Build the app with the printed public key in `THREADLINE_PRIVATE_UPDATE_PUBLIC_KEY`, then run the installer recipe with the same environment. The recipe checks that the app contains the public key. Preview builds use the existing **Threadline Installer Test** installation, shortcut and build history. The example uses build 22, schema 18 and a Windows PowerShell session launched from WSL for reading the public key.
 
 ```sh
 export THREADLINE_PRIVATE_UPDATE_PUBLIC_KEY="$(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$(wslpath -w "$PWD/tools/windows/private-release.ps1")" -Action PublicKey | tr -d '\r')"
 cargo build --locked --release --target x86_64-pc-windows-msvc -p threadline-app --bin threadline
-tools/windows/build-installer.sh --fixture target/x86_64-pc-windows-msvc/release/threadline.exe /mnt/c/builds/Threadline-Setup-21.exe 0.1.0-local.21 21 18
+tools/windows/build-installer.sh --fixture target/x86_64-pc-windows-msvc/release/threadline.exe /mnt/c/builds/Threadline-Setup-22.exe 0.1.0-local.22 22 18
 ```
 
 In Windows PowerShell, stage and sign the three release assets in a new directory. Verify the oldest supported schema against the app's migration path. Use the same public key that was reviewed for the bootstrap build. The signing command checks the installer digest and build metadata before generating the detached signature.
 
 ```powershell
 $pin = .\tools\windows\private-release.ps1 -Action PublicKey
-.\tools\windows\private-release.ps1 -Action Sign -Installer C:\builds\Threadline-Setup-21.exe -ExpectedPublicKey $pin -OldestSupportedSchema 18 -OutputDirectory C:\builds\signed-21
+.\tools\windows\private-release.ps1 -Action Sign -Installer C:\builds\Threadline-Setup-22.exe -ExpectedPublicKey $pin -OldestSupportedSchema 18 -OutputDirectory C:\builds\signed-22
 ```
 
-Upload `Threadline-Setup-21.exe`, `threadline-private-windows-x64.json` and `threadline-private-windows-x64.json.sig` from that output directory to the private repository's `v0.1.0-local.21` GitHub prerelease. Increment the version suffix and build together for each future update. The app verifies the 64-byte signature over the exact UTF-8 manifest bytes and checks the downloaded installer's size and SHA-256 digest. Windows may show an unknown publisher the first time someone runs the bootstrap installer.
+Upload `Threadline-Setup-22.exe`, `threadline-private-windows-x64.json` and `threadline-private-windows-x64.json.sig` from that output directory to the public `joshmarkovic/threadline` GitHub prerelease tagged `v0.1.0-local.22`. Keep the manifest and signature filenames for compatibility with existing preview installations. Increment the version suffix and build together for each future update. The app fetches these assets anonymously, verifies the 64-byte signature over the exact UTF-8 manifest bytes and checks the installer's size and SHA-256 digest. Windows may show an unknown publisher the first time someone runs the bootstrap installer.
 
 ## Stage a signed Windows release
 
-For an approved release, build the Windows app with the trusted publisher fingerprint from the reviewed signer configuration. The app uses that compiled fingerprint to verify its own installed executable before accessing the private release credential. Windows verifies the downloaded installer against the same fingerprint before Threadline offers a restart.
+For an approved stable release, build the Windows app with the trusted publisher fingerprint from the reviewed signer configuration. The app uses that compiled fingerprint to verify its installed executable before checking for updates. Windows verifies the downloaded installer against the same fingerprint before Threadline starts setup.
 
 ```sh
 export THREADLINE_RELEASE_PUBLISHER_SHA256="$(jq -er '.publisher_certificate_sha256 | select(test("^[0-9a-fA-F]{64}$"))' /private/windows-signer.json)"
@@ -154,12 +154,12 @@ For startup updates, publish the approved stable release as `v<VERSION>` in `jos
 - `threadline-windows-x64.json` from the metadata finalizer. The packaging recipe records `restart_protocol: 1` in the staged metadata and the finalizer copies it to the manifest.
 - The signed setup executable, for example `ThreadlineSetup.exe`. Its exact, case-sensitive filename and GitHub download URL must match the manifest's `artifact_url`, such as `https://github.com/joshmarkovic/threadline/releases/download/v0.1.0/ThreadlineSetup.exe`.
 
-Verify that GitHub reports an uploaded state, byte size, and `sha256:` digest for both assets. Increment both the stable semantic version and the package build. The build must also exceed the profile's recorded high-water mark. Registered, publisher-verified release installations use this stable channel. Private preview installations use their own registration, install directory and signed metadata.
+Verify that GitHub reports an uploaded state, byte size, and `sha256:` digest for both assets. Increment both the stable semantic version and the package build. The build must also exceed the profile's recorded high-water mark. Registered, publisher-verified release installations use this stable channel. Windows preview installations use their own registration, install directory and signed metadata.
 
-The following PowerShell command is a template for a future release. It assumes the user has obtained the publisher-verified, prebuilt bootstrap and trusted manifest digest. No public release endpoint or signed Threadline setup is available yet.
+The following PowerShell command is a template for a future stable release. It assumes the user has obtained the publisher-verified, prebuilt bootstrap and trusted manifest digest. The current Windows download is a preview. [Windows preview download and installation](../../README.md#install-the-windows-preview)
 
 ```powershell
 .\threadline-installer.exe --version <VERSION> --channel stable --manifest-sha256 <TRUSTED_MANIFEST_SHA256>
 ```
 
-Use the same command with a newer exact version and manifest digest to update. Add `--verify-only` to check the Windows target, retained build and database compatibility, byte length, digest and Authenticode without starting setup. Verification can run in a disconnected session. Installation checks the interactive desktop and Direct3D before downloading and again before launching setup. For an offline or private download, place the verified release manifest and its named setup file together, then add `--offline-dir <DIRECTORY>`. The bootstrap reads the same independent trust inputs in either mode. A separately authorized manual download can supply a private release. The app's personal access token belongs only in Accounts.
+Use the same command with a newer exact version and manifest digest to update. Add `--verify-only` to check the Windows target, retained build and database compatibility, byte length, digest and Authenticode without starting setup. Verification can run in a disconnected session. Installation checks the interactive desktop and Direct3D before downloading and again before launching setup. For an offline download, place the verified release manifest and its named setup file together, then add `--offline-dir <DIRECTORY>`. The bootstrap reads the same independent trust inputs in either mode.
