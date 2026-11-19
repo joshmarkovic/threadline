@@ -1431,6 +1431,19 @@ impl ReaderWorkspace {
                     })),
             );
         }
+        #[cfg(feature = "e2e")]
+        let content = match &self.observer {
+            Some(observer) => div()
+                .relative()
+                .flex_1()
+                .min_h_0()
+                .flex()
+                .flex_col()
+                .child(content)
+                .child(observer.visible_control_bounds(format!("reader-conversation-{pane}")))
+                .into_any_element(),
+            None => content.into_any_element(),
+        };
         div()
             .flex_1()
             .min_h_0()
@@ -1438,7 +1451,7 @@ impl ReaderWorkspace {
             .flex()
             .flex_col()
             .child(header)
-            .child(self.observed_control(format!("reader-conversation-{pane}"), content, false))
+            .child(content)
             .into_any_element()
     }
 }

@@ -2003,6 +2003,63 @@ fn ui_006_failed_enqueue_keeps_the_saved_comment_and_reports_the_failure(cx: &mu
     });
 }
 
+#[cfg(feature = "e2e")]
+#[gpui_kit::test]
+fn issue_conversation_observation_tracks_the_viewport_without_moving_it(cx: &mut TestAppContext) {
+    let setup = ReaderHarness::seeded();
+    setup.one_pane(&Tab {
+        id: "conversation-viewport".into(),
+        item: setup.fixture.long_discussion,
+        view: TabView::default(),
+    });
+    let (window, reader) = setup.open(cx);
+    let (observer, _writer) = crate::observation::Observer::new(
+        setup._directory.path().join("conversation-bounds.json"),
+        std::time::Instant::now(),
+        false,
+        setup.runtime.handle(),
+    );
+    cx.update_window(window, |_, window, cx| {
+        use gpui_kit::{
+            Modifiers, PlatformInput, ScrollDelta, ScrollEvent, ScrollSource, TouchPhase,
+        };
+
+        let id = "reader-conversation-0";
+        window.render_frame(cx);
+        let before = window.find(id).bounds();
+        let logical = [
+            before.origin.x,
+            before.origin.y,
+            before.size.width,
+            before.size.height,
+        ]
+        .map(|value| value.as_f32());
+        assert!(logical[2] > 0. && logical[3] > 0.);
+        reader.update(cx, |reader, cx| {
+            reader.set_observer(Some(observer.clone()), cx)
+        });
+        observer.begin_frame();
+        window.render_frame(cx);
+        assert_eq!(window.find(id).bounds(), before);
+        assert_eq!(observer.test_control_bounds(id), Some(logical));
+
+        window.dispatch_event(
+            PlatformInput::Scroll(ScrollEvent {
+                position: before.center(),
+                delta: ScrollDelta::Lines(Point::new(0., -40.)),
+                modifiers: Modifiers::default(),
+                touch_phase: TouchPhase::Moved,
+                source: ScrollSource::Pointer,
+            }),
+            cx,
+        );
+        observer.begin_frame();
+        window.render_frame(cx);
+        assert_eq!(observer.test_control_bounds(id), Some(logical));
+    })
+    .unwrap();
+}
+
 #[gpui_kit::test]
 fn ui_006_registered_native_commands_offer_edits_and_comments_without_issue_creation(
     cx: &mut TestAppContext,
