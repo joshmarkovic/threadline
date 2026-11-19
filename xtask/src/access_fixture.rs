@@ -755,6 +755,9 @@ fn answer(
             Route::ReviewSubmitted => {
                 socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:4202:08\r\n")?
             }
+            Route::IssueEditCommitted => {
+                write!(socket, "X-GitHub-Request-Id: {}\r\n", writes::ISSUE_EDIT_REQUEST_ID)?
+            }
             Route::ReviewDecision(step) => {
                 write!(socket, "X-GitHub-Request-Id: SYNTHETIC:08:{step:?}\r\n")?
             }

@@ -4,6 +4,7 @@ const POST: &str = "/repos/fixture-org/private/issues/41/comments";
 const CONFIRMED: &str = "Threadline S07 explicitly queued comment.";
 const UNKNOWN: &str = "Threadline S07 accepted comment with a lost response.";
 const CONFIRMED_TITLE: &str = "Confirmed edit across both panes";
+pub(super) const ISSUE_EDIT_REQUEST_ID: &str = "SYNTHETIC:410:07:EDIT";
 
 pub(super) fn patch_issue(phase: Phase, path: &str, payload: &Value) -> Option<Route> {
     (phase == Phase::IssueEditCommit
@@ -232,7 +233,13 @@ mod tests {
             let mut reply = String::new();
             socket.read_to_string(&mut reply).unwrap();
             assert!(reply.starts_with("HTTP/1.1 200"));
-            serde_json::from_str::<Value>(reply.split_once("\r\n\r\n").unwrap().1).unwrap()
+            let (headers, body) = reply.split_once("\r\n\r\n").unwrap();
+            if method == "PATCH" {
+                assert!(headers.lines().any(|line| {
+                    line.strip_prefix("X-GitHub-Request-Id: ") == Some(ISSUE_EDIT_REQUEST_ID)
+                }));
+            }
+            serde_json::from_str::<Value>(body).unwrap()
         };
         fs::write(fixture.phase_file(), "issue-edit-baseline").unwrap();
         let initial = request("GET", ITEMS, Value::Null);
