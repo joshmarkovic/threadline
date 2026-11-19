@@ -19,6 +19,7 @@ struct Simulator {
     user_requests: Arc<AtomicUsize>,
     repository_id: Arc<AtomicU64>,
     page_two_ready: Arc<AtomicBool>,
+    history_branch_phase: Arc<AtomicUsize>,
     check_arrived: Arc<AtomicBool>,
     hold_check_response: Arc<AtomicBool>,
     worker: Option<thread::JoinHandle<()>>,
@@ -40,6 +41,8 @@ impl Simulator {
         let server_user_requests = user_requests.clone();
         let repository_id = Arc::new(AtomicU64::new(42));
         let page_two_ready = Arc::new(AtomicBool::new(false));
+        let history_branch_phase = Arc::new(AtomicUsize::new(0));
+        let server_history_phase = history_branch_phase.clone();
         let check_arrived = Arc::new(AtomicBool::new(false));
         let hold_check_response = Arc::new(AtomicBool::new(false));
         let (server_check_arrived, server_check_hold) =
@@ -60,7 +63,13 @@ impl Simulator {
                             stream,
                             server_sso.load(Ordering::Relaxed),
                             server_repository.load(Ordering::Relaxed),
-                            reader.then(|| (address, server_page_two.load(Ordering::Relaxed))),
+                            reader.then(|| {
+                                (
+                                    address,
+                                    server_page_two.load(Ordering::Relaxed),
+                                    server_history_phase.load(Ordering::Relaxed),
+                                )
+                            }),
                             &server_check_arrived,
                             &server_check_hold,
                         ) {
@@ -82,6 +91,7 @@ impl Simulator {
             user_requests,
             repository_id,
             page_two_ready,
+            history_branch_phase,
             check_arrived,
             hold_check_response,
             worker: Some(worker),
@@ -106,7 +116,7 @@ fn respond(
     mut stream: TcpStream,
     sso: bool,
     repository_id: u64,
-    reader: Option<(SocketAddr, bool)>,
+    reader: Option<(SocketAddr, bool, usize)>,
     check_arrived: &AtomicBool,
     hold_check_response: &AtomicBool,
 ) -> bool {
@@ -167,9 +177,9 @@ fn respond(
                 .to_string(),
             )
         }
-    } else if let Some(reply) =
-        reader.and_then(|(address, page_two)| reader_reply(&target, &repo, address, page_two))
-    {
+    } else if let Some(reply) = reader.and_then(|(address, page_two, history_phase)| {
+        reader_reply(&target, &repo, address, page_two, history_phase)
+    }) {
         reply
     } else {
         match target.as_str() {
@@ -249,6 +259,7 @@ fn reader_reply(
     private: &str,
     address: SocketAddr,
     page_two: bool,
+    history_phase: usize,
 ) -> Option<(&'static str, String, String)> {
     use serde_json::json;
 
@@ -286,6 +297,28 @@ fn reader_reply(
         ));
     }
     let main = json!({"name":"main","commit":{"sha":"a".repeat(40)}});
+    let changed = json!({"name":"main","commit":{"sha":"b".repeat(40)}});
+    const BRANCHES: &str = "/repositories/42/branches?per_page=20&page=";
+    if let Some(page) = target.strip_prefix(BRANCHES) {
+        let page: u8 = page.parse().unwrap();
+        let reply = match (history_phase, page) {
+            (0, 1) | (1, 2) => success(json!([changed])),
+            (1 | 3, 1) | (2, 1..=4) => (
+                "200 OK",
+                format!(
+                    "Link: <http://{address}{BRANCHES}{}>; rel=\"next\"\r\n",
+                    page + 1
+                ),
+                "[]".into(),
+            ),
+            (3, 2) => success(json!([])),
+            _ => panic!("unexpected branch inventory page"),
+        };
+        return Some(reply);
+    }
+    if target == "/repositories/42/tags?per_page=20&page=1" {
+        return Some(success(json!([])));
+    }
     if target == "/repositories/73/branches/main" {
         return Some(success(main));
     }
@@ -850,6 +883,85 @@ async fn sync_worker_waits_for_hydration_and_restored_offline_then_observes_both
         );
     }
     assert_eq!(simulator.requests.load(Ordering::Relaxed), before + 4);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn inspected_watched_branch_requires_authoritative_absence_before_deletion() {
+    use crate::reader::ReaderService;
+    use threadline_storage::{
+        history::{HistoryMonitoring, HistoryRef},
+        resources::CommitOid,
+    };
+
+    let simulator = Simulator::start_with_reader(true);
+    let dir = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open_profile(dir.path()).unwrap());
+    let service = AccountService {
+        store: store.clone(),
+        credentials: Arc::new(FixtureVault::default()),
+        github: GitHubClient::loopback(simulator.address).unwrap(),
+        fixture: true,
+    };
+    let cancel = Cancellation::new();
+    let connected = service
+        .execute(
+            AccountCommand::Connect {
+                repository: "fixture-org/private".into(),
+                pat: Pat::from_input("threadline-test-fixture".into()),
+                renew: None,
+            },
+            &cancel,
+        )
+        .await;
+    assert!(connected.github_error.is_none());
+    let account = connected.view.active.unwrap();
+    let repo = connected
+        .view
+        .repositories
+        .iter()
+        .find(|repo| repo.name == "private")
+        .unwrap()
+        .id;
+    store
+        .set_history_monitoring(
+            account,
+            repo,
+            &HistoryMonitoring {
+                branches: ["main".into()].into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let profile = &connected.view.profiles[0];
+    let reference = HistoryRef::Branch("main".into());
+    let old = CommitOid::parse(&"a".repeat(40)).unwrap();
+    let new = CommitOid::parse(&"b".repeat(40)).unwrap();
+    store
+        .observe_history_ref(profile, repo, &reference, Some(&old), 1)
+        .unwrap();
+    let reader = ReaderService::new(service);
+    for (phase, complete, expected) in [
+        (0, true, Some(&new)),
+        (1, true, Some(&new)),
+        (2, false, Some(&new)),
+        (3, true, None),
+    ] {
+        simulator
+            .history_branch_phase
+            .store(phase, Ordering::Relaxed);
+        let result = reader
+            .fetch_history_refs(account, repo, Some(&reference), &cancel)
+            .await
+            .unwrap();
+        assert_eq!(result.complete, complete);
+        let cached = store
+            .history_ref(account, repo, &reference)
+            .unwrap()
+            .unwrap();
+        assert_eq!(cached.tip.as_ref(), expected);
+        let changes = store.history_ref_moves(account, repo, 0, 10).unwrap();
+        assert_eq!(changes.len(), if phase == 3 { 2 } else { 1 });
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

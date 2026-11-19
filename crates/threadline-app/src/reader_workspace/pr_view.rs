@@ -1259,12 +1259,15 @@ impl ReaderWorkspace {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let settings = tab_settings(tab);
-        let source_ref = pr
-            .data
-            .revision
-            .merge_base
-            .as_ref()
-            .map_or("merge base unavailable", |oid| oid.as_str());
+        let revision = &pr.data.revision;
+        let source_ref = revision.merge_base.as_ref().map_or_else(
+            || "merge base unavailable".to_owned(),
+            |oid| format!("merge base {}", oid.as_str()),
+        );
+        let comparison = format!(
+            "Pull request comparison · {source_ref} → head {}",
+            revision.head.as_str()
+        );
         let mut buttons = div().flex().flex_wrap().items_center().gap_1();
         let path = file.summary.path.clone();
         if let Some(diff) = &pr.diff {
@@ -1366,10 +1369,15 @@ impl ReaderWorkspace {
             .flex_shrink_0()
             .border_b_1()
             .border_color(palette.border)
-            .child(div().text_xs().text_color(palette.muted).child(format!(
-                "Comparison {source_ref} → {}",
-                pr.data.revision.head.as_str()
-            )))
+            .child(
+                div()
+                    .id(format!("pr-{pane}-comparison-mode"))
+                    .role(Role::Status)
+                    .aria_label(comparison.clone())
+                    .text_xs()
+                    .text_color(palette.muted)
+                    .child(comparison),
+            )
             .child(buttons)
             .into_any_element()
     }

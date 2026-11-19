@@ -14,6 +14,7 @@ impl ReaderService {
         &self,
         account: AccountId,
         repository: RepositoryId,
+        inspected: Option<&HistoryRef>,
         cancel: &Cancellation,
     ) -> Result<PageStatus, ReaderError> {
         let scope = self.scope(account, repository, cancel)?;
@@ -21,17 +22,29 @@ impl ReaderService {
         let reader = bound.reader();
         let mut complete = true;
         for kind in [HistoryRefKind::Branch, HistoryRefKind::Tag] {
+            let inspected_branch = match (kind, inspected) {
+                (HistoryRefKind::Branch, Some(reference @ HistoryRef::Branch(name))) => {
+                    Some((reference, name))
+                }
+                _ => None,
+            };
             let mut page = 1;
+            let mut started_at = None;
+            let mut inventory_complete = true;
+            let mut inspected_present = false;
             // Large ref inventories stay bounded even when GitHub continues the listing.
             loop {
                 self.check_scope(&scope, cancel)?;
                 self.admit(account, cancel).await?;
+                let observed_at = UtcMillis::now()?.0;
+                started_at.get_or_insert(observed_at);
                 let reply = self
                     .history_value(account, reader.history_refs(kind, page, cancel).await)
                     .await?;
                 self.check_scope(&scope, cancel)?;
-                let at = UtcMillis::now()?.0;
                 for row in reply.records {
+                    inspected_present |=
+                        inspected_branch.is_some_and(|(_, name)| name == &row.name);
                     let reference = match kind {
                         HistoryRefKind::Branch => HistoryRef::Branch(row.name),
                         HistoryRefKind::Tag => HistoryRef::Tag(row.name),
@@ -42,18 +55,36 @@ impl ReaderService {
                         repository,
                         &reference,
                         Some(&tip),
-                        at,
+                        observed_at,
                     )?;
                 }
-                complete &= !reply.limited;
+                inventory_complete &= !reply.limited;
                 match reply.next_page {
                     Some(next) if page < 4 && !reply.limited => page = next,
                     Some(_) => {
-                        complete = false;
+                        inventory_complete = false;
                         break;
                     }
                     None => break,
                 }
+            }
+            complete &= inventory_complete;
+            // Use the start of a complete scan so absence cannot overwrite a newer observation.
+            if inventory_complete
+                && !inspected_present
+                && let (Some((reference, _)), Some(observed_at)) = (inspected_branch, started_at)
+                && self
+                    .store
+                    .history_monitoring(account, repository)?
+                    .watches(reference)
+            {
+                self.store.observe_history_ref(
+                    &scope.profile,
+                    repository,
+                    reference,
+                    None,
+                    observed_at,
+                )?;
             }
         }
         Ok(PageStatus {

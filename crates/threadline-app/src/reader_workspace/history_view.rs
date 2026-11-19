@@ -174,7 +174,7 @@ enum ChangeHistory {
 
 #[derive(Clone)]
 enum HistoryFetch {
-    References,
+    References(Option<HistoryRef>),
     Walk(HistoryRef),
     Comparison(HistoryComparison),
 }
@@ -322,9 +322,9 @@ impl ReaderWorkspace {
             cx,
             move |service, account, cancel| async move {
                 let page = match fetch {
-                    HistoryFetch::References => {
+                    HistoryFetch::References(inspected) => {
                         service
-                            .fetch_history_refs(account, repository, &cancel)
+                            .fetch_history_refs(account, repository, inspected.as_ref(), &cancel)
                             .await?
                     }
                     HistoryFetch::Walk(reference) => {
@@ -344,7 +344,7 @@ impl ReaderWorkspace {
                     return;
                 }
                 let same_route = match &finished {
-                    HistoryFetch::References => true,
+                    HistoryFetch::References(_) => true,
                     HistoryFetch::Walk(reference) => this
                         .history
                         .data
@@ -737,11 +737,17 @@ impl ReaderWorkspace {
             header = header.child(self.observed_control(id, button, false));
         }
         if let Some(repository) = self.history.repository {
+            let inspected = self
+                .history
+                .data
+                .as_ref()
+                .and_then(|data| data.view.as_ref())
+                .map(|view| view.reference.clone());
             header = header.child(self.history_download_control(
                 "history-fetch-refs",
                 "Download branches and tags",
                 repository,
-                HistoryFetch::References,
+                HistoryFetch::References(inspected),
                 cx,
             ));
         }
@@ -761,6 +767,9 @@ impl ReaderWorkspace {
             let Some(tip) = entry.tip.as_ref() else {
                 refs = refs.child(
                     div()
+                        .id(format!("history-ref-deleted-{index}"))
+                        .role(Role::Status)
+                        .aria_label(format!("{} deleted", ref_name(&entry.reference)))
                         .text_xs()
                         .child(format!("{} deleted", ref_name(&entry.reference))),
                 );
@@ -793,11 +802,27 @@ impl ReaderWorkspace {
                 .find(|entry| entry.reference == view.reference)
             && current.tip.as_ref() != Some(&view.tip)
         {
-            refs = refs.child(div().text_xs().text_color(palette.muted).child(if let Some(latest) = &current.tip {
-                format!("Showing saved tip {}. Select this branch or tag again to view its new tip {}.", view.tip.as_str(), latest.as_str())
+            let description = if let Some(latest) = &current.tip {
+                format!(
+                    "Showing saved tip {}. Select this branch or tag again to view its new tip {}.",
+                    view.tip.as_str(),
+                    latest.as_str()
+                )
             } else {
-                format!("The remote reference was removed. Its saved commits at {} remain available.", view.tip.as_str())
-            }));
+                format!(
+                    "The remote reference was removed. Its saved commits at {} remain available.",
+                    view.tip.as_str()
+                )
+            };
+            refs = refs.child(
+                div()
+                    .id("history-inspected-ref-status")
+                    .role(Role::Status)
+                    .aria_label(description.clone())
+                    .text_xs()
+                    .text_color(palette.muted)
+                    .child(description),
+            );
         }
         let Some(page) = data.page.as_ref() else {
             return div()
@@ -1043,11 +1068,19 @@ impl ReaderWorkspace {
             }
         };
         panel = panel
-            .child(div().text_sm().child(summary))
+            .child(
+                div()
+                    .id("history-comparison-mode")
+                    .role(Role::Status)
+                    .aria_label(summary.clone())
+                    .text_sm()
+                    .child(summary),
+            )
             .child(
                 div()
                     .id("history-comparison-coverage")
                     .role(Role::Status)
+                    .aria_label(coverage_label(page.coverage))
                     .child(coverage_label(page.coverage)),
             )
             .child(
