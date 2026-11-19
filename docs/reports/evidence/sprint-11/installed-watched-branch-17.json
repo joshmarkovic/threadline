@@ -1,0 +1,65 @@
+{
+  "scenario": "S11-WATCHED-BRANCH",
+  "app_revision": "e3aec22a4bc5a7167fcb29bb58f5f62154be04d1",
+  "source_of_commits": "Monitored fixture reference and separately committed Git history pages",
+  "attempts": [
+    {
+      "driver_revision": "d71ce9ae021f48605a6e1237f6acd6e46827d1fe",
+      "installed_app_sha256": "7088621d171dc41a6c57f43fe4411a1f486965ec71aa9795de678e5748b364a6",
+      "fixture_sha256": "d063924905952d84aa86ee07c3369d7f257060a254e34acf45c82e133c194eb9",
+      "raw_directory": "installed17-watched-branch.7MCrPu",
+      "raw_sha256": "d6f2e5d29a8195d64644ea36dcb6a753ff2b9fc5784c9d37a32033a0fda4edd8",
+      "status": "Blocked",
+      "exit_code": 78,
+      "detail": "The owned test form did not receive foreground.",
+      "foreground_owner": null,
+      "initial_pid": 28940,
+      "branch": "feature/fixture-search",
+      "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "head": "dddddddddddddddddddddddddddddddddddddddd",
+      "observed_commit_oids": [
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "cccccccccccccccccccccccccccccccccccccccc",
+        "dddddddddddddddddddddddddddddddddddddddd"
+      ],
+      "events": 3,
+      "grouped_events": 3,
+      "published_feed_entries": 3,
+      "native_groups": 1,
+      "exact_app_scoped_history_verified": true,
+      "native_outcome": "delivered",
+      "shell_input_issued": false,
+      "comparison_opened": false,
+      "synthetic_profile_archived": true
+    },
+    {
+      "driver_revision": "662865beb67a547e111ad1a6c1ee6beee6886320",
+      "installed_app_sha256": "7088621d171dc41a6c57f43fe4411a1f486965ec71aa9795de678e5748b364a6",
+      "fixture_sha256": "d063924905952d84aa86ee07c3369d7f257060a254e34acf45c82e133c194eb9",
+      "raw_directory": "installed17-watched-branch.NOzwgM",
+      "raw_sha256": "0d012520549d80064807c336a03d329c2422d0cfb34bcaa501088d0e0f7c9980",
+      "status": "Blocked",
+      "exit_code": 78,
+      "detail": "Neither the verified installed window nor the owned test form has foreground.",
+      "foreground_owner": "neither fixture window",
+      "initial_pid": 17836,
+      "branch": "feature/fixture-search",
+      "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "head": "dddddddddddddddddddddddddddddddddddddddd",
+      "observed_commit_oids": [
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "cccccccccccccccccccccccccccccccccccccccc",
+        "dddddddddddddddddddddddddddddddddddddddd"
+      ],
+      "events": 3,
+      "grouped_events": 3,
+      "published_feed_entries": 3,
+      "native_groups": 1,
+      "exact_app_scoped_history_verified": true,
+      "native_outcome": "delivered",
+      "shell_input_issued": false,
+      "comparison_opened": false,
+      "synthetic_profile_archived": true
+    }
+  ]
+}
