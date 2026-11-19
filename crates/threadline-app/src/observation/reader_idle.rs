@@ -85,7 +85,8 @@ mod tests {
     #[test]
     fn idle_sample_excludes_settling_and_counts_only_the_bounded_window() {
         let start = Instant::now() + Duration::from_secs(1);
-        assert_eq!(sample_bin(start, start - Duration::from_nanos(1)), None);
+        // Use a representable earlier tick on Windows as well as Linux.
+        assert_eq!(sample_bin(start, start - Duration::from_millis(1)), None);
         assert_eq!(sample_bin(start, start), Some(0));
         assert_eq!(
             sample_bin(start, start + Duration::from_millis(1600)),
