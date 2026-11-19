@@ -61,9 +61,9 @@ function Wait-Control([string]$Id, [string]$Name = '') {
     }
     throw "The installed window did not expose the expected $Id control."
 }
-function Invoke-Control([string]$Id) {
-    $null = Wait-Control $Id
-    if (!(Invoke-OwnedId $child $Id)) { throw "The installed window did not invoke $Id." }
+function Invoke-Control([string]$Id, [string]$Name) {
+    $null = Wait-Control $Id $Name
+    if (!(Invoke-OwnedId $child $Id $Name)) { throw "The installed window did not invoke $Id." }
 }
 function Read-Inventory([string]$Phase) {
     if ($Case -cne 'E2E-020') { return }
@@ -143,7 +143,7 @@ try {
     $initial = Wait-Control 'reader-attachment-0' 'Open cached image'
     $report.markdown_initial = $initial.Current.Name
     if ($preferencePin) {
-        Invoke-Control 'account-open'
+        Invoke-Control 'account-open' 'Settings'
         $expected = 'Display time zone ' + [char]0xb7 + ' ' + $ExpectedDisplayTimezone
         $label = Wait-Control 'display-timezone-effective' $expected
         $field = Wait-Control 'display-timezone' 'Display time zone'
@@ -152,7 +152,7 @@ try {
             $value.Current.Value -cne $ExpectedDisplayTimezone) { throw 'The installed time zone field did not show the explicit saved choice.' }
         $report.installed_display_timezone = [ordered]@{status='Pass';effective_label=$label.Current.Name
             explicit_field_matched=$true;preference_sha256=$preferencePin.ToLowerInvariant()}
-        Invoke-Control 'account-close'
+        Invoke-Control 'account-close' 'Home'
         $null = Wait-Control 'reader-attachment-0' 'Open cached image'
     }
     Read-Inventory 'Native Markdown with parsed image attachment'

@@ -42,13 +42,13 @@ function Wait-AccountControl([string]$Id) {
     }
 }
 
-function Click-AccountControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwatch]$InputClock, [hashtable]$InputTiming) {
+function Click-AccountControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwatch]$InputClock, [hashtable]$InputTiming, [string]$ExpectedName) {
     $state = Wait-AccountControl $Id
     if ($script:UseOwnedUiAutomation) {
         if ($Id -cnotin @('account-token', 'account-repository')) {
             # GPUI observations can publish before Windows receives the matching accessibility tree.
             for ($attempt = 0; $attempt -lt 12; $attempt++) {
-                if (Invoke-OwnedFixtureControl $Window $Id $InputClock -InputTiming $InputTiming) { return }
+                if (Invoke-OwnedFixtureControl $Window $Id $InputClock -InputTiming $InputTiming -ExpectedName $ExpectedName) { return }
                 Start-Sleep -Milliseconds 50
             }
         }
@@ -110,13 +110,14 @@ function Set-AccessPhase([string]$Phase) {
     }
 }
 
-function Open-AccountFixture {
-    if ($script:UseOwnedUiAutomation) {
-        Click-AccountControl $script:app.MainWindowHandle 'account-open'
-    } else {
-        [ThreadlineWinInput]::Chord(@(0x11, 0x10, 0x41))
-    }
-    return Wait-Account 'open the native account panel' { param($account) $account.panel_open }
+function Open-FixtureSettings([IntPtr]$Window) {
+    Click-AccountControl $Window 'account-open' -ExpectedName 'Settings'
+    $null = Wait-Account 'the Settings screen' { param($account) $account.panel_open }
+}
+
+function Open-FixtureHome([IntPtr]$Window) {
+    Click-AccountControl $Window 'account-close' -ExpectedName 'Home'
+    $null = Wait-Account 'the Home workspace' { param($account) !$account.panel_open }
 }
 
 function Enter-FixtureAccountForm([IntPtr]$Window, [switch]$LoopbackTokenAction) {
@@ -231,15 +232,9 @@ function Test-FixtureAccountRouteCorrection([IntPtr]$Window) {
     }
 }
 
-function Connect-FixtureAccount([IntPtr]$Window, [switch]$FromVisibleControl, [switch]$LoopbackTokenAction, [switch]$VerifyRouteCorrection) {
-    if ($FromVisibleControl) {
-        Click-AccountControl $Window 'account-open'
-        $null = Wait-Account 'open the native account panel through its visible control' {
-            param($account) $account.panel_open
-        }
-    } else {
-        $null = Open-AccountFixture
-    }
+function Connect-FixtureAccount([IntPtr]$Window, [switch]$LoopbackTokenAction, [switch]$VerifyRouteCorrection) {
+    Click-AccountControl $Window 'display-timezone-new-york' -ExpectedName 'New York (Eastern Time)'
+    Click-AccountControl $Window 'onboarding-zone-continue' -ExpectedName 'Continue to GitHub'
     Enter-FixtureAccountForm $Window -LoopbackTokenAction:$LoopbackTokenAction
     if ($VerifyRouteCorrection) { Test-FixtureAccountRouteCorrection $Window }
     Click-AccountControl $Window 'account-connect'
@@ -261,11 +256,23 @@ function Connect-FixtureAccount([IntPtr]$Window, [switch]$FromVisibleControl, [s
     $null = Wait-Account 'repository selected in the native account panel' {
         param($account) $account.selected_count -eq 1 -and $account.profile_access -ceq 'Readable'
     }
-    Add-Evidence 'Select the verified repository' 1
+    Click-AccountControl $Window 'onboarding-continue' -ExpectedName 'Continue to Home'
+    $null = Wait-Account 'a verified account and monitored repository on Home' {
+        param($account) !$account.panel_open -and $account.active_user_id -eq 41 -and $account.selected_count -eq 1
+    }
+    Add-Evidence 'Complete Welcome and reach Home with the verified repository' 1
 }
 
 function Invoke-GitHubAccessProof([IntPtr]$Window, [string]$Profile) {
     Connect-FixtureAccount $Window -VerifyRouteCorrection
+    Wait-OwnedFixtureLabel $Window 'home-repository-summary' 'Monitoring 1 of 1 repositories'
+    Click-AccountControl $Window 'home-refresh-all' -ExpectedName 'Refresh all'
+    Wait-OwnedFixtureLabel $Window 'home-refresh-status' 'GitHub repositories refreshed.'
+    Add-Evidence 'Refresh the monitored repository from Home' 'GitHub repositories refreshed.'
+    Open-FixtureSettings $Window
+    $zoneLabel = 'Display time zone ' + [char]0xb7 + ' America/New_York'
+    Wait-OwnedFixtureLabel $Window 'display-timezone-effective' $zoneLabel
+    Add-Evidence 'Read the time zone selected during Welcome from Settings' 'America/New_York'
     Set-AccessPhase 'partial'
     Click-AccountControl $Window 'account-refresh'
     $null = Wait-Account 'partial SSO repository discovery with retained direct access' {
@@ -303,7 +310,7 @@ function Invoke-GitHubAccessProof([IntPtr]$Window, [string]$Profile) {
     $script:report.restarted_pid = $script:app.Id
     $restarted = Get-ReadyWindow
     if (!$script:UseOwnedUiAutomation) { Set-WindowFocus $restarted }
-    $null = Open-AccountFixture
+    Open-FixtureSettings $restarted
     $null = Wait-Account 'readable same-profile selection restored after Quit' {
         param($account) $account.active_user_id -eq 41 -and $account.selected_count -eq 1
     }

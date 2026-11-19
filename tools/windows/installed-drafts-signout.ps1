@@ -54,7 +54,7 @@ function Invoke-InstalledDraftSignOut([long]$Account, [long]$PreviousGeneration)
                 $panes = Wait-InstalledDraft $child 'the original active issue and review panes' { Read-InstalledDraftPanes $child } -ReturnValue
                 if (!$restart) {
                     $before = $panes
-                    Wait-InstalledDraft $child 'the owned Accounts panel' { Invoke-OwnedId $child 'account-open' }
+                    Wait-InstalledDraft $child 'the installed Settings screen' { Invoke-OwnedId $child 'account-open' 'Settings' }
                     Wait-InstalledDraft $child 'the exact active synthetic account while offline' {
                         (Test-SyntheticActiveOfflineAccount $child $Account) -and
                             $null -ne (Find-OwnedId (Get-OwnedWindow $child) $child.Id 'account-sign-out')
@@ -63,7 +63,7 @@ function Invoke-InstalledDraftSignOut([long]$Account, [long]$PreviousGeneration)
                     if (!(Invoke-OwnedId $child 'account-sign-out')) { throw 'The verified synthetic account did not support Sign out.' }
                     $result.sign_out_invoked = $true
                     Wait-InstalledDraft $child 'the updated original offline account controls' { Test-SyntheticActiveOfflineAccount $child $Account }
-                    Wait-InstalledDraft $child 'close of the exact installed Accounts panel' { Invoke-OwnedId $child 'account-close' }
+                    Wait-InstalledDraft $child 'return to the installed Home workspace' { Invoke-OwnedId $child 'account-close' 'Home' }
                 } else {
                     if ($panes.left -cne $before.left -or $panes.right -cne $before.right) {
                         throw 'The offline restart changed the active cached items.'

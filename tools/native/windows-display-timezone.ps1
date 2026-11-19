@@ -1,9 +1,3 @@
-function Wait-OwnedDisplayLabel([IntPtr]$Window, [string]$Id, [string]$Label) {
-    Wait-For "the owned $Id label with the expected text" {
-        $null -ne (Find-OwnedFixtureControl $Window $Id $Label -AllowDisabled)
-    }
-}
-
 function Save-FixtureDisplayTimeZone([IntPtr]$Window, [ValidateSet('America/New_York', 'UTC')][string]$Zone) {
     Wait-For 'the owned display time zone field' {
         Set-OwnedFixtureEditValue $Window 'display-timezone' 'Display time zone' $Zone
@@ -15,7 +9,7 @@ function Save-FixtureDisplayTimeZone([IntPtr]$Window, [ValidateSet('America/New_
     Wait-For 'the owned Save time zone action' {
         Invoke-OwnedFixtureControl $Window 'display-timezone-save' $null 'Save time zone'
     }
-    Wait-OwnedDisplayLabel $Window 'display-timezone-message' 'Display time zone saved.'
+    Wait-OwnedFixtureLabel $Window 'display-timezone-message' 'Display time zone saved.'
 }
 
 function Invoke-DisplayTimeZoneProof([IntPtr]$Window, [string]$Profile) {
@@ -34,13 +28,13 @@ function Invoke-DisplayTimeZoneProof([IntPtr]$Window, [string]$Profile) {
         param($reader) $reader.active_number -eq 1 -and $reader.focused_pane -eq 0 -and $reader.offline -and $reader.signed_out
     }
     Click-AccountControl $Window 'reader-maximize-pane'
-    Wait-OwnedDisplayLabel $Window $timeLabel $utc
-    Click-AccountControl $Window 'account-open'
-    Wait-OwnedDisplayLabel $Window $zoneLabel $effectiveUtc
+    Wait-OwnedFixtureLabel $Window $timeLabel $utc
+    Open-FixtureSettings $Window
+    Wait-OwnedFixtureLabel $Window $zoneLabel $effectiveUtc
     Save-FixtureDisplayTimeZone $Window 'America/New_York'
-    Wait-OwnedDisplayLabel $Window $zoneLabel $effectiveLocal
-    Click-AccountControl $Window 'account-close'
-    Wait-OwnedDisplayLabel $Window $timeLabel $local
+    Wait-OwnedFixtureLabel $Window $zoneLabel $effectiveLocal
+    Open-FixtureHome $Window
+    Wait-OwnedFixtureLabel $Window $timeLabel $local
     Add-Evidence 'Display one summer and one winter cached instant in the chosen time zone' ([ordered]@{
         issue_number = 1; time_zone = 'America/New_York'; before = $utc; after = $local
     })
@@ -49,16 +43,16 @@ function Invoke-DisplayTimeZoneProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Reader 'the same offline cached issue after a fresh launch' {
         param($reader) $reader.active_number -eq 1 -and $reader.focused_pane -eq 0 -and $reader.offline -and $reader.signed_out
     }
-    Wait-OwnedDisplayLabel $window $timeLabel $local
-    Click-AccountControl $window 'account-open'
-    Wait-OwnedDisplayLabel $window $zoneLabel $effectiveLocal
+    Wait-OwnedFixtureLabel $window $timeLabel $local
+    Open-FixtureSettings $window
+    Wait-OwnedFixtureLabel $window $zoneLabel $effectiveLocal
     Save-FixtureDisplayTimeZone $window 'UTC'
-    Wait-OwnedDisplayLabel $window $zoneLabel $effectiveUtc
-    Click-AccountControl $window 'account-close'
-    Wait-OwnedDisplayLabel $window $timeLabel $utc
+    Wait-OwnedFixtureLabel $window $zoneLabel $effectiveUtc
+    Open-FixtureHome $window
+    Wait-OwnedFixtureLabel $window $timeLabel $utc
     Add-Evidence 'Restore the chosen time zone across a process restart and change back to UTC' ([ordered]@{
         issue_number = 1; persisted = $local; changed_back = $utc
     })
     Stop-ThroughUi
-    $script:report.detail = 'Owned account controls persisted the display time zone, showed the exact summer and winter offsets on a cached issue, and restored UTC after a separate offline restart.'
+    $script:report.detail = 'Settings persisted the display time zone, showed the exact summer and winter offsets on a cached issue, and restored UTC after a separate offline restart.'
 }

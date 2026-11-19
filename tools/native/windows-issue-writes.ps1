@@ -14,13 +14,12 @@ function Open-WriteFixtureIssue([IntPtr]$Window, [switch]$UserConnected) {
 }
 
 function Set-WriteFixtureOffline([IntPtr]$Window, [bool]$Offline) {
-    Click-AccountControl $Window 'account-open'
-    $null = Wait-Account 'the open native account controls' { param($account) $account.panel_open }
+    Open-FixtureSettings $Window
     Click-AccountControl $Window 'account-offline'
     $null = Wait-Reader 'the saved connectivity choice' {
         param($reader) $reader.offline -eq $Offline
     }
-    Click-AccountControl $Window 'account-close'
+    Open-FixtureHome $Window
 }
 
 function Type-WriteFixtureField([IntPtr]$Window, [string]$Id, [string]$Value) {

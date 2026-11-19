@@ -360,14 +360,14 @@ function Invoke-RepositoryScopeHoldProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Account 'the original cached account and both synthetic repositories' {
         param($account) $account.active_user_id -eq 41 -and $account.selected_count -eq 2 -and !$account.busy
     }
-    Click-AccountControl $Window 'account-open'
+    Open-FixtureSettings $Window
     Wait-For 'remove only the native original repository row' {
         Invoke-OwnedFixtureControl $Window 'account-remove-1' $null 'Remove'
     }
     $null = Wait-Account 'the same user with only the other repository selected' {
         param($account) $account.active_user_id -eq 41 -and $account.selected_count -eq 1 -and !$account.busy
     }
-    Click-AccountControl $Window 'account-close'
+    Open-FixtureHome $Window
     Stop-ThroughUi
     $offline = Read-NativeLifecycle $Profile 'scope-hold' 'scope-hold-before-restart.json'
     Assert-ScopedOutbox $before $offline $true
@@ -391,14 +391,14 @@ function Invoke-RepositoryScopeHoldProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Sync 'verify authenticated connectivity with dispatch enabled and no eligible scope work' {
         param($sync) (Test-LifecycleSync $sync $false $false -Reachable) -and $sync.eligible_outbox -eq 0
     }
-    Click-AccountControl $restarted 'account-open'
+    Open-FixtureSettings $restarted
     Click-AccountControl $restarted 'account-refresh'
     $null = Wait-Account 'verify the still-selected archive on the original account' {
         param($account)
         $account.active_user_id -eq 41 -and $account.selected_count -eq 1 -and !$account.busy -and
             $account.profile_access -ceq 'Readable' -and $account.reachability -ceq 'ReceivedResponse'
     }
-    Click-AccountControl $restarted 'account-close'
+    Open-FixtureHome $restarted
     Add-Evidence 'Check the worker explicitly and refresh access to the only selected repository' 'archive'
     Click-AccountControl $restarted 'reader-outbox'
     Click-AccountControl $restarted 'reader-outbox-filter-all'
@@ -528,7 +528,7 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
 
     $signOut = Start-LifecycleWindow $Profile 'native-lifecycle-signout-observation.json'
     $null = Wait-LifecycleWorkspace $false $false
-    Click-AccountControl $signOut 'account-open'
+    Open-FixtureSettings $signOut
     Click-AccountControl $signOut 'account-sign-out'
     $null = Wait-Account 'the original private account signed out with its repository selection preserved' {
         param($account)
@@ -546,7 +546,7 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
 
     $isolated = Start-LifecycleWindow $Profile 'native-lifecycle-isolation-observation.json'
     $null = Wait-LifecycleWorkspace $false $true
-    Click-AccountControl $isolated 'account-open'
+    Open-FixtureSettings $isolated
     Wait-For 'the exact alternate local account control' {
         Invoke-OwnedFixtureControl $isolated ("account-switch-" + $script:lifecycleSeed.alternate) $null 'fixture-other'
     }
@@ -559,7 +559,7 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
     Wait-For 'switch back to the exact signed-out original account' {
         Invoke-OwnedFixtureControl $isolated ("account-switch-" + $script:lifecycleSeed.account) $null 'fixture-user'
     }
-    Click-AccountControl $isolated 'account-close'
+    Open-FixtureHome $isolated
     $null = Wait-LifecycleWorkspace $false $true
     Stop-ThroughUi
     $final = Read-NativeLifecycle $Profile 'inspect' 'native-lifecycle-final.json'
@@ -575,7 +575,7 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
     Set-AccessPhase 'lifecycle-return'
     $repair = Start-LifecycleWindow $Profile 'native-lifecycle-repair-observation.json'
     $null = Wait-LifecycleWorkspace $false $true
-    Click-AccountControl $repair 'account-open'
+    Open-FixtureSettings $repair
     Select-FixtureReplacement $repair $lifecycleSeed.account
     Enter-FixtureAccountForm $repair -LoopbackTokenAction
     Click-AccountControl $repair 'account-connect'
@@ -584,7 +584,7 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
         $account.active_local_id -eq $script:lifecycleSeed.account -and
             $account.active_user_id -eq 41 -and $account.profile_access -ceq 'Readable' -and $account.selected_count -eq 2
     }
-    Click-AccountControl $repair 'account-close'
+    Open-FixtureHome $repair
     Open-SyncSettings $repair
     Click-AccountControl $repair 'sync-check-now'
     $null = Wait-Sync 'the renewed credential serves a new verified online connection' {

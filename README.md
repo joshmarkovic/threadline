@@ -2,6 +2,22 @@
 
 Threadline is a native desktop client for GitHub issues and pull requests. It keeps downloaded conversations, reviews, tabs, and drafts in a local SQLite profile. You can reopen cached work offline and inspect queued changes in the Outbox.
 
+## Install the private Windows test build
+
+On Windows 11 x64, sign in to GitHub with an account that can read `joshmarkovic/threadline`, then download and run the installer. [Download Threadline-Setup-20.exe](https://github.com/joshmarkovic/threadline/releases/download/v0.1.0-local.20/Threadline-Setup-20.exe)
+
+You can also download the installer with GitHub CLI. If you need the CLI, install it with `winget install --id GitHub.cli --exact` and open a new PowerShell window.
+
+Run these commands from the folder where you want to keep the installer. Skip the first line if you're already signed in.
+
+```powershell
+gh auth login --hostname github.com --web
+gh release download v0.1.0-local.20 --repo joshmarkovic/threadline --pattern Threadline-Setup-20.exe --dir . --clobber
+if ($LASTEXITCODE -eq 0) { & .\Threadline-Setup-20.exe }
+```
+
+Open **Threadline Installer Test** from Start after setup finishes. This private prerelease is unsigned. The test installation keeps its own registration. Automatic updates require a signed stable installation.
+
 ## Install from source
 
 You need Git, Rust 1.98 or later, and a GitHub account with access to the private Threadline repository. Make sure Cargo's bin directory is on your `PATH`.
@@ -29,11 +45,15 @@ Sign in through the browser if prompted, then continue with `cd threadline` abov
 
 From an existing checkout, use `cargo run --locked -p threadline-app` to build and run a development copy.
 
-Open **Accounts**, enter the private repository as `owner/repository`, paste its GitHub personal access token into the masked field, and choose **Check access**. Threadline verifies the account and repository with GitHub. Select the repositories you want to keep in the reader. On Windows, the native credential store protects the token. The token's repository selection and permissions govern which reads and writes GitHub allows. [Account setup and endpoint permissions](docs/architecture/github-api.md)
+## Open your workspace
 
-In **Accounts → Display time zone**, enter an IANA name such as `America/New_York` or `UTC` and choose **Save time zone**. Enter `system` to follow the device. Displayed dates update immediately. Applying a calendar-day filter uses the selected time zone. Saved filters keep their existing UTC cutoffs. Work and quiet hours use the selected time zone when they have no override. You can also set the preference before opening a workspace with `threadline --display-timezone America/New_York`. [Time-zone and storage behavior](docs/architecture/synchronization.md#time-zones)
+On the Welcome screen, choose your display time zone and continue to GitHub. For New York, choose **New York (Eastern Time)**. Enter the full repository name, such as `joshmarkovic/threadline`, paste a GitHub personal access token, and choose **Check access**. A fine-grained token needs access to that repository and the permissions for the features you use. Select the repositories you want to monitor, then choose **Continue to Home**. Windows Credential Manager protects the token. [Account setup and endpoint permissions](docs/architecture/github-api.md)
 
-The per-user Windows 11 x64 development installer has been tested locally. If you received the setup executable, run it directly to install the prebuilt app. The signed public package and its end-user download command remain pending. Developers can build and exercise the local installer. [Windows packaging guide](tools/windows/README.md) · [Package evidence](docs/reports/sprint-12.md)
+**Home** shows the cached workspace. Use **Refresh all** to request fresh data for monitored repositories. **Settings** lets you add an account, replace a token, change the repositories you monitor, or work offline.
+
+Windows stores the workspace in `%LOCALAPPDATA%\Threadline\Data\threadline.sqlite3` and the display preference in `%LOCALAPPDATA%\Threadline\Config\display-timezone`. Threadline stores timestamps in UTC. Change how they appear under **Settings → Display time zone**. Choose a preset or enter an IANA name such as `America/New_York` and save it. Use `system` to follow the device. Calendar-day filters use your selected zone. Existing saved filters retain their UTC cutoffs. You can also set the preference before opening a workspace with `threadline --display-timezone America/New_York`. [Time-zone and storage behavior](docs/architecture/synchronization.md#time-zones)
+
+Registered signed Windows installations check for the latest stable GitHub release on startup. Threadline downloads and verifies compatible signed updates in the background and offers **Restart to update** when ready. For a private release repository, save a separate token with **Contents: Read** in Settings. [Windows packaging guide](tools/windows/README.md) · [Package evidence](docs/reports/sprint-12.md)
 
 Uninstall preserves your local workspace and sign-in credentials. To preview or permanently remove the retained data, use the separate Windows cleanup command. [Remove a retained local workspace](tools/windows/README.md#remove-a-retained-local-workspace)
 

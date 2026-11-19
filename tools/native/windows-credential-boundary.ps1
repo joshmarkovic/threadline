@@ -11,12 +11,11 @@ function Select-FixtureReplacement([IntPtr]$Window, [long]$LocalAccount) {
 
 function Invoke-CredentialBoundaryProof([IntPtr]$Window, [string]$Profile) {
     Set-AccessPhase 'credential-ready'
-    Connect-FixtureAccount $Window -FromVisibleControl -LoopbackTokenAction
+    Connect-FixtureAccount $Window -LoopbackTokenAction
     $initial = Wait-Account 'the original verified local account' {
         param($account) $account.active_local_id -gt 0 -and $account.active_user_id -eq 41
     }
     [long]$original = $initial.account_access.active_local_id
-    Click-AccountControl $Window 'account-close'
     $item = Open-WriteFixtureIssue $Window -UserConnected
     Set-WriteFixtureOffline $Window $true
     Click-AccountControl $Window 'reader-draft-comment-0'
@@ -25,7 +24,7 @@ function Invoke-CredentialBoundaryProof([IntPtr]$Window, [string]$Profile) {
     Wait-WriteFixtureDraft $item $text
     Queue-WriteFixtureDraft $Window $item 1
 
-    Click-AccountControl $Window 'account-open'
+    Open-FixtureSettings $Window
     Click-AccountControl $Window 'account-sign-out'
     $null = Wait-Account 'the original account is signed out with its selected repository retained' {
         param($account)
@@ -43,7 +42,7 @@ function Invoke-CredentialBoundaryProof([IntPtr]$Window, [string]$Profile) {
         original_user = 41; selected_repository_retained = $true; outbox = 1; offline = $true
     })
 
-    Click-AccountControl $ready 'account-open'
+    Open-FixtureSettings $ready
     Set-AccessPhase 'credential-other'
     Click-AccountControl $ready 'account-offline'
     $null = Wait-Reader 'online mode with no usable original account credential' {
@@ -61,6 +60,7 @@ function Invoke-CredentialBoundaryProof([IntPtr]$Window, [string]$Profile) {
         original_user = 41; replacement_rejected = $true
     })
 
+    Click-AccountControl $ready 'account-add' -ExpectedName 'Add account'
     Enter-FixtureAccountForm $ready -LoopbackTokenAction
     Click-AccountControl $ready 'account-connect'
     $alternate = Wait-Account 'the same repository is authenticated in a separate local account' {
@@ -71,7 +71,7 @@ function Invoke-CredentialBoundaryProof([IntPtr]$Window, [string]$Profile) {
     if ($alternate.account_access.selected_count -eq 0) {
         Click-AccountControl $ready 'account-select-0'
     }
-    Click-AccountControl $ready 'account-close'
+    Open-FixtureHome $ready
     $null = Wait-Reader 'the second account cannot see or dispatch the original account queue' {
         param($reader) !$reader.signed_out -and !$reader.offline -and $reader.outbox -eq 0
     }
@@ -79,7 +79,7 @@ function Invoke-CredentialBoundaryProof([IntPtr]$Window, [string]$Profile) {
         alternate_user = 42; outbox = 0
     })
 
-    Click-AccountControl $ready 'account-open'
+    Open-FixtureSettings $ready
     Wait-For 'the owned original account switch' {
         Invoke-OwnedFixtureControl $ready "account-switch-$original" $null 'fixture-user'
     }
@@ -100,7 +100,7 @@ function Invoke-CredentialBoundaryProof([IntPtr]$Window, [string]$Profile) {
         !$account.busy -and $account.active_local_id -eq $original -and $account.active_user_id -eq 41 -and
             $account.profile_access -ceq 'Readable' -and $account.selected_count -eq 1
     }
-    Click-AccountControl $ready 'account-close'
+    Open-FixtureHome $ready
     Click-AccountControl $ready 'reader-outbox'
     Click-AccountControl $ready 'reader-outbox-filter-history'
     Inspect-WriteFixtureAction $ready 0 'Confirmed' 'Comment'

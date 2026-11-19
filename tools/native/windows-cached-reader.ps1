@@ -792,10 +792,10 @@ function Invoke-ReaderBacklog([string]$Profile, $Runtime) {
     $before = Wait-Reader 'the original cached issue in the left pane' {
         param($reader) $reader.active_number -eq 1 -and $reader.cached_content_ready
     }
-    $null = Open-AccountFixture
+    Open-FixtureSettings $window
     Set-AccessPhase 'backlog-hold'
     Click-AccountControl $window 'account-offline'
-    Click-AccountControl $window 'account-close'
+    Open-FixtureHome $window
     $null = Wait-Reader 'the saved workspace running online' { param($reader) !$reader.offline }
 
     $marker = Join-Path ([IO.Path]::GetDirectoryName($script:AccessPhaseFile)) 'backlog-request-pending.txt'

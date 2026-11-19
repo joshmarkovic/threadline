@@ -24,11 +24,11 @@ function Find-OwnedId($Root, [int]$ChildId, [string]$Id, [switch]$AllowDisabled)
     return $null
 }
 
-function Invoke-OwnedId([Diagnostics.Process]$Process, [string]$Id) {
+function Invoke-OwnedId([Diagnostics.Process]$Process, [string]$Id, [string]$Name) {
     $root = Get-OwnedWindow $Process
     $control = Find-OwnedId $root $Process.Id $Id
     $invoke = $null
-    if ($null -eq $control -or
+    if ($null -eq $control -or ($Name -and $control.Current.Name -cne $Name) -or
         !$control.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern, [ref]$invoke) -or
         $null -eq (Get-OwnedWindow $Process) -or $control.Current.ProcessId -ne $Process.Id) { return $false }
     $invoke.Invoke()

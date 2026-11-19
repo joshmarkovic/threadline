@@ -73,6 +73,12 @@ function Find-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [string]$Expecte
     }
 }
 
+function Wait-OwnedFixtureLabel([IntPtr]$Window, [string]$Id, [string]$Label) {
+    Wait-For "the owned $Id label with the expected text" {
+        $null -ne (Find-OwnedFixtureControl $Window $Id $Label -AllowDisabled)
+    }
+}
+
 function Invoke-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [Diagnostics.Stopwatch]$InputClock, [string]$ExpectedName, [hashtable]$InputTiming) {
     $element = Find-OwnedFixtureControl $Window $Id $ExpectedName
     if ($null -eq $element) { return $false }
