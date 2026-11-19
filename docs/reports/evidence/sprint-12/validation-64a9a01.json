@@ -1,0 +1,543 @@
+{
+  "source_revision": "64a9a016dd805aa92fa1cc379a97c18686c0ee34",
+  "source_dirty": false,
+  "linux_canonical_lanes": [
+    {
+      "lane": "unit",
+      "run": "unit-1795107362931-3174869",
+      "status": "Pass",
+      "exit_code": 0,
+      "named_cases": 23,
+      "passed_test_executions": 161,
+      "cases": [
+        {
+          "case": "UT-002",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-005",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-006",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-007",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-011",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "UT-012",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "UT-008",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "UT-013",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-014",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-015",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-016",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-017",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-018",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-019",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-021",
+          "status": "Pass",
+          "passed": 83
+        },
+        {
+          "case": "S01-CORE",
+          "status": "Pass",
+          "passed": 20
+        },
+        {
+          "case": "S01-DIFF-FIXTURE",
+          "status": "Pass",
+          "passed": 34
+        },
+        {
+          "case": "UT-001",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-003",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-004",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-009",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-010",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UT-020",
+          "status": "Pass",
+          "passed": 1
+        }
+      ],
+      "raw_result_sha256": "ef647ba1f84c4a21de167bfc011abc985da53d364e3611fa371f18629c6e9c7e",
+      "raw_junit_sha256": "301c45dc818f0264695916bf07de27801e64064b91eb2a3a7db0a4e603588378"
+    },
+    {
+      "lane": "integration",
+      "run": "integration-1795107574427-3180276",
+      "status": "Pass",
+      "exit_code": 0,
+      "named_cases": 36,
+      "passed_test_executions": 163,
+      "cases": [
+        {
+          "case": "IT-021",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "IT-018",
+          "status": "Pass",
+          "passed": 11
+        },
+        {
+          "case": "IT-019",
+          "status": "Pass",
+          "passed": 4
+        },
+        {
+          "case": "IT-006",
+          "status": "Pass",
+          "passed": 10
+        },
+        {
+          "case": "IT-007",
+          "status": "Pass",
+          "passed": 4
+        },
+        {
+          "case": "S10-HISTORY-HTTP",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "S10-HISTORY-MONITOR",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "S05-FEED-HTTP",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "S05-SYNC-WORKER",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "IT-008",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "IT-009",
+          "status": "Pass",
+          "passed": 8
+        },
+        {
+          "case": "IT-010",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "IT-011",
+          "status": "Pass",
+          "passed": 6
+        },
+        {
+          "case": "IT-013",
+          "status": "Pass",
+          "passed": 5
+        },
+        {
+          "case": "IT-012",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "S07-WRITE-WORKER",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "IT-014",
+          "status": "Pass",
+          "passed": 5
+        },
+        {
+          "case": "IT-015",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "IT-016",
+          "status": "Pass",
+          "passed": 5
+        },
+        {
+          "case": "IT-017",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "IT-003",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "S01-SIMULATOR",
+          "status": "Pass",
+          "passed": 6
+        },
+        {
+          "case": "S01-PLATFORM",
+          "status": "Pass",
+          "passed": 5
+        },
+        {
+          "case": "IT-001",
+          "status": "Pass",
+          "passed": 8
+        },
+        {
+          "case": "IT-002",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "S02-RESOURCE-CONTRACTS",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "S02-DURABILITY",
+          "status": "Pass",
+          "passed": 11
+        },
+        {
+          "case": "S02-DISK-FULL",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "S02-FIXTURES",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "IT-004",
+          "status": "Pass",
+          "passed": 5
+        },
+        {
+          "case": "IT-005",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "S03-ACCOUNT-PROFILES",
+          "status": "Pass",
+          "passed": 12
+        },
+        {
+          "case": "S03-ACCESS-STORAGE",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "S04-READ-TRANSPORT",
+          "status": "Pass",
+          "passed": 9
+        },
+        {
+          "case": "S04-CACHED-STORE",
+          "status": "Pass",
+          "passed": 11
+        },
+        {
+          "case": "S04-READ-SERVICE",
+          "status": "Pass",
+          "passed": 1
+        }
+      ],
+      "raw_result_sha256": "d458113814ae66301567a72c580bc74ba3cb1d36df32e8a4a8f4e66b440e7273",
+      "raw_junit_sha256": "b06b83aa5d3eca84ad6a2a09db8a3a63191f41de0c709560ec49b48fc62e11f6"
+    },
+    {
+      "lane": "ui",
+      "run": "ui-1795108088673-3189957",
+      "status": "Pass",
+      "exit_code": 0,
+      "named_cases": 9,
+      "passed_test_executions": 32,
+      "cases": [
+        {
+          "case": "UI-004",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "S01-GPUI",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "UI-001",
+          "status": "Pass",
+          "passed": 1
+        },
+        {
+          "case": "UI-002",
+          "status": "Pass",
+          "passed": 2
+        },
+        {
+          "case": "UI-003",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "UI-006",
+          "status": "Pass",
+          "passed": 5
+        },
+        {
+          "case": "UI-005",
+          "status": "Pass",
+          "passed": 3
+        },
+        {
+          "case": "UI-008",
+          "status": "Pass",
+          "passed": 8
+        },
+        {
+          "case": "UI-007",
+          "status": "Pass",
+          "passed": 4
+        }
+      ],
+      "raw_result_sha256": "ebe729fa9e6ce463c18ef110e8954436e7a2654af98094450b45d2acd93c0dcd",
+      "raw_junit_sha256": "11c72b7841d7eb750199e6f548806851a6963448497f57534f60e62b19bef1b6"
+    }
+  ],
+  "linux_numeric_exits": {
+    "fmt": 0,
+    "clippy": 0,
+    "unit": 0,
+    "integration": 0,
+    "ui": 0
+  },
+  "formatting": {
+    "command": "cargo fmt --all --check",
+    "exit_code": 0,
+    "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "clippy": {
+    "linux": {
+      "status": "Pass",
+      "exit_code": 0,
+      "command": "cargo clippy --locked --offline --workspace --all-targets --features threadline-app/e2e -- -D warnings",
+      "raw_log_sha256": "568827a854588ea38e016cdd815ceda2aa8b8a9672708b377f99420f59fe79e5"
+    },
+    "win": {
+      "status": "Pass",
+      "exit_code": 0,
+      "command": "cargo clippy --locked --offline --target x86_64-pc-windows-msvc --workspace --all-targets --features threadline-app/e2e -- -D warnings",
+      "raw_log_sha256": "2710ae3efae4ce6846d62bb1e7911c3146fa39a2febd58e86911e24265f8c49e"
+    },
+    "windows_ordinary_binaries": {
+      "status": "Pass",
+      "exit_code": 0,
+      "command": "cargo clippy --locked --offline --target x86_64-pc-windows-msvc --workspace --bins -- -D warnings",
+      "raw_log_sha256": "6220d46133955b7a319ea552d6475a0c0d64e7766edcf431d696fd7c987e054d"
+    }
+  },
+  "normal_release_compile": {
+    "status": "Pass",
+    "warnings": 0,
+    "e2e_feature": false,
+    "raw_build_log_sha256": "8a673335f180934cf12182defd52d0a7bfcc476d5ab970ddf07e7b6ebe05fa4b",
+    "build_receipt_sha256": "5c47ef1a5ca1dee4c5bf42ecbb4dfd416f3b44eef1d33ba1d0c089f8857e3aec"
+  },
+  "windows": {
+    "scope": "Named exact-source timezone regressions on real Windows x64. Automatic approval rejected the replacement broad bundle because it could include timing. The earlier complete build 17 Windows suite retains its own receipt.",
+    "checks": [
+      {
+        "check": "win-dst",
+        "executable": "threadline_core-d90a2952ae9ad0ec.exe",
+        "executable_sha256": "3fda2c752a4167dd038c20c59d386817ad54ff1e502219155f48689003fbd5c9",
+        "exit_code": 0,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0,
+        "failed_tests": [],
+        "raw_log_sha256": "b969dda928de9b40d6f358d3ff8b5df2024bdb8b41649a50c533faee75a86346",
+        "tests": [
+          {
+            "test": "display_time::tests::display_timezone_preserves_instants_across_new_york_dst",
+            "status": "Pass"
+          }
+        ]
+      },
+      {
+        "check": "win-zone-ui",
+        "executable": "threadline_app-422fe7b782f0531f.exe",
+        "executable_sha256": "8e6fd6eed160dc8b515ca84faa88f47c95cf69919dc2678ab347cb7e7a28fa32",
+        "exit_code": 0,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.1,
+        "failed_tests": [],
+        "raw_log_sha256": "e29cc4f66a299f099176f615b9dce102f8c0aeb050079516d610a1b34f7549a4",
+        "tests": [
+          {
+            "test": "display_time::tests::display_timezone_persists_separately_from_the_database_and_isolated_accounts",
+            "status": "Pass"
+          },
+          {
+            "test": "display_time::tests::display_timezone_refreshes_system_mode_without_changing_user_or_isolated_modes",
+            "status": "Pass"
+          }
+        ]
+      },
+      {
+        "check": "win-utc-reader",
+        "executable": "github_reader-27e930e2bb9cdeed.exe",
+        "executable_sha256": "83bcd4a8ab42d565147133758029a37a75f46fdb35393db3ac4ac825e50ad58f",
+        "exit_code": 0,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.01,
+        "failed_tests": [],
+        "raw_log_sha256": "d05608d184662285e31d68469fe29a71f0e1fd902c3f14dd333ce9e84e9d6593",
+        "tests": [
+          {
+            "test": "issue_timestamps_with_equivalent_offsets_use_the_same_utc_millis",
+            "status": "Pass"
+          }
+        ]
+      },
+      {
+        "check": "win-utc-revision",
+        "executable": "foundation-91c3fcc2cfe7d49c.exe",
+        "executable_sha256": "88352877ff76d2c42ff91b81fcd00c78dec60962be6c5141ea371635505fcd74",
+        "exit_code": 0,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.02,
+        "failed_tests": [],
+        "raw_log_sha256": "31432e511f8521f18d6cb7e9b650b5b9b680c1bb229a05fcdc55f48edab2754c",
+        "tests": [
+          {
+            "test": "timestamp_revisions_normalize_offsets_without_losing_precision",
+            "status": "Pass"
+          }
+        ]
+      },
+      {
+        "check": "win-zone-schedule",
+        "executable": "notifications-f43ed1a5fb88e366.exe",
+        "executable_sha256": "eb7e4d031686fe16ee14f16e2982d108582b3a1073fbbb3e1616a0bd780eb985",
+        "exit_code": 0,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.49,
+        "failed_tests": [],
+        "raw_log_sha256": "aa1ee88d578b544e1da4cbe95e72112677266eeadcee4794397a97d06f522125",
+        "tests": [
+          {
+            "test": "display_timezone_drives_unset_work_and_quiet_windows_but_preserves_an_account_override",
+            "status": "Pass"
+          }
+        ]
+      },
+      {
+        "check": "win-zone-static-text",
+        "executable": "threadline_app-db153c5f09bed1e7.exe",
+        "executable_sha256": "8f3d192ba52941996a4ed180147b9db0e141016e0ccb1f3e17611d0916de2d5d",
+        "exit_code": 0,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "seconds": 0.74,
+        "failed_tests": [],
+        "raw_log_sha256": "29e6ff6606e5bc5d966b2c39ad9a0cd4fb84e49c8432a39292055f36a1cce61e",
+        "tests": [
+          {
+            "test": "reader_workspace::tests::ui_003_cached_timestamp_exports_its_static_text_to_accessibility",
+            "status": "Pass"
+          }
+        ]
+      }
+    ],
+    "totals": {
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0
+    }
+  }
+}
