@@ -1,0 +1,26 @@
+{
+  "recipe_revision": "4d1cb866c66761be4b99e313501044ae949b703e",
+  "app_revision": "64a9a016dd805aa92fa1cc379a97c18686c0ee34",
+  "setup": {
+    "package_version": "0.1.0-local.19",
+    "publisher_verification": "unsigned local fixture",
+    "current_schema": 18,
+    "size": 11218348,
+    "sha256": "2ed3a8d257fd73d149dbd47f98316cd54b5e8eae2aebd3631bbedb307bb12dee",
+    "app_sha256": "30f90b43e89720a4ce2b51153c0811326e0b453dc4a1a704c9a471615337a033",
+    "notification_helper_sha256": "2e08784447cff4c1bf2547a878689d72c90d0cc1a7da6295e7126172a062baec"
+  },
+  "native_upgrade": {
+    "parent_shell": "7.6.7",
+    "inherited_parent_modules": true,
+    "setup_exit": 0,
+    "previous_build": 18,
+    "installed_build": 19,
+    "version": "0.1.0-local.19",
+    "app_sha256": "30f90b43e89720a4ce2b51153c0811326e0b453dc4a1a704c9a471615337a033",
+    "start_shortcut_target_verified": true,
+    "timezone_file_preserved": true,
+    "user_zone_is_new_york": true
+  },
+  "native_upgrade_receipt_sha256": "a5bc04214a63e6405c6cc74b6bdb844588439e04c0aedb3483ba20c3c8c519f0"
+}

@@ -47,7 +47,7 @@ The independent configuration contains `current_sha256`, `predecessor` and `stag
 | 15 | The staged executable did not match its expected digest. Obtain an intact setup |
 | 16 | Setup could not write staged files or registrations. Check space and permissions, then rerun |
 | 17 | The managed location or a staging file has unexpected ownership or a link. Restore the ordinary per-user path |
-| 18 | The Windows PowerShell prerequisite or verification failed. Review the local policy or permission error |
+| 18 | If build 18 failed when launched from PowerShell 7, use build 19 or later. The setup details identify the check that failed. Verify that Windows PowerShell 5.1 can load its built-in modules and, for a staged-file error, read the executable. |
 | 19 | Setup kept staging files after a rollback was interrupted. Release open files and rerun the same setup |
 | 20 | Windows could not verify the approved publisher. Obtain the trusted signed package |
 | 21–22 | Windows could not verify the staged shortcut or snapshot, or an existing shortcut or sender has a different target. Inspect the named entry and rerun the matching setup |
