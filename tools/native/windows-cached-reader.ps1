@@ -314,15 +314,39 @@ function Wait-ConcurrentFeed([int]$Page, [switch]$Served) {
 
 function Complete-ConcurrentFeed([int]$Page, $Attribution) {
     $directory = [IO.Path]::GetDirectoryName($script:AccessPhaseFile)
-    if ((Get-ConcurrentFeedState $Page) -cne 'held' -or
+    $state = Get-ConcurrentFeedState $Page
+    if ($state -cne 'held' -or
         $Attribution.status -cne 'Correlated' -or $Attribution.input -cne 'UIA InvokePattern') {
-        Stop-Blocked "Scheduled loopback feed page $Page could not be correlated through the useful native paint."
+        Stop-Blocked "Scheduled loopback feed page $Page could not be correlated through the useful native paint. Request $state, timing $($Attribution.status), input $($Attribution.input)."
     }
     $ack = [IO.Path]::Combine($directory,"reader-feed-$Page-painted")
     [IO.File]::Open($ack, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None).Dispose()
     Wait-ConcurrentFeed $Page -Served
     $Attribution.feed_page = $Page
     $Attribution.feed_response_written = $true
+}
+
+function Wait-ReaderPerformanceState([string]$Description, [scriptblock]$Ready, [string]$Kind,
+    [bool]$Concurrent, [int]$Page, [hashtable]$InputTiming) {
+    if (!$Concurrent) { return Wait-Reader $Description $Ready 5 }
+    $pending = [ordered]@{ page=$Page; action=$Kind; useful_view=$false; paint='Unavailable'; request='held' }
+    $deadline = [Diagnostics.Stopwatch]::StartNew()
+    do {
+        $pending.request = Get-ConcurrentFeedState $Page
+        if ($pending.request -cne 'held') { break }
+        $state = Read-Observation
+        if ($null -ne $state -and $state.PSObject.Properties['cached_reader'] -and
+            $null -ne $state.cached_reader -and (& $Ready $state.cached_reader)) {
+            $pending.useful_view = $true
+            $target = if ($Kind -ceq 'search') { $state.cached_reader.search_generation } else { $state.cached_reader.active_item }
+            $timing = Get-ReaderTimingAttribution $InputTiming $state $Kind $target ([Diagnostics.Stopwatch]::GetTimestamp())
+            $pending.paint = $timing.status
+            if ($timing.status -ceq 'Correlated') { return $state }
+        }
+        Start-Sleep -Milliseconds 5
+    } while ($deadline.ElapsedMilliseconds -lt 8000)
+    $script:report.concurrent_pending = $pending
+    Stop-Blocked "Scheduled feed page $Page did not cover $Description. Request $($pending.request), useful view $($pending.useful_view), paint $($pending.paint)."
 }
 
 function Measure-ReaderPerformance([IntPtr]$Window, $Samples, $Attribution, [switch]$Physical, [switch]$Concurrent) {
@@ -353,11 +377,11 @@ function Measure-ReaderPerformance([IntPtr]$Window, $Samples, $Attribution, [swi
         } else {
             Click-AccountControl $Window 'reader-search-submit' $clock $inputTiming
         }
-        $found = Wait-Reader 'the first local result page for the current query' {
+        $found = Wait-ReaderPerformanceState 'the first local result page for the current query' {
             param($reader)
             $null -ne $reader.search_generation -and $reader.search_generation -gt $generation -and
                 $reader.search_results -gt 0 -and $reader.first_search_item -eq $targetItem
-        } 5
+        } 'search' $Concurrent $feedPage $inputTiming
         $sampleMs = $clock.Elapsed.TotalMilliseconds
         $observed = [Diagnostics.Stopwatch]::GetTimestamp()
         $generation = $found.cached_reader.search_generation
@@ -368,9 +392,9 @@ function Measure-ReaderPerformance([IntPtr]$Window, $Samples, $Attribution, [swi
 
         if ($Concurrent) { Wait-ConcurrentFeed $feedPage }
         Click-AccountControl $Window 'reader-result-0' $clock $inputTiming
-        $opened = Wait-Reader 'useful cached content in the newly opened item' {
+        $opened = Wait-ReaderPerformanceState 'useful cached content in the newly opened item' {
             param($reader) $reader.active_item -eq $targetItem -and $reader.cached_content_ready
-        } 5
+        } 'open' $Concurrent $feedPage $inputTiming
         $sampleMs = $clock.Elapsed.TotalMilliseconds
         $observed = [Diagnostics.Stopwatch]::GetTimestamp()
         $timing = Get-ReaderTimingAttribution $inputTiming $opened 'open' $targetItem $observed
@@ -391,11 +415,11 @@ function Measure-ReaderPerformance([IntPtr]$Window, $Samples, $Attribution, [swi
         $position = ($sample + 1) % 2
         if ($Concurrent) { Wait-ConcurrentFeed $feedPage }
         Click-AccountControl $Window "reader-tab-0-$position" $clock $inputTiming
-        $after = Wait-Reader 'useful cached content in the other tab with both panes retained' {
+        $after = Wait-ReaderPerformanceState 'useful cached content in the other tab with both panes retained' {
             param($reader)
             $reader.active_item -ne $previous -and $reader.focused_pane -eq 0 -and
                 $reader.cached_content_ready -and ($reader.tab_counts -join ',') -ceq '10,10'
-        } 5
+        } 'tab' $Concurrent $feedPage $inputTiming
         $sampleMs = $clock.Elapsed.TotalMilliseconds
         $observed = [Diagnostics.Stopwatch]::GetTimestamp()
         $previous = $after.cached_reader.active_item

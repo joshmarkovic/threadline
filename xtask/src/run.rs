@@ -1090,7 +1090,14 @@ fn native_driver(
         };
         if fixture.finish(dir, check).is_err() {
             result.status = Status::Fail;
-            result.detail = "Could not verify the isolated GitHub trace.".into();
+            result
+                .detail
+                .push_str(" Could not verify the isolated GitHub trace.");
+            if dir.join("github-access-trace-error.json").is_file() {
+                result
+                    .detail
+                    .push_str(" See github-access-trace-error.json for the fixture interruption.");
+            }
         }
     }
     Ok(result)

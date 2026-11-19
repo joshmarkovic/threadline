@@ -436,6 +436,23 @@ try {
     $expired = $false
     try { Wait-ConcurrentFeed 3 } catch { $expired = $_.Exception.Message -like '*state expired*' }
     if (!$expired) { throw 'A terminal request was mistaken for a held request.' }
+    [IO.File]::WriteAllText((Join-Path $scratch 'reader-feed-4-held'), '')
+    $script:readCount = 0
+    $script:report = [ordered]@{}
+    function Read-Observation {
+        $script:readCount++
+        $id = if ($script:readCount -eq 1) { 7 } else { 9 }
+        return [pscustomobject]@{ cached_reader=[pscustomobject]@{
+            active_item=9; cached_content_ready=$true
+            performance_timing=[pscustomobject]@{frequency=[Diagnostics.Stopwatch]::Frequency
+                kind='open'; target=$id; handler_qpc=10; painted_qpc=15 }
+        }}
+    }
+    $inputTiming = @{ method='UIA InvokePattern'; begin=5L; returned=20L }
+    $matched = Wait-ReaderPerformanceState 'a fresh paint' {param($r) $r.active_item -eq 9 -and $r.cached_content_ready} 'open' $true 4 $inputTiming
+    if ($script:readCount -ne 2 -or $matched.cached_reader.performance_timing.target -ne 9) {
+        throw 'An earlier or re-read view supplied the timed paint.'
+    }
 } finally {
     [IO.Directory]::Delete($scratch, $true)
 }

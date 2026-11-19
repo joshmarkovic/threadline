@@ -230,6 +230,7 @@ enum Route {
     BacklogPermission,
     BacklogComment(u8),
     BacklogFeed(u8),
+    BacklogFeedRetry(u8),
     BacklogFeedMetadata(u16),
     BacklogCachedPr,
     BacklogArchive,
@@ -273,7 +274,13 @@ pub struct AccessFixture {
     address: SocketAddr,
     phase_file: PathBuf,
     stopping: Arc<AtomicBool>,
-    worker: Option<JoinHandle<io::Result<Vec<RequestEvidence>>>>,
+    worker: Option<JoinHandle<FixtureRun>>,
+}
+
+#[derive(Default)]
+struct FixtureRun {
+    records: Vec<RequestEvidence>,
+    error: Option<io::Error>,
 }
 
 pub enum TraceCheck {
@@ -315,7 +322,11 @@ impl AccessFixture {
             .spawn({
                 let phase_file = phase_file.clone();
                 let stopping = stopping.clone();
-                move || serve(listener, &phase_file, &stopping)
+                move || {
+                    let mut records = Vec::new();
+                    let error = serve(listener, &phase_file, &stopping, &mut records).err();
+                    FixtureRun { records, error }
+                }
             })?;
         Ok(Self {
             address,
@@ -334,9 +345,29 @@ impl AccessFixture {
     }
 
     pub fn finish(mut self, report_dir: &Path, check: TraceCheck) -> io::Result<()> {
-        let records = self.stop()?;
+        let FixtureRun { records, error } = self.stop()?;
         let trace = serde_json::to_vec_pretty(&records)?;
         fs::write(report_dir.join("github-access-trace.json"), trace)?;
+        if let Some(error) = error {
+            let reason = match error.to_string().as_str() {
+                "too many requests to the access fixture" => "request limit reached",
+                "incomplete access fixture request" => "incomplete request",
+                "invalid access fixture phase" => "invalid fixture phase",
+                "paint acknowledged before the feed request" => "paint preceded its request",
+                _ => "request or fixture I/O failed",
+            };
+            let diagnostic = json!({
+                "reason": reason,
+                "error_kind": format!("{:?}", error.kind()),
+                "os_error": error.raw_os_error(),
+                "completed_requests": records.len(),
+            });
+            fs::write(
+                report_dir.join("github-access-trace-error.json"),
+                serde_json::to_vec_pretty(&diagnostic)?,
+            )?;
+            return Err(error);
+        }
         let valid = match check {
             TraceCheck::Observe => true,
             TraceCheck::AccountJourney => complete_journey(&records),
@@ -370,13 +401,13 @@ impl AccessFixture {
         Ok(())
     }
 
-    fn stop(&mut self) -> io::Result<Vec<RequestEvidence>> {
+    fn stop(&mut self) -> io::Result<FixtureRun> {
         self.stopping.store(true, Ordering::Release);
         match self.worker.take() {
             Some(worker) => worker
                 .join()
-                .map_err(|_| io::Error::other("access fixture worker stopped unexpectedly"))?,
-            None => Ok(Vec::new()),
+                .map_err(|_| io::Error::other("access fixture worker stopped unexpectedly")),
+            None => Ok(FixtureRun::default()),
         }
     }
 }
@@ -505,8 +536,8 @@ fn serve(
     listener: TcpListener,
     phase_file: &Path,
     stopping: &AtomicBool,
-) -> io::Result<Vec<RequestEvidence>> {
-    let mut evidence = Vec::new();
+    evidence: &mut Vec<RequestEvidence>,
+) -> io::Result<()> {
     while !stopping.load(Ordering::Acquire) {
         match listener.accept() {
             Ok((mut socket, _)) => {
@@ -531,7 +562,7 @@ fn serve(
             Err(error) => return Err(error),
         }
     }
-    Ok(evidence)
+    Ok(())
 }
 
 fn answer(
@@ -594,21 +625,27 @@ fn answer(
             status: 0,
         });
     }
-    let held_feed = if let (true, Route::BacklogFeed(page), Some(target)) =
-        (authorized, route, binding.as_deref())
+    let mut evidence_route = route;
+    let mut held_feed = None;
+    let mut next_feed_page = None;
+    if let (true, Route::BacklogFeed(page), Some(target)) = (authorized, route, binding.as_deref())
     {
-        let Some(request) = concurrent::hold(phase_file, stopping, page, socket)? else {
-            return Ok(RequestEvidence {
-                phase,
-                route,
-                fixture_authorization: true,
-                status: 0,
-            });
-        };
-        Some((request, concurrent::next(target, page)))
-    } else {
-        None
-    };
+        match concurrent::hold(phase_file, stopping, page, socket)? {
+            concurrent::FeedAttempt::Painted(request) => held_feed = Some(request),
+            concurrent::FeedAttempt::AlreadyServed => {
+                evidence_route = Route::BacklogFeedRetry(page)
+            }
+            concurrent::FeedAttempt::Interrupted => {
+                return Ok(RequestEvidence {
+                    phase,
+                    route,
+                    fixture_authorization: true,
+                    status: 0,
+                });
+            }
+        }
+        next_feed_page = concurrent::next(target, page);
+    }
     let reply = (authorized.then(|| review_threads::response(phase, route, binding.as_deref())))
         .flatten()
         .unwrap_or_else(|| response(phase, route, authorized, merge_sent));
@@ -623,7 +660,7 @@ fn answer(
     if let Some(sso) = reply.sso {
         write!(socket, "X-GitHub-SSO: {sso}\r\n")?;
     }
-    if let Some((_, Some(next))) = &held_feed {
+    if let Some(next) = next_feed_page {
         let address = socket.local_addr()?;
         write!(socket, "Link: <http://{address}{next}>; rel=\"next\"\r\n")?;
     }
@@ -681,12 +718,12 @@ fn answer(
     }
     socket.write_all(b"\r\n")?;
     socket.write_all(&body)?;
-    if let Some((request, _)) = held_feed {
+    if let Some(request) = held_feed {
         request.response_written()?;
     }
     Ok(RequestEvidence {
         phase,
-        route,
+        route: evidence_route,
         fixture_authorization: authorized,
         status: reply.status,
     })
@@ -1176,14 +1213,16 @@ mod tests {
                 assert!(reply.contains("Retry-After: 2\r\n"));
             }
         }
-        let mut records = fixture.stop().unwrap();
-        assert!(complete_sync_journey(&records));
+        let mut run = fixture.stop().unwrap();
+        assert!(run.error.is_none());
+        let records = &mut run.records;
+        assert!(complete_sync_journey(records));
         records.push(RequestEvidence {
             phase: Phase::SyncOffline,
             route: Route::User,
             status: 200,
             fixture_authorization: true,
         });
-        assert!(!complete_sync_journey(&records));
+        assert!(!complete_sync_journey(records));
     }
 }

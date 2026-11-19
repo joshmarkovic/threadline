@@ -130,6 +130,12 @@ pub(super) struct HeldFeed<'a> {
     served: bool,
 }
 
+pub(super) enum FeedAttempt<'a> {
+    Painted(HeldFeed<'a>),
+    AlreadyServed,
+    Interrupted,
+}
+
 impl HeldFeed<'_> {
     pub(super) fn response_written(mut self) -> io::Result<()> {
         publish(self.phase_file, self.page, "served")?;
@@ -151,12 +157,24 @@ pub(super) fn hold<'a>(
     stopping: &AtomicBool,
     page: u8,
     socket: &TcpStream,
-) -> io::Result<Option<HeldFeed<'a>>> {
+) -> io::Result<FeedAttempt<'a>> {
     let ack = marker(phase_file, page, "painted");
     if ack.try_exists()? {
+        if marker(phase_file, page, "served").try_exists()? {
+            return Ok(FeedAttempt::AlreadyServed);
+        }
+        if marker(phase_file, page, "response-failed").try_exists()? {
+            return Ok(FeedAttempt::Interrupted);
+        }
         return Err(io::Error::other(
             "paint acknowledged before the feed request",
         ));
+    }
+    // A disconnected or timed-out request has no verified overlap to reuse.
+    for terminal in ["disconnected", "expired", "stopped", "response-failed"] {
+        if marker(phase_file, page, terminal).try_exists()? {
+            return Ok(FeedAttempt::Interrupted);
+        }
     }
     publish(phase_file, page, "held")?;
     let started = Instant::now();
@@ -172,7 +190,7 @@ pub(super) fn hold<'a>(
             break "expired";
         }
         if ack.try_exists()? {
-            return Ok(Some(HeldFeed {
+            return Ok(FeedAttempt::Painted(HeldFeed {
                 phase_file,
                 page,
                 served: false,
@@ -181,7 +199,7 @@ pub(super) fn hold<'a>(
         thread::sleep(Duration::from_millis(20));
     };
     publish(phase_file, page, terminal)?;
-    Ok(None)
+    Ok(FeedAttempt::Interrupted)
 }
 
 pub(super) fn next(target: &str, page: u8) -> Option<String> {
@@ -217,6 +235,7 @@ pub(super) fn trace(records: &[RequestEvidence]) -> bool {
                         Route::User
                         | Route::Repository
                         | Route::BacklogFeed(_)
+                        | Route::BacklogFeedRetry(_)
                         | Route::BacklogArchive
                         | Route::BacklogAuxiliaryFeed
                         | Route::BacklogFeedMetadata(_) => row.status == 200,
@@ -294,6 +313,10 @@ mod tests {
             let reply = read(socket);
             assert!(reply.starts_with("HTTP/1.1 200"));
             assert!(marker(&phase, page, "served").exists());
+            if page == 30 {
+                let retry = read(request(&target));
+                assert_eq!(retry, reply);
+            }
             if let Some(next) = next(&target, page) {
                 assert!(reply.contains(&format!(
                     "Link: <http://{}{next}>; rel=\"next\"",
@@ -308,6 +331,48 @@ mod tests {
             .unwrap();
         let trace = fs::read(profile.path().join("github-access-trace.json")).unwrap();
         assert!(!contains_fixture_credential(&trace));
+        let records: Vec<Value> = serde_json::from_slice(&trace).unwrap();
+        assert_eq!(
+            records
+                .iter()
+                .filter(|row| row["route"]
+                    .get("backlog_feed_retry")
+                    .is_some_and(|page| page == 30))
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn concurrent_failed_fixture_retains_prior_completed_requests() {
+        let profile = tempfile::tempdir().unwrap();
+        let fixture = AccessFixture::start(profile.path()).unwrap();
+        fs::write(fixture.phase_file(), "backlog-concurrent").unwrap();
+        let mut ordinary = TcpStream::connect(fixture.address()).unwrap();
+        write!(
+            ordinary,
+            "GET {USER} HTTP/1.1\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\n\r\n"
+        )
+        .unwrap();
+        let mut reply = String::new();
+        ordinary.read_to_string(&mut reply).unwrap();
+        assert!(reply.starts_with("HTTP/1.1 200"));
+        publish(fixture.phase_file(), 1, "painted").unwrap();
+        let mut bad = TcpStream::connect(fixture.address()).unwrap();
+        write!(bad, "GET {SYNC_ITEMS}2026-11-19T00%3A00%3A00Z{PAGE_END}1 HTTP/1.1\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\n\r\n").unwrap();
+        assert_eq!(bad.read(&mut [0]).unwrap(), 0);
+        assert!(fixture.finish(profile.path(), TraceCheck::Observe).is_err());
+        let raw = fs::read(profile.path().join("github-access-trace.json")).unwrap();
+        let rows: Vec<Value> = serde_json::from_slice(&raw).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["status"], 200);
+        assert!(!contains_fixture_credential(&raw));
+        let error: Value = serde_json::from_slice(
+            &fs::read(profile.path().join("github-access-trace-error.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(error["reason"], "paint preceded its request");
+        assert_eq!(error["completed_requests"], 1);
     }
 
     #[test]
@@ -319,12 +384,15 @@ mod tests {
         let client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
         let (server, _) = listener.accept().unwrap();
         client.shutdown(std::net::Shutdown::Both).unwrap();
-        assert!(
-            hold(&phase, &AtomicBool::new(false), 51, &server)
-                .unwrap()
-                .is_none()
-        );
+        assert!(matches!(
+            hold(&phase, &AtomicBool::new(false), 51, &server).unwrap(),
+            FeedAttempt::Interrupted
+        ));
         assert!(marker(&phase, 51, "disconnected").is_file());
         assert!(!marker(&phase, 51, "served").exists());
+        assert!(matches!(
+            hold(&phase, &AtomicBool::new(false), 51, &server).unwrap(),
+            FeedAttempt::Interrupted
+        ));
     }
 }
