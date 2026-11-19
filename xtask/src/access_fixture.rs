@@ -46,6 +46,8 @@ const DISCOVERY: &str = "/user/repos?per_page=100&page=1";
 const REPOSITORY: &str = "/repos/fixture-org/private";
 const ITEMS: &str =
     "/repos/fixture-org/private/issues?state=all&sort=created&direction=desc&per_page=20&page=1";
+const PR_STATE_ITEMS_NEXT: &str =
+    "/repos/fixture-org/private/issues?state=all&sort=created&direction=desc&per_page=20&page=2";
 const ITEM: &str = "/repos/fixture-org/private/issues/41";
 const SCHEDULED_ISSUE: &str = "/repositories/71/issues/41";
 const COMMENTS_FIRST: &str = "/repos/fixture-org/private/issues/41/comments?per_page=20&page=1";
@@ -79,6 +81,7 @@ enum Phase {
     SyncTransport,
     SyncNotificationSend,
     PrLoad,
+    PrMergeState,
     PrDelay,
     PrRelease,
     PrSharedHold,
@@ -151,6 +154,7 @@ impl Phase {
             "sync-transport" => Ok(Self::SyncTransport),
             "sync-notification-send" => Ok(Self::SyncNotificationSend),
             "pr-load" => Ok(Self::PrLoad),
+            "pr-merge-state" => Ok(Self::PrMergeState),
             "pr-delay" => Ok(Self::PrDelay),
             "pr-release" => Ok(Self::PrRelease),
             "pr-shared-hold" => Ok(Self::PrSharedHold),
@@ -212,6 +216,7 @@ enum Route {
     Repository,
     Graphql,
     Items,
+    PrStateItemsNext,
     Item,
     ScheduledIssue,
     HistoricalSearch,
@@ -331,6 +336,7 @@ pub enum TraceCheck {
     RateLimitedCache,
     NotificationSchedule,
     PullRequestJourney,
+    PullRequestMergeState,
     SharedPrPanes,
     ReviewContextJourney,
     ReviewDraftJourney,
@@ -420,6 +426,7 @@ impl AccessFixture {
             TraceCheck::RateLimitedCache => rate_limit::trace(&records),
             TraceCheck::NotificationSchedule => complete_notification_schedule(&records),
             TraceCheck::PullRequestJourney => pr::trace(&records),
+            TraceCheck::PullRequestMergeState => pr::trace_merge_state(&records),
             TraceCheck::SharedPrPanes => pr::trace_shared(&records),
             TraceCheck::ReviewContextJourney => pr::trace_review_context(&records),
             TraceCheck::ReviewDraftJourney => pr::trace_review_draft(&records),
@@ -762,6 +769,13 @@ fn answer(
             "Link: <http://{local}{COMMENTS_NEXT}>; rel=\"next\"\r\n"
         )?;
     }
+    if phase == Phase::PrMergeState && route == Route::Items && reply.status == 200 {
+        let local = socket.local_addr()?;
+        write!(
+            socket,
+            "Link: <http://{local}{PR_STATE_ITEMS_NEXT}>; rel=\"next\"\r\n"
+        )?;
+    }
     socket.write_all(b"\r\n")?;
     socket.write_all(&body)?;
     if let Some(request) = held_feed {
@@ -802,6 +816,11 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         (Some("GET"), Some(DISCOVERY), Some("HTTP/1.1")) => Route::Discovery,
         (Some("GET"), Some(REPOSITORY), Some("HTTP/1.1")) => Route::Repository,
         (Some("GET"), Some(ITEMS), Some("HTTP/1.1")) => Route::Items,
+        (Some("GET"), Some(PR_STATE_ITEMS_NEXT), Some("HTTP/1.1"))
+            if phase == Phase::PrMergeState =>
+        {
+            Route::PrStateItemsNext
+        }
         (Some("GET"), Some(ITEM), Some("HTTP/1.1")) => Route::Item,
         (Some("GET"), Some(SCHEDULED_ISSUE), Some("HTTP/1.1"))
             if matches!(

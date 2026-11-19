@@ -616,7 +616,7 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
                 Some(NativeMode::WindowsReaderOffline)
             } else if id == "S05-WINDOWS-RATE-LIMIT" {
                 Some(NativeMode::WindowsSync)
-            } else if id == "S06-SHARED-PR-PANES" {
+            } else if matches!(id, "S06-SHARED-PR-PANES" | "S06-PR-MERGE-STATE") {
                 Some(NativeMode::WindowsPullRequest)
             } else if id == "S11-NATIVE-ACTIVITY" {
                 Some(NativeMode::WindowsNativeActivity)
@@ -885,6 +885,9 @@ fn native_driver(
         NativeMode::WindowsSync => Some("Sync"),
         NativeMode::WindowsNotificationSchedule => Some("NotificationSchedule"),
         NativeMode::WindowsPullRequest if id == "S06-SHARED-PR-PANES" => Some("SharedPullRequest"),
+        NativeMode::WindowsPullRequest if id == "S06-PR-MERGE-STATE" => {
+            Some("PullRequestMergeState")
+        }
         NativeMode::WindowsPullRequest => Some("PullRequest"),
         NativeMode::WindowsHistory => Some("History"),
         NativeMode::WindowsReviewDraft if id == "S08-REVIEW-DECISIONS" => Some("ReviewDecisions"),
@@ -1085,6 +1088,9 @@ fn native_driver(
             }
             (Status::Pass, NativeMode::WindowsPullRequest) if id == "S06-SHARED-PR-PANES" => {
                 TraceCheck::SharedPrPanes
+            }
+            (Status::Pass, NativeMode::WindowsPullRequest) if id == "S06-PR-MERGE-STATE" => {
+                TraceCheck::PullRequestMergeState
             }
             (Status::Pass, NativeMode::WindowsPullRequest) => TraceCheck::PullRequestJourney,
             (Status::Pass, NativeMode::WindowsHistory) => TraceCheck::HistoryJourney,

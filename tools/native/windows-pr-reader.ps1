@@ -66,6 +66,79 @@ function Open-FixturePr([IntPtr]$Window, [int]$Pane, [int]$Number, [string]$Titl
     }
 }
 
+function Confirm-FixturePrMergeLabel([IntPtr]$Window, [string]$Name) {
+    Wait-For 'the exact native pull request merge-state label' {
+        $null -ne (Find-OwnedFixtureControl $Window 'pr-0-merge-state' $Name -AllowDisabled)
+    }
+}
+
+function Invoke-PrMergeStateProof([IntPtr]$Window, [string]$Profile) {
+    Wait-SeededFixtureAccount
+    Click-AccountControl $Window 'reader-repository-1'
+    Click-AccountControl $Window 'reader-fetch-repository'
+    $head = 'b' * 40
+    $title = 'First fixture pull request'
+    $updated = 'First fixture pull request after issue refresh'
+    $other = 'Second fixture pull request'
+    $dot = ' ' + [char]0x00b7 + ' '
+    $mergedLabel = 'Merged' + $dot + 'Ready for review' + $dot + 'fixture-author' + $dot + 'topic ' + [char]0x2192 + ' main'
+    $unknownLabel = 'Closed' + $dot + 'merge state unknown'
+
+    Activate-FixturePr $Window 'reader-result-' 42 $title -Result
+    Click-AccountControl $Window 'pr-0-refresh'
+    $initial = Wait-PrReader 'the verified merged pull request and its two provider identities' {
+        param($pr, $reader)
+        $reader.active_number -eq 42 -and $pr.closed -eq $true -and $pr.merged -eq $true -and
+            $pr.issue_rest_id -eq 442 -and $pr.pull_request_rest_id -eq 762 -and $pr.head -ceq $head
+    }
+    $first = $initial.cached_reader.active_item
+    $revision = $initial.cached_reader.pull_request.revision_id
+    Confirm-FixturePrMergeLabel $Window $mergedLabel
+    Add-Evidence 'Read the authoritative merged pull request identity' ([ordered]@{ item = $first; number = 42; issue_id = 442; pull_request_id = 762; revision = $revision; label = $mergedLabel })
+
+    Click-AccountControl $Window 'reader-browse'
+    Click-AccountControl $Window 'reader-fetch-repository'
+    Activate-FixturePr $Window 'reader-result-' 42 $updated -Result
+    $null = Wait-PrReader 'the newer issue-shaped response retained the original confirmed merge' {
+        param($pr, $reader)
+        $reader.active_item -eq $first -and $pr.closed -eq $true -and $pr.merged -eq $true -and
+            $pr.issue_rest_id -eq 442 -and $pr.pull_request_rest_id -eq 762 -and $pr.revision_id -eq $revision
+    }
+    Confirm-FixturePrMergeLabel $Window $mergedLabel
+    Add-Evidence 'Consume the newer issue-shaped closed response and keep the merged label' ([ordered]@{ item = $first; updated_title_seen = $true; label = $mergedLabel })
+
+    Set-WriteFixtureOffline $Window $true
+    Click-AccountControl $Window 'reader-browse'
+    Activate-FixturePr $Window 'reader-result-' 43 $other -Result
+    $undownloaded = Wait-PrReader 'the closed second pull request has no downloaded merge facts' {
+        param($pr, $reader)
+        $reader.active_number -eq 43 -and $reader.offline -and $pr.closed -eq $true -and $null -eq $pr.merged -and
+            $pr.issue_rest_id -eq 443 -and $null -eq $pr.pull_request_rest_id -and $null -eq $pr.head
+    }
+    $second = $undownloaded.cached_reader.active_item
+    if (!$first -or !$second -or $first -eq $second) { throw 'The two pull request identities were conflated.' }
+    Confirm-FixturePrMergeLabel $Window $unknownLabel
+    Add-Evidence 'Display the closed pull request without inventing downloaded merge facts' ([ordered]@{ item = $second; number = 43; issue_id = 443; pull_request_id = $null; label = $unknownLabel })
+
+    $restart = Restart-Reader $Profile
+    $null = Wait-PrReader 'the closed PR reloads the same missing merge state from SQLite' {
+        param($pr, $reader)
+        $reader.active_item -eq $second -and $reader.offline -and $pr.closed -eq $true -and
+            $pr.issue_rest_id -eq 443 -and $null -eq $pr.pull_request_rest_id -and $null -eq $pr.merged
+    }
+    Confirm-FixturePrMergeLabel $restart $unknownLabel
+    Activate-FixturePr $restart 'reader-tab-0-' 42 $updated
+    $null = Wait-PrReader 'the confirmed merge and separate provider identities reload from SQLite' {
+        param($pr, $reader)
+        $reader.active_item -eq $first -and $reader.offline -and $pr.closed -eq $true -and $pr.merged -eq $true -and
+            $pr.issue_rest_id -eq 442 -and $pr.pull_request_rest_id -eq 762 -and $pr.revision_id -eq $revision
+    }
+    Confirm-FixturePrMergeLabel $restart $mergedLabel
+    Add-Evidence 'Verify both exact merge-state labels and distinct stored identities after offline restart' ([ordered]@{ merged_item = $first; unknown_item = $second; merged_revision = $revision })
+    Stop-ThroughUi
+    $script:report.detail = 'The Windows reader kept an authoritative merged pull request and its identities after a newer issue-shaped closed response. A separate closed pull request retained unknown merge status through a SQLite restart. The fixture recorded no mutation or request for the unknown PR details.'
+}
+
 function Invoke-PrReaderProof([IntPtr]$Window) {
     Set-AccessPhase 'pr-load'
     Wait-SeededFixtureAccount

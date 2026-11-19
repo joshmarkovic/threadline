@@ -19,6 +19,9 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == "S06-SHARED-PR-PANES" {
         return Some("s06-shared-pr-panes-v2");
     }
+    if case == "S06-PR-MERGE-STATE" {
+        return Some("s06-pr-merge-state-v1");
+    }
     if case == "S08-COMMENT-DEPENDENCY" {
         return Some("s08-native-comment-dependency-v1");
     }
@@ -219,6 +222,7 @@ pub fn associations(case: &str) -> Associations {
         ),
         "S08-THREAD-QUEUE" => ("REVIEW-01;REVIEW-04;OUTBOX-03;TEST-04", "AC-63;AC-65"),
         "S06-SHARED-PR-PANES" => ("WORKSPACE-07;CACHE-02;PR-02;TEST-04", "AC-44"),
+        "S06-PR-MERGE-STATE" => ("DATA-07;DATA-09;PR-01;TEST-04", "AC-52"),
         "S07-ISSUE-CONFLICT" => ("ISSUE-03;ISSUE-05;OUTBOX-03;TEST-04", "AC-13;AC-15"),
         "S08-COMMENT-DEPENDENCY" => ("OUTBOX-06;TEST-04;TEST-05", "AC-63;AC-92"),
         "S08-REVIEW-PREDECESSOR" => ("REVIEW-04;OUTBOX-03;TEST-04", "AC-63"),

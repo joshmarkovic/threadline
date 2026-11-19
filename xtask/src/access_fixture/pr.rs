@@ -34,6 +34,7 @@ pub(super) fn applies(phase: Phase) -> bool {
     matches!(
         phase,
         Phase::PrLoad
+            | Phase::PrMergeState
             | Phase::PrDelay
             | Phase::PrRelease
             | Phase::PrSharedHold
@@ -134,9 +135,30 @@ fn data(phase: Phase, route: Route) -> Option<Value> {
         })
     };
     match route {
+        Route::Items if phase == Phase::PrMergeState => {
+            let mut first = first();
+            let mut second = second();
+            first["state"] = json!("closed");
+            second["state"] = json!("closed");
+            Some(json!([first, second]))
+        }
+        Route::PrStateItemsNext if phase == Phase::PrMergeState => {
+            let mut updated = first();
+            updated["state"] = json!("closed");
+            updated["title"] = json!("First fixture pull request after issue refresh");
+            updated["updated_at"] = json!("2021-01-03T00:00:00Z");
+            Some(json!([updated]))
+        }
         Route::Items => Some(json!([first(), second()])),
         Route::PullA => {
             let mut value = pull(first(), 42, A_BASE, A_HEAD);
+            if phase == Phase::PrMergeState {
+                value["state"] = json!("closed");
+                value["merged"] = json!(true);
+                value["merged_at"] = json!("2021-01-02T00:00:00Z");
+                value["merge_commit_sha"] = json!(A_MERGE);
+                value["updated_at"] = json!("2021-01-02T00:00:00Z");
+            }
             if matches!(phase, Phase::PrSharedHold | Phase::PrSharedRelease) {
                 value["draft"] = json!(true);
                 value["updated_at"] = json!("2021-01-02T00:00:00Z");
@@ -220,6 +242,36 @@ fn data(phase: Phase, route: Route) -> Option<Value> {
         }
         _ => None,
     }
+}
+
+pub(super) fn trace_merge_state(records: &[RequestEvidence]) -> bool {
+    records.iter().all(|entry| {
+        entry.phase == Phase::PrMergeState
+            && entry.fixture_authorization
+            && entry.status == 200
+            && matches!(
+                entry.route,
+                Route::User
+                    | Route::Repository
+                    | Route::Items
+                    | Route::PrStateItemsNext
+                    | Route::PullA
+                    | Route::CompareA
+                    | Route::UpdatedItems
+                    | Route::UpdatedComments
+                    | Route::UpdatedInlineComments
+                    | Route::OpenPullIndex
+            )
+    }) && records
+        .iter()
+        .filter_map(|entry| {
+            matches!(
+                entry.route,
+                Route::Items | Route::PullA | Route::PrStateItemsNext
+            )
+            .then_some(entry.route)
+        })
+        .eq([Route::Items, Route::PullA, Route::PrStateItemsNext])
 }
 
 pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
@@ -409,6 +461,42 @@ mod tests {
             assert_eq!(pull["head"]["sha"], A_HEAD);
             assert_eq!(pull["draft"], phase != Phase::PrSharedReady);
         }
+    }
+
+    #[test]
+    fn merge_state_journey_keeps_separate_issue_and_pull_request_identities() {
+        let phase = Phase::PrMergeState;
+        let baseline = data(phase, Route::Items).unwrap();
+        let details = data(phase, Route::PullA).unwrap();
+        let next = data(phase, Route::PrStateItemsNext).unwrap();
+        assert_eq!(baseline[0]["id"], 442);
+        assert_eq!(details["id"], 762);
+        assert_eq!(details["merged"], true);
+        assert_eq!(next[0]["id"], baseline[0]["id"]);
+        assert_eq!(next[0]["pull_request"], baseline[0]["pull_request"]);
+        assert_eq!(next[0]["state"], "closed");
+        assert!(next[0].get("merged").is_none());
+        assert!(next[0]["pull_request"].get("merged_at").is_none());
+        assert_eq!(baseline[1]["id"], 443);
+        assert_eq!(baseline[1]["state"], "closed");
+        assert!(baseline[1]["pull_request"].get("merged_at").is_none());
+
+        let mut records = Vec::from([Route::Items, Route::PullA, Route::PrStateItemsNext].map(
+            |route| RequestEvidence {
+                phase,
+                route,
+                status: 200,
+                fixture_authorization: true,
+            },
+        ));
+        assert!(trace_merge_state(&records));
+        records.push(RequestEvidence {
+            phase,
+            route: Route::PullB,
+            status: 200,
+            fixture_authorization: true,
+        });
+        assert!(!trace_merge_state(&records));
     }
 
     #[test]

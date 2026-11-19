@@ -5,8 +5,8 @@ use super::{
 };
 use crate::palette::Palette;
 use gpui_kit::{
-    AnyElement, InteractiveElement, IntoElement, ParentElement, Role, StatefulInteractiveElement,
-    Styled,
+    AnyElement, Element, InteractiveElement, IntoElement, ParentElement, Role,
+    StatefulInteractiveElement, Styled,
     base::ElementExt,
     component::{
         Disableable, Selectable,
@@ -25,6 +25,18 @@ use threadline_storage::{
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(super) struct PrReadKey(ItemId, &'static str, String);
+
+fn pr_state_status(pane: usize, text: String, palette: Palette) -> impl Element {
+    let id = format!("pr-{pane}-merge-state");
+    div()
+        .id(id.clone())
+        .accessibility_id(id)
+        .role(Role::Status)
+        .aria_label(text.clone())
+        .text_xs()
+        .text_color(palette.muted)
+        .child(text)
+}
 
 #[derive(Clone)]
 enum Command {
@@ -76,6 +88,9 @@ pub(crate) struct PrObservation {
     head: Option<String>,
     merge_base: Option<String>,
     merged: Option<bool>,
+    closed: Option<bool>,
+    issue_rest_id: Option<u64>,
+    pull_request_rest_id: Option<u64>,
     linked_issue: Option<i64>,
     verified_targets: usize,
     download_state: Option<String>,
@@ -212,6 +227,26 @@ impl ReaderWorkspace {
                         _ => None,
                     }
                 }),
+                closed: cached
+                    .data
+                    .item
+                    .as_ref()
+                    .and_then(|item| match item.closed {
+                        Change::Value(value) => Some(value),
+                        _ => None,
+                    }),
+                issue_rest_id: cached
+                    .data
+                    .item
+                    .as_ref()
+                    .and_then(|item| item.issue_id)
+                    .map(|id| id.get()),
+                pull_request_rest_id: cached
+                    .data
+                    .item
+                    .as_ref()
+                    .and_then(|item| item.pull_request.as_ref())
+                    .map(|pull| pull.id.get()),
                 linked_issue: pr
                     .and_then(|pr| pr.data.linked.as_ref())
                     .map(|issue| issue.item.id.0),
@@ -397,10 +432,14 @@ impl ReaderWorkspace {
                 h.base_ref.as_deref().unwrap_or("Unknown target branch")
             );
             header = header
-                .child(div().text_xs().text_color(palette.muted).child(format!(
-                    "{state} · {draft} · {} · {refs}",
-                    h.author.as_deref().unwrap_or("Unknown author")
-                )))
+                .child(pr_state_status(
+                    pane,
+                    format!(
+                        "{state} · {draft} · {} · {refs}",
+                        h.author.as_deref().unwrap_or("Unknown author")
+                    ),
+                    palette,
+                ))
                 .child(div().text_xs().text_color(palette.muted).child(format!(
                         "{reviewers} · {}",
                         h.review_decision
@@ -415,7 +454,7 @@ impl ReaderWorkspace {
                 .child(self.pr_download_header(pane, tab, pr, palette, cx))
                 .child(self.merge_view(pane, tab, pr, palette, cx));
         } else {
-            header = header.child(div().text_xs().text_color(palette.muted).child(state));
+            header = header.child(pr_state_status(pane, state.into(), palette));
         }
         header.into_any_element()
     }
