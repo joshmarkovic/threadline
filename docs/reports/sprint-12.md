@@ -92,27 +92,25 @@ A separate two-process reference used the same managed Windows UI Automation Inv
 
 In Threadline, the Windows AccessKit provider sends an accessibility action to GPUI's foreground executor, which dispatches it to the rendered node's handler. Threadline's app trace begins at that handler. The reference captured latency before entry into its own provider, while Threadline's data measures its own handler-to-paint interval and external end-to-end time. The published budgets still use the external timings. [Threadline measurements](evidence/sprint-12/reader-performance.json) · [Windows measurement driver](../../tools/native/windows-owned-uia.ps1) · [Windows provider entry](https://learn.microsoft.com/en-us/dotnet/framework/ui-automation/expose-a-server-side-ui-automation-provider)
 
-### Portable regression
-
-On clean `8da02ce`, Linux x64 under WSL2 passed 23 unit scenarios with 100 reported tests, 36 integration scenarios with 144 tests, and nine UI scenarios with 18 tests. The canonical invocations returned exit 0. Formatting and strict Clippy passed. [Invocation and receipt hashes](evidence/sprint-12/portable-release-validation.json)
-
 ## Local regression suites
 
-Formatting and strict Clippy passed on clean `f06de5e` in WSL Linux. Clippy checked all workspace targets with the app's E2E feature enabled and warnings treated as errors. The canonical runner used seed 12345 for the local test lanes. [Commands and test receipts](evidence/sprint-12/local-suite-validation.json)
+Formatting and strict Clippy passed on clean `013044b` in WSL2 Linux x64. Clippy checked all workspace targets with the app's E2E feature enabled and warnings treated as errors. The canonical runner used seed 12345. [Commands and results](evidence/sprint-12/current-local-validation.json)
 
 | Linux test lane | Selectors passed | Test results passed |
 | --- | ---: | ---: |
-| Unit | 23 | 96 |
-| Integration | 36 | 136 |
+| Unit | 23 | 104 |
+| Integration | 36 | 145 |
 | In-process GPUI | 9 | 18 |
 
-On Windows 11 x64 build 22631.7652, 32 native test executables from `3dc5b64` recorded 238 passes, two failures and two ignored credential tests. The original IT-021 failure came from a staged bootstrap path. The corrected test at `575b609` passed with the actual Windows installer executable supplied explicitly. The other failure came from a one-nanosecond subtraction in an idle sampling test that rounded to the same tick on Windows. The `4619aa5` native app rerun passed all 42 tests, including the corrected idle test. [Original outcomes, test names and follow-ups](evidence/sprint-12/local-suite-validation.json)
+All 32 native test executables from `01d19b0` exited successfully on Windows 11 x64 build 22631.7652. The default run recorded 260 passes, zero failures and two ignored Credential Manager entries. The separately enabled protected-store test passed. Its child read the existing synthetic entry in a new process, and the test removed both of its keys. The receipts separate these runs from the external desktop journeys. [Per-executable digests, results and credential receipt](evidence/sprint-12/current-local-validation.json)
+
+The earlier Windows run on `3dc5b64` recorded 238 passes, two failures and two ignored entries. IT-021 failed because of a staged bootstrap path and passed after correction on `575b609`. A Windows timer rounded an idle-sampling test's one-nanosecond subtraction to the same tick. The corrected app suite on `4619aa5` passed all 42 tests. Earlier Linux results at `f06de5e` and `8da02ce` remain recorded. [Original outcomes and targeted reruns](evidence/sprint-12/local-suite-validation.json) · [Earlier portable suite](evidence/sprint-12/portable-release-validation.json)
 
 A separate Windows test delivered modeled suspend and resume messages to its own hidden platform window. The broker emitted one normal resume event. Physical sleep still needs target evidence. [Native resume receipt](evidence/sprint-12/local-suite-validation.json)
 
 ## Windows closure and remaining checks
 
-Sixteen Windows unit, SQLite and in-process GPUI selectors now cite the matching tests in the native executable logs. The corrected IT-021 CLI passed separately. Windows Credential Manager also passed a separately enabled synthetic round-trip. A new process read the same protected entry and the test removed both of its keys. The original default-suite totals still include the two skipped protected-store entries. [Exact tests and receipt hashes](evidence/sprint-12/windows-traceability.json) · [Windows scenario ledger](../spec/test_platform_traceability.csv)
+The Windows scenario ledger links each covered unit, SQLite and in-process GPUI case to its matching native tests. [Exact tests and receipt hashes](evidence/sprint-12/windows-traceability.json) · [Windows scenario ledger](../spec/test_platform_traceability.csv)
 
 E2E-015 invoked the owned Load preview control through Windows UI Automation on `6ea3e43` at 96 DPI. Windows then refused foreground focus and the driver stopped before sending physical input. Earlier Sprint 01 runs separately verified native text input and clipboard at 96 and 144 DPI. The E2E-015 run still needs its combined keyboard, clipboard, exact Unicode and high-DPI checks in an unlocked Windows session, and a separate signed visual and screen-reader record. [E2E-015 receipt](evidence/sprint-12/windows-traceability.json) · [Earlier native input](sprint-01.md)
 

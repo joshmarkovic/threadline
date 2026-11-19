@@ -1,0 +1,493 @@
+{
+  "portable": {
+    "lanes": [
+      {
+        "run": "integration-1795049485344-2317461",
+        "lane": "integration",
+        "source_revision": "013044b65a11371d3ffb1d80be5f4527bea9cc3c",
+        "source_dirty": false,
+        "host": {
+          "os": "linux",
+          "architecture": "x86_64",
+          "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+          "display_session": "Wayland and X11 environment"
+        },
+        "package_version": "0.1.0",
+        "seed": 12345,
+        "cargo_lock_sha256": "082539453360bf3f03c3bda8861f85e9ea384536457a9dfd27b5143e05890f9a",
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "integration",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "started_at_unix_ms": 1795049485343,
+        "finished_at_unix_ms": 1795049776086,
+        "selectors_passed": 36,
+        "tests_reported_passed": 145,
+        "status": "Pass",
+        "exit_code": 0,
+        "result_sha256": "8f788a7689367d4d9e5dae716e837142c4591a5a51067f3d8d3ed95249b3a7bc",
+        "junit_sha256": "b06b83aa5d3eca84ad6a2a09db8a3a63191f41de0c709560ec49b48fc62e11f6"
+      },
+      {
+        "run": "ui-1795049776091-2323979",
+        "lane": "ui",
+        "source_revision": "013044b65a11371d3ffb1d80be5f4527bea9cc3c",
+        "source_dirty": false,
+        "host": {
+          "os": "linux",
+          "architecture": "x86_64",
+          "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+          "display_session": "Wayland and X11 environment"
+        },
+        "package_version": "0.1.0",
+        "seed": 12345,
+        "cargo_lock_sha256": "082539453360bf3f03c3bda8861f85e9ea384536457a9dfd27b5143e05890f9a",
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "ui",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "started_at_unix_ms": 1795049776091,
+        "finished_at_unix_ms": 1795049950909,
+        "selectors_passed": 9,
+        "tests_reported_passed": 18,
+        "status": "Pass",
+        "exit_code": 0,
+        "result_sha256": "0f9f04437e60072ee2b0c69b8474d2483014264e937e3aceb8b8b1041af9c393",
+        "junit_sha256": "11c72b7841d7eb750199e6f548806851a6963448497f57534f60e62b19bef1b6"
+      },
+      {
+        "run": "unit-1795049384140-2314659",
+        "lane": "unit",
+        "source_revision": "013044b65a11371d3ffb1d80be5f4527bea9cc3c",
+        "source_dirty": false,
+        "host": {
+          "os": "linux",
+          "architecture": "x86_64",
+          "version": "Linux 6.18.40.1-microsoft-standard-WSL2",
+          "display_session": "Wayland and X11 environment"
+        },
+        "package_version": "0.1.0",
+        "seed": 12345,
+        "cargo_lock_sha256": "082539453360bf3f03c3bda8861f85e9ea384536457a9dfd27b5143e05890f9a",
+        "command": {
+          "program": "xtask",
+          "argv": [
+            "test",
+            "unit",
+            "--seed",
+            "12345",
+            "--report-dir",
+            "<report-dir>"
+          ],
+          "redacted": true
+        },
+        "started_at_unix_ms": 1795049384140,
+        "finished_at_unix_ms": 1795049485336,
+        "selectors_passed": 23,
+        "tests_reported_passed": 104,
+        "status": "Pass",
+        "exit_code": 0,
+        "result_sha256": "0e426123a0c6911c9eea896f3310c0bbaf62df4e08647ccbb7c18119b64438f0",
+        "junit_sha256": "301c45dc818f0264695916bf07de27801e64064b91eb2a3a7db0a4e603588378"
+      }
+    ],
+    "checks": [
+      {
+        "command": "cargo fmt --all -- --check",
+        "status": "Pass",
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "cargo clippy --workspace --all-targets --features threadline-app/e2e -- -D warnings",
+        "status": "Pass",
+        "exit_code": 0,
+        "log_sha256": "bb9a7806dcef271a94c5b5c881d18f01896904e1c7a90a5a4657d25a3c75ea86"
+      }
+    ],
+    "previous_receipts": [
+      "local-suite-validation.json",
+      "portable-release-validation.json"
+    ]
+  },
+  "windows": {
+    "source_revision": "01d19b020c9defa4422d4a0e2f71e22a7781d856",
+    "host": {
+      "os": "Windows 11 Enterprise 23H2",
+      "build": "22631.7652",
+      "architecture": "x64"
+    },
+    "target": "x86_64-pc-windows-msvc",
+    "scope": "Native execution of 32 Rust test executables, including the in-process GPUI harness. Separate-process GUI and published package verification have their own receipts.",
+    "report_group": "unit-01d19b0/receipts",
+    "default_suite": {
+      "executables": 32,
+      "passed": 260,
+      "failed": 0,
+      "ignored": 2,
+      "exits_sha256": "6a4a6395b464ff8f25130dfa2b08b7d707d1fb98fb7badc064a9dca318979c22",
+      "ignored_tests": [
+        "credentials::windows::tests::native_restart_fixture_reader ... ignored, child invoked only by the protected-store restart fixture",
+        "credentials::windows::tests::native_synthetic_protected_store_round_trip ... ignored, requires a Windows user logon with Credential Manager access"
+      ],
+      "runs": [
+        {
+          "suite": "access",
+          "executable_sha256": "09c2e58d325b564bf549ca08117df1c37ec793a7965a220b82b2a42fd28d3f13",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "950995e87b41dba9297dc8562935528b104b8c8fb212186186221ca1ea1e6fd2",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "bootstrap_command",
+          "executable_sha256": "b9c091f644af859a081cb4887942e999d9b716e77442ea34d75bd32f1f007c7d",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "35a180c99363011f13c993827c026e14a6a192be709a0b0b44e288c5b838ebcc",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "durability",
+          "executable_sha256": "79fea43ef273daf2153940c8c2b474b07d401e66764a593b82eff1a0c003469e",
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "95e685e490be7205efed23b9dd9e98e6e809c4b24402f4ec45038aac2623bfa9",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "feasibility_ui",
+          "executable_sha256": "03915c9b77905cb6ab3db9ca72b1340cd9edb0a8f2519732b3244f0680a811f1",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "962384054df0a3b6a04d7a83d003951fb06b7718474f35842df644487c6e883c",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "fixtures",
+          "executable_sha256": "9d517f097348aad9184a1d1ea3dda9bd662080f5bb88d7d0b08792cf98842e22",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "2cbf5d6b0d99ba3e87fe1f23be7b0d42bb92a8531462007adfb1bbfc639d9f39",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "foundation",
+          "executable_sha256": "ff4b9115dd36f95b96bc45146ca5255fda109f0ab8da3b20de97247ad5fa8d8e",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "5e27cf93b3a7cae7b79d0bfeb9599cb9d65437b6837dc91ab9d87adb7cd02524",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "github_access",
+          "executable_sha256": "ea6835d4f0fa4d3e4ae9d4912e2eb878457bdc98821cff973084d539a52d6e71",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "000d41f9066790850f67973d6084612f305b8066b0c296ea7ad00c2d057be32e",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "github_history",
+          "executable_sha256": "18951ba4cf7da4bac913f0f9eba11f7ef2c66b81718b9941fccdb09edfc8ed1b",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "86c30ff39b7abfe2f48daa8dad3aa27241c8f2bc28ef21686e8497a046be4731",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "github_merge",
+          "executable_sha256": "a9c47925110706cc8924f221c846ec8ea38049e14216caf234d8b8408fc6b7d7",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "8efd9baf12e739c11d9dc8f784928cf9cde4d72f5229e3d703e66196e4c5df84",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "github_pr",
+          "executable_sha256": "c46966db22f0517fdef3306024e75fc1f4537471ead102a21a800e0a4d82884b",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "5a93592a81e88bf710550d53658e37b799267a45699f77d665c12b043373871d",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "github_reader",
+          "executable_sha256": "45472a7ce77ee4212c43ed461fcdf214875975288d292874b285747970ea189e",
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "ef7b07c76dedd4357558d906f3616bb93901999f9d86537d0d3232d4785a9249",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "github_review_writes",
+          "executable_sha256": "1ce9e921fa1d6135ed9815abd84b267ffe7e2bf09744d4e03a72a7307216e09d",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "35641fd5f28ad06981d4a4035d2088a5b61599e9bf41ff0e76da0c729f7eef02",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "github_writes",
+          "executable_sha256": "2b1b4310874b0964819cbd4d6c2f365720180213f1b3d2f559ee326457485953",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "e21f46d4cbef5d60c2a0d1e524f2edfdcf10a886442dbbc0590b94501c8bf0a9",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "history",
+          "executable_sha256": "d385520286bc77f847e412d9832e4ec67ce68723fe689f5e7650c318e4fc081d",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "d42b3924d8ef3138620fc7ffedbfa260e2aa10e87ddae0d863c852152aae810a",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "history_monitor",
+          "executable_sha256": "843cc3e4c8635e75bce20fe39b45feb467941e7e14f1c30cdffe3cc1a98e5fad",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "d292fdf14d96a63fd482d72eecab99dab0906cf897d1e1b1260eb8225a74651b",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "identity",
+          "executable_sha256": "c2beec55acca7c3309b3d37671cccd34095fef68c7c7274070a0a8b4d5451b4e",
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "2f625d946a5f11cedb16dc90bde6250e52152a3bf450d5c652360e496948f4b1",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "merges",
+          "executable_sha256": "ccf7686c524f436011265bdd0e5659753d35233ddbe5c13c53660506e70b1e82",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "06fec6f20f7c95f3077cadaf050af692601d7f0bbe0ec9dc83ade45bceb6dd81",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "notifications",
+          "executable_sha256": "509997e17d9dcd53b61dc5e140b6178f3644dfbd6bd05e0854b2a476efaa5460",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "045fdfd96b7e28a4879794dd953793bfc9e6d7aa0df791258d2488666d0eccf3",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "pr",
+          "executable_sha256": "18e70286b62cbce4f1830ce6714d685639e92c33a94441f4207fcae691d499c1",
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "b803bbbcfe304ea3a9750f2bd61cd3ad00b69f7cd065177080495a53d10b558f",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "reader",
+          "executable_sha256": "9f45f9de53bb17ec2db2268553535bb960d2bf1740a8a9fcf9db6fb7fc05f2ac",
+          "passed": 11,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "5798289c7ba9393326b41f77a5ad74c79893c070ee740c08ab571930992a6138",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "resources",
+          "executable_sha256": "4137a7716fd58ca7c13ea6bbde047f86a510389ce2cd964eba5e93800a8f2ea0",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "9189bd7c7ade3f97afc51fddcc08378e68ebbc85d9262087a25015cdd8bd540d",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "reviews",
+          "executable_sha256": "aaecefa18a430e4c3bf54f832d0f3519727a8e00bfdd3fd322315b941a5ee484",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "5a7650b8c52aa63266696637870d29ca40225a07fb5ac88d0c50d43489bd0e25",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "sync",
+          "executable_sha256": "b42c5496c5fefd98b2f480a2e03b002bd3326cd9ade003350757165c52569f9c",
+          "passed": 13,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "7ecf1629d92f07967cd33c45b363bd61081ba162f0cbf508ee4754df32e08f08",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "threadline",
+          "executable_sha256": "2a9f99d89e89bb9f4f0d9b24d41612762340a63d5d5aca6e5d3022d17976b5a8",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "9190e73c20d848ea75e951c055cd73213b98cdb10458e1f8a9db997d8fc602fc",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "threadline_app",
+          "executable_sha256": "d63a2f382c511330e1ba01bd08376b1fe1ac224d35f6af18edf6d4f46fa7d3e0",
+          "passed": 45,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "a5ad836bfac77cbc12d6cd8931f599f7c0b42ea3c75d4edda55e5dce4ed21fd0",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "threadline_core",
+          "executable_sha256": "475512d2637a5d71ae063e94bfb08a0acb5b5bc6fe128c49ef6381421d6ed78a",
+          "passed": 17,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "1db51f23fc7fc4b9bfe452b71e932a524e0a23a054bd02fcdf91cd1f466cffe2",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "threadline_installer",
+          "executable_sha256": "ab630cee3efc13a7346d334b97aa3e23c323701643295f65db14ba4daea17c13",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "bf50490b24ebddb1386b52092ee422056a0ca5e177f3a8538af90fd946eaf353",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "threadline_platform",
+          "executable_sha256": "a87907e115de541a0aa970e30f40b0c297000c0947abb46e9adad11691af0e36",
+          "passed": 9,
+          "failed": 0,
+          "ignored": 2,
+          "exit_code": 0,
+          "log_sha256": "0ca4d03d5290f2a6f3e42109b99d1d327e8a82bd560cfd6b3419fdfa30f70d69",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "threadline_storage",
+          "executable_sha256": "c10e43a2b02fca9c2579b44a9cf0bc9f8e23f6c778d2244ffd25c83e8ba8d299",
+          "passed": 14,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "5c91b3e931896ac9f02a484173123773f8487d6ae6964748a560a87cd6d9851d",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "threadline-installer",
+          "executable_sha256": "ee70c46ff6a040befbab51e36b148b00ed6327b10dcef6ae258a32a4cd67418d",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "9190e73c20d848ea75e951c055cd73213b98cdb10458e1f8a9db997d8fc602fc",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "writes",
+          "executable_sha256": "d32ba63d693a296549c74b747e25ef5b0d89445f39adaa350e65ab16cb26ee48",
+          "passed": 12,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "ef86387924c9850ed09e001c03a077634a82ab2a80a58ec2a11b1ac64f3e515a",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "suite": "xtask",
+          "executable_sha256": "34fc53acc09c4ccd5fac9234adb47029e98ffc2c0e9fd1e7edc0c8f4c1c7366c",
+          "passed": 46,
+          "failed": 0,
+          "ignored": 0,
+          "exit_code": 0,
+          "log_sha256": "6fe483d870bc9349318c8ea96c9d90dab420ac9319eaff86e45def3b6d0785f4",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    "explicit_protected_store": {
+      "command": "native_synthetic_protected_store_round_trip --ignored",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "log_sha256": "e9f967350e7329a44943040edf91b42a8b2d61f8cfcdf9d2b5ed75aa6740608f",
+      "uses_test_owned_credentials": true,
+      "cross_process_read_verified": true,
+      "cleanup_verified": true
+    },
+    "earlier_failures_and_targeted_retests": "local-suite-validation.json",
+    "scenario_checks": {
+      "IT-020": [
+        "explicit-protected-store.log"
+      ],
+      "IT-021": {
+        "bootstrap_command": "it_021_command_explains_wrong_channel_and_invalid_manifest_pin_before_accessing_files",
+        "threadline_installer": "tests::it_021_real_http_stages_only_approved_complete_payload_and_retains_running_install"
+      }
+    }
+  }
+}
