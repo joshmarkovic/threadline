@@ -1,0 +1,137 @@
+{
+  "run": "e2e-1795066883799-42104",
+  "case": "S08-REVIEW-THREAD-PLACEMENT",
+  "status": "Pass",
+  "exit_code": 0,
+  "child_exit_code": 0,
+  "source_revision": "0e902a49fcaeeb23f0a3876187ec8abb1a14bfb4",
+  "source_dirty": false,
+  "fixture_revision": "s08-review-thread-placement-v1",
+  "seed": 12345,
+  "cargo_lock_sha256": "ba1fa2481ba47ebb082dae4aff8bf1a099cea5775b4196b096aeb3bb094d4efb",
+  "started_at_unix_ms": 1795066883798,
+  "finished_at_unix_ms": 1795066955721,
+  "host": "Windows 11 x64",
+  "dpi": 96,
+  "app_sha256": "bcb27a1a1ae36cd4919a03e5fd8b97fcb9aeac80a04e2bcf611fe07a2251e0e7",
+  "runner_sha256": "32d181be21f96d56db437308e86d724e25d07b8e2580f67069aa183224a08f7b",
+  "pull_request_number": 42,
+  "file": "src/first.rs",
+  "revision_id": 1,
+  "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "merge_base": "cccccccccccccccccccccccccccccccccccccccc",
+  "action_count": 25,
+  "observations": [
+    {
+      "mode": "Unified",
+      "side": "Left",
+      "line": 9,
+      "thread": "PRRT_LEFT",
+      "downloaded_reply_visible": true
+    },
+    {
+      "mode": "Unified",
+      "side": "Right",
+      "line": 17,
+      "thread": "PRRT_RIGHT",
+      "downloaded_reply_visible": true
+    },
+    {
+      "mode": "Unified",
+      "completed_threads": 4,
+      "fallback_visible": true
+    },
+    {
+      "mode": "Split",
+      "side": "Left",
+      "line": 9,
+      "thread": "PRRT_LEFT",
+      "downloaded_reply_visible": true
+    },
+    {
+      "mode": "Split",
+      "side": "Right",
+      "line": 17,
+      "thread": "PRRT_RIGHT",
+      "downloaded_reply_visible": true
+    },
+    {
+      "mode": "Split",
+      "completed_threads": 4,
+      "fallback_visible": true
+    }
+  ],
+  "fixture_http": [
+    {
+      "route": "user",
+      "status": 200,
+      "fixture_authorization": true
+    },
+    {
+      "route": "repository",
+      "status": 200,
+      "fixture_authorization": true
+    },
+    {
+      "route": "user",
+      "status": 200,
+      "fixture_authorization": true
+    },
+    {
+      "route": "repository",
+      "status": 200,
+      "fixture_authorization": true
+    },
+    {
+      "route": "items",
+      "status": 200,
+      "fixture_authorization": true
+    },
+    {
+      "route": "user",
+      "status": 200,
+      "fixture_authorization": true
+    },
+    {
+      "route": "repository",
+      "status": 200,
+      "fixture_authorization": true
+    },
+    {
+      "route": "pull_a",
+      "status": 200,
+      "fixture_authorization": true
+    },
+    {
+      "route": "compare_a",
+      "status": 200,
+      "fixture_authorization": true
+    },
+    {
+      "route": "user",
+      "status": 200,
+      "fixture_authorization": true
+    },
+    {
+      "route": "repository",
+      "status": 200,
+      "fixture_authorization": true
+    },
+    {
+      "route": "pull_a",
+      "status": 200,
+      "fixture_authorization": true
+    },
+    {
+      "route": "queued_thread_list",
+      "status": 200,
+      "fixture_authorization": true
+    }
+  ],
+  "raw_sha256": {
+    "result.json": "87ad3327a938bb341305d6e788e6a41754c23719ea7f4eb1ee983ef00075f4bc",
+    "review-thread-placement-native.json": "08c42af0c5e94fa0208e0eb647a549223eed6f7e85e76f38be8b2e08384363ed",
+    "github-access-trace.json": "247e487f3a81889907219b3e338aa2b53694d47469c9b7fc76cdcf561756e971",
+    "native-driver.log": "58fd3e2acc0150bddd3dff72b76e93949f68ae96f9cfe0fe8d1a96b073aef814"
+  }
+}

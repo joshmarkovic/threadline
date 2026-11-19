@@ -24,6 +24,10 @@ On Windows 11 x64 at `f17e39c`, three local HTTP tests and six real SQLite revie
 
 The native runs used `cargo xtask test e2e --suite full --case <case> --binary <binary-path> --seed 12345 --report-dir <report-dir>` against the isolated loopback provider. The receipts record test-build hashes, source revisions, and sanitized observations. [Earlier native Windows review receipts](evidence/sprint-08/native-verification.json) · [Platform test ledger](../spec/test_platform_traceability.csv)
 
+## Existing threads in unified and split diffs
+
+`S08-REVIEW-THREAD-PLACEMENT` passed on Windows 11 x64 at 96 DPI using the matching `0e902a4` app, runner and driver. In both diff modes, Next unresolved thread opened the same downloaded review groups on the original side of line 9 and the modified side of line 17 in `src/first.rs`. Both groups exposed their downloaded replies through Windows UI Automation. File-level and outdated threads remained in Conversation. The simulator served one comparison and one thread-list request among 13 authenticated reads. [Windows AC-21 receipt](evidence/sprint-08/thread-placement-native.json)
+
 ## Ordered ordinary comment edits
 
 `S08-COMMENT-DEPENDENCY` passed on Windows 11 at 96 DPI with matching app, runner and driver `fc91657`. The tester queued an ordinary comment on existing issue 41, then used the pending comment to draft an explicit follow-up edit. Both actions survived an offline restart. After reconnect, GitHub's fixture returned comment 4101 once. A second process reopened the same SQLite profile, read comment 4101, and edited it once. The reader showed one cached comment and an empty Outbox. A separate comment lost its response and remained in Outcome unknown. Its dependent edit stayed queued, with no repeat send. [Exact request sequence and six native attempts](evidence/sprint-08/comment-dependency.json)
