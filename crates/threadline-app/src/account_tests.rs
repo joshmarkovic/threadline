@@ -809,6 +809,178 @@ async fn pr_service_commits_verified_files_context_and_cross_repository_referenc
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn pr_download_resumes_after_a_leased_http_response_arrives_too_late() {
+    use crate::reader::{ReaderError, ReaderService};
+    use threadline_storage::{
+        Change, IssueClassification, IssueRecord, ItemLocator, ItemRepresentation, ItemUpdate,
+        NodeId, UtcMillis,
+        pr::{PrDownloadState, PrFamily, PrInputPage},
+        resources::{Coverage, WalkMode},
+    };
+
+    let fixture = Simulator::start_with_reader(true);
+    let dir = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open_profile(dir.path()).unwrap());
+    let service = AccountService {
+        store: store.clone(),
+        credentials: Arc::new(FixtureVault::default()),
+        github: GitHubClient::loopback(fixture.address).unwrap(),
+        fixture: true,
+    };
+    let cancel = Cancellation::new();
+    let connected = service
+        .execute(
+            AccountCommand::Connect {
+                repository: "fixture-org/private".into(),
+                pat: Pat::from_input("threadline-test-fixture".into()),
+                renew: None,
+            },
+            &cancel,
+        )
+        .await;
+    assert!(connected.github_error.is_none());
+    let account = connected.view.active.unwrap();
+    let public = connected
+        .view
+        .repositories
+        .iter()
+        .find(|repo| repo.name == "public")
+        .unwrap()
+        .clone();
+    let repository = public.id;
+    let selected = service
+        .execute(
+            AccountCommand::Select {
+                profile: connected.view.profiles[0].clone(),
+                repository: public,
+            },
+            &cancel,
+        )
+        .await;
+    assert!(selected.github_error.is_none());
+    let pr = store
+        .ingest(
+            account,
+            ItemLocator {
+                repository,
+                number: 42,
+            },
+            ItemUpdate {
+                representation: ItemRepresentation::Issue(IssueRecord {
+                    id: 142.try_into().unwrap(),
+                    node_id: Some(NodeId::new("I_142").unwrap()),
+                    classification: IssueClassification::PullRequest,
+                }),
+                remote_updated_at: UtcMillis(1000),
+                title: Change::Value("Fixture pull request".into()),
+                body: Change::Missing,
+                closed: Change::Value(false),
+            },
+        )
+        .unwrap();
+    let reader = ReaderService::new(service);
+    assert!(
+        reader
+            .fetch_pr_family(account, pr, PrFamily::Files, &cancel)
+            .await
+            .unwrap()
+            .complete
+    );
+    let (revision, _) = store.current_pr_revision(account, pr).unwrap().unwrap();
+    for family in [
+        PrFamily::Commits,
+        PrFamily::Reviews,
+        PrFamily::Threads,
+        PrFamily::Statuses,
+    ] {
+        let progress = store
+            .start_pr_fetch(&revision, family, WalkMode::Full)
+            .unwrap();
+        store
+            .commit_pr_page(
+                &revision,
+                family,
+                &progress,
+                PrInputPage {
+                    records: Vec::new(),
+                    next_cursor: None,
+                    validators: None,
+                    partial: None,
+                    fetched_at_ms: UtcMillis::now().unwrap().0,
+                },
+            )
+            .unwrap();
+    }
+    let now = UtcMillis::now().unwrap().0;
+    let pending = store
+        .request_pr_download(&revision, false, false, now)
+        .unwrap();
+    assert_eq!(pending.state, PrDownloadState::Pending);
+    let old = store.claim_pr_download(account, now).unwrap().unwrap();
+    assert_eq!(old.revision, revision);
+    fixture.hold_check_response.store(true, Ordering::Release);
+    let first_reader = reader.clone();
+    let first = tokio::spawn(async move {
+        first_reader
+            .run_claimed_pr_download(&old, &Cancellation::new(), || {})
+            .await
+    });
+    tokio::time::timeout(Duration::from_secs(8), async {
+        while !fixture.check_arrived.load(Ordering::Acquire) {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+
+    let before = store
+        .pr_page(&revision, PrFamily::Checks, None, 10)
+        .unwrap();
+    assert_eq!(
+        before.state.fetch,
+        threadline_storage::resources::FetchState::Downloading
+    );
+    let lease_due = store.next_pr_download_due(account).unwrap().unwrap();
+    assert!(lease_due > now);
+    let reopened = Store::open_profile(dir.path()).unwrap();
+    let recovered = reopened
+        .claim_pr_download(account, lease_due)
+        .unwrap()
+        .unwrap();
+    assert_eq!(recovered.attempt.generation, pending.generation);
+    fixture.hold_check_response.store(false, Ordering::Release);
+    assert!(matches!(first.await.unwrap(), Err(ReaderError::Cancelled)));
+    let untouched = store
+        .pr_page(&revision, PrFamily::Checks, None, 10)
+        .unwrap();
+    assert_eq!(untouched.state.coverage, Coverage::Missing);
+    assert!(untouched.rows.is_empty());
+    assert_eq!(untouched.state, before.state);
+    assert_eq!(untouched.next, before.next);
+    assert_eq!(
+        store
+            .discussion_page(account, pr, None, 10)
+            .unwrap()
+            .state
+            .coverage,
+        Coverage::Complete
+    );
+
+    assert_eq!(
+        reader
+            .run_claimed_pr_download(&recovered, &cancel, || {})
+            .await
+            .unwrap(),
+        PrDownloadState::Complete
+    );
+    let checks = reopened
+        .pr_page(&revision, PrFamily::Checks, None, 10)
+        .unwrap();
+    assert_eq!(checks.state.coverage, Coverage::Complete);
+    assert_eq!(checks.rows.len(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn sync_worker_waits_for_hydration_and_restored_offline_then_observes_both_feeds() {
     use crate::sync_worker::SyncWorker;
     use threadline_core::connectivity::{ConnectionStatus, ProbeTrigger};
