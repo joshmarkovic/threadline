@@ -428,13 +428,13 @@ function Invoke-CommentDependencyProof([IntPtr]$Window, [string]$Profile) {
     Click-AccountControl $resumed 'reader-outbox-filter-attention'
     Wait-For 'the exact original comment with an uncertain response' {
         $label = 'Comment ' + [char]0x00b7 + ' Outcome unknown'
-        Invoke-OwnedFixtureControl $resumed 'reader-outbox-action-0' $null $label
+        Invoke-OwnedFixtureControl $resumed 'reader-outbox-action-2' $null $label
     }
     $null = Wait-Reader 'the lost-response predecessor stays uncertain and preserves its held dependent' {
         param($reader) $reader.outbox_visible -and $reader.outbox_action_state -ceq 'OutcomeUnknown' -and $reader.outbox -eq 2
     }
     Click-AccountControl $resumed 'reader-outbox-filter-pending'
-    Inspect-WriteFixtureAction $resumed 0 'Queued' 'Comment'
+    Inspect-WriteFixtureAction $resumed 3 'Queued' 'Comment'
     Stop-ThroughUi
     Add-Evidence 'Preserve the uncertain predecessor and the separately visible queued edit without a second mutation' ([ordered]@{
         item = $item; uncertain = 1; held_dependent = 1
