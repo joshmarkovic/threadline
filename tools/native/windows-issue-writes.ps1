@@ -177,6 +177,8 @@ function Invoke-IssueWriteProof([IntPtr]$Window, [string]$Profile) {
     Queue-WriteFixtureDraft $Window $item 1
 
     Click-AccountControl $Window 'reader-draft-comment-0'
+    # The issue editor and the newly opened comment reuse one native automation ID.
+    Wait-WriteFixtureDraft $item ''
     $submitted = 'Threadline S07 explicitly queued comment.'
     Type-WriteFixtureField $Window 'reader-draft-input-0' $submitted
     Wait-WriteFixtureDraft $item $submitted
