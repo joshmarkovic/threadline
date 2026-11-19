@@ -217,7 +217,7 @@ async fn checks_release_visibility_when_latest_stable_release_is_missing() {
         github
             .stage(&current(), &platform(), tmp.path(), Some("fixture"))
             .await,
-        Err(ACCESS)
+        Err(CheckError::ReleaseAccessRequired)
     ));
     server.serve("/release/releases?per_page=1", "200 OK", 2, b"[]");
     assert!(
@@ -429,6 +429,47 @@ async fn signed_private_metadata_must_bind_the_build_installer_schema_channel_an
 }
 
 #[tokio::test]
+async fn prompts_for_release_access_only_when_github_rejects_the_credential_or_hides_releases() {
+    let server = HttpFixture::new();
+    let (github, pair) = github_signer(&server);
+    let tmp = tempfile::tempdir().unwrap();
+    let current = private_current(21);
+    let host = platform();
+    let check = || github.stage(&current, &host, tmp.path(), Some("fixture"));
+    for (status, prompt) in [
+        ("401 Unauthorized", true),
+        ("404 Not Found", true),
+        ("403 Forbidden", false),
+        ("429 Too Many Requests", false),
+        ("500 Internal Server Error", false),
+    ] {
+        server.serve(PRIVATE_LIST, status, 0, b"");
+        assert_eq!(
+            check().await.err().unwrap() == CheckError::ReleaseAccessRequired,
+            prompt,
+            "{status}"
+        );
+    }
+    let raw = serde_json::to_vec(&private_manifest()).unwrap();
+    let sig = pair.sign(&ring::rand::SystemRandom::new(), &raw).unwrap();
+    publish_private(&server, 22, &raw, sig.as_ref(), ASSET);
+    server.serve(META, "401 Unauthorized", 0, b"");
+    assert!(matches!(
+        check().await,
+        Err(CheckError::ReleaseAccessRequired)
+    ));
+    server.serve(META, "403 Forbidden", 0, b"");
+    assert!(matches!(check().await, Err(CheckError::Other(_))));
+    server.serve(META, "404 Not Found", 0, b"");
+    assert!(matches!(
+        check().await,
+        Err(CheckError::ReleaseAccessRequired)
+    ));
+    server.serve("/release/releases?per_page=1", "200 OK", 2, b"[]");
+    assert!(matches!(check().await, Err(CheckError::Other(_))));
+}
+
+#[tokio::test]
 async fn private_feed_requires_contents_access_and_skips_older_unsigned_prereleases() {
     let server = HttpFixture::new();
     let (github, pair) = github_signer(&server);
@@ -438,7 +479,7 @@ async fn private_feed_requires_contents_access_and_skips_older_unsigned_prerelea
         github
             .stage(&private_current(21), &platform(), tmp.path(), None)
             .await,
-        Err(ACCESS)
+        Err(CheckError::ReleaseAccessRequired)
     ));
     let old = json!({"tag_name":"v0.1.0-local.20","prerelease":true,"draft":false,"assets":[]});
     let mut draft = old.clone();

@@ -32,7 +32,17 @@ trait VerifiedSetup: Send + Sync {
     fn launch(&self) -> Result<(), &'static str>;
 }
 
-type CheckResult = Result<Option<Box<dyn VerifiedSetup>>, &'static str>;
+#[cfg(windows)]
+use threadline_installer::github_update::CheckError;
+
+// The release backend is Windows-only. Other platforms use the same outcomes in fixture checks.
+#[cfg(not(windows))]
+#[cfg_attr(not(test), allow(dead_code))]
+enum CheckError {
+    ReleaseAccessRequired,
+    Other(&'static str),
+}
+type CheckResult = Result<Option<Box<dyn VerifiedSetup>>, CheckError>;
 type CheckFuture<'a> = Pin<Box<dyn Future<Output = CheckResult> + Send + 'a>>;
 trait Source: Send + Sync {
     fn configured(&self) -> bool;
@@ -76,9 +86,9 @@ impl Source for Releases {
         #[cfg(windows)]
         {
             Box::pin(async move {
-                Ok(threadline_installer::github_update::check(token)
-                    .await?
-                    .map(|setup| Box::new(setup) as Box<dyn VerifiedSetup>))
+                threadline_installer::github_update::check(token)
+                    .await
+                    .map(|setup| setup.map(|setup| Box::new(setup) as Box<dyn VerifiedSetup>))
             })
         }
         #[cfg(not(windows))]
@@ -102,6 +112,7 @@ enum State {
     Waiting,
     Checking,
     NeedsCredential,
+    ReleaseAccessDenied,
     Current,
     Failed(&'static str),
     Ready(Arc<dyn VerifiedSetup>),
@@ -246,9 +257,11 @@ impl Updates {
             if private_channel && token.is_none() {
                 return Ok(State::NeedsCredential);
             }
-            Ok(match source.check(token).await? {
-                Some(setup) => State::Ready(setup.into()),
-                None => State::Current,
+            Ok(match source.check(token).await {
+                Ok(Some(setup)) => State::Ready(setup.into()),
+                Ok(None) => State::Current,
+                Err(CheckError::ReleaseAccessRequired) => State::ReleaseAccessDenied,
+                Err(CheckError::Other(reason)) => State::Failed(reason),
             })
         });
         self.check_task = Some(work.abort_handle());
@@ -389,12 +402,19 @@ impl Render for Updates {
             State::Waiting => "Waiting for the workspace settings.".into(),
             State::Checking => "Checking for updates…".into(),
             State::NeedsCredential => "Connect GitHub to download private app updates.".into(),
+            State::ReleaseAccessDenied => {
+                "GitHub couldn’t read the release repository. Update release access in Settings."
+                    .into()
+            }
             State::Current => "No newer update is available.".into(),
             State::Failed(error) => error.to_string(),
             State::Ready(_) if self.launching => "Starting the verified installer…".into(),
             State::Ready(setup) => format!("Threadline {} is ready to install.", setup.version()),
         };
-        let needs_access = matches!(self.state, State::NeedsCredential);
+        let needs_access = matches!(
+            self.state,
+            State::NeedsCredential | State::ReleaseAccessDenied
+        );
         if !self.open && !ready && !needs_access {
             return div();
         }
@@ -422,7 +442,11 @@ impl Render for Updates {
         if needs_access && !self.open {
             summary = summary.child(
                 Button::new("updates-open-settings")
-                    .label("Set up updates")
+                    .label(if matches!(self.state, State::ReleaseAccessDenied) {
+                        "Update release access"
+                    } else {
+                        "Set up updates"
+                    })
                     .accessibility_id("updates-open-settings")
                     .on_click(cx.listener(|_, _, _, cx| cx.emit(OpenUpdateSettings))),
             );
@@ -475,7 +499,7 @@ impl Render for Updates {
                 );
             panel = panel
                 .child("For private downloads, save a GitHub token here once. Use an existing or dedicated token with Contents read access to joshmarkovic/threadline. Windows Credential Manager stores it separately from your workspace login.")
-                .child(div().flex().items_center().gap_2().child(token).child(save).children((!needs_access).then_some(remove)));
+                .child(div().flex().items_center().gap_2().child(token).child(save).children((!matches!(self.state, State::NeedsCredential)).then_some(remove)));
         }
         if self.open
             && let Some(note) = self.credential_note

@@ -160,7 +160,7 @@ pub(super) fn verified_install() -> Result<Option<(Installed, Trust)>> {
     Ok(Some((current, trust)))
 }
 
-pub(super) async fn check(token: Option<&str>) -> Result<Option<Staged>> {
+pub(super) async fn check(token: Option<&str>) -> super::CheckResult<Option<Staged>> {
     let Some((current, trust)) = verified_install()? else {
         return Ok(None);
     };

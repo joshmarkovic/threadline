@@ -17,6 +17,7 @@ struct Fixture {
     handoffs: AtomicUsize,
     acknowledge_handoff: AtomicBool,
     release_gate: tokio::sync::Notify,
+    next_error: Mutex<Option<CheckError>>,
 }
 impl CredentialStore for Fixture {
     fn read(&self, key: &CredentialRef) -> Result<Option<Credential>, PlatformError> {
@@ -52,6 +53,9 @@ impl Source for TestSource {
                 .store(token == Some("fixture-only"), Ordering::SeqCst);
             self.0.checks.fetch_add(1, Ordering::SeqCst);
             self.0.release_gate.notified().await;
+            if let Some(error) = self.0.next_error.lock().unwrap().take() {
+                return Err(error);
+            }
             Ok(Some(
                 Box::new(TestSetup(self.0.clone())) as Box<dyn VerifiedSetup>
             ))
@@ -206,7 +210,9 @@ fn startup_updates_skip_credential_store_and_network_when_unconfigured(cx: &mut 
 }
 
 #[gpui_kit::test]
-fn private_updates_request_release_access_once_in_settings(cx: &mut TestAppContext) {
+fn private_updates_request_credentials_for_missing_or_rejected_access_only(
+    cx: &mut TestAppContext,
+) {
     cx.executor().allow_parking();
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let fixture = Arc::new(Fixture::default());
@@ -253,6 +259,50 @@ fn private_updates_request_release_access_once_in_settings(cx: &mut TestAppConte
         window.render_frame(cx);
         assert!(window.try_find("updates-token-save").is_none());
         assert!(window.find("updates-manage-token").visible());
+        panel.update(cx, |model, cx| model.show_settings(false, window, cx));
+    })
+    .unwrap();
+
+    *fixture.next_error.lock().unwrap() = Some(CheckError::ReleaseAccessRequired);
+    fixture.release_gate.notify_one();
+    await_model(cx, |cx| {
+        cx.read(|cx| matches!(panel.read(cx).state, State::ReleaseAccessDenied))
+    });
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.find("updates-open-settings").visible());
+        assert!(window.try_find("updates-token-save").is_none());
+        panel.update(cx, |model, cx| model.show_settings(true, window, cx));
+        window.render_frame(cx);
+        assert!(window.find("updates-token-save").visible());
+        panel.read(cx).input.clone().update(cx, |input, cx| {
+            input.set_value("replacement-fixture", window, cx)
+        });
+        window.click("updates-token-save", cx);
+    })
+    .unwrap();
+    await_model(cx, |_| fixture.checks.load(Ordering::SeqCst) == 2);
+    assert_eq!(
+        fixture.credential.lock().unwrap().as_deref(),
+        Some(&b"replacement-fixture"[..])
+    );
+    *fixture.next_error.lock().unwrap() = Some(CheckError::Other("GitHub rate limit reached."));
+    fixture.release_gate.notify_one();
+    await_model(cx, |cx| {
+        cx.read(|cx| {
+            matches!(
+                panel.read(cx).state,
+                State::Failed("GitHub rate limit reached.")
+            )
+        })
+    });
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert!(window.find("updates-check-again").visible());
+        assert!(window.try_find("updates-token-save").is_none());
+        panel.update(cx, |model, cx| model.show_settings(false, window, cx));
+        window.render_frame(cx);
+        assert!(window.try_find("updates-open-settings").is_none());
     })
     .unwrap();
 }

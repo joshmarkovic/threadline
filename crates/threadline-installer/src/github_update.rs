@@ -1,5 +1,20 @@
 //! Automatic releases for the registered Windows installation.
-use crate::{Result, Staged};
+use crate::Staged;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CheckError {
+    /// GitHub rejected authentication or concealed the release repository.
+    ReleaseAccessRequired,
+    Other(&'static str),
+}
+
+impl From<&'static str> for CheckError {
+    fn from(message: &'static str) -> Self {
+        Self::Other(message)
+    }
+}
+
+type CheckResult<T> = Result<T, CheckError>;
 
 #[cfg(any(windows, test))]
 mod release;
@@ -35,7 +50,7 @@ pub fn private_channel() -> bool {
 
 /// An optional release-only credential may be supplied by the account owner.
 /// Dropping this future discards any partial download.
-pub async fn check(release_token: Option<&str>) -> Result<Option<Staged>> {
+pub async fn check(release_token: Option<&str>) -> CheckResult<Option<Staged>> {
     #[cfg(windows)]
     return windows::check(release_token).await;
     #[cfg(not(windows))]
