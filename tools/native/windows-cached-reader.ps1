@@ -168,6 +168,13 @@ function Invoke-OfflineReaderProof([IntPtr]$Window, [string]$Profile) {
 function Invoke-ReaderResumeProof([IntPtr]$Window, [string]$Profile) {
     Set-AccessPhase 'reader-failure'
     Wait-SeededFixtureAccount
+    # Keep the shared request budget available for this explicit pin and continuation.
+    Open-SyncSettings $Window
+    Click-AccountControl $Window 'sync-pause-background'
+    $null = Wait-Sync 'background refresh paused before the explicit offline download' {
+        param($sync) $sync.controls.pause_background -and !$sync.controls.work_offline
+    }
+    Click-AccountControl $Window 'reader-browse'
     Click-AccountControl $Window 'reader-repository-1'
     Click-AccountControl $Window 'reader-fetch-repository'
     Click-AccountControl $Window 'reader-result-0'
@@ -206,10 +213,13 @@ function Invoke-ReaderResumeProof([IntPtr]$Window, [string]$Profile) {
             $reader.download_state -cin @('Active', 'Pending')
     }
     Open-SyncSettings $restarted
+    $null = Wait-Sync 'the original background pause and Work Offline setting after restart' {
+        param($sync) $sync.controls.pause_background -and $sync.controls.work_offline
+    }
     Set-AccessPhase 'reader-resume'
     Click-AccountControl $restarted 'sync-work-offline'
-    $null = Wait-Sync 'leave Work Offline through the native settings' {
-        param($sync) !$sync.controls.work_offline
+    $null = Wait-Sync 'leave Work Offline while background refresh stays paused' {
+        param($sync) !$sync.controls.work_offline -and $sync.controls.pause_background
     }
     Wait-SeededFixtureAccount
     $null = Wait-Reader 'the worker resumes the original download with two unique comments' {
