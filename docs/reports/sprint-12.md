@@ -2,9 +2,9 @@
 
 The selected Windows 11 x64 test package is `0.1.0-local.18`, built from `64a9a01` with database schema 18. The unsigned setup is `.build/windows-installer/local18-64a9a01/threadline-64a9a01-local18.exe` in the local repository workspace. It installs per user and adds **Threadline Installer Test** to Start. All ten local installer steps passed. [Build 18 setup and digests](evidence/sprint-12/installed-build-18.json) · [Local install, upgrade and uninstall instructions](../../tools/windows/README.md)
 
-The build 17 regression suites passed on Windows and Linux. Its sixteen original targeted desktop cases recorded 13 passes, two failures and one blocked case. Installed cold notification activation, feed fallback and offline runtime passed. Native keyboard, clipboard and owned accessibility checks completed at 144 DPI. Signed human observations are pending. Build 16 remains the latest completed full suite and its four large-workspace timing budgets remain open. [Exact-source regressions](evidence/sprint-12/validation-e3aec22.json) · [Build 17 targeted desktop cases](evidence/sprint-12/native-e3aec22-functional.json) · [Build 16 full suite and measured budgets](evidence/sprint-12/full-native-2870642-installed16-connected.json)
+Build 18 passed the Linux regression lanes and seven focused Windows tests. Eighteen named Windows desktop cases recorded 17 passes and one failure. The accessibility case stopped when Windows could not verify that the cursor belonged to Threadline at the drag endpoint. Signed visual and screen-reader observations are pending. Build 16 remains the latest completed full suite, with four timing budgets still open. [Exact-source regressions](evidence/sprint-12/validation-64a9a01.json) · [Build 18 named Windows cases](evidence/sprint-12/native-64a9a01-functional.json) · [Build 16 full suite and measured budgets](evidence/sprint-12/full-native-2870642-installed16-connected.json)
 
-The user selected local installer testing and left publication pending. The local package is unsigned. The Windows release still needs a signed setup, its published installation commands and exact-package verification. macOS and Linux have separate release gates. [Windows release gates](#windows-release-gates) · [Installation plan](../spec/INSTALLATION_PLAN.md)
+The user selected local installer testing and left publication and hosted checks pending. The local package is unsigned. The Windows release still needs a signed setup, its published installation commands and exact-package verification. macOS and Linux have separate release gates. [Windows release gates](#windows-release-gates) · [Installation plan](../spec/INSTALLATION_PLAN.md)
 
 The first Windows 11 x64 setup checks on build 22631 established the local install and recovery path. An installed predecessor and successor opened the same offline workspace across a SQLite schema upgrade. [Early setup outcomes and package digests](evidence/sprint-12/installer-lifecycle.json)
 
@@ -197,6 +197,16 @@ The earlier Windows run on `3dc5b64` recorded 238 passes, two failures and two i
 A separate Windows test delivered modeled suspend and resume messages to its own hidden platform window. The broker emitted one normal resume event. Physical sleep still needs target evidence. [Native resume receipt](evidence/sprint-12/local-suite-validation.json)
 
 ## Full native Windows suite
+
+### Targeted Windows desktop cases on local build 18
+
+The selected `64a9a01` app and runner recorded 17 passes and one failure across 18 named cases. The 15 cases using the optimized test app recorded 144 DPI. The ordinary installed app passed cold activation in Windows Notification Center and the offline native runtime check. An unregistered copy with the same executable bytes kept all 37 fixture events available in Activity. [Commands, exit codes, source and executable hashes](evidence/sprint-12/native-64a9a01-functional.json)
+
+E2E-003 typed the synthetic Markdown into the visible offline editor and restored its exact digest, both panes and all 20 tabs in a separate process. E2E-008 kept the selected source line and draft through Commits, Files, linked-issue and layout changes and a separate offline restart. E2E-004 resumed the saved second discussion page and finished with two distinct cached comments. The display case persisted the chosen zone and verified both seasonal offsets. [Reader and discussion results](evidence/sprint-12/native-64a9a01-functional.json) · [Display time zone and restart](evidence/sprint-12/display-timezone-64a9a01.json)
+
+E2E-015 opened the two fixture panes and invoked the owned preview control through Windows UI Automation. It exited 1 on the first Markdown selection drag when Windows reported that the cursor belonged elsewhere at the endpoint. Remaining input and clipboard steps did not run. Build 17 separately completed the automated checks at 144 DPI. Signed human visual and screen-reader observations remain pending. [Build 18 failure and screenshot hashes](evidence/sprint-12/native-64a9a01-functional.json) · [Build 17 automation](evidence/sprint-12/native-e3aec22-functional.json)
+
+The earlier `f88be8c` test executable passed E2E-008. Its E2E-003 stopped at the Windows focus guard and its first display case stopped at fixture validation. The earlier setup bytes were never installed. The selected build 18 runs covered named functional checks. E2E-014 and the full aggregate were deferred. Build 16 remains the most recent measured full run. [Earlier and selected named runs](evidence/sprint-12/native-64a9a01-functional.json) · [Last completed full suite](evidence/sprint-12/full-native-2870642-installed16-connected.json)
 
 ### Targeted Windows desktop cases on local build 17
 
