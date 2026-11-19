@@ -1773,6 +1773,147 @@ fn ui_006_native_offline_edit_keeps_saved_text_and_cancels_the_original_queue_ta
 }
 
 #[gpui_kit::test]
+fn ui_006_failed_enqueue_keeps_the_saved_comment_and_reports_the_failure(cx: &mut TestAppContext) {
+    use rusqlite::{Connection, TransactionBehavior};
+    use threadline_storage::{queue::State, writes::WriteIntent};
+
+    let setup = ReaderHarness::seeded();
+    let account = setup.fixture.account;
+    let item = setup.fixture.long_discussion;
+    setup.one_pane(&Tab {
+        id: "comment-queue-failure".into(),
+        item,
+        view: TabView::default(),
+    });
+    let previous = setup.store.queue_page(account, 0, 100).unwrap();
+    let projections = setup.store.projections(account, item).unwrap();
+    let (window, reader) = setup.open(cx);
+    click(cx, window, "reader-draft-comment-0");
+    let draft_id = format!("comment-{}", item.0);
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let reader = reader.read(cx);
+            !reader.layout_busy && reader.drafts.contains_key(&draft_id)
+        })
+    });
+    let body = "Keep this Markdown when the database cannot queue the comment.";
+    cx.update_window(window, |_, window, cx| {
+        let edit = reader.read(cx).drafts[&draft_id].view.clone();
+        edit.focus_handle(cx).focus(window, cx);
+        window.render_frame(cx);
+        window.input(body, cx);
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let editor = &reader.read(cx).drafts[&draft_id];
+            editor.saved() && editor.body == body
+        })
+    });
+    let saved = setup.store.draft(account, &draft_id).unwrap().unwrap();
+    assert_eq!(saved.content.body, body);
+
+    let mut other_writer = Connection::open(setup._directory.path().join("s04-ui.sqlite")).unwrap();
+    let reservation = other_writer
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .unwrap();
+    click(cx, window, "reader-submit-0");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            reader.read(cx).status
+                == Some("The action could not be queued. Your local draft is still saved.")
+        })
+    });
+    cx.update_window(window, |_, _, cx| {
+        let reader = reader.read(cx);
+        let editor = &reader.drafts[&draft_id];
+        assert_eq!(editor.view.read(cx).value().as_ref(), body);
+        assert!(editor.submitted.is_none());
+    })
+    .unwrap();
+    assert_eq!(setup.store.queue_page(account, 0, 100).unwrap(), previous);
+    assert_eq!(setup.store.projections(account, item).unwrap(), projections);
+    assert_eq!(
+        setup
+            .store
+            .draft(account, &draft_id)
+            .unwrap()
+            .unwrap()
+            .content,
+        saved.content
+    );
+    drop(reservation);
+
+    click(cx, window, "reader-submit-0");
+    until(cx, |cx| {
+        cx.read(|cx| reader.read(cx).drafts[&draft_id].submitted.is_some())
+    });
+    let operations = setup.store.queue_page(account, 0, 100).unwrap();
+    assert_eq!(operations.len(), previous.len() + 1);
+    let queued = operations.last().unwrap();
+    assert_eq!(queued.item, item);
+    assert_eq!(queued.state, State::Queued);
+    assert_eq!(
+        setup.store.write_intent(account, &queued.id).unwrap(),
+        Some(WriteIntent::CreateComment { body: body.into() })
+    );
+
+    let tab = "comment-queue-failure";
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let reader = reader.read(cx);
+            !reader.layout_busy
+                && reader.tab_views[tab]
+                    .data
+                    .projections
+                    .iter()
+                    .any(|entry| entry.operation_id == queued.id)
+        })
+    });
+    let index = cx.read(|cx| {
+        reader.read(cx).tab_views[tab]
+            .data
+            .projections
+            .iter()
+            .position(|entry| entry.operation_id == queued.id)
+            .unwrap()
+    });
+    cx.update_window(window, |_, window, cx| {
+        use gpui_kit::{
+            Modifiers, PlatformInput, ScrollDelta, ScrollEvent, ScrollSource, TouchPhase,
+        };
+        window.render_frame(cx);
+        let viewport = window.find("reader-conversation-0").bounds();
+        window.dispatch_event(
+            PlatformInput::Scroll(ScrollEvent {
+                position: viewport.center(),
+                delta: ScrollDelta::Lines(Point::new(0., -150.)),
+                modifiers: Modifiers::default(),
+                touch_phase: TouchPhase::Moved,
+                source: ScrollSource::Pointer,
+            }),
+            cx,
+        );
+        window.render_frame(cx);
+        window.click(format!("reader-edit-pending-comment-0-{index}"), cx);
+    })
+    .unwrap();
+    let followup = format!("comment-edit-{}-{}", item.0, queued.id);
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let reader = reader.read(cx);
+            reader
+                .active_tab()
+                .is_some_and(|tab| tab.view.draft.as_deref() == Some(&followup))
+                && reader
+                    .drafts
+                    .get(&followup)
+                    .is_some_and(|editor| editor.comment_edit && editor.body == body)
+        })
+    });
+}
+
+#[gpui_kit::test]
 fn ui_006_registered_native_commands_offer_edits_and_comments_without_issue_creation(
     cx: &mut TestAppContext,
 ) {

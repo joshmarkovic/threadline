@@ -249,6 +249,53 @@ function Invoke-IssueWriteSurfaceProof([IntPtr]$Window) {
     $script:report.detail = 'The owned native controls, Ctrl+N, existing issue draft and actual ordinary comment did not expose an issue-creation path.'
 }
 
+function Invoke-VisiblePendingCommentEdit([IntPtr]$Window, [long]$Item) {
+    $id = 'reader-edit-pending-comment-0-0'
+    $pane = 'reader-conversation-0'
+    for ($step = 0; $step -le 5; $step++) {
+        if (!(Test-OwnedFixtureWindow $Window)) {
+            Stop-Blocked 'The isolated issue conversation is no longer owned by the expected app.'
+        }
+        $matched = @{ signature = $null; state = $null }
+        Wait-For 'the exact offline issue and its stable native conversation viewport' {
+            $current = Read-Observation
+            if ($null -eq $current -or !$current.ready -or $current.pid -ne $script:app.Id -or $current.scale_factor -le 0) {
+                $matched.signature = $null
+                return $false
+            }
+            $reader = $current.PSObject.Properties['cached_reader']
+            $account = $current.PSObject.Properties['account_access']
+            $viewport = $current.bounds.PSObject.Properties[$pane]
+            if ($null -eq $reader -or $null -eq $reader.Value -or $reader.Value.active_item -ne $Item -or
+                !$reader.Value.offline -or !$reader.Value.active_draft_submitted -or
+                $null -eq $account -or $null -eq $account.Value -or $account.Value.panel_open -or
+                $null -eq $viewport -or $null -eq $viewport.Value -or $viewport.Value.Count -ne 4 -or
+                $viewport.Value[2] -le 0 -or $viewport.Value[3] -le 0) {
+                $matched.signature = $null
+                return $false
+            }
+            $signature = (@($current.scale_factor) + $viewport.Value) -join ','
+            $same = $matched.signature -ceq $signature
+            $matched.signature = $signature
+            $matched.state = $current
+            return $same
+        }
+        $state = $matched.state
+        if ($null -ne $state.bounds.PSObject.Properties[$id] -and
+            (Invoke-OwnedFixtureControl $Window $id $null 'Draft a follow-up edit')) { return }
+        if ($step -eq 5) { break }
+        $rect = $state.bounds.PSObject.Properties[$pane].Value
+        $point = To-ClientPoint ($rect[0] + $rect[2] / 2) ($rect[1] + $rect[3] / 2) $state.scale_factor
+        $dpi = [uint32][Math]::Round(96 * $state.scale_factor)
+        [ThreadlineWinInput]::ScrollOwnedConversation($Window, [uint32]$script:app.Id, $dpi, $point, -1)
+        Add-Evidence 'Reveal the pending comment action in the owned issue conversation' ([ordered]@{
+            automation_id = $id; step = $step + 1; input = 'Owned HWND WM_MOUSEWHEEL'
+        })
+        Start-Sleep -Milliseconds 100
+    }
+    throw 'The native follow-up edit action remained unavailable in the verified issue viewport.'
+}
+
 function Queue-CommentDependencyPair([IntPtr]$Window, [long]$Item, [string]$Original, [string]$Revised) {
     Click-AccountControl $Window 'reader-draft-comment-0'
     Wait-For 'the create-comment editor in the owned app' {
@@ -258,9 +305,7 @@ function Queue-CommentDependencyPair([IntPtr]$Window, [long]$Item, [string]$Orig
     Wait-WriteFixtureDraft $Item $Original
     Queue-WriteFixtureDraft $Window $Item 1 'Queue comment'
 
-    Wait-For 'the native follow-up edit control on the first queued comment' {
-        Invoke-OwnedFixtureControl $Window 'reader-edit-pending-comment-0-0' $null 'Draft a follow-up edit'
-    }
+    Invoke-VisiblePendingCommentEdit $Window $Item
     Wait-For 'the follow-up edit editor in the owned app' {
         $null -ne (Find-OwnedFixtureControl $Window 'reader-submit-0' 'Queue comment edit' -AllowDisabled)
     }

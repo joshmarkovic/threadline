@@ -1438,7 +1438,7 @@ impl ReaderWorkspace {
             .flex()
             .flex_col()
             .child(header)
-            .child(content)
+            .child(self.observed_control(format!("reader-conversation-{pane}"), content, false))
             .into_any_element()
     }
 }
