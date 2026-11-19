@@ -13,6 +13,7 @@ fn active(phase: Phase) -> bool {
             | Phase::LifecycleCrash
             | Phase::LifecycleRecovery
             | Phase::LifecycleSignedOut
+            | Phase::LifecycleReturn
     )
 }
 
@@ -53,10 +54,12 @@ pub(super) fn hold(
         if let Ok(next) = Phase::read(phase_file)
             && next != phase
         {
+            fs::remove_file(&marker)?;
             return Ok((phase == Phase::LifecycleCrash).then_some(0));
         }
         thread::sleep(Duration::from_millis(20));
     }
+    fs::remove_file(&marker)?;
     Ok(Some(0))
 }
 
@@ -100,6 +103,11 @@ pub(super) fn trace(records: &[RequestEvidence]) -> bool {
             entry.phase == Phase::LifecycleRecovery
                 && entry.route == Route::User
                 && entry.status == 200
+        })
+        && [Route::User, Route::Repository].into_iter().all(|route| {
+            records.iter().any(|entry| {
+                entry.phase == Phase::LifecycleReturn && entry.route == route && entry.status == 200
+            })
         })
         && !records.iter().any(|entry| {
             matches!(
@@ -160,6 +168,9 @@ mod tests {
             fs::write(phase, "lifecycle-recovery").unwrap();
             assert!(mutation.join().unwrap().is_empty());
             assert!(request("GET", "/user", "").starts_with("HTTP/1.1 200"));
+            fs::write(phase, "lifecycle-return").unwrap();
+            assert!(request("GET", "/user", "").starts_with("HTTP/1.1 200"));
+            assert!(request("GET", "/repos/fixture-org/private", "").starts_with("HTTP/1.1 200"));
         });
         fixture
             .finish(dir.path(), TraceCheck::NativeLifecycle)

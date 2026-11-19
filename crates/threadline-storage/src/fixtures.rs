@@ -372,7 +372,7 @@ fn populate_profile(store: &Store, seed: u64, scale: Scale, profile: Profile) ->
     Ok(Fixture {
         revision: match profile {
             Profile::Backlog => LARGE_WORKSPACE_REVISION,
-            Profile::Lifecycle => "s12-native-lifecycle-v1",
+            Profile::Lifecycle => LIFECYCLE_REVISION,
             Profile::Reader => "s04-reader-v1",
             Profile::Data => REVISION,
         },

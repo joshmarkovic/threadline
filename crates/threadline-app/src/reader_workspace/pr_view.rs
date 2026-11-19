@@ -65,6 +65,8 @@ pub(crate) struct PrObservation {
     files_on_page: Option<usize>,
     threads_coverage: Option<String>,
     threads_on_page: Option<usize>,
+    reviews_on_page: Option<usize>,
+    checks_coverage: Option<String>,
     patch_change_lines: Option<usize>,
     source_anchor: Option<PrSourceObservation>,
     selected_source_line: Option<usize>,
@@ -94,12 +96,15 @@ impl ReaderWorkspace {
         (cached.data.item.as_ref()?.kind == threadline_storage::ItemKind::PullRequest).then(|| {
             let settings = tab_settings(tab);
             let pr = cached.pr.as_deref();
-            let threads = pr.and_then(|pr| {
-                pr.data
-                    .pages
-                    .iter()
-                    .find_map(|(family, page)| (*family == PrFamily::Threads).then_some(page))
-            });
+            let page = |target| {
+                pr.and_then(|pr| {
+                    pr.data
+                        .pages
+                        .iter()
+                        .find_map(|(family, page)| (*family == target).then_some(page))
+                })
+            };
+            let threads = page(PrFamily::Threads);
             PrObservation {
                 section: format!("{:?}", settings.section),
                 context_mode: format!("{:?}", settings.context_mode),
@@ -118,6 +123,9 @@ impl ReaderWorkspace {
                     .map(|files| files.rows.len()),
                 threads_coverage: threads.map(|page| format!("{:?}", page.state.coverage)),
                 threads_on_page: threads.map(|page| page.rows.len()),
+                reviews_on_page: page(PrFamily::Reviews).map(|page| page.rows.len()),
+                checks_coverage: page(PrFamily::Checks)
+                    .map(|page| format!("{:?}", page.state.coverage)),
                 patch_change_lines: pr
                     .and_then(|pr| pr.data.files.as_ref()?.selected.as_ref()?.patch.as_ref())
                     .map(|patch| patch.additions() + patch.deletions()),
@@ -539,6 +547,17 @@ impl ReaderWorkspace {
             PrFamily::Media => "Media",
         };
         let name = family.name();
+        let coverage_id = format!("pr-{pane}-{name}-coverage");
+        let coverage = div()
+            .id(coverage_id.clone())
+            .role(Role::Status)
+            .text_xs()
+            .text_color(palette.muted)
+            .child(coverage_label(
+                label,
+                state.coverage,
+                state.last_validation_at_ms,
+            ));
         div()
             .flex()
             .flex_col()
@@ -549,18 +568,7 @@ impl ReaderWorkspace {
                     .flex_wrap()
                     .items_center()
                     .gap_1()
-                    .child(
-                        div()
-                            .id(format!("pr-{pane}-{name}-coverage"))
-                            .role(Role::Status)
-                            .text_xs()
-                            .text_color(palette.muted)
-                            .child(coverage_label(
-                                label,
-                                state.coverage,
-                                state.last_validation_at_ms,
-                            )),
-                    )
+                    .child(self.observed_control(coverage_id, coverage, false))
                     .children(next.map(|cursor| {
                         self.pr_control(
                             &format!("pr-{pane}-{name}-cached-next"),

@@ -1,30 +1,113 @@
 use super::*;
 use crate::{
     access::{
-        AccessState, CredentialKind, DiscoveryState, RepositoryObservation,
+        AccessProfile, AccessState, CredentialKind, DiscoveryState, RepositoryObservation,
         RepositoryObservationSource,
     },
+    history::{HistoryEntry, HistoryRef},
     merges::{Gate, MergeMethod, MergePolicy, MergeSubmission, QueueRequirement},
     notifications::{DeliveryMode, PopupOutcome},
-    pr::{PatchEvidence, PrFamily, PrHeader, PrInputPage, PrRecord, SourceSide},
+    pr::{
+        InlineComment, PatchEvidence, PrDiffMode, PrFamily, PrHeader, PrInputPage, PrRecord,
+        PrTabView, SourceSide,
+    },
     resources::{ActivityEvent, DeliveryPhase, Validators, WalkMode},
     reviews::{DraftInline, ReviewDraft, ReviewEvent, ReviewIntent, ReviewSubmission},
+    sync::{ObservationPage, ReadPriority, ReadTarget},
     writes::{FieldEdit, IssueChanges, Permission, WriteIntent, WriteSubmission},
 };
 use std::num::NonZeroU64;
 
-pub const LIFECYCLE_REVISION: &str = "s12-native-lifecycle-v1";
+pub const LIFECYCLE_REVISION: &str = "s12-native-lifecycle-v2";
 pub const LIFECYCLE_ALT_USER: u64 = 42;
 pub const LIFECYCLE_EVENT: &str = "lifecycle-delivered-once";
 pub const LIFECYCLE_COMMENT: &str = "Threadline lifecycle submitted comment.";
 pub const LIFECYCLE_DRAFT: &str = "Threadline lifecycle original inline draft.";
-pub const LIFECYCLE_REVIEW: &str = "lifecycle-typed-review";
+pub const LIFECYCLE_THREAD_ROOT: u64 = 771;
+pub const LIFECYCLE_THREAD: &str = "TL_LIFECYCLE_THREAD";
 pub const LIFECYCLE_ACTIONS: [&str; 4] = [
     "00000000-0000-4000-8002-000000000001",
     "00000000-0000-4000-8002-000000000002",
     "00000000-0000-4000-8002-000000000003",
     "00000000-0000-4000-8002-000000000004",
 ];
+
+fn review_draft_id(item: ItemId) -> String {
+    format!("review-{}", item.0)
+}
+
+fn seed_history_and_sync(
+    store: &Store,
+    fixture: &Fixture,
+    profile: &AccessProfile,
+    now: i64,
+) -> Result<()> {
+    let account = fixture.account;
+    let repository = fixture.repository;
+    let history_head = CommitOid::parse(&"a".repeat(40))?;
+    let history_base = CommitOid::parse(&"b".repeat(40))?;
+    let reference = HistoryRef::Branch("main".into());
+    store.observe_history_ref(profile, repository, &reference, Some(&history_head), now)?;
+    let walk = store
+        .begin_history_page(profile, repository, &reference)?
+        .ok_or(Error::NotFound)?;
+    let entry = |oid, title: &str, parents| HistoryEntry {
+        commit: GraphCommit {
+            oid,
+            title: title.into(),
+            committed_at_ms: FIXTURE_TIME_MS,
+            parents,
+        },
+        message: title.into(),
+        author: Some("Fixture author".into()),
+        authored_at_ms: Some(FIXTURE_TIME_MS),
+    };
+    store.commit_history_page(
+        &walk,
+        &[
+            entry(
+                history_head,
+                "Offline history tip",
+                vec![history_base.clone()],
+            ),
+            entry(history_base, "Offline history parent", vec![]),
+        ],
+        None,
+        true,
+        now,
+    )?;
+
+    let target = ReadTarget {
+        repository,
+        item: None,
+        family: ResourceFamily::RepositoryItems,
+        revision: String::new(),
+    };
+    store.subscribe_read(
+        account,
+        &target,
+        "lifecycle-checkpoint",
+        ReadPriority::Activity,
+        now,
+    )?;
+    let claim = store
+        .claim_sync_read(account, now)?
+        .ok_or(Error::NotFound)?;
+    if claim.target != target || claim.cursor.is_some() {
+        return Err(Error::Conflict("Unexpected lifecycle read claim"));
+    }
+    store.commit_observed_page(
+        &claim,
+        ObservationPage {
+            items: vec![],
+            comments: vec![],
+            next_cursor: Some("2"),
+            validators: Validators::default(),
+        },
+        now,
+        "UTC",
+    )
+}
 
 /// Prepare an isolated profile with the same stable private identity as the loopback server.
 pub fn populate_native_lifecycle(
@@ -94,8 +177,17 @@ pub fn populate_native_lifecycle(
     }
     store.update_sync_settings(account, |settings| {
         settings.controls.work_offline = false;
-        settings.controls.pause_background = true;
+        settings.controls.pause_background = false;
         settings.controls.pause_queued_actions = true;
+        settings.schedule.timezone = Some("UTC".into());
+        settings.schedule.work_interval_secs = 180;
+    })?;
+    let current = store
+        .github_access_profile(account, BACKLOG_OWNER)?
+        .ok_or(Error::NotFound)?;
+    seed_history_and_sync(store, &fixture, &current, now)?;
+    store.update_sync_settings(account, |settings| {
+        settings.controls.pause_background = true
     })?;
     let base = &fixture.comparison.base;
     let rev = store.record_pr_revision(
@@ -124,7 +216,9 @@ pub fn populate_native_lifecycle(
                 status: "modified".into(),
                 additions: Some(1),
                 deletions: Some(1),
-                patch: PatchEvidence::Text("@@ -1 +1 @@\n-previous\n+changed\n".into()),
+                patch: PatchEvidence::Text(
+                    "@@ -1,3 +1,3 @@\n-previous\n+changed\n unchanged\n another line\n".into(),
+                ),
             }],
             next_cursor: None,
             validators: Some(&Validators::default()),
@@ -140,13 +234,81 @@ pub fn populate_native_lifecycle(
         comments: vec![DraftInline {
             key: "lifecycle-original-line".into(),
             body: LIFECYCLE_DRAFT.into(),
-            anchor,
+            anchor: anchor.clone(),
         }],
     };
-    store.create_review_draft(&rev, LIFECYCLE_REVIEW, &draft)?;
+    let review_id = review_draft_id(fixture.reviewed_pr);
+    store.create_review_draft(&rev, &review_id, &draft)?;
+    for (family, record) in [
+        (
+            PrFamily::Reviews,
+            PrRecord::Review {
+                id: 770,
+                node_id: Some("TL_LIFECYCLE_REVIEW".into()),
+                author: Some("Fixture author".into()),
+                actor: Default::default(),
+                body: "Offline formal review.".into(),
+                state: "COMMENTED".into(),
+                submitted_at_ms: Some(FIXTURE_TIME_MS),
+                commit_oid: Some(fixture.head.as_str().into()),
+            },
+        ),
+        (
+            PrFamily::Threads,
+            PrRecord::Thread {
+                node_id: LIFECYCLE_THREAD.into(),
+                resolved: Some(false),
+                outdated: Some(false),
+                comments: vec![InlineComment {
+                    id: LIFECYCLE_THREAD_ROOT,
+                    node_id: Some("TL_LIFECYCLE_ROOT".into()),
+                    in_reply_to: None,
+                    author: Some("Fixture author".into()),
+                    actor: Default::default(),
+                    body: "Offline inline review thread.".into(),
+                    created_at_ms: Some(FIXTURE_TIME_MS),
+                    updated_at_ms: Some(FIXTURE_TIME_MS),
+                    anchor: Some(crate::pr::ReviewAnchor {
+                        path: anchor.path.clone(),
+                        side: anchor.side,
+                        line: anchor.first_line,
+                        original_oid: anchor.source_oid.clone(),
+                    }),
+                }],
+                replies_complete: true,
+                reply_cursor: None,
+            },
+        ),
+    ] {
+        let progress = store.start_pr_fetch(&rev, family, WalkMode::Full)?;
+        store.commit_pr_page(
+            &rev,
+            family,
+            &progress,
+            PrInputPage {
+                records: vec![record],
+                next_cursor: None,
+                validators: None,
+                fetched_at_ms: FIXTURE_TIME_MS,
+                partial: None,
+            },
+        )?;
+    }
     let mut workspace = store.workspace(account)?.ok_or(Error::NotFound)?;
     workspace.proportions = vec![0.43, 0.57];
-    workspace.panes[1].tabs[0].view.draft = Some(LIFECYCLE_REVIEW.into());
+    let view = &mut workspace.panes[1].tabs[0].view;
+    view.draft = Some(review_id);
+    view.pr_reader = Some(PrTabView {
+        diff_mode: PrDiffMode::Split,
+        selected_path: Some(anchor.path.clone()),
+        code_anchor: Some(crate::pr::ReviewAnchor {
+            path: anchor.path,
+            side: anchor.side,
+            line: 3,
+            original_oid: anchor.source_oid,
+        }),
+        ..PrTabView::default()
+    });
     store.save_reader_layout(account, &workspace, None)?;
 
     for (index, intent) in [
@@ -194,9 +356,6 @@ pub fn populate_native_lifecycle(
             submitted_at_ms: FIXTURE_TIME_MS,
         },
     )?;
-    let current = store
-        .github_access_profile(account, BACKLOG_OWNER)?
-        .ok_or(Error::NotFound)?;
     store.record_merge_policy(
         &current,
         &rev,
@@ -269,10 +428,45 @@ pub fn lifecycle_checkpoint(store: &Store, stage: &str) -> Result<serde_json::Va
         .ok_or(Error::NotFound)?;
     let account = original.account;
     let layout = store.workspace(account)?.ok_or(Error::NotFound)?;
-    let controls = store.sync_settings(account)?.controls;
-    let draft = store
-        .review_draft(account, LIFECYCLE_REVIEW)?
+    let settings = store.sync_settings(account)?;
+    let controls = settings.controls;
+    let primary_review = layout
+        .panes
+        .get(1)
+        .and_then(|pane| pane.tabs.first())
         .ok_or(Error::NotFound)?;
+    let primary_issue = layout
+        .panes
+        .first()
+        .and_then(|pane| pane.tabs.first())
+        .ok_or(Error::NotFound)?
+        .item;
+    let draft = store
+        .review_draft(account, &review_draft_id(primary_review.item))?
+        .ok_or(Error::NotFound)?;
+    let (revision, _) = store
+        .pr_revision(account, draft.item, draft.revision_id)?
+        .ok_or(Error::NotFound)?;
+    let history_head = CommitOid::parse(&"a".repeat(40))?;
+    let history = store.history_page(account, revision.repository, &history_head, None, 10)?;
+    let comments = store.discussion_page(account, primary_issue, None, 20)?;
+    let reviews = store.pr_page(&revision, PrFamily::Reviews, None, 10)?;
+    let threads = store.pr_page(&revision, PrFamily::Threads, None, 10)?;
+    let checks = store.pr_page(&revision, PrFamily::Checks, None, 1)?;
+    let search = store.search_downloaded(
+        account,
+        crate::reader::ReaderScope::Repository(revision.repository),
+        "Investigate relay behavior 1",
+        10,
+    )?;
+    let sync_checkpoint = store.read(|db| {
+        Ok(db.query_row(
+            "SELECT cursor,walk_started FROM scheduled_reads
+             WHERE account_id=? AND repository_id=? AND item_id IS NULL AND family=? AND revision=''",
+            params![account, revision.repository, ResourceFamily::RepositoryItems.name()],
+            |row| Ok((row.get::<_, Option<String>>(0)?, row.get::<_, Option<i64>>(1)?)),
+        )?)
+    })?;
     let delivery = store
         .load_delivery_state(account, LIFECYCLE_EVENT)?
         .ok_or(Error::NotFound)?;
@@ -292,6 +486,14 @@ pub fn lifecycle_checkpoint(store: &Store, stage: &str) -> Result<serde_json::Va
         || draft.draft.comments[0].anchor.first_line != 1
         || delivery.phase != DeliveryPhase::Delivered
         || delivery_groups != 1
+        || history.rows.len() != 2
+        || comments.records.is_empty()
+        || reviews.rows.len() != 1
+        || threads.rows.len() != 1
+        || checks.state.coverage != crate::resources::Coverage::Missing
+        || search.len() != 1
+        || sync_checkpoint.0.as_deref() != Some("2")
+        || sync_checkpoint.1.is_none()
         || !alternate_rows.is_empty()
         || original_rows
             .iter()
@@ -302,6 +504,16 @@ pub fn lifecycle_checkpoint(store: &Store, stage: &str) -> Result<serde_json::Va
         return Err(Error::Conflict("lifecycle fixture data was not preserved"));
     }
     let attempts = store.attempts(account, LIFECYCLE_ACTIONS[0])?;
+    let feed = store.notification_feed(account, None, 10)?;
+    let dependent_holds = LIFECYCLE_ACTIONS[1..]
+        .iter()
+        .map(|id| store.dispatch_hold(account, id))
+        .collect::<Result<Vec<_>>>()?;
+    let credential_generation: i64 = store.read(|db| Ok(db.query_row(
+        "SELECT credential_generation FROM github_access_profiles WHERE account_id=? AND owner_scope=?",
+        params![account, BACKLOG_OWNER],
+        |row| row.get(0),
+    )?))?;
     Ok(serde_json::json!({
         "fixture_revision": LIFECYCLE_REVISION,
         "stage": stage,
@@ -314,18 +526,39 @@ pub fn lifecycle_checkpoint(store: &Store, stage: &str) -> Result<serde_json::Va
         "pane_proportions": layout.proportions,
         "focused_pane": layout.focused_pane,
         "review_item": draft.item.0,
+        "content": {
+            "repository": revision.repository.0,
+            "issue": primary_issue.0,
+            "issue_comments": comments.records.len(),
+            "pr": draft.item.0,
+            "pr_revision": revision.id,
+            "pr_head": revision.head.as_str(),
+            "file": "src/relay_00.rs",
+            "formal_reviews": reviews.rows.len(),
+            "review_threads": threads.rows.len(),
+            "check_coverage": format!("{:?}", checks.state.coverage),
+            "history_commits": history.rows.len(),
+            "history_head": history_head.as_str(),
+            "search_matches": search.len(),
+        },
+        "sync_checkpoint": {"cursor": sync_checkpoint.0, "started_at_ms": sync_checkpoint.1},
+        "schedule": {"timezone": settings.schedule.timezone, "work_interval_secs": settings.schedule.work_interval_secs},
         "review_anchor_preserved": true,
         "prior_delivery": "Delivered",
         "delivery_groups": delivery_groups,
         "delivery_unchanged_at_ms": delivery.updated_at_ms,
-        "feed_count": store.notification_feed(account, None, 10)?.len(),
+        "feed_count": feed.len(),
+        "feed_event": feed.first().ok_or(Error::NotFound)?.id,
         "work_offline": controls.work_offline,
         "pause_queued_actions": controls.pause_queued_actions,
         "actions": original_rows.iter().map(|row| format!("{:?}", row.state)).collect::<Vec<_>>(),
+        "action_ids": original_rows.iter().map(|row| row.id.as_str()).collect::<Vec<_>>(),
         "first_attempts": attempts.len(),
         "first_send_starts": attempts.iter().filter(|attempt| attempt.sending_at.is_some()).count(),
         "next_recovery_at_ms": store.next_operation_recovery(account)?,
         "dependents": 3,
+        "dependent_holds": dependent_holds,
+        "credential_generation": credential_generation,
     }))
 }
 

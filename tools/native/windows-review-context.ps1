@@ -341,8 +341,8 @@ function Invoke-ReviewDecisionsProof([IntPtr]$Window, [string]$Profile, [switch]
     }
 }
 
-function Wait-FixtureThreadViewport([long]$Item) {
-    $head = 'b' * 40
+function Wait-FixtureThreadViewport([long]$Item, [string]$Head = ('b' * 40), [int]$Pane = 0) {
+    $viewportId = "pr-$Pane-conversation-records"
     $matched = @{ geometry = $null; state = $null }
     Wait-For 'the original PR thread and a stable visible Conversation viewport' {
         $candidate = Read-Observation
@@ -352,7 +352,7 @@ function Wait-FixtureThreadViewport([long]$Item) {
         }
         $account = $candidate.PSObject.Properties['account_access']
         $reader = $candidate.PSObject.Properties['cached_reader']
-        $viewport = $candidate.bounds.PSObject.Properties['pr-0-conversation-records']
+        $viewport = $candidate.bounds.PSObject.Properties[$viewportId]
         if ($null -eq $account -or $null -eq $account.Value -or $account.Value.panel_open -or
             $null -eq $reader -or $null -eq $reader.Value -or $reader.Value.active_item -ne $Item -or
             $null -eq $viewport -or $null -eq $viewport.Value -or $viewport.Value.Count -ne 4 -or
@@ -376,16 +376,17 @@ function Wait-FixtureThreadViewport([long]$Item) {
     return $matched.state
 }
 
-function Show-FixtureThreadControl([IntPtr]$Window, [long]$Item, [string]$Id, [string]$Name, [int]$Direction, [switch]$Edit) {
+function Show-FixtureThreadControl([IntPtr]$Window, [long]$Item, [string]$Id, [string]$Name, [int]$Direction, [switch]$Edit,
+    [string]$Head = ('b' * 40), [int]$Pane = 0) {
     for ($step = 0; $step -le 5; $step++) {
         if (!(Test-OwnedFixtureWindow $Window)) {
             Stop-Blocked 'The isolated Threadline conversation is no longer owned by the expected process.'
         }
-        $observed = Wait-FixtureThreadViewport $Item
+        $observed = Wait-FixtureThreadViewport $Item $Head $Pane
         if ($null -ne $observed.bounds.PSObject.Properties[$Id] -and
             $null -ne (Find-OwnedFixtureControl $Window $Id $Name -Edit:$Edit)) { return }
         if ($step -eq 5) { break }
-        $rect = $observed.bounds.PSObject.Properties['pr-0-conversation-records'].Value
+        $rect = $observed.bounds.PSObject.Properties["pr-$Pane-conversation-records"].Value
         $point = To-ClientPoint ($rect[0] + $rect[2] / 2) ($rect[1] + $rect[3] / 2) $observed.scale_factor
         $dpi = [uint32][Math]::Round(96 * $observed.scale_factor)
         [ThreadlineWinInput]::ScrollOwnedConversation($Window, [uint32]$script:app.Id, $dpi, $point, $Direction)

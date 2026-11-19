@@ -1021,6 +1021,96 @@ fn ui_008_observed_reader_controls_follow_the_visible_panes(cx: &mut TestAppCont
 
 #[cfg(feature = "e2e")]
 #[gpui_kit::test]
+fn mixed_lifecycle_cache_loads_every_seeded_editor_in_the_original_panes(cx: &mut TestAppContext) {
+    use threadline_storage::fixtures::populate_native_lifecycle;
+
+    let directory = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open_profile(directory.path()).unwrap());
+    let fixture = populate_native_lifecycle(
+        &store,
+        12345,
+        "00112233445566778899aabbccddeeff",
+        1_900_000_000_000,
+        || Ok(()),
+    )
+    .unwrap();
+    super::lifecycle_fixture::seed_drafts(&store, fixture.account).unwrap();
+    let layout = store.workspace(fixture.account).unwrap().unwrap();
+    let review_id = layout.panes[1].tabs[0].id.clone();
+    let setup = ReaderHarness {
+        _directory: directory,
+        store,
+        fixture,
+        runtime: tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .worker_threads(2)
+            .build()
+            .unwrap(),
+    };
+    let (window, reader) = setup.open(cx);
+    until(cx, |cx| {
+        cx.read(|cx| {
+            reader
+                .read(cx)
+                .review_editors
+                .contains_key(&setup.fixture.reviewed_pr)
+        })
+    });
+    cx.read(|cx| {
+        let workspace = reader.read(cx);
+        assert_eq!(
+            workspace.review_editors[&setup.fixture.reviewed_pr].tab_id,
+            review_id
+        );
+        assert_eq!(workspace.cached_active_panes(), 2);
+        assert_eq!(workspace.layout.proportions, vec![0.43, 0.57]);
+    });
+    for (id, pane, index) in [
+        ("reader-tab-0-0", 0, 0),
+        ("reader-tab-0-1", 0, 1),
+        ("reader-tab-1-1", 1, 1),
+    ] {
+        let tab = &layout.panes[pane].tabs[index];
+        let draft = tab.view.draft.as_ref().unwrap();
+        click(cx, window, id);
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let workspace = reader.read(cx);
+                workspace
+                    .active_tab()
+                    .is_some_and(|active| active.id == tab.id)
+                    && workspace
+                        .drafts
+                        .get(draft)
+                        .is_some_and(|editor| editor.saved() && editor.submitted.is_none())
+            })
+        });
+    }
+    let drafts =
+        super::lifecycle_fixture::draft_checkpoint(&setup.store, setup.fixture.account).unwrap();
+    assert_eq!(drafts.as_array().unwrap().len(), 4);
+    click(cx, window, "pr-1-checks");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let workspace = reader.read(cx);
+            let tab = workspace.active_tab().unwrap();
+            workspace
+                .tab_views
+                .get(&tab.id)
+                .and_then(|view| view.pr.as_ref())
+                .is_some_and(|pr| {
+                    pr.data.pages.iter().any(|(family, page)| {
+                        *family == threadline_storage::pr::PrFamily::Checks
+                            && page.state.coverage
+                                == threadline_storage::resources::Coverage::Missing
+                    })
+                })
+        })
+    });
+}
+
+#[cfg(feature = "e2e")]
+#[gpui_kit::test]
 fn scroll_within_pr_conversation_reveals_cached_thread_actions(cx: &mut TestAppContext) {
     use gpui_kit::{Modifiers, PlatformInput, ScrollDelta, ScrollEvent, ScrollSource, TouchPhase};
     use threadline_storage::{

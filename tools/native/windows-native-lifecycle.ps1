@@ -19,10 +19,12 @@ function Read-NativeLifecycle([string]$Profile, [string]$Stage, [string]$Name) {
 function Initialize-NativeLifecycle([string]$Profile) {
     Set-AccessPhase 'lifecycle-offline'
     $script:lifecycleSeed = Read-NativeLifecycle $Profile 'seed' 'native-lifecycle-seeded.json'
-    if ($lifecycleSeed.fixture_revision -cne 's12-native-lifecycle-v1' -or
+    if ($lifecycleSeed.fixture_revision -cne 's12-native-lifecycle-v2' -or
         !$lifecycleSeed.work_offline -or !$lifecycleSeed.pause_queued_actions -or !$lifecycleSeed.protected_token_present -or
         ($lifecycleSeed.tab_counts -join ',') -cne '10,10' -or ($lifecycleSeed.actions -join ',') -cne 'Queued,Queued,Queued,Queued' -or
-        !$lifecycleSeed.review_anchor_preserved -or $lifecycleSeed.prior_delivery -cne 'Delivered' -or $lifecycleSeed.feed_count -ne 1) {
+        !$lifecycleSeed.review_anchor_preserved -or $lifecycleSeed.prior_delivery -cne 'Delivered' -or $lifecycleSeed.feed_count -ne 1 -or
+        ($lifecycleSeed.drafts.kind -join ',') -cne 'IssueEdit,Comment,Review,Reply' -or
+        $lifecycleSeed.sync_checkpoint.cursor -cne '2' -or $lifecycleSeed.content.check_coverage -cne 'Missing') {
         throw 'The lifecycle fixture did not seed its exact retained layout, drafts, queue and delivery.'
     }
     Add-Evidence 'Seed mixed private cached work and install one unique protected fixture key' $lifecycleSeed
@@ -70,14 +72,127 @@ function Wait-LifecycleMarker([string]$Name) {
     }
 }
 
+function Assert-LifecycleCacheUnchanged($Checkpoint) {
+    foreach ($field in @('content', 'drafts', 'sync_checkpoint', 'schedule', 'feed_event', 'action_ids')) {
+        $initial = $script:lifecycleSeed.PSObject.Properties[$field].Value | ConvertTo-Json -Compress -Depth 8
+        $retained = $Checkpoint.PSObject.Properties[$field].Value | ConvertTo-Json -Compress -Depth 8
+        if ($initial -cne $retained) { throw "The retained lifecycle fixture changed: $field." }
+    }
+}
+
+function Wait-LifecycleReview([long]$Item) {
+    $content = $script:lifecycleSeed.content
+    $draft = $script:lifecycleSeed.drafts[2]
+    $null = Wait-PrReader 'the original two-pane review, file, view and unsent draft' {
+        param($pr, $reader)
+        $reader.active_item -eq $Item -and $pr.head -ceq $content.pr_head -and
+            $pr.diff_mode -ceq 'Split' -and $pr.selected_file -ceq $content.file -and
+            $null -ne $pr.source_anchor -and $pr.source_anchor.line -eq 3 -and $pr.source_anchor.side -ceq 'Right' -and
+            $null -ne $pr.review_draft -and $pr.review_draft.id -ceq $draft.id -and
+            $pr.review_draft.saved -and !$pr.review_draft.queued
+    }
+}
+
+function Wait-LifecycleDraft($Draft, [switch]$Discussion) {
+    $null = Wait-Reader 'the same visible, saved and unsubmitted fixture editor' {
+        param($reader)
+        $reader.offline -and $reader.active_item -eq $Draft.item -and $reader.active_draft_saved -and
+            !$reader.active_draft_submitted -and $reader.active_draft_sha256 -ceq $Draft.body_sha256 -and
+            (!$Discussion -or ($reader.comments_coverage -ceq 'Complete' -and $reader.comment_count -gt 0))
+    }
+}
+
+function Invoke-LifecycleCachedSurfaces([IntPtr]$Window) {
+    $content = $script:lifecycleSeed.content
+    $drafts = $script:lifecycleSeed.drafts
+    Wait-LifecycleReview $content.pr
+    Click-AccountControl $Window 'pr-1-review-toggle-editor'
+    $null = Wait-AccountControl 'pr-1-diff'
+    Click-AccountControl $Window 'pr-1-checks'
+    $null = Wait-PrReader 'the same pull request with explicit unchecked coverage' {
+        param($pr, $reader)
+        $reader.offline -and $reader.active_item -eq $content.pr -and
+            $pr.head -ceq $content.pr_head -and $pr.section -ceq 'Checks' -and $pr.checks_coverage -ceq 'Missing'
+    }
+    $null = Wait-AccountControl 'pr-1-checks-coverage'
+    Click-AccountControl $Window 'pr-1-files'
+    Wait-LifecycleReview $content.pr
+
+    Click-AccountControl $Window 'reader-tab-0-0'
+    Wait-LifecycleDraft $drafts[0] -Discussion
+    $null = Wait-AccountControl 'reader-draft-input-0'
+    Click-AccountControl $Window 'reader-tab-0-1'
+    Wait-LifecycleDraft $drafts[1]
+    $null = Wait-AccountControl 'reader-draft-input-0'
+    Click-AccountControl $Window 'reader-tab-1-1'
+    Wait-LifecycleDraft $drafts[3]
+    $null = Wait-PrReader 'the exact downloaded formal review and original thread' {
+        param($pr, $reader)
+        $reader.offline -and $reader.active_item -eq $content.pr -and $pr.section -ceq 'Conversation' -and
+            $pr.head -ceq $content.pr_head -and $pr.reviews_on_page -eq 1 -and $pr.threads_on_page -eq 1
+    }
+    Show-FixtureThreadControl $Window $content.pr 'pr-1-thread-0-reply-input' 'Reply to review thread' -1 -Edit -Head $content.pr_head -Pane 1
+
+    Wait-For 'the owned local search field accepts the exact fixture query' {
+        Set-OwnedFixtureEditValue $Window 'reader-search' 'Search downloaded content' 'Investigate relay behavior 1'
+    }
+    Click-AccountControl $Window 'reader-search-submit'
+    $null = Wait-Reader 'local search returns the same downloaded issue while offline' {
+        param($reader) $reader.offline -and $reader.search_results -eq 1 -and $reader.first_search_item -eq $content.issue
+    }
+    Click-AccountControl $Window ('reader-repository-' + $content.repository)
+    Click-AccountControl $Window 'reader-history'
+    Click-AccountControl $Window 'history-ref-0'
+    $null = Wait-History 'the selected branch has both downloaded historical commits' {
+        param($history, $reader)
+        $reader.offline -and $history.repository -eq $content.repository -and
+            $history.commits -eq 2 -and $history.coverage -ceq 'Complete'
+    }
+    Click-AccountControl $Window 'history-commit-0'
+    $null = Wait-History 'the original cached history tip opens in the native graph' {
+        param($history) $history.selected -ceq $content.history_head
+    }
+    Click-AccountControl $Window 'reader-activity'
+    Wait-For 'the original delivered activity item opens from the native feed' {
+        Invoke-OwnedFixtureControl $Window ('activity-open-' + $script:lifecycleSeed.feed_event) $null 'Open'
+    }
+    $null = Wait-Reader 'the activity feed retained the original downloaded issue target' {
+        param($reader) $reader.offline -and $reader.active_item -eq $content.issue
+    }
+    Click-AccountControl $Window 'reader-outbox'
+    Click-AccountControl $Window 'reader-outbox-filter-pending'
+    $null = Wait-Reader 'the visible paused Outbox retains four original pending actions' {
+        param($reader) $reader.offline -and $reader.outbox_visible -and $reader.outbox -eq 4
+    }
+    $null = Wait-AccountControl 'reader-outbox-action-0'
+    Click-AccountControl $Window 'reader-browse'
+    Click-AccountControl $Window 'reader-tab-0-0'
+    Click-AccountControl $Window 'reader-tab-1-0'
+    $null = Wait-LifecycleWorkspace $true $false
+    Add-Evidence 'Open the original cached issue, review and history with four retained drafts before any network request' ([ordered]@{
+        item = $content.issue; pr = $content.pr; head = $content.pr_head; history_head = $content.history_head
+        local_search_matches = 1; feed_event = $script:lifecycleSeed.feed_event; draft_kinds = $drafts.kind
+        unfetched_checks = 'Missing'; pending_actions = 4
+    })
+}
+
 function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
     $initial = Wait-LifecycleWorkspace $true $false
     Add-Evidence 'Restore the useful two-pane native workspace with Work Offline and saved credential' ([ordered]@{
         pid = $initial.pid; panes = $initial.cached_reader.cached_visible_panes; outbox = $initial.cached_reader.outbox
     })
+    Invoke-LifecycleCachedSurfaces $Window
+    Stop-ThroughUi
+    Assert-LifecycleCacheUnchanged (Read-NativeLifecycle $Profile 'inspect' 'native-lifecycle-before-offline-restart.json')
+    $Window = Start-LifecycleWindow $Profile 'native-lifecycle-offline-restart-observation.json'
+    $reopened = Wait-LifecycleWorkspace $true $false
+    if ($reopened.pid -eq $initial.pid) { throw 'The offline profile did not reopen in a separate process.' }
+    Wait-LifecycleReview $script:lifecycleSeed.content.pr
+    Add-Evidence 'Quit normally and restore the same offline workspace and original review in a new process' $reopened.pid
     Open-SyncSettings $Window
     $null = Wait-Sync 'separate offline, read and Outbox holds' {
-        param($sync) Test-LifecycleSync $sync $true $true
+        param($sync) (Test-LifecycleSync $sync $true $true) -and $null -ne $sync.schedule -and
+            $sync.schedule.timezone -ceq 'UTC' -and $sync.schedule.work_interval_secs -eq 180
     }
     Set-AccessPhase 'lifecycle-ready'
     Click-AccountControl $Window 'sync-work-offline'
@@ -98,6 +213,7 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
     Stop-ThroughUi
 
     $retained = Read-NativeLifecycle $Profile 'inspect' 'native-lifecycle-before-delayed-start.json'
+    Assert-LifecycleCacheUnchanged $retained
     if (!$retained.protected_token_present -or $retained.work_offline -or !$retained.pause_queued_actions -or
         $retained.first_attempts -ne 0 -or $retained.feed_count -ne 1) {
         throw 'Normal close did not preserve the protected token, controls and delivered activity.'
@@ -106,6 +222,10 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
     $online = Start-LifecycleWindow $Profile 'native-lifecycle-online-observation.json'
     Wait-LifecycleMarker 'lifecycle-probe-held'
     $ready = Wait-LifecycleWorkspace $false $false
+    Wait-LifecycleReview $script:lifecycleSeed.content.pr
+    if (!(Test-Path -LiteralPath (Join-Path $script:ProfileDir 'lifecycle-probe-held') -PathType Leaf)) {
+        throw 'The deliberately delayed provider response was released before the restored cache was observed.'
+    }
     Add-Evidence 'Observe both restored panes and four actions while the authenticated startup response is held' ([ordered]@{
         pid = $ready.pid; cached_panes = $ready.cached_reader.cached_visible_panes
         queued_actions = $ready.cached_reader.outbox; protected_credential_reentered = $false
@@ -202,6 +322,7 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-LifecycleWorkspace $false $true
     Stop-ThroughUi
     $final = Read-NativeLifecycle $Profile 'inspect' 'native-lifecycle-final.json'
+    Assert-LifecycleCacheUnchanged $final
     if ($final.protected_token_present -or $final.active_account -ne $lifecycleSeed.account -or
         $final.alternate_queue -ne 0 -or $final.feed_count -ne 1 -or $final.first_send_starts -ne 1 -or
         $final.delivery_groups -ne 1 -or
@@ -209,5 +330,46 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
         throw 'Account switching did not preserve the isolated durable signed-out state.'
     }
     Add-Evidence 'Restore the original signed-out workspace after visiting the isolated account' $final
-    $script:report.detail = 'The mixed workspace restored before an authenticated startup response. An interrupted mutation remained uncertain across restart and sign-out. The protected key was removed, the other profile saw no private work, three dependents and the original draft stayed intact, and the prior delivery was not repeated.'
+
+    Set-AccessPhase 'lifecycle-return'
+    $repair = Start-LifecycleWindow $Profile 'native-lifecycle-repair-observation.json'
+    $null = Wait-LifecycleWorkspace $false $true
+    Click-AccountControl $repair 'account-open'
+    Select-FixtureReplacement $repair $lifecycleSeed.account
+    Enter-FixtureAccountForm $repair -LoopbackTokenAction
+    Click-AccountControl $repair 'account-connect'
+    $null = Wait-Account 'the same owner and GitHub user renew the original protected credential' {
+        param($account)
+        $account.active_local_id -eq $script:lifecycleSeed.account -and
+            $account.active_user_id -eq 41 -and $account.profile_access -ceq 'Readable' -and $account.selected_count -eq 2
+    }
+    Click-AccountControl $repair 'account-close'
+    Open-SyncSettings $repair
+    Click-AccountControl $repair 'sync-check-now'
+    $null = Wait-Sync 'the renewed credential serves a new verified online connection' {
+        param($sync) Test-LifecycleSync $sync $false $false -Reachable
+    }
+    Click-AccountControl $repair 'reader-outbox'
+    Click-AccountControl $repair 'reader-outbox-filter-attention'
+    Wait-For 'the same owned Outbox row remains uncertain after same-user repair' {
+        $name = 'Comment ' + [char]0x00b7 + ' Outcome unknown'
+        Invoke-OwnedFixtureControl $repair 'reader-outbox-action-0' $null $name
+    }
+    $null = Wait-Reader 'the uncertain parent and three dependents remain in the original renewed account' {
+        param($reader) !$reader.signed_out -and $reader.outbox_visible -and $reader.outbox -eq 4 -and
+            $reader.outbox_action_state -ceq 'OutcomeUnknown'
+    }
+    Stop-ThroughUi
+    $renewed = Read-NativeLifecycle $Profile 'inspect' 'native-lifecycle-renewed.json'
+    Assert-LifecycleCacheUnchanged $renewed
+    if (!$renewed.protected_token_present -or !$renewed.protected_reference_matches -or
+        $renewed.credential_generation -le $final.credential_generation -or
+        ($renewed.actions -join ',') -cne 'OutcomeUnknown,Queued,Queued,Queued' -or
+        ($renewed.dependent_holds -join ',') -cne 'dependency,dependency,dependency' -or
+        $renewed.first_attempts -ne 1 -or $renewed.first_send_starts -ne 1 -or
+        $renewed.delivery_unchanged_at_ms -ne $lifecycleSeed.delivery_unchanged_at_ms) {
+        throw 'Renewal changed the scoped uncertain operation, its dependents or a prior delivery.'
+    }
+    Add-Evidence 'Renew the same protected identity and preserve uncertainty without replay or releasing dependents' $renewed
+    $script:report.detail = 'The mixed workspace restored its offline reader and four unsent draft kinds before the delayed startup response. An interrupted ordinary comment stayed uncertain across restart, sign-out, profile isolation and same-user renewal. The original attempt and its three held dependents remained unchanged, and the prior delivery was not repeated.'
 }

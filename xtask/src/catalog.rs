@@ -32,7 +32,7 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
         return Some("s11-native-activity-v3");
     }
     if case == "S12-NATIVE-LIFECYCLE" {
-        return Some("s12-native-lifecycle-v1");
+        return Some("s12-native-lifecycle-v2");
     }
     if matches!(case, "E2E-014" | "S12-READER-CONCURRENT") {
         return Some("s12-large-workspace-v2");

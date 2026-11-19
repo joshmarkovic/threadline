@@ -23,6 +23,8 @@ use threadline_storage::{
 mod activity_view;
 mod drafts;
 mod history_view;
+#[cfg(feature = "e2e")]
+pub(crate) mod lifecycle_fixture;
 mod media;
 mod merge_view;
 mod outbox;

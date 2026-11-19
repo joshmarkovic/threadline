@@ -607,7 +607,7 @@ impl ReaderWorkspace {
     }
 }
 
-fn draft_base(
+pub(super) fn draft_base(
     store: &Store,
     account: AccountId,
     item: ItemId,

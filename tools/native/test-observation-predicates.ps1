@@ -59,6 +59,15 @@ if (!(Test-LifecycleWorkspace $lifecycleReader 3 $false $true) -or
     (Test-LifecycleWorkspace $lifecycleReader 4 $false $true)) {
     throw 'Native lifecycle did not fence the restored signed-out workspace and exact cached item.'
 }
+$script:lifecycleSeed = '{"content":{"issue":1},"drafts":[{"id":"comment-1","version":2}],"sync_checkpoint":{"cursor":"2","started_at_ms":10},"schedule":{"timezone":"UTC"},"feed_event":1,"action_ids":["fixture-action"]}' | ConvertFrom-Json
+$retained = $script:lifecycleSeed | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+Assert-LifecycleCacheUnchanged $retained
+$retained.sync_checkpoint.cursor = '3'
+$refusedCheckpoint = $false
+try { Assert-LifecycleCacheUnchanged $retained } catch {
+    $refusedCheckpoint = $_.Exception.Message -like '*sync_checkpoint*'
+}
+if (!$refusedCheckpoint) { throw 'Native lifecycle accepted a changed durable sync continuation.' }
 $quietChoice = 'Enable quiet hours ' + [char]0x00b7 + ' '
 if ((Get-NotificationChoiceName 'Enable quiet hours' $false) -cne ($quietChoice + 'Unselected') -or
     (Get-NotificationChoiceName 'Enable quiet hours' $true) -cne ($quietChoice + 'Selected')) {

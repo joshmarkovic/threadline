@@ -153,7 +153,7 @@ fn seed(scope: FixtureScope) -> Result<serde_json::Value, String> {
         .ok_or(ERROR)?;
     let now = UtcMillis::now().map_err(|_| ERROR)?.0;
     let store = Store::open_profile(&scope.root).map_err(|_| ERROR)?;
-    populate_native_lifecycle(&store, seed, &scope.credential.name, now, || {
+    let fixture = populate_native_lifecycle(&store, seed, &scope.credential.name, now, || {
         NativeCredentialStore
             .save(
                 &scope.credential,
@@ -162,11 +162,20 @@ fn seed(scope: FixtureScope) -> Result<serde_json::Value, String> {
             .map_err(|_| Error::Conflict("The isolated Windows protected credential failed"))
     })
     .map_err(|error| format!("Could not seed the isolated lifecycle profile. {error}"))?;
+    crate::reader_workspace::lifecycle_fixture::seed_drafts(&store, fixture.account)
+        .map_err(|error| format!("Could not seed the isolated lifecycle drafts. {error}"))?;
     inspect(&scope, &store, "seeded")
 }
 
 fn inspect(scope: &FixtureScope, store: &Store, stage: &str) -> Result<serde_json::Value, String> {
     let mut snapshot = lifecycle_checkpoint(store, stage).map_err(|error| error.to_string())?;
+    let account = snapshot["account"]
+        .as_i64()
+        .map(threadline_storage::AccountId)
+        .ok_or(ERROR)?;
+    snapshot["drafts"] =
+        crate::reader_workspace::lifecycle_fixture::draft_checkpoint(store, account)
+            .map_err(|error| error.to_string())?;
     snapshot["protected_reference_matches"] = store
         .github_access_profiles()
         .map_err(|_| ERROR)?
