@@ -5136,3 +5136,95 @@ mod badges;
 #[cfg(feature = "e2e")]
 mod mention_delivery;
 mod review_mute;
+
+#[gpui_kit::test]
+fn ui_003_offline_pr_conversation_shortcut_focuses_visible_draft(cx: &mut TestAppContext) {
+    use threadline_storage::pr::PrSection;
+
+    let setup = ReaderHarness::seeded();
+    let account = setup.fixture.account;
+    let item = setup.fixture.reviewed_pr;
+    let original = setup.store.workspace(account).unwrap().unwrap();
+    let unrelated = original.panes[0].clone();
+    let draft_id = format!("comment-{}", item.0);
+    let queue_before = setup.store.queue_page(account, 0, 100).unwrap();
+    let (window, reader) = setup.open_at(cx, size(px(1320.), px(820.)));
+    cx.read(|cx| {
+        let reader = reader.read(cx);
+        assert_eq!(reader.active_tab().unwrap().item, item);
+        assert!(
+            reader.tab_views[&reader.active_tab().unwrap().id]
+                .pr
+                .is_none()
+        );
+    });
+    click(cx, window, "pr-1-conversation");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let reader = reader.read(cx);
+            !reader.layout_busy
+                && reader
+                    .active_tab()
+                    .and_then(|tab| tab.view.pr_reader.as_ref())
+                    .is_some_and(|state| state.section == PrSection::Conversation)
+        })
+    });
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        reader.read(cx).surface_focus.clone().focus(window, cx);
+    })
+    .unwrap();
+    cx.simulate_keystrokes(window, "secondary-alt-d");
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let workspace = reader.read(cx);
+            !workspace.layout_busy && workspace.drafts.contains_key(&draft_id)
+        })
+    });
+    cx.update_window(window, |_, window, cx| {
+        window.simulate_next_frame(cx);
+        window.render_frame(cx);
+        let workspace = reader.read(cx);
+        assert!(!workspace.maximized);
+        assert_eq!(workspace.layout.panes[0], unrelated);
+        let field = window.find_all("reader-draft-input-1");
+        assert!(
+            field.iter().any(|editor| {
+                let bounds = editor.bounds();
+                editor.visible()
+                    && bounds.size.height > px(0.)
+                    && bounds.bottom() <= window.viewport_size().height
+            }),
+            "the focused Markdown editor must be visible in its original pane: {field:?}"
+        );
+        assert!(
+            workspace.drafts[&draft_id]
+                .view
+                .focus_handle(cx)
+                .is_focused(window)
+        );
+        window.input("Offline keyboard draft.", cx);
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let workspace = reader.read(cx);
+            workspace.drafts[&draft_id].saved()
+                && workspace.drafts[&draft_id].body == "Offline keyboard draft."
+        })
+    });
+    assert_eq!(
+        setup
+            .store
+            .draft(account, &draft_id)
+            .unwrap()
+            .unwrap()
+            .content
+            .body,
+        "Offline keyboard draft."
+    );
+    assert_eq!(
+        setup.store.queue_page(account, 0, 100).unwrap(),
+        queue_before
+    );
+}

@@ -1426,15 +1426,18 @@ impl ReaderWorkspace {
                         cx,
                     ))
                     .child(
-                        div().id(format!("reader-draft-input-{pane}")).child(
-                            self.observed_control(
-                                format!("reader-draft-input-{pane}"),
-                                Textarea::new(&editor.view)
-                                    .accessibility_id(format!("reader-draft-input-{pane}"))
-                                    .aria_label("Local Markdown draft"),
-                                true,
+                        div()
+                            .id(format!("reader-draft-input-{pane}"))
+                            .test_support()
+                            .child(
+                                self.observed_control(
+                                    format!("reader-draft-input-{pane}"),
+                                    Textarea::new(&editor.view)
+                                        .accessibility_id(format!("reader-draft-input-{pane}"))
+                                        .aria_label("Local Markdown draft"),
+                                    true,
+                                ),
                             ),
-                        ),
                     )
                     .child(div().text_xs().child(if editor.lease_lost {
                         super::drafts::EDITOR_LEASE_LOST
@@ -1713,13 +1716,17 @@ impl ReaderWorkspace {
             && self.layout.panes.iter().any(|pane| {
                 pane.active
                     .and_then(|slot| pane.tabs.get(slot))
-                    .is_some_and(|tab| {
-                        tab.view.pr_reader.as_ref().is_none_or(|settings| {
+                    .and_then(|tab| self.tab_views.get(&tab.id).map(|view| (tab, view)))
+                    .is_some_and(|(tab, view)| match &tab.view.pr_reader {
+                        Some(settings) => {
                             settings.section == threadline_storage::pr::PrSection::Conversation
-                        }) && self
-                            .tab_views
-                            .get(&tab.id)
-                            .is_some_and(|view| view.pr.is_some())
+                                && view
+                                    .data
+                                    .item
+                                    .as_ref()
+                                    .is_some_and(|item| item.kind == ItemKind::PullRequest)
+                        }
+                        None => view.pr.is_some(),
                     })
             });
         let mut upper = div()

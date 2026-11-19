@@ -123,20 +123,34 @@ function Restart-Reader([string]$Profile, [hashtable]$Startup, [switch]$SeedQuie
     return $window
 }
 
-function Test-OwnedOfflineDraftFocus([IntPtr]$Window, [string]$Id) {
+function Test-OfflineDraftFocusReceipt($Snapshot, [int]$Owner, [string]$Id, [long]$Item, [int]$Pane) {
+    if ($null -eq $Snapshot -or $Snapshot.pid -ne $Owner) { return $false }
+    $cached = $Snapshot.PSObject.Properties['cached_reader']
+    if ($null -eq $cached -or $null -eq $cached.Value) { return $false }
+    $reader = $cached.Value
+    $focus = $reader.PSObject.Properties['active_draft_focus']
+    return $null -ne $focus -and $focus.Value -ceq $Id -and $reader.active_item -eq $Item -and
+        $reader.focused_pane -eq $Pane -and $reader.offline -and $reader.signed_out
+}
+
+function Get-OwnedOfflineDraftFocus([IntPtr]$Window, [string]$Id, [long]$Item, [int]$Pane) {
     if (!(Test-OwnedFixtureWindow $Window) -or [ThreadlineWinInput]::GetForegroundWindow() -ne $Window) {
         Stop-Blocked 'The isolated offline reader lost its verified foreground before typing.'
     }
     $editor = Find-OwnedFixtureControl $Window $Id 'Local Markdown draft' -Edit
-    if ($null -eq $editor) { return $false }
+    if ($null -eq $editor) { return $null }
     try {
-        if ($editor.Current.HasKeyboardFocus) { return $true }
+        if ($editor.Current.HasKeyboardFocus) { return 'UI Automation' }
         $focused = [Windows.Automation.AndCondition]::new([Windows.Automation.Condition[]]@(
             [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty, [int]$script:app.Id)
             [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::HasKeyboardFocusProperty, $true)
         ))
-        return $null -ne $editor.FindFirst([Windows.Automation.TreeScope]::Descendants, $focused)
-    } catch [Windows.Automation.ElementNotAvailableException] { return $false }
+        if ($null -ne $editor.FindFirst([Windows.Automation.TreeScope]::Descendants, $focused)) { return 'UI Automation' }
+    } catch [Windows.Automation.ElementNotAvailableException] { return $null }
+    if (Test-OfflineDraftFocusReceipt (Read-Observation) $script:app.Id $Id $Item $Pane) {
+        return 'GPUI FocusHandle'
+    }
+    return $null
 }
 
 function Invoke-OfflineReaderProof([IntPtr]$Window, [string]$Profile) {
@@ -149,24 +163,32 @@ function Invoke-OfflineReaderProof([IntPtr]$Window, [string]$Profile) {
     Click-AccountControl $Window "reader-tab-$pane-0"
     # The seeded PR starts in Files. Ordinary comment drafts are visible in Conversation.
     Click-AccountControl $Window "pr-$pane-conversation"
-    $null = Wait-Reader 'the same downloaded pull request in Conversation' {
+    $conversation = Wait-Reader 'the same downloaded pull request in Conversation' {
         param($reader)
         $pr = $reader.PSObject.Properties['pull_request']
         $reader.active_item -eq $item -and $reader.focused_pane -eq $pane -and
             $reader.offline -and $reader.signed_out -and $null -ne $pr -and $null -ne $pr.Value -and
             $pr.Value.section -ceq 'Conversation'
     }
-    [ThreadlineWinInput]::Chord(@(0x11, 0x12, 0x44))
     $editor = "reader-draft-input-$pane"
+    if ($null -eq $conversation.cached_reader.active_draft_chars) {
+        [ThreadlineWinInput]::Chord(@(0x11, 0x12, 0x44))
+    } else {
+        Click-AccountControl $Window $editor
+    }
+    Wait-For 'the visible exact owned local Markdown draft editor' {
+        $null -ne (Find-OwnedFixtureControl $Window $editor 'Local Markdown draft' -Edit)
+    }
     Wait-For 'keyboard focus on the exact owned local Markdown draft editor' {
-        Test-OwnedOfflineDraftFocus $Window $editor
+        Get-OwnedOfflineDraftFocus $Window $editor $item $pane
     }
     $draft = 'Offline synthetic draft 04'
     $hash = [Security.Cryptography.SHA256]::Create()
     try {
         $digest = [BitConverter]::ToString($hash.ComputeHash([Text.Encoding]::UTF8.GetBytes($draft))).Replace('-', '').ToLowerInvariant()
     } finally { $hash.Dispose() }
-    if (!(Test-OwnedOfflineDraftFocus $Window $editor)) { Stop-Blocked 'The owned draft editor lost keyboard focus before typing.' }
+    $focus = Get-OwnedOfflineDraftFocus $Window $editor $item $pane
+    if (!$focus) { Stop-Blocked 'The owned draft editor lost keyboard focus before typing.' }
     [ThreadlineWinInput]::ReplaceFixtureText($Window, $script:app.Id, $draft)
     $null = Wait-Reader 'the exact native draft saved in the offline profile' {
         param($reader)
@@ -174,9 +196,8 @@ function Invoke-OfflineReaderProof([IntPtr]$Window, [string]$Profile) {
             $reader.active_draft_saved -and $reader.active_draft_sha256 -ceq $digest
     }
     Add-Evidence 'Type and save a local Markdown draft offline' ([ordered]@{
-        item = $item; draft_sha256 = $digest; owned_editor_focused = $true; input = 'guarded Win32 SendInput'
+        item = $item; draft_sha256 = $digest; focus_provider = $focus; input = 'guarded Win32 SendInput'
     })
-
     $null = Restart-Reader $Profile
     $null = Wait-Reader 'the original item, pane layout and saved draft without login' {
         param($reader)

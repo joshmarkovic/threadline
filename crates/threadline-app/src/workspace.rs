@@ -1576,7 +1576,7 @@ impl Workspace {
                 .and_then(|_| {
                     self.reader
                         .as_ref()
-                        .map(|reader| reader.read(cx).observation(cx))
+                        .map(|reader| reader.read(cx).observation(window, cx))
                 }),
         }
     }

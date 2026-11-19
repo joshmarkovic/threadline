@@ -87,6 +87,8 @@ pub(crate) struct ReaderObservation {
     pub active_draft_saved: Option<bool>,
     pub active_draft_chars: Option<usize>,
     pub active_draft_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_draft_focus: Option<String>,
     pub signed_out: bool,
     pub offline: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -503,7 +505,7 @@ impl ReaderWorkspace {
     }
 
     #[cfg(feature = "e2e")]
-    pub(crate) fn observation(&self, cx: &gpui_kit::App) -> ReaderObservation {
+    pub(crate) fn observation(&self, window: &Window, cx: &gpui_kit::App) -> ReaderObservation {
         use sha2::{Digest, Sha256};
         let active = self
             .layout
@@ -560,6 +562,12 @@ impl ReaderWorkspace {
                 let value = draft.view.read(cx).value();
                 format!("{:x}", Sha256::digest(value.as_bytes()))
             }),
+            active_draft_focus: draft
+                .filter(|draft| {
+                    active.is_some_and(|tab| tab.id == draft.tab_id && tab.item == draft.item)
+                        && draft.view.focus_handle(cx).is_focused(window)
+                })
+                .map(|_| format!("reader-draft-input-{}", self.layout.focused_pane)),
             signed_out: self.access == AccessState::SignedOut,
             offline: self.offline,
             shared_sync: self.sync_update.as_ref().map(|update| {
