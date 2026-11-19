@@ -160,17 +160,14 @@ pub(super) fn verified_install() -> Result<Option<(Installed, Trust)>> {
     Ok(Some((current, trust)))
 }
 
-pub(super) async fn check(token: Option<&str>) -> super::CheckResult<Option<Staged>> {
+pub(super) async fn check() -> Result<Option<Staged>> {
     let Some((current, trust)) = verified_install()? else {
         return Ok(None);
     };
     let host = windows_host::detect_for(trust.registration())?;
     host.check()?;
     let (cache, mut directories) = cache()?;
-    let Some(mut staged) = Github::new(trust)?
-        .stage(&current, &host, &cache, token)
-        .await?
-    else {
+    let Some(mut staged) = Github::new(trust)?.stage(&current, &host, &cache).await? else {
         return Ok(None);
     };
     directories.push(lock_directory(staged._directory.path())?);

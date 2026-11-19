@@ -1,41 +1,18 @@
 use super::*;
-use gpui_kit::{TestAppContext, WindowOptions, test::TestWindowExt};
+use gpui_kit::{AppContext, TestAppContext, WindowOptions, test::TestWindowExt};
 use std::sync::{
     Mutex,
     atomic::{AtomicBool, AtomicUsize, Ordering},
 };
-use threadline_platform::PlatformError;
 
 #[derive(Default)]
 struct Fixture {
     configured: AtomicBool,
-    private_channel: AtomicBool,
-    credential: Mutex<Option<Vec<u8>>>,
-    reads: AtomicUsize,
     checks: AtomicUsize,
-    with_token: AtomicBool,
     handoffs: AtomicUsize,
     acknowledge_handoff: AtomicBool,
     release_gate: tokio::sync::Notify,
-    next_error: Mutex<Option<CheckError>>,
-}
-impl CredentialStore for Fixture {
-    fn read(&self, key: &CredentialRef) -> Result<Option<Credential>, PlatformError> {
-        assert_eq!(key.scope, "updates/github.com/joshmarkovic/threadline");
-        assert_eq!(key.name, "release-contents-read");
-        self.reads.fetch_add(1, Ordering::SeqCst);
-        Ok(self.credential.lock().unwrap().clone().map(Credential))
-    }
-    fn save(&self, key: &CredentialRef, credential: &Credential) -> Result<(), PlatformError> {
-        assert_eq!(key.scope, "updates/github.com/joshmarkovic/threadline");
-        *self.credential.lock().unwrap() = Some(credential.0.clone());
-        Ok(())
-    }
-    fn remove(&self, key: &CredentialRef) -> Result<(), PlatformError> {
-        assert_eq!(key.name, "release-contents-read");
-        self.credential.lock().unwrap().take();
-        Ok(())
-    }
+    next_error: Mutex<Option<&'static str>>,
 }
 
 struct TestSource(Arc<Fixture>);
@@ -43,14 +20,8 @@ impl Source for TestSource {
     fn configured(&self) -> bool {
         self.0.configured.load(Ordering::SeqCst)
     }
-    fn private_channel(&self) -> bool {
-        self.0.private_channel.load(Ordering::SeqCst)
-    }
-    fn check<'a>(&'a self, token: Option<&'a str>) -> CheckFuture<'a> {
+    fn check(&self) -> CheckFuture<'_> {
         Box::pin(async move {
-            self.0
-                .with_token
-                .store(token == Some("fixture-only"), Ordering::SeqCst);
             self.0.checks.fetch_add(1, Ordering::SeqCst);
             self.0.release_gate.notified().await;
             if let Some(error) = self.0.next_error.lock().unwrap().take() {
@@ -97,21 +68,13 @@ fn startup_updates_wait_for_policy_cancel_and_allow_manual_retry(cx: &mut TestAp
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let fixture = Arc::new(Fixture::default());
     fixture.configured.store(true, Ordering::SeqCst);
-    fixture
-        .save(
-            &CredentialRef::github_releases(),
-            &Credential(b"fixture-only".to_vec()),
-        )
-        .unwrap();
     let (window, panel) = cx.update(|cx| {
         gpui_kit::init(cx);
-        gpui_kit::open_window(WindowOptions::default(), cx, |window, cx| {
+        gpui_kit::open_window(WindowOptions::default(), cx, |_, cx| {
             cx.new(|cx| {
                 Updates::with_source(
                     runtime.handle().clone(),
                     Arc::new(TestSource(fixture.clone())),
-                    fixture.clone(),
-                    window,
                     cx,
                 )
             })
@@ -133,17 +96,8 @@ fn startup_updates_wait_for_policy_cancel_and_allow_manual_retry(cx: &mut TestAp
     await_model(cx, |cx| {
         cx.update(|cx| matches!(panel.read(cx).state, State::Ready(_)))
     });
-    assert!(fixture.with_token.load(Ordering::SeqCst));
     cx.update_window(window, |_, window, cx| {
-        panel.update(cx, |model, cx| {
-            model.credential_note = Some("Private release token saved.");
-            model.show_settings(true, window, cx);
-        });
         window.render_frame(cx);
-        assert!(window.find("update-credential-note").visible());
-        panel.update(cx, |model, cx| model.show_settings(false, window, cx));
-        window.render_frame(cx);
-        assert!(window.try_find("update-credential-note").is_none());
         assert!(window.find("updates-restart").visible());
     })
     .unwrap();
@@ -182,19 +136,17 @@ fn startup_updates_wait_for_policy_cancel_and_allow_manual_retry(cx: &mut TestAp
 }
 
 #[gpui_kit::test]
-fn startup_updates_skip_credential_store_and_network_when_unconfigured(cx: &mut TestAppContext) {
+fn startup_updates_skip_network_when_unconfigured(cx: &mut TestAppContext) {
     cx.executor().allow_parking();
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let fixture = Arc::new(Fixture::default());
     let (_, panel) = cx.update(|cx| {
         gpui_kit::init(cx);
-        gpui_kit::open_window(WindowOptions::default(), cx, |window, cx| {
+        gpui_kit::open_window(WindowOptions::default(), cx, |_, cx| {
             cx.new(|cx| {
                 Updates::with_source(
                     runtime.handle().clone(),
                     Arc::new(TestSource(fixture.clone())),
-                    fixture.clone(),
-                    window,
                     cx,
                 )
             })
@@ -205,28 +157,23 @@ fn startup_updates_skip_credential_store_and_network_when_unconfigured(cx: &mut 
     await_model(cx, |cx| {
         cx.update(|cx| matches!(panel.read(cx).state, State::Unconfigured))
     });
-    assert_eq!(fixture.reads.load(Ordering::SeqCst), 0);
     assert_eq!(fixture.checks.load(Ordering::SeqCst), 0);
 }
 
 #[gpui_kit::test]
-fn private_updates_request_credentials_for_missing_or_rejected_access_only(
-    cx: &mut TestAppContext,
-) {
+fn public_updates_offer_retry_without_a_token_prompt(cx: &mut TestAppContext) {
     cx.executor().allow_parking();
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let fixture = Arc::new(Fixture::default());
     fixture.configured.store(true, Ordering::SeqCst);
-    fixture.private_channel.store(true, Ordering::SeqCst);
+    *fixture.next_error.lock().unwrap() = Some("The public GitHub releases are unavailable.");
     let (window, panel) = cx.update(|cx| {
         gpui_kit::init(cx);
-        gpui_kit::open_window(WindowOptions::default(), cx, |window, cx| {
+        gpui_kit::open_window(WindowOptions::default(), cx, |_, cx| {
             cx.new(|cx| {
                 Updates::with_source(
                     runtime.handle().clone(),
                     Arc::new(TestSource(fixture.clone())),
-                    fixture.clone(),
-                    window,
                     cx,
                 )
             })
@@ -234,77 +181,24 @@ fn private_updates_request_credentials_for_missing_or_rejected_access_only(
         .unwrap()
     });
     cx.update(|cx| panel.update(cx, |model, cx| model.set_policy(Some(true), cx)));
-    await_model(cx, |cx| {
-        cx.read(|cx| matches!(panel.read(cx).state, State::NeedsCredential))
-    });
-    assert_eq!(fixture.checks.load(Ordering::SeqCst), 0);
-    cx.update_window(window, |_, window, cx| {
-        window.render_frame(cx);
-        assert!(window.find("updates-open-settings").visible());
-        assert!(window.try_find("updates-token-save").is_none());
-        panel.update(cx, |model, cx| model.show_settings(true, window, cx));
-        window.render_frame(cx);
-        assert!(window.find("updates-token-save").visible());
-        panel
-            .read(cx)
-            .input
-            .clone()
-            .update(cx, |input, cx| input.set_value("fixture-only", window, cx));
-        window.click("updates-token-save", cx);
-    })
-    .unwrap();
     await_model(cx, |_| fixture.checks.load(Ordering::SeqCst) == 1);
-    assert!(fixture.with_token.load(Ordering::SeqCst));
-    cx.update_window(window, |_, window, cx| {
-        window.render_frame(cx);
-        assert!(window.try_find("updates-token-save").is_none());
-        assert!(window.find("updates-manage-token").visible());
-        panel.update(cx, |model, cx| model.show_settings(false, window, cx));
-    })
-    .unwrap();
-
-    *fixture.next_error.lock().unwrap() = Some(CheckError::ReleaseAccessRequired);
     fixture.release_gate.notify_one();
     await_model(cx, |cx| {
-        cx.read(|cx| matches!(panel.read(cx).state, State::ReleaseAccessDenied))
+        cx.read(|cx| matches!(panel.read(cx).state, State::Failed(_)))
     });
     cx.update_window(window, |_, window, cx| {
+        panel.update(cx, |model, cx| model.show_settings(true, cx));
         window.render_frame(cx);
-        assert!(window.find("updates-open-settings").visible());
-        assert!(window.try_find("updates-token-save").is_none());
-        panel.update(cx, |model, cx| model.show_settings(true, window, cx));
-        window.render_frame(cx);
-        assert!(window.find("updates-token-save").visible());
-        panel.read(cx).input.clone().update(cx, |input, cx| {
-            input.set_value("replacement-fixture", window, cx)
-        });
-        window.click("updates-token-save", cx);
+        assert!(window.try_find("updates-release-token").is_none());
+        assert!(window.try_find("updates-manage-token").is_none());
+        window.click("updates-check-again", cx);
     })
     .unwrap();
     await_model(cx, |_| fixture.checks.load(Ordering::SeqCst) == 2);
-    assert_eq!(
-        fixture.credential.lock().unwrap().as_deref(),
-        Some(&b"replacement-fixture"[..])
-    );
-    *fixture.next_error.lock().unwrap() = Some(CheckError::Other("GitHub rate limit reached."));
     fixture.release_gate.notify_one();
     await_model(cx, |cx| {
-        cx.read(|cx| {
-            matches!(
-                panel.read(cx).state,
-                State::Failed("GitHub rate limit reached.")
-            )
-        })
+        cx.read(|cx| matches!(panel.read(cx).state, State::Ready(_)))
     });
-    cx.update_window(window, |_, window, cx| {
-        window.render_frame(cx);
-        assert!(window.find("updates-check-again").visible());
-        assert!(window.try_find("updates-token-save").is_none());
-        panel.update(cx, |model, cx| model.show_settings(false, window, cx));
-        window.render_frame(cx);
-        assert!(window.try_find("updates-open-settings").is_none());
-    })
-    .unwrap();
 }
 
 #[gpui_kit::test]
@@ -331,8 +225,6 @@ fn check_workspace_startup(cx: &mut TestAppContext, interact: bool) {
                 Updates::with_source(
                     runtime.handle().clone(),
                     Arc::new(TestSource(fixture.clone())),
-                    fixture.clone(),
-                    window,
                     cx,
                 )
             });
@@ -405,8 +297,6 @@ fn startup_update_retries_after_workspace_save_and_installer_failures(cx: &mut T
                 Updates::with_source(
                     runtime.handle().clone(),
                     Arc::new(TestSource(fixture.clone())),
-                    fixture.clone(),
-                    window,
                     cx,
                 )
             });

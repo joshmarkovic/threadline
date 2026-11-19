@@ -45,29 +45,20 @@ fn current() -> Installed {
 }
 
 #[tokio::test]
-async fn stages_private_assets_by_api_id_and_cleans_on_drop() {
+async fn stages_public_stable_assets_by_api_id_and_cleans_on_drop() {
     let server = HttpFixture::new();
     let github = client(&server);
     let tmp = tempfile::tempdir().unwrap();
     publish(&server, manifest(), |_| {});
     let staged = github
-        .stage(
-            &current(),
-            &platform(),
-            tmp.path(),
-            Some("fixture-release-only"),
-        )
+        .stage(&current(), &platform(), tmp.path())
         .await
         .unwrap()
         .unwrap();
     assert_eq!(fs::read(&staged.path).unwrap(), ASSET);
     assert_eq!(*server.requests.lock().unwrap(), [LATEST, META, SETUP]);
     let headers = server.headers.lock().unwrap();
-    assert!(
-        headers
-            .iter()
-            .all(|h| h.contains("authorization: bearer fixture-release-only\r\n"))
-    );
+    assert!(headers.iter().all(|h| !h.contains("authorization:")));
     assert!(headers[0].contains("accept: application/vnd.github+json"));
     assert!(
         headers[1..]
@@ -100,7 +91,7 @@ async fn ignores_non_stable_older_and_protocol_incompatible_releases() {
         publish(&server, manifest(), |r| r[field] = value);
         assert!(
             github
-                .stage(&current(), &platform(), tmp.path(), None)
+                .stage(&current(), &platform(), tmp.path())
                 .await
                 .unwrap()
                 .is_none()
@@ -124,7 +115,7 @@ async fn ignores_non_stable_older_and_protocol_incompatible_releases() {
         publish(&server, m, |_| {});
         assert!(
             github
-                .stage(&current(), &platform(), tmp.path(), None)
+                .stage(&current(), &platform(), tmp.path())
                 .await
                 .unwrap()
                 .is_none()
@@ -166,7 +157,7 @@ async fn rejects_ambiguous_unsigned_or_corrupt_assets_before_handoff() {
         publish(&server, manifest(), |r| r["assets"][index][field] = value);
         assert!(
             github
-                .stage(&current(), &platform(), tmp.path(), None)
+                .stage(&current(), &platform(), tmp.path())
                 .await
                 .is_err()
         );
@@ -176,7 +167,7 @@ async fn rejects_ambiguous_unsigned_or_corrupt_assets_before_handoff() {
     publish(&server, m, |_| {});
     assert!(
         github
-            .stage(&current(), &platform(), tmp.path(), None)
+            .stage(&current(), &platform(), tmp.path())
             .await
             .is_err()
     );
@@ -193,7 +184,7 @@ async fn rejects_ambiguous_unsigned_or_corrupt_assets_before_handoff() {
         server.serve(SETUP, "200 OK", ASSET.len(), &bytes);
         assert!(
             github
-                .stage(&current(), &platform(), tmp.path(), None)
+                .stage(&current(), &platform(), tmp.path())
                 .await
                 .is_err()
         );
@@ -208,21 +199,14 @@ async fn checks_release_visibility_when_latest_stable_release_is_missing() {
     let tmp = tempfile::tempdir().unwrap();
     assert!(
         github
-            .stage(&current(), &platform(), tmp.path(), None)
+            .stage(&current(), &platform(), tmp.path())
             .await
             .is_err()
     );
-    server.serve("/release", "200 OK", 2, b"{}");
-    assert!(matches!(
-        github
-            .stage(&current(), &platform(), tmp.path(), Some("fixture"))
-            .await,
-        Err(CheckError::ReleaseAccessRequired)
-    ));
     server.serve("/release/releases?per_page=1", "200 OK", 2, b"[]");
     assert!(
         github
-            .stage(&current(), &platform(), tmp.path(), Some("fixture"))
+            .stage(&current(), &platform(), tmp.path())
             .await
             .unwrap()
             .is_none()
@@ -230,7 +214,7 @@ async fn checks_release_visibility_when_latest_stable_release_is_missing() {
     server.serve(LATEST, "403 Forbidden", 0, b"");
     assert!(
         github
-            .stage(&current(), &platform(), tmp.path(), Some("fixture"))
+            .stage(&current(), &platform(), tmp.path())
             .await
             .is_err()
     );
@@ -335,7 +319,7 @@ fn publish_private(
 }
 
 #[tokio::test]
-async fn stages_only_an_independently_signed_private_update() {
+async fn stages_public_preview_anonymously_and_checks_its_signature() {
     let server = HttpFixture::new();
     let (github, pair) = github_signer(&server);
     let (_, other) = github_signer(&server);
@@ -345,17 +329,24 @@ async fn stages_only_an_independently_signed_private_update() {
     let signature = pair.sign(&rng, &original).unwrap();
     publish_private(&server, 22, &original, signature.as_ref(), ASSET);
     let staged = github
-        .stage(
-            &private_current(21),
-            &platform(),
-            tmp.path(),
-            Some("synthetic"),
-        )
+        .stage(&private_current(21), &platform(), tmp.path())
         .await
         .unwrap()
         .unwrap();
     assert_eq!(fs::read(&staged.path).unwrap(), ASSET);
     drop(staged);
+    assert_eq!(
+        *server.requests.lock().unwrap(),
+        [PRIVATE_LIST, META, SIGNATURE, SETUP]
+    );
+    assert!(
+        server
+            .headers
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|h| !h.contains("authorization:"))
+    );
     // Replacing the GitHub release and all of its SHA-256 metadata must not confer signing authority.
     let mut changed = original.clone();
     changed.push(b' ');
@@ -369,7 +360,7 @@ async fn stages_only_an_independently_signed_private_update() {
         publish_private(&server, 22, raw, sig, ASSET);
         assert!(
             github
-                .stage(&private_current(21), &platform(), tmp.path(), None)
+                .stage(&private_current(21), &platform(), tmp.path())
                 .await
                 .is_err()
         );
@@ -379,7 +370,7 @@ async fn stages_only_an_independently_signed_private_update() {
     server.serve(SETUP, "200 OK", ASSET.len(), &vec![0; ASSET.len()]);
     assert!(
         github
-            .stage(&private_current(21), &platform(), tmp.path(), None)
+            .stage(&private_current(21), &platform(), tmp.path())
             .await
             .is_err()
     );
@@ -418,7 +409,7 @@ async fn signed_private_metadata_must_bind_the_build_installer_schema_channel_an
         assert!(
             !matches!(
                 github
-                    .stage(&private_current(21), &platform(), tmp.path(), None)
+                    .stage(&private_current(21), &platform(), tmp.path())
                     .await,
                 Ok(Some(_))
             ),
@@ -429,58 +420,46 @@ async fn signed_private_metadata_must_bind_the_build_installer_schema_channel_an
 }
 
 #[tokio::test]
-async fn prompts_for_release_access_only_when_github_rejects_the_credential_or_hides_releases() {
+async fn handles_unavailable_releases_and_rate_limits_without_authentication() {
     let server = HttpFixture::new();
     let (github, pair) = github_signer(&server);
     let tmp = tempfile::tempdir().unwrap();
     let current = private_current(21);
     let host = platform();
-    let check = || github.stage(&current, &host, tmp.path(), Some("fixture"));
-    for (status, prompt) in [
-        ("401 Unauthorized", true),
-        ("404 Not Found", true),
-        ("403 Forbidden", false),
-        ("429 Too Many Requests", false),
-        ("500 Internal Server Error", false),
+    let check = || github.stage(&current, &host, tmp.path());
+    for status in [
+        "401 Unauthorized",
+        "404 Not Found",
+        "403 Forbidden",
+        "429 Too Many Requests",
+        "500 Internal Server Error",
     ] {
         server.serve(PRIVATE_LIST, status, 0, b"");
-        assert_eq!(
-            check().await.err().unwrap() == CheckError::ReleaseAccessRequired,
-            prompt,
-            "{status}"
-        );
+        assert!(check().await.is_err(), "{status}");
     }
     let raw = serde_json::to_vec(&private_manifest()).unwrap();
     let sig = pair.sign(&ring::rand::SystemRandom::new(), &raw).unwrap();
     publish_private(&server, 22, &raw, sig.as_ref(), ASSET);
-    server.serve(META, "401 Unauthorized", 0, b"");
-    assert!(matches!(
-        check().await,
-        Err(CheckError::ReleaseAccessRequired)
-    ));
-    server.serve(META, "403 Forbidden", 0, b"");
-    assert!(matches!(check().await, Err(CheckError::Other(_))));
     server.serve(META, "404 Not Found", 0, b"");
     assert!(matches!(
         check().await,
-        Err(CheckError::ReleaseAccessRequired)
+        Err("The release asset is no longer available. Check for updates again.")
     ));
-    server.serve("/release/releases?per_page=1", "200 OK", 2, b"[]");
-    assert!(matches!(check().await, Err(CheckError::Other(_))));
+    assert!(
+        server
+            .headers
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|h| !h.contains("authorization:"))
+    );
 }
 
 #[tokio::test]
-async fn private_feed_requires_contents_access_and_skips_older_unsigned_prereleases() {
+async fn preview_feed_skips_older_unsigned_prereleases() {
     let server = HttpFixture::new();
     let (github, pair) = github_signer(&server);
     let tmp = tempfile::tempdir().unwrap();
-    server.serve("/release", "200 OK", 2, b"{}");
-    assert!(matches!(
-        github
-            .stage(&private_current(21), &platform(), tmp.path(), None)
-            .await,
-        Err(CheckError::ReleaseAccessRequired)
-    ));
     let old = json!({"tag_name":"v0.1.0-local.20","prerelease":true,"draft":false,"assets":[]});
     let mut draft = old.clone();
     draft["tag_name"] = json!("v0.1.0-local.55");
@@ -498,7 +477,7 @@ async fn private_feed_requires_contents_access_and_skips_older_unsigned_prerelea
     serve(PRIVATE_LIST, &page);
     assert!(
         github
-            .stage(&private_current(21), &platform(), tmp.path(), None)
+            .stage(&private_current(21), &platform(), tmp.path())
             .await
             .unwrap()
             .is_none()
@@ -519,7 +498,7 @@ async fn private_feed_requires_contents_access_and_skips_older_unsigned_prerelea
     serve("/release/releases?per_page=20&page=2", &[valid]);
     assert!(
         github
-            .stage(&private_current(21), &platform(), tmp.path(), None)
+            .stage(&private_current(21), &platform(), tmp.path())
             .await
             .unwrap()
             .is_some()
@@ -549,10 +528,39 @@ async fn verify_downloaded_private_release() {
         ..platform()
     };
     let staged = github
-        .stage(&private_current(build - 1), &host, tmp.path(), None)
+        .stage(&private_current(build - 1), &host, tmp.path())
         .await
         .unwrap()
         .unwrap();
     assert_eq!(staged.manifest.package_build, build);
     assert_eq!(fs::read(&staged.path).unwrap(), setup);
+}
+
+#[tokio::test]
+#[ignore = "downloads the public GitHub preview and checks it against the expected package"]
+async fn verify_live_public_release() {
+    let build: u32 = std::env::var("THREADLINE_VERIFY_RELEASE_BUILD")
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert!(build > 1);
+    let key = private_key(&std::env::var("THREADLINE_VERIFY_RELEASE_PUBLIC_KEY").unwrap()).unwrap();
+    let expected_hash = pin(&std::env::var("THREADLINE_VERIFY_RELEASE_SHA256").unwrap()).unwrap();
+    let host = Platform {
+        profile_schema: None,
+        highest_build: build - 1,
+        ..platform()
+    };
+    let tmp = tempfile::tempdir().unwrap();
+    let staged = Github::new(Trust::Private(key))
+        .unwrap()
+        .stage(&private_current(build - 1), &host, tmp.path())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(staged.manifest.package_build, build);
+    assert_eq!(
+        Sha256::digest(fs::read(&staged.path).unwrap()).as_slice(),
+        expected_hash
+    );
 }

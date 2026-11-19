@@ -490,7 +490,7 @@ impl Workspace {
         let open = route != WorkspaceRoute::Home;
         if let Some(updates) = &self.updates {
             updates.update(cx, |updates, cx| {
-                updates.show_settings(route == WorkspaceRoute::Settings, window, cx)
+                updates.show_settings(route == WorkspaceRoute::Settings, cx)
             });
         }
         if let Some(reader) = self.reader.as_ref() {
@@ -528,7 +528,7 @@ impl Workspace {
     }
 
     pub(crate) fn enable_updates(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let updates = cx.new(|cx| crate::updates::Updates::new(self.runtime.clone(), window, cx));
+        let updates = cx.new(|cx| crate::updates::Updates::new(self.runtime.clone(), cx));
         self.attach_updates(updates, window, cx);
     }
 
@@ -538,15 +538,6 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self._subscriptions.push(cx.subscribe_in(
-            &updates,
-            window,
-            |this, _, _: &crate::updates::OpenUpdateSettings, window, cx| {
-                if this.route == WorkspaceRoute::Home {
-                    this.toggle_accounts(window, cx);
-                }
-            },
-        ));
         self._subscriptions.push(cx.subscribe_in(
             &updates,
             window,

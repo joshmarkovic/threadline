@@ -1,4 +1,3 @@
-use super::{CheckError, CheckResult};
 use crate::{
     MAX_MANIFEST, Platform, Result, Selection, Staged, finish_download, new_download, pin,
     select_manifest, stream_body,
@@ -28,7 +27,7 @@ pub(super) fn private_key(hex: &str) -> Result<[u8; 65]> {
     let coordinates = hex
         .strip_prefix("04")
         .filter(|c| c.len() == 128 && c.is_ascii())
-        .ok_or("The embedded private update key is invalid.")?;
+        .ok_or("The embedded preview update key is invalid.")?;
     let mut key = [0; 65];
     key[0] = 4;
     key[1..33].copy_from_slice(&pin(&coordinates[..64])?);
@@ -123,33 +122,17 @@ impl Github {
         })
     }
 
-    async fn request(
-        &self,
-        route: &str,
-        accept: &'static str,
-        token: Option<&str>,
-    ) -> Result<Response> {
+    async fn request(&self, route: &str, accept: &'static str) -> Result<Response> {
         // Only fixed routes with decimal page numbers or asset IDs enter this request.
-        let url = if route.is_empty() {
-            Url::parse(self.api.as_str().trim_end_matches('/'))
-        } else {
-            self.api.join(route)
-        }
-        .map_err(|_| INVALID)?;
-        if url.origin() != self.api.origin()
-            || (!route.is_empty() && !url.path().starts_with(self.api.path()))
-        {
+        let url = self.api.join(route).map_err(|_| INVALID)?;
+        if url.origin() != self.api.origin() || !url.path().starts_with(self.api.path()) {
             return Err(INVALID);
         }
-        let mut get = self
-            .client
+        self.client
             .get(url)
             .header(header::ACCEPT, accept)
-            .header("X-GitHub-Api-Version", "2026-03-10");
-        if let Some(token) = token {
-            get = get.bearer_auth(token);
-        }
-        get.send()
+            .header("X-GitHub-Api-Version", "2026-03-10")
+            .send()
             .await
             .map_err(|_| "Could not reach GitHub to check for Windows updates.")
     }
@@ -167,24 +150,15 @@ impl Github {
         Ok(self.client.get(url))
     }
 
-    async fn asset_bytes(
-        &self,
-        asset: &Asset,
-        out: &mut (dyn Write + Send),
-        token: Option<&str>,
-    ) -> CheckResult<()> {
+    async fn asset_bytes(&self, asset: &Asset, out: &mut (dyn Write + Send)) -> Result<()> {
         let mut response = self
             .request(
                 &format!("releases/assets/{}", asset.id),
                 "application/octet-stream",
-                token,
             )
             .await?;
         if response.status() == StatusCode::NOT_FOUND {
-            self.check_visibility(token).await?;
-            return Err(CheckError::Other(
-                "The release asset is no longer available. Check for updates again.",
-            ));
+            return Err("The release asset is no longer available. Check for updates again.");
         }
         Self::api_status(response.status())?;
         for _ in 0..3 {
@@ -201,51 +175,47 @@ impl Github {
                 .map_err(|_| "Could not download the selected Windows update from GitHub.")?;
         }
         if stream_body(response, out, asset.size).await? != asset.size {
-            return Err(CheckError::Other(
-                "GitHub returned an incomplete Windows update asset.",
-            ));
+            return Err("GitHub returned an incomplete Windows update asset.");
         }
         Ok(())
     }
 
-    fn api_status(status: StatusCode) -> CheckResult<()> {
+    fn api_status(status: StatusCode) -> Result<()> {
         match status {
             StatusCode::UNAUTHORIZED | StatusCode::NOT_FOUND => {
-                Err(CheckError::ReleaseAccessRequired)
+                Err("The public GitHub releases are unavailable. Try again later.")
             }
-            StatusCode::FORBIDDEN => Err(CheckError::Other(
-                "GitHub refused this update request. Try again later.",
-            )),
-            StatusCode::TOO_MANY_REQUESTS => Err(CheckError::Other(
-                "GitHub is limiting update requests. Try again later.",
-            )),
+            StatusCode::FORBIDDEN => Err("GitHub refused this update request. Try again later."),
+            StatusCode::TOO_MANY_REQUESTS => {
+                Err("GitHub is limiting update requests. Try again later.")
+            }
             _ => Ok(()),
         }
     }
 
-    async fn json<T: serde::de::DeserializeOwned>(response: Response) -> CheckResult<T> {
+    async fn json<T: serde::de::DeserializeOwned>(response: Response) -> Result<T> {
         Self::api_status(response.status())?;
         let mut raw = Vec::new();
         stream_body(response, &mut raw, MAX_RELEASE).await?;
-        serde_json::from_slice(&raw).map_err(|_| CheckError::Other(INVALID))
+        serde_json::from_slice(&raw).map_err(|_| INVALID)
     }
 
-    async fn check_visibility(&self, token: Option<&str>) -> CheckResult<()> {
-        // Repository metadata can be public to the caller while releases are inaccessible.
+    async fn check_visibility(&self) -> Result<()> {
+        // GitHub also returns 404 when the public repository has no stable release yet.
         Self::json::<Vec<Release>>(
-            self.request("releases?per_page=1", "application/vnd.github+json", token)
+            self.request("releases?per_page=1", "application/vnd.github+json")
                 .await?,
         )
         .await?;
         Ok(())
     }
 
-    async fn release(&self, token: Option<&str>) -> CheckResult<Option<(Version, Release)>> {
+    async fn release(&self) -> Result<Option<(Version, Release)>> {
         let accept = "application/vnd.github+json";
         if matches!(self.trust, Trust::Authenticode(_)) {
-            let response = self.request("releases/latest", accept, token).await?;
+            let response = self.request("releases/latest", accept).await?;
             if response.status() == StatusCode::NOT_FOUND {
-                self.check_visibility(token).await?;
+                self.check_visibility().await?;
                 return Ok(None);
             }
             let release: Release = Self::json(response).await?;
@@ -263,8 +233,7 @@ impl Github {
         let mut latest: Option<(Version, Release)> = None;
         for page in 1..=100 {
             let route = format!("releases?per_page={PAGE_SIZE}&page={page}");
-            let releases: Vec<Release> =
-                Self::json(self.request(&route, accept, token).await?).await?;
+            let releases: Vec<Release> = Self::json(self.request(&route, accept).await?).await?;
             let last = releases.len() < PAGE_SIZE;
             for release in releases {
                 if !release.prerelease || release.draft {
@@ -287,9 +256,7 @@ impl Github {
                 return Ok(latest);
             }
         }
-        Err(CheckError::Other(
-            "GitHub returned too many release pages to select an update.",
-        ))
+        Err("GitHub returned too many release pages to select an update.")
     }
 
     pub(super) async fn stage(
@@ -297,10 +264,9 @@ impl Github {
         current: &Installed,
         host: &Platform,
         temp: &Path,
-        token: Option<&str>,
-    ) -> CheckResult<Option<Staged>> {
+    ) -> Result<Option<Staged>> {
         host.check()?;
-        let Some((version, release)) = self.release(token).await? else {
+        let Some((version, release)) = self.release().await? else {
             return Ok(None);
         };
         if !version.cmp_precedence(&current.version).is_gt() {
@@ -322,29 +288,25 @@ impl Github {
             manifest_hash,
         };
         let mut raw = Vec::new();
-        self.asset_bytes(manifest_asset, &mut raw, token).await?;
+        self.asset_bytes(manifest_asset, &mut raw).await?;
         if let Trust::Private(key) = self.trust {
             let sig_url = dir.join(PRIVATE_SIGNATURE).map_err(|_| INVALID)?;
             let (sig_asset, sig_hash) = release.asset(PRIVATE_SIGNATURE, &sig_url, 64)?;
             let mut signature = Vec::new();
-            self.asset_bytes(sig_asset, &mut signature, token).await?;
+            self.asset_bytes(sig_asset, &mut signature).await?;
             if signature.len() != 64 || Sha256::digest(&signature).as_slice() != sig_hash {
-                return Err(CheckError::Other(
-                    "The private update signature is incomplete or corrupt.",
-                ));
+                return Err("The preview update signature is incomplete or corrupt.");
             }
             ring::signature::UnparsedPublicKey::new(&ring::signature::ECDSA_P256_SHA256_FIXED, key)
                 .verify(&raw, &signature)
-                .map_err(|_| "The private update manifest failed signature verification.")?;
+                .map_err(|_| "The preview update manifest failed signature verification.")?;
         }
         let (manifest, url) = select_manifest(&dir, &raw, &selection, host)?;
         match self.trust {
             Trust::Authenticode(publisher)
                 if pin(&manifest.publisher_certificate_sha256)? != publisher =>
             {
-                return Err(CheckError::Other(
-                    "The update manifest names a different publisher.",
-                ));
+                return Err("The update manifest names a different publisher.");
             }
             Trust::Private(_) => {
                 let expected_url = dir
@@ -353,9 +315,9 @@ impl Github {
                 if private_build(&selection.version) != Some(manifest.package_build)
                     || url != expected_url
                 {
-                    return Err(CheckError::Other(
-                        "The private update does not match its release tag and installer name.",
-                    ));
+                    return Err(
+                        "The preview update does not match its release tag and installer name.",
+                    );
                 }
             }
             _ => {}
@@ -371,12 +333,10 @@ impl Github {
             .ok_or(INVALID)?;
         let (setup, hash) = release.asset(leaf, &url, manifest.size)?;
         if setup.size != manifest.size || hash != pin(&manifest.sha256)? {
-            return Err(CheckError::Other(
-                "The installer asset differs from the approved Windows release manifest.",
-            ));
+            return Err("The installer asset differs from the approved Windows release manifest.");
         }
         let (dir, path, mut output) = new_download(temp)?;
-        self.asset_bytes(setup, &mut output, token).await?;
+        self.asset_bytes(setup, &mut output).await?;
         Ok(Some(finish_download(
             dir, path, output, setup.size, manifest,
         )?))
