@@ -1,0 +1,540 @@
+{
+  "scenario": "S11-NATIVE-ACTIVITY",
+  "scope": "Windows 11 native test build with actual SQLite, worker and loopback HTTP. Captured delivery decisions at the isolated desktop adapter boundary.",
+  "runs": [
+    {
+      "run": "e2e-1795051197172-20504",
+      "fixture_revision": "s11-native-activity-v1",
+      "status": "Fail",
+      "exit_code": 1,
+      "report_checkout": "8f330d64d4ee1b7de461eb06281b7175e6278357",
+      "source_dirty": false,
+      "binary_sha256": "1b50e1f0d803741e8dd535a57ff84a381c1be3f2ff639451db70d34e6aeb48aa",
+      "windows_version": "Microsoft Windows [Version 10.0.22631.7652]",
+      "dpi": 96,
+      "seed": 12345,
+      "actions": 10,
+      "elapsed_ms": 47052,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "S11-NATIVE-ACTIVITY",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "detail": "Timed out at the obsolete explicit refresh control after opening the old pull request.",
+      "source_sha256": {
+        "result.json": "38a4cba74458325a0af84a73b4d537ab9c3bf7b743acbd83a99d701c0ca96560",
+        "native-activity.json": "6fc01c0815abd0ac8da03ec93ab40a40b4e3c0511c7e77c7fb30bc75ad7d3db4",
+        "github-access-trace.json": "afe570f47315d1e4dd6640ca602a6f33643d560fc17fccd63c8b5faa0392aa92",
+        "binary.json": "40a6671045b1fcb1b6ee8c5d4181a9f7e655fb9a7b81c190bd338b6535dbf96d"
+      }
+    },
+    {
+      "run": "e2e-1795052145979-41684",
+      "fixture_revision": "s11-native-activity-v1",
+      "status": "Fail",
+      "exit_code": 1,
+      "report_checkout": "ec28ba2720f352768bd42118c1b1d38b655e1e38",
+      "source_dirty": false,
+      "binary_sha256": "467f2fdd55260d89f9fed05ed71ad0ffe5f3ee8e07a77b03bd325d9b2d636c0a",
+      "windows_version": "Microsoft Windows [Version 10.0.22631.7652]",
+      "dpi": 96,
+      "seed": 12345,
+      "actions": 11,
+      "elapsed_ms": 109846,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "S11-NATIVE-ACTIVITY",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "detail": "Downloaded the old pull request with a zero-alert baseline. The fresh delivery wait timed out. The simulator reused the baseline clock for fresh events.",
+      "source_sha256": {
+        "result.json": "b5c835d9a63892b4ee0f79924b63039c21121233ae820d1bcdbf10e1914d4b2d",
+        "native-activity.json": "57a619cc7e69a2a90387114949a32540acc4544cf4379c0a078b1d79462048c5",
+        "github-access-trace.json": "0b0c23bab2b4ce47c2eaf06e80d35ae13554761e506d299d121a9f3e8985c482",
+        "binary.json": "d45eb720fb2ff805bda279ae070a714b9f346896722457b8788b65f331a9b8ba"
+      }
+    },
+    {
+      "run": "e2e-1795053094749-43532",
+      "fixture_revision": "s11-native-activity-v2",
+      "status": "Fail",
+      "exit_code": 1,
+      "report_checkout": "43bd2fc625043687f9d5fec86637f1243e754739",
+      "source_dirty": false,
+      "binary_sha256": "c98a01e1fa629040243835b6dc27b555816b9a6b7add69e67ab91b3aa6c5bb86",
+      "windows_version": "Microsoft Windows [Version 10.0.22631.7652]",
+      "dpi": 96,
+      "seed": 12345,
+      "actions": 23,
+      "elapsed_ms": 200044,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "S11-NATIVE-ACTIVITY",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "detail": "Timed out waiting for one catch-up digest and the separately watched branch comparison.",
+      "source_sha256": {
+        "result.json": "83ce9b73b40b98ac7d4992e2662093e50369be01eb098ebf7302988d7a69c51e",
+        "native-activity.json": "d81dc0e8085f7a3c705d16e68c1facc5df854f789732c90a6b7f63d1f9ebd58f",
+        "github-access-trace.json": "81d2dced49e81afb3199240b76599ef4fe01414d3f56e68b8109b5b85c9a29cb",
+        "binary.json": "94c26fad52abb31ea06b104be2cd7fb26cc22357c3a3acd872a64b9e59a8475e"
+      }
+    },
+    {
+      "run": "e2e-1795054325677-36004",
+      "fixture_revision": "s11-native-activity-v3",
+      "status": "Fail",
+      "exit_code": 1,
+      "report_checkout": "cb49699d32e517773994f85910eab16119dc5518",
+      "source_dirty": false,
+      "binary_sha256": "cf0169bcb17744d98b9f222c99ed6e5f96485c68162ca6e69562c8606a9fc5eb",
+      "windows_version": "Microsoft Windows [Version 10.0.22631.7652]",
+      "dpi": 96,
+      "seed": 12345,
+      "actions": 24,
+      "elapsed_ms": 199794,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "S11-NATIVE-ACTIVITY",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "detail": "The fresh and long-offline checks captured the expected groups. A generic geometry wait stopped the replay before it could activate the restored merge row.",
+      "source_sha256": {
+        "result.json": "7fe82417ebba6d0e9deb5fc57a8611b5c553ec4d19cb50181f1a2142c414f6a1",
+        "native-activity.json": "d4d6951c24b8929db044cf9636ee3543f67f86ebdee7ad97adc099b0236727d9",
+        "github-access-trace.json": "a8d10c078dc418c87fafc58e32da2a8162dfbcc993a85c8f313d2b4f2b329c8e",
+        "binary.json": "4d2e5b875fb07f79faf01e29a40779e5f05fb2527e17667527305beb2700e738"
+      }
+    },
+    {
+      "run": "e2e-1795056192922-47140",
+      "fixture_revision": "s11-native-activity-v3",
+      "status": "Pass",
+      "exit_code": 0,
+      "report_checkout": "1375feb00b434069474bd3f53e3023648c979a33",
+      "source_dirty": false,
+      "binary_sha256": "3d6c15c0c0c50df78a15e593e18d351e603206af9b9416fb44975a1d74cd7051",
+      "windows_version": "Microsoft Windows [Version 10.0.22631.7652]",
+      "dpi": 96,
+      "seed": 12345,
+      "actions": 27,
+      "elapsed_ms": 185066,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "S11-NATIVE-ACTIVITY",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "detail": "Normal native synchronization and reader controls verified baseline silence, unopened-item activity, exact actor suppression with retained review bodies, a grouped human review, long-offline catch-up, watched-ref movement and one merge transition. A scoped fixture captured the planned delivery boundary without displaying native shell banners.",
+      "source_sha256": {
+        "result.json": "b84c400637062551cc640c48c0d3cfcb81959ffbeb61cc3f02d6b1e0d127b443",
+        "native-activity.json": "6830baa1d64dd3ac0c4606bdb0775495bb71ca63a93e7fac2a090ba4ae4ec3d5",
+        "github-access-trace.json": "19382d3bcb0ed08f62638a4ffd1bb7505602d79422b9d23df5c5f292a73bf770",
+        "binary.json": "d64ac25657ee654be9164ef937e9566d7d3bfc487f69b53606ed35e83f0871db"
+      },
+      "app_source": "1375feb00b434069474bd3f53e3023648c979a33",
+      "driver_checkout": "1375feb00b434069474bd3f53e3023648c979a33"
+    }
+  ],
+  "latest_run": {
+    "baseline": {
+      "receipt_sha256": "731147aca3e9fdf03a1dd34d7e15ae656593a13235fc8dfd60b03638e893745a",
+      "fixture_revision": "s11-native-activity-v3",
+      "opened_tabs": 1,
+      "delivered_groups": 0,
+      "suppressed": 0,
+      "bot_content": 0,
+      "human_content": 0,
+      "feed": []
+    },
+    "fresh": {
+      "receipt_sha256": "a0b4ec4743d47bf2a28e6bbc2e614cc81f56364f12f7d6bd993ae67863935849",
+      "fixture_revision": "s11-native-activity-v3",
+      "opened_tabs": 1,
+      "delivered_groups": 2,
+      "suppressed": 2,
+      "bot_content": 0,
+      "human_content": 0,
+      "feed": [
+        {
+          "id": 5,
+          "key": "github:pr-reviews:6302:review_submitted:1795056249727",
+          "kind": "review_submitted",
+          "categories": [
+            "CommentOnlyReview"
+          ],
+          "target": {
+            "Item": {
+              "item": 1,
+              "thread": null
+            }
+          },
+          "delivery": "Delivered"
+        },
+        {
+          "id": 3,
+          "key": "github:pr-inline-comments:6202:inline_comment_created:1795056249727",
+          "kind": "inline_comment_created",
+          "categories": [
+            "InlineComment"
+          ],
+          "target": {
+            "Item": {
+              "item": 1,
+              "thread": null
+            }
+          },
+          "delivery": "Delivered"
+        },
+        {
+          "id": 1,
+          "key": "github:comments:6101:comment_created:1795056249727",
+          "kind": "comment_created",
+          "categories": [
+            "OrdinaryComment"
+          ],
+          "target": {
+            "Item": {
+              "item": 3,
+              "thread": "issue-comment:6101"
+            }
+          },
+          "delivery": "Delivered"
+        }
+      ]
+    },
+    "first-closed": {
+      "receipt_sha256": "18300d125018dedc6721b96ba30b5265330b2c12023a26fed12c530b0614803b",
+      "fixture_revision": "s11-native-activity-v3",
+      "opened_tabs": 2,
+      "delivered_groups": 2,
+      "suppressed": 2,
+      "bot_content": 1,
+      "human_content": 1,
+      "feed": [
+        {
+          "id": 5,
+          "key": "github:pr-reviews:6302:review_submitted:1795056249727",
+          "kind": "review_submitted",
+          "categories": [
+            "CommentOnlyReview"
+          ],
+          "target": {
+            "Item": {
+              "item": 1,
+              "thread": null
+            }
+          },
+          "delivery": "Delivered"
+        },
+        {
+          "id": 3,
+          "key": "github:pr-inline-comments:6202:inline_comment_created:1795056249727",
+          "kind": "inline_comment_created",
+          "categories": [
+            "InlineComment"
+          ],
+          "target": {
+            "Item": {
+              "item": 1,
+              "thread": null
+            }
+          },
+          "delivery": "Delivered"
+        },
+        {
+          "id": 1,
+          "key": "github:comments:6101:comment_created:1795056249727",
+          "kind": "comment_created",
+          "categories": [
+            "OrdinaryComment"
+          ],
+          "target": {
+            "Item": {
+              "item": 3,
+              "thread": "issue-comment:6101"
+            }
+          },
+          "delivery": "Delivered"
+        }
+      ]
+    },
+    "catchup-seeded": {
+      "receipt_sha256": "1cd4163c4b8d2d85af04c52f1a955f9433d604daffaa3a2d8d85a641bcb33d23",
+      "fixture_revision": "s11-native-activity-v3",
+      "opened_tabs": 0,
+      "delivered_groups": 0,
+      "suppressed": 0,
+      "bot_content": 0,
+      "human_content": 0,
+      "feed": []
+    },
+    "catchup": {
+      "receipt_sha256": "d359e524b0c45eb3269160342662b6ab9caa73fc7d21ee4364737a19521d5dab",
+      "fixture_revision": "s11-native-activity-v3",
+      "opened_tabs": 0,
+      "delivered_groups": 2,
+      "suppressed": 0,
+      "bot_content": 0,
+      "human_content": 0,
+      "feed": [
+        {
+          "id": 4,
+          "key": "commit:1:8888888888888888888888888888888888888888",
+          "kind": "branch_commit_observed",
+          "categories": [
+            "BranchUpdate"
+          ],
+          "target": {
+            "Comparison": {
+              "reference": "refs/heads/main",
+              "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "head": "8888888888888888888888888888888888888888"
+            }
+          },
+          "delivery": "Delivered"
+        },
+        {
+          "id": 3,
+          "key": "github:pr-review-requests:1:pr_merged:1795055017183",
+          "kind": "pr_merged",
+          "categories": [
+            "PrMerged"
+          ],
+          "target": {
+            "Item": {
+              "item": 1,
+              "thread": null
+            }
+          },
+          "delivery": "Delivered"
+        },
+        {
+          "id": 2,
+          "key": "github:comments:6103:comment_created:1795055017183",
+          "kind": "comment_created",
+          "categories": [
+            "OrdinaryComment"
+          ],
+          "target": {
+            "Item": {
+              "item": 4,
+              "thread": "issue-comment:6103"
+            }
+          },
+          "delivery": "Delivered"
+        },
+        {
+          "id": 1,
+          "key": "github:comments:6102:comment_created:1795055017183",
+          "kind": "comment_created",
+          "categories": [
+            "OrdinaryComment"
+          ],
+          "target": {
+            "Item": {
+              "item": 3,
+              "thread": "issue-comment:6102"
+            }
+          },
+          "delivery": "Delivered"
+        }
+      ]
+    },
+    "replay": {
+      "receipt_sha256": "5cd0305ac51f6a58d5f8757200a7352910f0821f25a0d9974f5a13393373412d",
+      "fixture_revision": "s11-native-activity-v3",
+      "opened_tabs": 1,
+      "delivered_groups": 2,
+      "suppressed": 0,
+      "bot_content": 0,
+      "human_content": 0,
+      "feed": [
+        {
+          "id": 4,
+          "key": "commit:1:8888888888888888888888888888888888888888",
+          "kind": "branch_commit_observed",
+          "categories": [
+            "BranchUpdate"
+          ],
+          "target": {
+            "Comparison": {
+              "reference": "refs/heads/main",
+              "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "head": "8888888888888888888888888888888888888888"
+            }
+          },
+          "delivery": "Delivered"
+        },
+        {
+          "id": 3,
+          "key": "github:pr-review-requests:1:pr_merged:1795055017183",
+          "kind": "pr_merged",
+          "categories": [
+            "PrMerged"
+          ],
+          "target": {
+            "Item": {
+              "item": 1,
+              "thread": null
+            }
+          },
+          "delivery": "Delivered"
+        },
+        {
+          "id": 2,
+          "key": "github:comments:6103:comment_created:1795055017183",
+          "kind": "comment_created",
+          "categories": [
+            "OrdinaryComment"
+          ],
+          "target": {
+            "Item": {
+              "item": 4,
+              "thread": "issue-comment:6103"
+            }
+          },
+          "delivery": "Delivered"
+        },
+        {
+          "id": 1,
+          "key": "github:comments:6102:comment_created:1795055017183",
+          "kind": "comment_created",
+          "categories": [
+            "OrdinaryComment"
+          ],
+          "target": {
+            "Item": {
+              "item": 3,
+              "thread": "issue-comment:6102"
+            }
+          },
+          "delivery": "Delivered"
+        }
+      ]
+    }
+  },
+  "latest_routes_by_phase": {
+    "activity_baseline": {
+      "user:200": 3,
+      "repository:200": 2,
+      "updated_items:200": 3,
+      "updated_comments:200": 2,
+      "activity_watched:200": 4,
+      "updated_inline_comments:200": 2,
+      "pull_activity_a:200": 2,
+      "activity_branches:200": 3,
+      "pull_activity_b:200": 1,
+      "pull_a:200": 1,
+      "activity_commit_statuses:200": 2,
+      "open_pull_index:200": 2,
+      "activity_check_runs:200": 1,
+      "items:200": 1,
+      "pull_b:200": 2,
+      "compare_a:200": 1
+    },
+    "activity_fresh": {
+      "compare_a:200": 20,
+      "activity_branches:200": 4,
+      "updated_comments:200": 3,
+      "updated_inline_comments:200": 2,
+      "activity_watched:200": 4,
+      "pull_activity_a:200": 2,
+      "activity_check_runs:200": 2,
+      "activity_commit_statuses:200": 2,
+      "open_pull_index:200": 2,
+      "updated_items:200": 2,
+      "pull_a:200": 1,
+      "activity_reviews:200": 1,
+      "user:200": 1,
+      "repository:200": 1
+    },
+    "activity_catchup": {
+      "user:200": 2,
+      "repository:200": 1,
+      "updated_items:200": 6,
+      "updated_comments:200": 6,
+      "activity_watched:200": 6,
+      "updated_inline_comments:200": 6,
+      "pull_activity_a:200": 1,
+      "activity_moved_tip:200": 1,
+      "pull_activity_b:200": 1,
+      "open_pull_index:200": 5,
+      "activity_branches:200": 5
+    },
+    "activity_replay": {
+      "user:200": 1,
+      "repository:200": 1,
+      "activity_branches:200": 2,
+      "updated_items:200": 2,
+      "updated_comments:200": 2,
+      "activity_watched:200": 2,
+      "updated_inline_comments:200": 1,
+      "open_pull_index:200": 1
+    }
+  }
+}
