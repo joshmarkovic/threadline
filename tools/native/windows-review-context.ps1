@@ -5,13 +5,15 @@ function Select-FixtureRightReviewLine([IntPtr]$Window, [string]$Head, [string]$
         $pr.head -ceq $Head -and $pr.selected_file -ceq $FixturePath -and $pr.diff_mode -ceq 'Split'
     }
     Wait-For 'the owned native Next change action' {
-        Invoke-OwnedFixtureControl $Window 'pr-0-next-change' $null 'Next change'
+        $current = Read-Observation
+        $null -ne $current -and $current.pid -eq $script:app.Id -and
+            $null -ne $current.bounds.PSObject.Properties['pr-0-next-change'] -and
+            (Invoke-OwnedFixtureControl $Window 'pr-0-next-change' $null 'Next change')
     }
     $null = Wait-PrReader 'the exact modified source line selected by the native action' {
         param($pr)
         $anchor = $pr.source_anchor
-        $selected = if ($Line -eq 1) { $pr.selected_source_line -eq 1 } else { $null -ne $pr.selected_source_line }
-        $pr.head -ceq $Head -and $selected -and $null -ne $anchor -and
+        $pr.head -ceq $Head -and $pr.selected_source_line -eq $Line -and $null -ne $anchor -and
             $anchor.path -ceq $FixturePath -and $anchor.side -ceq 'Right' -and $anchor.line -eq $Line
     }
 }
@@ -266,10 +268,14 @@ function Invoke-ReviewDecisionsProof([IntPtr]$Window, [string]$Profile, [switch]
         $null = Open-FixturePr $Window 0 $fixture.number $fixture.title $fixture.head $fixture.path $fixture.changed
         $draft = Enter-FixtureAnchoredReview $Window $fixture.head $fixture.path
         if ($fixture.lines.Count -eq 2) {
+            Click-AccountControl $Window 'pr-0-review-toggle-editor'
+            $null = Wait-PrReader 'the saved review draft remains while the editor collapses' {
+                param($pr) $pr.review_draft.id -ceq $draft -and $pr.review_draft.saved -and $pr.review_draft.collapsed
+            }
             Select-FixtureRightReviewLine $Window $fixture.head $fixture.path 3
             Click-AccountControl $Window 'pr-0-review-add-inline'
             $null = Wait-PrReader 'the two distinct native source anchors' {
-                param($pr) $null -ne $pr.review_draft -and @($pr.review_draft.anchors).Count -eq 2
+                param($pr) $null -ne $pr.review_draft -and !$pr.review_draft.collapsed -and @($pr.review_draft.anchors).Count -eq 2
             }
             Wait-For 'the owned second inline note editor' {
                 Set-OwnedFixtureEditValue $Window 'pr-0-review-inline' 'Inline review comment' 'Threadline synthetic second inline review note.'

@@ -80,6 +80,7 @@ pub(super) struct ReviewEditor {
     pub summary: Entity<TextareaState>,
     pub inline: Vec<InlineEditor>,
     pub focused_inline: Option<usize>,
+    pub collapsed: bool,
     pub failed: bool,
     pub sending: bool,
     pub(crate) version: i64,
@@ -152,6 +153,7 @@ pub(super) struct ReviewObservation {
     revision: i64,
     head: String,
     owner_tab: bool,
+    collapsed: bool,
     event: String,
     saved: bool,
     queued: bool,
@@ -178,6 +180,7 @@ impl ReviewEditor {
             revision: self.version,
             head: self.revision().head.as_str().to_owned(),
             owner_tab: self.tab_id == tab.id,
+            collapsed: self.collapsed,
             event: format!("{:?}", self.event),
             saved: self.saved(),
             queued: self.submitted == Some(self.version),
@@ -573,6 +576,7 @@ impl ReaderWorkspace {
                 summary,
                 inline,
                 focused_inline: None,
+                collapsed: false,
                 failed: false,
                 sending: false,
                 version: saved.revision,
@@ -644,10 +648,34 @@ impl ReaderWorkspace {
         }
     }
 
-    fn focus_review_tab(&mut self, item: ItemId, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(editor) = self.review_editors.get(&item) else {
+    pub(super) fn toggle_review_editor(
+        &mut self,
+        item: ItemId,
+        tab: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(editor) = self
+            .review_editors
+            .get_mut(&item)
+            .filter(|editor| editor.tab_id == tab)
+        else {
             return;
         };
+        if editor.collapsed {
+            self.focus_review_tab(item, window, cx);
+        } else {
+            editor.capture(cx);
+            editor.collapsed = true;
+            cx.notify();
+        }
+    }
+
+    fn focus_review_tab(&mut self, item: ItemId, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(editor) = self.review_editors.get_mut(&item) else {
+            return;
+        };
+        editor.collapsed = false;
         let id = editor.tab_id.clone();
         let focus = editor
             .focused_inline
@@ -676,6 +704,7 @@ impl ReaderWorkspace {
             }
         }
         window.on_next_frame(move |window, cx| focus.focus(window, cx));
+        cx.notify();
     }
 
     fn add_review_inline(

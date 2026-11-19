@@ -48,9 +48,26 @@ impl ReaderWorkspace {
         }
 
         let editor = owned.expect("the editing tab owns its draft");
+        let id = format!("pr-{pane}-review-toggle-editor");
+        let tab_id = tab.id.clone();
+        let toggle = control(
+            id.clone(),
+            if editor.collapsed {
+                "Show review editor"
+            } else {
+                "Collapse review editor"
+            },
+        )
+        .on_click(cx.listener(move |this, _, window, cx| {
+            this.toggle_review_editor(item, &tab_id, window, cx);
+        }));
+        let toggle = self.observed_control(id, toggle, false);
+        if editor.collapsed {
+            return panel.child(toggle).into_any_element();
+        }
         let revision = &pr.data.revision;
         let stale = editor.revision().id != revision.id;
-        let mut event_controls = div().flex().flex_wrap().gap_1();
+        let mut event_controls = div().flex().flex_wrap().gap_1().child(toggle);
         for (key, label, event) in [
             ("comment", "Comment", ReviewEvent::Comment),
             ("approve", "Approve", ReviewEvent::Approve),

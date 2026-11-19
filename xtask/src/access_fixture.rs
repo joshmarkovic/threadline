@@ -972,7 +972,11 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
                 "id":"R_71","name":"private","owner":{"login":"fixture-org"},"isPrivate":true,"viewerPermission":"READ"
             }}}),
         ),
-        (phase, Route::UpdatedItems | Route::UpdatedComments) if merge::applies(phase) => {
+        (phase, Route::UpdatedItems | Route::UpdatedComments)
+            if merge::applies(phase)
+                || review_decisions::active(phase)
+                || review_threads::active(phase) =>
+        {
             result(200, "OK", json!([]))
         }
         (Phase::ReaderFailure | Phase::ReaderResume, Route::Items) => {

@@ -179,6 +179,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn fixture_has_an_empty_activity_snapshot_before_native_pause() {
+        for phase in [
+            Phase::ReviewDecisions,
+            Phase::ReviewPredecessor,
+            Phase::ReviewResume,
+            Phase::ThreadQueue,
+            Phase::ThreadOutdated,
+        ] {
+            for route in [Route::UpdatedItems, Route::UpdatedComments] {
+                let reply = crate::access_fixture::response(phase, route, true, false);
+                assert_eq!(reply.status, 200);
+                assert_eq!(reply.body, json!([]));
+            }
+            assert_eq!(
+                crate::access_fixture::response(phase, Route::Unexpected, true, false).status,
+                404
+            );
+        }
+    }
+
+    #[test]
     fn decision_fixture_requires_distinct_anchors_and_exact_predecessors() {
         let phase = Phase::ReviewDecisions;
         let create = "/repos/fixture-org/private/pulls/42/reviews";

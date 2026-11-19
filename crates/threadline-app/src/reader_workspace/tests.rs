@@ -1438,6 +1438,54 @@ fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {
         assert_eq!(inline.anchor.first_line, 21);
         assert_eq!(inline.anchor.last_line, 21);
         assert_eq!(inline.anchor.source_oid, revision.head.as_str());
+
+        click(cx, window, "pr-0-review-toggle-editor");
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            assert!(reader.read(cx).review_editors[&pr].collapsed);
+            assert!(window.try_find("pr-0-review-inline").is_none());
+            assert!(window.try_find("pr-0-next-change").is_some());
+        })
+        .unwrap();
+        assert_eq!(store.review_draft(account, &draft_id).unwrap(), Some(saved));
+        click(cx, window, "pr-0-next-change");
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let reader = reader.read(cx);
+                !reader.layout_busy
+                    && diff
+                        .read(cx)
+                        .selected_lines()
+                        .is_some_and(|line| line.start() == 40)
+            })
+        });
+        click(cx, window, "pr-0-review-add-inline");
+        until(cx, |cx| {
+            cx.read(|cx| {
+                let editor = &reader.read(cx).review_editors[&pr];
+                !editor.collapsed && editor.inline.len() == 2 && editor.focused_inline == Some(1)
+            })
+        });
+        cx.update_window(window, |_, window, cx| {
+            window.simulate_next_frame(cx);
+            window.render_frame(cx);
+            let editor = &reader.read(cx).review_editors[&pr];
+            assert!(editor.inline[1].input.focus_handle(cx).is_focused(window));
+            window.input("Second anchored review note", cx);
+        })
+        .unwrap();
+        until(cx, |cx| {
+            cx.read(|cx| reader.read(cx).review_editors[&pr].saved())
+        });
+        let saved = store.review_draft(account, &draft_id).unwrap().unwrap();
+        assert_eq!(saved.draft.comments.len(), 2);
+        assert_eq!(saved.draft.comments[0].body, "One anchored review note");
+        assert_eq!(saved.draft.comments[1].body, "Second anchored review note");
+        assert_eq!(saved.draft.comments[1].anchor.first_line, 40);
+        assert_eq!(
+            saved.draft.comments[1].anchor.source_oid,
+            revision.head.as_str()
+        );
         cx.update_window(window, |_, _, cx| {
             diff.update(cx, |state, cx| {
                 state.set_selected_lines(
