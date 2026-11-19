@@ -8,7 +8,7 @@ param(
     [switch]$PlatformProof,
     [switch]$ToastProof,
     [switch]$AccessProof,
-    [ValidateSet('Offline', 'Resume', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewDecisions', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'CredentialBoundary', 'NativeLifecycle', 'History', 'Writes', 'WriteSurface')][string]$ReaderProof,
+    [ValidateSet('Offline', 'Resume', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewDecisions', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'CredentialBoundary', 'NativeLifecycle', 'NativeActivity', 'History', 'Writes', 'WriteSurface')][string]$ReaderProof,
     [switch]$AccessibilityProof,
     [string]$AccessAddress,
     [string]$AccessPhaseFile,
@@ -49,6 +49,8 @@ $reportName = if ($Measure) {
     'credential-boundary-native.json'
 } elseif ($ReaderProof -eq 'NativeLifecycle') {
     'native-lifecycle.json'
+} elseif ($ReaderProof -eq 'NativeActivity') {
+    'native-activity.json'
 } elseif ($ReaderProof -eq 'History') {
     'history-native.json'
 } elseif ($ReaderProof -in @('Writes', 'WriteSurface')) {
@@ -90,7 +92,7 @@ $copiedClipboardSequence = $null
 $toastFixture = $null
 $toastSubmissionAttempted = $false
 $script:UseOwnedUiAutomation = $false
-$script:UseSeededFixtureAuth = $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewDecisions', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'History', 'Writes', 'WriteSurface', 'PerformanceConcurrent')
+$script:UseSeededFixtureAuth = $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewDecisions', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'History', 'Writes', 'WriteSurface', 'PerformanceConcurrent', 'NativeActivity')
 
 function Get-FileSha256 {
     param([string]$Path)
@@ -208,7 +210,7 @@ function Get-ThreadlineArguments([string]$Observation, [switch]$OpenReview, [str
     return $arguments
 }
 
-function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenReview, [string]$SeedReader, [switch]$ReaderIdle, [switch]$SeedQuietEvent, [switch]$ReaderBacklog, [ValidateSet('seed','inspect','cleanup')][string]$Lifecycle) {
+function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenReview, [string]$SeedReader, [switch]$ReaderIdle, [switch]$SeedQuietEvent, [switch]$ReaderBacklog, [ValidateSet('seed','inspect','cleanup')][string]$Lifecycle, [ValidateSet('seed','inspect')][string]$ActivityFixture) {
     $info = New-Object System.Diagnostics.ProcessStartInfo
     $info.FileName = $script:Binary
     $info.UseShellExecute = $false
@@ -225,6 +227,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_READER_TIMING')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_READER_IDLE')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_NATIVE_LIFECYCLE')
+    $info.EnvironmentVariables.Remove('THREADLINE_E2E_NATIVE_ACTIVITY')
     if ($ReaderProof -in @('Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) { $info.EnvironmentVariables['THREADLINE_E2E_READER_TIMING'] = '1' }
     if ($ReaderIdle) { $info.EnvironmentVariables['THREADLINE_E2E_READER_IDLE'] = '1' }
     if ($ToastProof -and $null -ne $script:toastFixture) {
@@ -241,6 +244,11 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
         $info.EnvironmentVariables['THREADLINE_E2E_NATIVE_LIFECYCLE'] = '1'
         $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1'
         if ($Lifecycle) { $info.Arguments = "--e2e-native-lifecycle $Lifecycle " + $info.Arguments }
+    }
+    if ($ReaderProof -eq 'NativeActivity') {
+        $info.EnvironmentVariables['THREADLINE_E2E_NATIVE_ACTIVITY'] = '1'
+        $info.EnvironmentVariables['THREADLINE_E2E_SYNC'] = '1'
+        if ($ActivityFixture) { $info.Arguments = "--e2e-native-activity $ActivityFixture " + $info.Arguments }
     }
     return [Diagnostics.Process]::Start($info)
 }
@@ -915,20 +923,21 @@ try {
         }
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
-    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewDecisions', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'CredentialBoundary', 'NativeLifecycle', 'History', 'Writes', 'WriteSurface', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) {
+    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -in @('Resume', 'Sync', 'NotificationSchedule', 'PullRequest', 'ReviewDraft', 'ReviewDecisions', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'CredentialBoundary', 'NativeLifecycle', 'NativeActivity', 'History', 'Writes', 'WriteSurface', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) {
         Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
         . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
         $script:UseOwnedUiAutomation = !$AccessibilityProof -and $ReaderProof -ne 'PerformancePhysical'
         $report.driver = 'Windows PowerShell / owned UI Automation and guarded Win32 SendInput'
     }
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
-    if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'ReviewDecisions', 'ThreadQueue', 'DirectMerge', 'MergeQueue', 'NativeLifecycle', 'PerformanceConcurrent')) { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
-    if ($ReaderProof -in @('PullRequest', 'ReviewDraft', 'ReviewDecisions', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue')) { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
+    if ($ReaderProof -in @('Sync', 'NotificationSchedule', 'ReviewDraft', 'ReviewDecisions', 'ThreadQueue', 'DirectMerge', 'MergeQueue', 'NativeLifecycle', 'NativeActivity', 'PerformanceConcurrent')) { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
+    if ($ReaderProof -in @('PullRequest', 'ReviewDraft', 'ReviewDecisions', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'NativeActivity')) { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
     if ($ReaderProof -in @('NotificationSchedule', 'ReviewDraft', 'ReviewDecisions', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'CredentialBoundary', 'History', 'Writes', 'WriteSurface')) { . (Join-Path $PSScriptRoot 'windows-issue-writes.ps1') }
     if ($ReaderProof -in @('ReviewDraft', 'ReviewDecisions', 'ThreadQueue', 'ReviewContext')) { . (Join-Path $PSScriptRoot 'windows-review-context.ps1') }
     if ($ReaderProof -in @('DirectMerge', 'MergeQueue')) { . (Join-Path $PSScriptRoot 'windows-merge.ps1') }
     if ($ReaderProof -eq 'CredentialBoundary') { . (Join-Path $PSScriptRoot 'windows-credential-boundary.ps1') }
     if ($ReaderProof -eq 'NativeLifecycle') { . (Join-Path $PSScriptRoot 'windows-native-lifecycle.ps1') }
+    if ($ReaderProof -eq 'NativeActivity') { . (Join-Path $PSScriptRoot 'windows-native-activity.ps1') }
     if ($ReaderProof -eq 'History') { . (Join-Path $PSScriptRoot 'windows-history.ps1') }
     $firstProfile = Join-Path $ProfileDir ('initial-' + [guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $firstProfile -Force
@@ -936,11 +945,13 @@ try {
     if ($ReaderProof -in @('Performance', 'PerformancePhysical')) { Initialize-ReaderProfile $firstProfile 'section-16' }
     if ($ReaderProof -in @('LargeWorkspace', 'PerformanceConcurrent')) { Initialize-ReaderProfile $firstProfile 'section-16-backlog' }
     if ($ReaderProof -eq 'NativeLifecycle') { Initialize-NativeLifecycle $firstProfile }
+    if ($ReaderProof -eq 'NativeActivity') { Initialize-NativeActivity $firstProfile 'native-activity-seeded.json' }
     if ($script:UseSeededFixtureAuth) {
         $fixturePhase = switch ($ReaderProof) {
             Resume { 'reader-failure' }
             Sync { 'sync-live' }
             NotificationSchedule { 'sync-live' }
+            NativeActivity { 'activity-offline' }
             PullRequest { 'pr-load' }
             ReviewDraft { 'pr-load' }
             ReviewDecisions { 'review-decisions' }
@@ -1022,6 +1033,7 @@ try {
             MergeQueue { Invoke-MergeQueueProof $window }
             CredentialBoundary { Invoke-CredentialBoundaryProof $window $firstProfile }
             NativeLifecycle { Invoke-NativeLifecycleProof $window $firstProfile }
+            NativeActivity { Invoke-NativeActivityProof $window $firstProfile }
             History { Invoke-HistoryProof $window $firstProfile }
             Writes { Invoke-IssueWriteProof $window $firstProfile }
             WriteSurface { Invoke-IssueWriteSurfaceProof $window }

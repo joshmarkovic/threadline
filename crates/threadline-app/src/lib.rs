@@ -1,6 +1,8 @@
 mod account_panel;
 mod accounts;
 mod activity_delivery;
+#[cfg(feature = "e2e")]
+mod activity_fixture;
 mod fixtures;
 #[cfg(feature = "e2e")]
 mod lifecycle_fixture;
@@ -16,6 +18,8 @@ mod sync_panel;
 mod sync_worker;
 mod workspace;
 
+#[cfg(feature = "e2e")]
+pub use activity_fixture::native_activity_command;
 #[cfg(feature = "e2e")]
 pub use lifecycle_fixture::native_lifecycle_command;
 #[cfg(windows)]

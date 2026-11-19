@@ -22,6 +22,9 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == "S08-REVIEW-DECISIONS" {
         return Some("s08-native-review-decisions-v1");
     }
+    if case == "S11-NATIVE-ACTIVITY" {
+        return Some("s11-native-activity-v1");
+    }
     if case == "S12-NATIVE-LIFECYCLE" {
         return Some("s12-native-lifecycle-v1");
     }
@@ -197,6 +200,10 @@ pub fn associations(case: &str) -> Associations {
         "S12-NATIVE-LIFECYCLE" => (
             "AUTH-05;CACHE-13;OUTBOX-10;TEST-04;TEST-05",
             "AC-68;AC-73;AC-74;AC-91;AC-92",
+        ),
+        "S11-NATIVE-ACTIVITY" => (
+            "NOTIFY-01;NOTIFY-17;SYNC-11;TEST-04",
+            "AC-27;AC-28;AC-29;AC-31;AC-32;AC-39;AC-40",
         ),
         "S04-READ-TRANSPORT" => (
             "CACHE-05;ISSUE-01;SEARCH-02;SEARCH-03;TEST-03",

@@ -68,7 +68,8 @@ function Set-AccessPhase([string]$Phase) {
         'merge-prepare', 'merge-send', 'merge-wrong-head', 'merge-queue-preflight', 'merge-queue-rejected', 'history', 'write-online', 'write-drop',
         'credential-ready', 'credential-offline', 'credential-other', 'credential-return',
         'lifecycle-offline', 'lifecycle-ready', 'lifecycle-delay', 'lifecycle-crash',
-        'lifecycle-recovery', 'lifecycle-signed-out')) {
+        'lifecycle-recovery', 'lifecycle-signed-out', 'activity-baseline', 'activity-fresh',
+        'activity-offline', 'activity-catchup', 'activity-replay')) {
         throw 'Unknown access fixture phase.'
     }
     try {

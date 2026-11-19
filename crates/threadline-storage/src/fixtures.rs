@@ -14,6 +14,8 @@ use crate::{
 
 mod backlog;
 pub use backlog::*;
+mod activity;
+pub use activity::*;
 mod lifecycle;
 pub use lifecycle::*;
 

@@ -8,8 +8,66 @@ use threadline_core::sync::policy::system_timezone;
 use threadline_platform::{ActivityId, ActivityNotification, PlatformControls, PlatformError};
 use threadline_storage::{
     Store, UtcMillis,
-    notifications::{PopupAvailability, PopupOutcome},
+    notifications::{PopupAvailability, PopupGroup, PopupOutcome},
 };
+
+enum DeliveryTarget {
+    Native(PlatformControls),
+    #[cfg(feature = "e2e")]
+    Capture(crate::activity_fixture::Capture),
+}
+
+impl DeliveryTarget {
+    fn availability(&self) -> PopupAvailability {
+        use threadline_platform::ActivityPermission;
+        let native = match self {
+            Self::Native(native) => native,
+            #[cfg(feature = "e2e")]
+            Self::Capture(_) => return PopupAvailability::Enabled,
+        };
+        match native.activity_permission() {
+            Ok(ActivityPermission::Enabled) => PopupAvailability::Enabled,
+            Ok(ActivityPermission::Disabled) => PopupAvailability::Disabled,
+            Ok(ActivityPermission::SenderSettingUnknown) => PopupAvailability::SenderSettingUnknown,
+            Err(PlatformError::Denied) => PopupAvailability::Disabled,
+            Err(PlatformError::NotificationRegistrationMissing) => {
+                PopupAvailability::RegistrationMissing
+            }
+            Err(error) => {
+                eprintln!("Threadline could not query the desktop notification service: {error}");
+                PopupAvailability::Unavailable
+            }
+        }
+    }
+
+    fn submit(&self, group: &PopupGroup) -> threadline_storage::Result<PopupOutcome> {
+        let native = match self {
+            Self::Native(native) => native,
+            #[cfg(feature = "e2e")]
+            Self::Capture(capture) => {
+                capture.record(group)?;
+                return Ok(PopupOutcome::Delivered);
+            }
+        };
+        let id =
+            ActivityId::parse(&group.native_id).map_err(|_| threadline_storage::Error::Corrupt)?;
+        Ok(
+            match native.submit_activity(ActivityNotification {
+                id,
+                events: group.event_count,
+                sound: group.sound,
+            }) {
+                Ok(()) => PopupOutcome::Delivered,
+                Err(
+                    PlatformError::Unsupported
+                    | PlatformError::Denied
+                    | PlatformError::NotificationRegistrationMissing,
+                ) => PopupOutcome::Rejected,
+                Err(_) => PopupOutcome::Unknown,
+            },
+        )
+    }
+}
 
 pub(crate) struct ActivityDelivery {
     stop: Arc<AtomicBool>,
@@ -17,6 +75,13 @@ pub(crate) struct ActivityDelivery {
 }
 impl ActivityDelivery {
     pub(crate) fn start(store: &Arc<Store>, native: PlatformControls) -> Option<Self> {
+        let target = DeliveryTarget::Native(native);
+        #[cfg(feature = "e2e")]
+        let target = if std::env::var_os("THREADLINE_E2E_NATIVE_ACTIVITY").is_some() {
+            DeliveryTarget::Capture(crate::activity_fixture::Capture::open()?)
+        } else {
+            target
+        };
         let (wake, rx) = mpsc::sync_channel(1);
         let stop = Arc::new(AtomicBool::new(false));
         store.watch_commits(wake.clone()).ok()?;
@@ -24,7 +89,7 @@ impl ActivityDelivery {
         let weak = Arc::downgrade(store);
         std::thread::Builder::new()
             .name("threadline-activity".into())
-            .spawn(move || run(weak, native, rx, worker_stop))
+            .spawn(move || run(weak, target, rx, worker_stop))
             .ok()?;
         let _ = wake.try_send(());
         Some(Self { stop, wake })
@@ -38,7 +103,7 @@ impl Drop for ActivityDelivery {
 }
 fn run(
     store: Weak<Store>,
-    native: PlatformControls,
+    target: DeliveryTarget,
     wake: mpsc::Receiver<()>,
     stop: Arc<AtomicBool>,
 ) {
@@ -55,7 +120,7 @@ fn run(
             break;
         }
         let Some(store) = store.upgrade() else { break };
-        delay = match deliver(&store, &native, &stop) {
+        delay = match deliver(&store, &target, &stop) {
             Ok(next) => next,
             Err(error) => {
                 eprintln!("Threadline activity delivery: {error}");
@@ -66,7 +131,7 @@ fn run(
 }
 fn deliver(
     store: &Store,
-    native: &PlatformControls,
+    target: &DeliveryTarget,
     stop: &AtomicBool,
 ) -> threadline_storage::Result<Option<Duration>> {
     let Some(account) = store.active_github_account()? else {
@@ -76,20 +141,7 @@ fn deliver(
         return Ok(None);
     }
     let zone = system_timezone().map_err(threadline_storage::Error::InvalidInput)?;
-    use threadline_platform::ActivityPermission;
-    let availability = match native.activity_permission() {
-        Ok(ActivityPermission::Enabled) => PopupAvailability::Enabled,
-        Ok(ActivityPermission::Disabled) => PopupAvailability::Disabled,
-        Ok(ActivityPermission::SenderSettingUnknown) => PopupAvailability::SenderSettingUnknown,
-        Err(PlatformError::Denied) => PopupAvailability::Disabled,
-        Err(PlatformError::NotificationRegistrationMissing) => {
-            PopupAvailability::RegistrationMissing
-        }
-        Err(error) => {
-            eprintln!("Threadline could not query the desktop notification service: {error}");
-            PopupAvailability::Unavailable
-        }
-    };
+    let availability = target.availability();
     while !stop.load(Ordering::Acquire)
         && store.process_notification_events(
             account,
@@ -109,22 +161,7 @@ fn deliver(
         else {
             break;
         };
-        let id =
-            ActivityId::parse(&group.native_id).map_err(|_| threadline_storage::Error::Corrupt)?;
-        let result = native.submit_activity(ActivityNotification {
-            id,
-            events: group.event_count,
-            sound: group.sound,
-        });
-        let outcome = match result {
-            Ok(()) => PopupOutcome::Delivered,
-            Err(
-                PlatformError::Unsupported
-                | PlatformError::Denied
-                | PlatformError::NotificationRegistrationMissing,
-            ) => PopupOutcome::Rejected,
-            Err(_) => PopupOutcome::Unknown,
-        };
+        let outcome = target.submit(&group)?;
         store.record_notification_outcome(
             account,
             &group.native_id,

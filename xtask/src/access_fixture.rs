@@ -14,6 +14,7 @@ use std::{
 use serde::Serialize;
 use serde_json::{Value, json};
 
+mod activity;
 mod backlog;
 mod concurrent;
 mod history;
@@ -99,6 +100,11 @@ enum Phase {
     LifecycleCrash,
     LifecycleRecovery,
     LifecycleSignedOut,
+    ActivityBaseline,
+    ActivityFresh,
+    ActivityOffline,
+    ActivityCatchup,
+    ActivityReplay,
 }
 
 impl Phase {
@@ -147,6 +153,11 @@ impl Phase {
             "lifecycle-crash" => Ok(Self::LifecycleCrash),
             "lifecycle-recovery" => Ok(Self::LifecycleRecovery),
             "lifecycle-signed-out" => Ok(Self::LifecycleSignedOut),
+            "activity-baseline" => Ok(Self::ActivityBaseline),
+            "activity-fresh" => Ok(Self::ActivityFresh),
+            "activity-offline" => Ok(Self::ActivityOffline),
+            "activity-catchup" => Ok(Self::ActivityCatchup),
+            "activity-replay" => Ok(Self::ActivityReplay),
             _ => Err(io::Error::other("invalid access fixture phase")),
         }
     }
@@ -211,6 +222,14 @@ enum Route {
     BacklogArchive,
     BacklogAuxiliaryFeed,
     LifecycleComment,
+    ActivityOldReview,
+    ActivityReviews,
+    ActivityThreads,
+    ActivityBranches,
+    ActivityWatched,
+    ActivityBaselineTip,
+    ActivityMovedTip,
+    ActivityUnwatched,
     Unexpected,
 }
 
@@ -236,6 +255,7 @@ pub enum TraceCheck {
     LargeWorkspaceBacklog,
     ConcurrentReader,
     NativeLifecycle,
+    NativeActivity,
     ReaderResume,
     SyncJourney,
     NotificationSchedule,
@@ -294,6 +314,7 @@ impl AccessFixture {
             TraceCheck::LargeWorkspaceBacklog => backlog::trace(&records),
             TraceCheck::ConcurrentReader => concurrent::trace(&records),
             TraceCheck::NativeLifecycle => lifecycle::trace(&records),
+            TraceCheck::NativeActivity => activity::trace(&records),
             TraceCheck::ReaderResume => complete_reader_resume(&records),
             TraceCheck::SyncJourney => complete_sync_journey(&records),
             TraceCheck::NotificationSchedule => complete_notification_schedule(&records),
@@ -457,10 +478,10 @@ fn serve(
     while !stopping.load(Ordering::Acquire) {
         match listener.accept() {
             Ok((mut socket, _)) => {
-                if evidence.len() >= 128 {
+                let phase = Phase::read(phase_file)?;
+                if evidence.len() >= if activity::active(phase) { 512 } else { 128 } {
                     return Err(io::Error::other("too many requests to the access fixture"));
                 }
-                let phase = Phase::read(phase_file)?;
                 let merge_sent = evidence.iter().any(|record: &RequestEvidence| {
                     record.route == Route::MergePut && record.status == 200
                 });
@@ -671,6 +692,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         ) => Route::OpenPullIndex,
         (Some("POST"), Some("/graphql"), Some("HTTP/1.1")) => Route::Graphql,
         (Some("GET"), Some(target), Some("HTTP/1.1")) => review_decisions::get(phase, target)
+            .or_else(|| activity::read_route(phase, target))
             .or_else(|| lifecycle::read_route(phase, target))
             .or_else(|| backlog::read_route(phase, target))
             .or_else(|| history::route(phase, target))
@@ -732,6 +754,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
             });
         } else if let Some(operation) = payload.as_ref().and_then(|body| {
             review_threads::graphql(phase, body)
+                .or_else(|| activity::graphql(phase, body))
                 .or_else(|| merge::graphql(phase, body))
                 .or_else(|| pr::activity_query(phase, body))
         }) {
@@ -798,6 +821,9 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
         return reply;
     }
     if let Some(response) = lifecycle::response(phase, route) {
+        return response;
+    }
+    if let Some(response) = activity::response(phase, route) {
         return response;
     }
     if matches!(route, Route::UpdatedInlineComments | Route::OpenPullIndex) {
