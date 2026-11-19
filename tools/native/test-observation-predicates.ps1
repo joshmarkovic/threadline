@@ -378,3 +378,25 @@ try {
 } finally {
     [IO.Directory]::Delete($scratch, $true)
 }
+
+# The standalone concurrent driver starts with no runtime budget map.
+$script:report = [ordered]@{ actions = @() }
+function Wait-Account { param($Description, $Check) }
+function Open-SyncSettings { param($Window) }
+function Wait-Sync { param($Description, $Check) }
+function Set-AccessPhase { param($Phase) }
+function Click-AccountControl { param($Window, $Id) }
+function Stop-ThroughUi {}
+function Measure-ReaderPerformance([IntPtr]$Window, $Samples, $Attribution, [switch]$Physical, [switch]$Concurrent) {
+    if ($Window -ne 123 -or !$Concurrent -or $Physical) { throw 'The native benchmark lost its concurrent mode.' }
+    foreach ($metric in $Samples.Keys) {
+        for ($index = 0; $index -lt 20; $index++) { $Samples[$metric].Add(50.0) }
+    }
+}
+Invoke-ConcurrentReaderPerformance 123
+if (!$script:report.concurrent_checks_passed -or $script:report.budgets.Count -ne 3 -or
+    @($script:report.budgets.Values.status | Where-Object { $_ -cne 'Pass' }).Count -ne 0) {
+    throw 'The concurrent driver did not populate a new budget map under strict mode.'
+}
+$missingTiming = Get-ReaderTimingAttribution @{method = 'UIA InvokePattern'; begin = 10; returned = 20} ([pscustomobject]@{ready = $true}) 'search' 1 30
+if ($missingTiming.status -cne 'Unavailable') { throw 'A missing reader observation appeared correlated.' }

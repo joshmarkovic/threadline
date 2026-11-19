@@ -257,7 +257,10 @@ function Get-ReaderTimingAttribution([hashtable]$InputTiming, [object]$State, [s
     }
     $details.input_call_ms = 1000.0 * ($returned - $begin) / $frequency
     $details.return_to_observation_ms = 1000.0 * ($Observed - $returned) / $frequency
-    $native = $State.cached_reader.PSObject.Properties['performance_timing']
+    if ($null -eq $State) { return $details }
+    $reader = $State.PSObject.Properties['cached_reader']
+    if ($null -eq $reader -or $null -eq $reader.Value) { return $details }
+    $native = $reader.Value.PSObject.Properties['performance_timing']
     if ($null -eq $native -or $null -eq $native.Value) { return $details }
     $native = $native.Value
     $handler = $native.handler_qpc
@@ -401,7 +404,7 @@ function Invoke-ReaderPerformance([IntPtr]$Window, [switch]$KeepOpen, [switch]$P
     $script:report.attribution = [ordered]@{
         source = 'Windows QueryPerformanceCounter. App paint callback precedes platform presentation.'
     }
-    if ($null -eq $script:report.budgets) { $script:report.budgets = [ordered]@{} }
+    if ($null -eq $script:report['budgets']) { $script:report['budgets'] = [ordered]@{} }
     try {
         Measure-ReaderPerformance $Window $samples $attribution -Physical:$Physical -Concurrent:$Concurrent
     } finally {
