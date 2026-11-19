@@ -2,7 +2,7 @@
 
 The current Windows 11 x64 test package is `0.1.0-local.16`, built from `2870642` with database schema 18. Its setup is `.build/windows-installer/local16-2870642/threadline-2870642-local16.exe` in the local repository workspace. It installs per user and adds **Threadline Installer Test** to Start. Build 16 passed all ten setup and same-schema retention steps. [Build 16 digests and setup receipt](evidence/sprint-12/installed-build-16.json) · [Local install, upgrade and uninstall instructions](../../tools/windows/README.md)
 
-The local regression suites passed on Windows and Linux. The first build 16 desktop run recorded 12 passes, eight blocked cases and one performance failure. Windows blocked the foreground steps, including the cold notification click. Four large-workspace timing budgets remain open. [Exact-source test results](evidence/sprint-12/validation-2870642.json) · [Desktop run and measured budgets](evidence/sprint-12/full-native-2870642-installed16.json)
+The local regression suites passed on Windows and Linux. The latest build 16 desktop run recorded 11 passes, three blocked cases and seven failures at 144 DPI. The installed app opened issue 42 from Windows Notification Center after it had exited, and kept the unrelated draft. Four large-workspace timing budgets remain open. [Exact-source test results](evidence/sprint-12/validation-2870642.json) · [Connected desktop outcomes and budgets](evidence/sprint-12/full-native-2870642-installed16-connected.json)
 
 The user selected local installer testing and left publication pending. The local package is unsigned. The Windows release still needs a signed setup, its published installation commands and exact-package verification. macOS and Linux have separate release gates. [Windows release gates](#windows-release-gates) · [Installation plan](../spec/INSTALLATION_PLAN.md)
 
@@ -171,6 +171,23 @@ A separate Windows test delivered modeled suspend and resume messages to its own
 
 ## Full native Windows suite
 
+### Connected Windows desktop with installed local build 16
+
+The connected Windows 11 x64 run on clean `2870642` ended with exit 1 after 11 passes, three blocked cases and seven failures. All 18 cases using the optimized test executable recorded 144 DPI. The remaining cases used the ordinary build 16 executable. [All 21 outcomes, source and executable hashes](evidence/sprint-12/full-native-2870642-installed16-connected.json)
+
+E2E-001 passed native window, text selection, clipboard and input checks. In E2E-012, Windows grouped 37 events, the driver used Windows UI Automation to invoke the fixture in Notification Center, and the new installed process opened cached issue 42. The unrelated issue 41 draft and its tab survived. The unregistered copy kept all 37 events available in the in-app feed in E2E-018. The installed offline runtime in E2E-020 reopened the saved split comparison and quit normally. Its three samples each found 72 modules, zero child processes and zero browser matches. [Installed and test executable receipts](evidence/sprint-12/full-native-2870642-installed16-connected.json)
+
+| Outcome | Cases and last verified state |
+| --- | --- |
+| Blocked | S01-WINDOWS-SHELL found the reported banner but could not identify its clickable title. S01-WINDOWS-TOAST and E2E-003 stopped at the foreground ownership check. |
+| Fail | E2E-002 entered the synthetic repository route and timed out acquiring focus in the masked token field. E2E-004 timed out waiting for the saved checkpoint after the second discussion page returned HTTP 502. Its final snapshot retained one cached comment, Partial coverage, a Failed fetch and a Pending download. |
+| Fail | E2E-007 received HTTP 200 creating the pending review and timed out waiting for a confirmed Outbox row. The loopback trace contained no submit request. E2E-009 received HTTP 200 from one merge request and timed out waiting for the exact visible Outbox row. |
+| Fail | E2E-013 timed out after the loopback fixture stopped on WinSock connection-abort error 10053. The trace retained seven successful requests before the abort. |
+| Fail | E2E-015 invoked the accessibility control, copied native Markdown and typed into the review input. The final physical drag failed its cursor ownership check. |
+| Fail | E2E-014 completed the offline and backlog journeys and exceeded four timing limits. |
+
+External p95 across 20 samples per action was 205.83 ms for cached open, 242.57 ms for search and 165.33 ms for tab switch, against 100, 200 and 100 ms. External warm launch took 14,608.75 ms against 2,000 ms. The driver measured 11,793.83 ms in the process-start call and recorded the first useful cached paint 2,730.15 ms after app entry. Idle redraw, memory and setup size passed. [Workload, measured limits and launch milestones](evidence/sprint-12/full-native-2870642-installed16-connected.json)
+
 ### First full suite with installed local build 16
 
 The first full Windows run on clean `2870642` recorded 12 passes, eight blocked cases and one failure at 96 DPI. The installed app delivered 37 fixture events as one group, then the foreground guard stopped the physical cold-activation check. Feed fallback and offline installed-runtime inspection passed. [Individual outcomes, installed executable and driver hashes](evidence/sprint-12/full-native-2870642-installed16.json)
@@ -275,9 +292,9 @@ Windows passed AC-63 through separate native restarts for review submission, thr
 
 The Windows `b230bbd` dispatcher test passed AC-62 against a local provider after SQLite rolled back each completion transaction. The reopened queue retained the original issue edit as Outcome unknown. Read-only checks confirmed the acknowledged comment ID, the existing review and its final event, and the exact expected head and acknowledged merge commit. No mutation was repeated. Earlier native response-loss, process interruption and pending-review recoveries retain their own results. [Four-family fault test, binary identity and prior results](evidence/sprint-12/windows-write-completion.json)
 
-LIVE-001 still needs a designated personal access token and an organization single sign-on check. Physical cold notification activation, the combined Windows accessibility journey and human signoff still need their own evidence. Exact public installation awaits publication. [GitHub account evidence](sprint-03.md) · [Installed notifications](sprint-11.md)
+LIVE-001 still needs a designated personal access token and an organization single sign-on check. The installed cold notification passed through the actual Windows Notification Center. The separate Sprint 01 interactive shell checks, the combined Windows accessibility journey and human signoff still have open steps. Exact public installation awaits publication. [GitHub account evidence](sprint-03.md) · [Connected desktop and installed cold activation](evidence/sprint-12/full-native-2870642-installed16-connected.json)
 
-E2E-015 invoked the owned Load preview control through Windows UI Automation on `6ea3e43` at 96 DPI. Windows then refused foreground focus and the driver stopped before sending physical input. Earlier Sprint 01 runs separately verified native text input and clipboard at 96 and 144 DPI. The E2E-015 run still needs its combined keyboard, clipboard, exact Unicode and high-DPI checks in an unlocked Windows session, and a separate signed visual and screen-reader record. [E2E-015 receipt](evidence/sprint-12/windows-traceability.json) · [Earlier native input](sprint-01.md)
+E2E-015 invoked the owned Load preview control through Windows UI Automation on `6ea3e43` at 96 DPI. Windows then refused foreground focus and the driver stopped before sending physical input. Connected build 16 exercised native selection, clipboard, review input and tab changes at 144 DPI before the last drag failed its ownership check. The combined journey and a separate signed visual and screen-reader record remain open. Earlier Sprint 01 runs separately verified native text input and clipboard at 96 and 144 DPI. [96-DPI receipt](evidence/sprint-12/windows-traceability.json) · [Connected 144-DPI receipt](evidence/sprint-12/full-native-2870642-installed16-connected.json) · [Earlier native input](sprint-01.md)
 
 ### Restored workspace, interrupted dispatch and sign-out
 
