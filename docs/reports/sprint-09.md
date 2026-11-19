@@ -18,6 +18,8 @@ LIVE-004 passed for the designated disposable pull request 3. The authorized cli
 
 For the passing E2E-010 run, a fixture-only accessibility action filled the masked field with the fixed synthetic credential. The normal account form performed access checks, replacement, sign-out and account switching. The normal Outbox worker performed the final send. The 34 local provider requests included no offline traffic. The guarded physical typing attempt is recorded separately. [Native account and request observations](evidence/sprint-09/native-verification.json)
 
+`S09-REPOSITORY-HOLD` passed on Windows 11 with app `c8f2412` and runner and driver `2c9ec5f`. Removing the original repository while offline held independent issue, review and merge submissions and a denied comment. A new process retained all four targets, pending or denied states, immutable snapshots and unsent drafts. The ordinary **Check now** and **Refresh access** controls verified the original user and the still-selected archive after reconnect. The native Outbox showed why all four original actions were held. The trace contained four authenticated reads and no mutation or offline traffic. The earlier run preserved the same work but timed out while the connection was still Checking. [Both native runs and exact action and request hashes](evidence/sprint-09/repository-hold-native.json)
+
 The native commands used `cargo xtask test e2e --suite full --case <case> --binary <binary-path> --seed 12345 --report-dir <report-dir>`. These runs used the local synthetic GitHub provider. [Native Windows receipts](evidence/sprint-09/native-verification.json) · [Sprint requirements](../spec/sprints/sprint_09_merge_workflows.md)
 
 ### Sidebar count badges

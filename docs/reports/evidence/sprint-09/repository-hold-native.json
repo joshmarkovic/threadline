@@ -1,0 +1,67 @@
+{
+  "case": "S09-REPOSITORY-HOLD",
+  "acceptance": ["AC-67"],
+  "scope": "Windows development executables, the normal account and Outbox controls, an isolated protected fixture key, and authenticated loopback HTTP",
+  "fixture_revision": "s09-deselected-outbox-v1",
+  "package_version": "0.1.0",
+  "cargo_lock_sha256": "ba1fa2481ba47ebb082dae4aff8bf1a099cea5775b4196b096aeb3bb094d4efb",
+  "host": {"os": "Windows 11", "build": "22631.7652", "architecture": "x86_64", "dpi": 96},
+  "command": "xtask test e2e --suite full --case S09-REPOSITORY-HOLD --binary <binary-path> --seed 12345 --report-dir <report-dir>",
+  "runs": [
+    {
+      "run": "e2e-1795068014136-44360",
+      "source": "038c30509ad0bd39480954db8313fe55635dc1c8",
+      "app_sha256": "94980b56a063e6e1b7cb5aa6363c38d700869aa07911d68dadc48ec6f61e3b93",
+      "app_bytes": 45989376,
+      "status": "Fail",
+      "exit_code": 1,
+      "native_actions": 8,
+      "provider_requests": 0,
+      "observed": "The app removed the original repository in Work Offline, preserved all four snapshots, and restored both cached panes in a new process. The saved settings returned online with dispatch unpaused and zero eligible actions. The connection stayed Checking until the driver's wait expired. The trace contains no network request.",
+      "raw_sha256": {
+        "result.json": "ed558fec517f56e034ffeeb7821b68a3ec650056d77bed2b60334f644f78ad9c",
+        "scope-hold-native.json": "3f764f22d15b3e13810a866b71813e5ca7c986ea79dd6229e2a2d40ef0165e35",
+        "scope-hold-before-restart.json": "3debbefef36f23388f7a9bdbe9af7c72238a96de9d87847c6ce34e7087b04d5d",
+        "scope-hold-restart-observation.json": "a170ecf84034c61fcfdf30259ac69a6c6f2a23c674bfd9dff3ee158fb212bec7",
+        "github-access-trace.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "native-lifecycle-cleanup.json": "dcc7ae0c8264f6549354d6538beeaee578907fc1047dfd466e0a5383b3db1580"
+      }
+    },
+    {
+      "run": "e2e-1795068546937-7268",
+      "app_source": "c8f241294e2420a827cd09e006ba1b0e8ab05dd1",
+      "runner_and_driver_source": "2c9ec5f710967caf27d17563514af1fd6bfc200b",
+      "app_sha256": "915f528d63723235dbda434a5fe214edb67c7efdb4a96cd29ef9931c84194c1a",
+      "app_bytes": 46011392,
+      "status": "Pass",
+      "exit_code": 0,
+      "native_actions": 24,
+      "started_at_unix_ms": 1795068546936,
+      "finished_at_unix_ms": 1795068624054,
+      "provider_requests": 4,
+      "requests_while_offline": 0,
+      "mutation_requests": 0,
+      "test_fixture_user_id": 41,
+      "original_repository_provider_id": 71,
+      "retained_selected_repository_provider_id": 72,
+      "stable_submission_states": [
+        {"kind": "Comment", "original_number": 11, "state": "NeedsAttention", "preflight_attempts": 1, "transport_starts": 0},
+        {"kind": "EditIssue", "original_number": 1, "state": "Queued", "preflight_attempts": 0, "transport_starts": 0},
+        {"kind": "Review", "original_number": 3, "state": "Queued", "preflight_attempts": 0, "transport_starts": 0},
+        {"kind": "Merge", "original_number": 12, "state": "Queued", "preflight_attempts": 0, "transport_starts": 0}
+      ],
+      "protected_fixture_key_removed": true,
+      "observed": "After the offline restart, the normal Sync Check now and Account Refresh verified the original user and only the selected archive. The four native Outbox inspections kept the original repository and item and showed the repository-selection hold. SQLite kept their original payload digests, attempt counts and the four unsent drafts.",
+      "raw_sha256": {
+        "result.json": "0b715a02e7b6d9a6890fea43130a712200505b395ae387af3d4ff33ab47ba4ac",
+        "scope-hold-native.json": "447abbc43f1ed1a9f07f4213aaa06536476e7484c1f335230cabbbebd06dedea",
+        "scope-hold-before-restart.json": "3debbefef36f23388f7a9bdbe9af7c72238a96de9d87847c6ce34e7087b04d5d",
+        "scope-hold-restart-observation.json": "0dbebcdd10984b38736c9338a1293b443fec9247f92a02644f1c44918061cec9",
+        "scope-hold-after-reconnect.json": "7e08f8e77dbcf5096f16ff7da8c3046c6ba93408ae5c84db24140fbad47b1f28",
+        "github-access-trace.json": "febd20406f9f330dcd6464b4a303b7b9330d3a94b20b0163879ecb145426edae",
+        "native-lifecycle-cleanup.json": "dcc7ae0c8264f6549354d6538beeaee578907fc1047dfd466e0a5383b3db1580"
+      }
+    }
+  ],
+  "related_receipts": ["native-verification.json", "../sprint-12/native-lifecycle-v2.json"]
+}
