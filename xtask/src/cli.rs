@@ -399,6 +399,7 @@ fn known_case(lane: Lane, case: &str) -> bool {
                     | "S09-REPOSITORY-HOLD"
                     | "S12-PANE-POSITIONS"
                     | "S12-PANE-LIFECYCLE"
+                    | "S12-DISPLAY-TIMEZONE"
             )
             | (Lane::E2e, "S05-WINDOWS-SYNC" | "S05-WINDOWS-RATE-LIMIT")
             | (Lane::E2e, "S06-SHARED-PR-PANES")

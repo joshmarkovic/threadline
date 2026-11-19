@@ -16,6 +16,9 @@ pub fn scenario_ids() -> impl Iterator<Item = &'static str> {
 }
 
 pub fn fixture_revision(case: &str) -> Option<&'static str> {
+    if case == "S12-DISPLAY-TIMEZONE" {
+        return Some("s12-display-timezone-v1");
+    }
     if case == "S12-CACHED-COMMENT-LINKS" {
         return Some("s12-cached-comment-links-v1");
     }
@@ -313,6 +316,7 @@ pub fn associations(case: &str) -> Associations {
             "WORKSPACE-01;WORKSPACE-02;WORKSPACE-04;WORKSPACE-07;CACHE-13;TEST-04",
             "AC-43;AC-46",
         ),
+        "S12-DISPLAY-TIMEZONE" => ("DATA-02;TEST-04", ""),
         _ => catalog_associations(case).unwrap_or_default(),
     };
     Associations {

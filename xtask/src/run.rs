@@ -623,7 +623,10 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
                 Some(NativeMode::WindowsReaderResume)
             } else if matches!(
                 id,
-                "S12-PANE-POSITIONS" | "S12-PANE-LIFECYCLE" | "S12-CACHED-COMMENT-LINKS"
+                "S12-PANE-POSITIONS"
+                    | "S12-PANE-LIFECYCLE"
+                    | "S12-CACHED-COMMENT-LINKS"
+                    | "S12-DISPLAY-TIMEZONE"
             ) {
                 Some(NativeMode::WindowsReaderOffline)
             } else if id == "S05-WINDOWS-RATE-LIMIT" {
@@ -898,6 +901,7 @@ fn native_driver(
         NativeMode::WindowsReaderOffline if id == "S12-CACHED-COMMENT-LINKS" => {
             Some("CachedCommentLinks")
         }
+        NativeMode::WindowsReaderOffline if id == "S12-DISPLAY-TIMEZONE" => Some("DisplayTimeZone"),
         NativeMode::WindowsReaderOffline => Some("Offline"),
         NativeMode::WindowsReaderResume if id == "S12-HISTORICAL-READER" => Some("Historical"),
         NativeMode::WindowsReaderResume if id == "S06-READER-CURSOR-RECOVERY" => {
@@ -1051,6 +1055,9 @@ fn native_driver(
         }
         NativeMode::WindowsReaderOffline if id == "S12-CACHED-COMMENT-LINKS" => {
             "cached-comment-links-native.json"
+        }
+        NativeMode::WindowsReaderOffline if id == "S12-DISPLAY-TIMEZONE" => {
+            "display-timezone-native.json"
         }
         NativeMode::WindowsReaderOffline | NativeMode::WindowsReaderResume => "reader-native.json",
         NativeMode::WindowsReaderPerformance => "reader-performance.json",

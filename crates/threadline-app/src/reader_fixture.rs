@@ -12,6 +12,7 @@ use threadline_storage::{
 };
 
 mod comment_links;
+mod display_time_zone;
 mod mixed;
 mod panes;
 mod recovery;
@@ -23,6 +24,7 @@ enum ReaderFixture {
     Backlog,
     PanePositions,
     CommentLinks,
+    DisplayTimeZone,
 }
 
 pub fn run() -> Option<Result<(), String>> {
@@ -50,6 +52,7 @@ pub fn run() -> Option<Result<(), String>> {
                     Some("section-16-backlog") => ReaderFixture::Backlog,
                     Some("small-pane-positions") => ReaderFixture::PanePositions,
                     Some("small-comment-links") => ReaderFixture::CommentLinks,
+                    Some("small-display-timezone") => ReaderFixture::DisplayTimeZone,
                     _ => {
                         return Err("Select a known isolated reader fixture.".to_owned());
                     }
@@ -244,9 +247,10 @@ fn seed_profile(
         .map_err(|_| "Could not create the reader fixture report.")?;
     let store = Store::open_profile(&profile).map_err(|error| error.to_string())?;
     let fixture = match variant {
-        ReaderFixture::Small | ReaderFixture::PanePositions | ReaderFixture::CommentLinks => {
-            populate_reader(&store, seed, Scale::Small)
-        }
+        ReaderFixture::Small
+        | ReaderFixture::PanePositions
+        | ReaderFixture::CommentLinks
+        | ReaderFixture::DisplayTimeZone => populate_reader(&store, seed, Scale::Small),
         ReaderFixture::Section16 => populate_reader(&store, seed, Scale::Section16),
         ReaderFixture::Backlog => populate_large_workspace(&store, seed),
     }
@@ -261,6 +265,10 @@ fn seed_profile(
     };
     let comment_links = matches!(variant, ReaderFixture::CommentLinks)
         .then(|| comment_links::seed(&store, &fixture))
+        .transpose()
+        .map_err(|error| error.to_string())?;
+    let display_time_zone = matches!(variant, ReaderFixture::DisplayTimeZone)
+        .then(|| display_time_zone::seed(&store, &fixture))
         .transpose()
         .map_err(|error| error.to_string())?;
     let unresolved = store
@@ -287,6 +295,7 @@ fn seed_profile(
         "fixture_revision": match variant {
             ReaderFixture::PanePositions => "s12-pane-positions-v1",
             ReaderFixture::CommentLinks => "s12-cached-comment-links-v1",
+            ReaderFixture::DisplayTimeZone => "s12-display-timezone-v1",
             _ => fixture.revision,
         },
         "seed": seed,
@@ -296,6 +305,7 @@ fn seed_profile(
             ReaderFixture::Backlog => "section-16-backlog",
             ReaderFixture::PanePositions => "small-pane-positions",
             ReaderFixture::CommentLinks => "small-comment-links",
+            ReaderFixture::DisplayTimeZone => "small-display-timezone",
         },
         "account_id": fixture.account.0,
         "repository_id": fixture.repository.0,
@@ -321,6 +331,9 @@ fn seed_profile(
         receipt["items"] = comment_links["cached_items"].clone();
         receipt["comments"] = comment_links["cached_comments"].clone();
         receipt["comment_links"] = comment_links;
+    }
+    if let Some(display_time_zone) = display_time_zone {
+        receipt["display_time_zone"] = display_time_zone;
     }
     let mut output = BufWriter::new(report);
     serde_json::to_writer_pretty(&mut output, &receipt)
