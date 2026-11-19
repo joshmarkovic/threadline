@@ -1,4 +1,12 @@
 # Invoked after verifying the app, helper, registered shortcut, shell identity and owned profile.
+function Get-ForegroundBranchApp {
+    $root = Get-OwnedWindow $child
+    if ($null -eq $root) { return [IntPtr]::Zero }
+    $handle = $child.MainWindowHandle
+    if ($root.Current.ProcessId -eq $child.Id -and [IntPtr]$root.Current.NativeWindowHandle -eq $handle -and
+        $handle -ne [IntPtr]::Zero -and [ThreadlineWinInput]::GetForegroundWindow() -eq $handle) { return $handle }
+    return [IntPtr]::Zero
+}
 function Test-InstalledWatchedBranch {
     $initial = Read-Fixture seed-watched
     $base = 'a' * 40
@@ -27,16 +35,29 @@ function Test-InstalledWatchedBranch {
     })
     if ($matching.Count -ne 1) { Stop-Blocked 'Another test-sender card has the same text.' }
     Add-Evidence 'Verify the single native card and its durable watched-branch destination' $delivery
-    $script:focusForm = New-Object Windows.Forms.Form
-    $focusForm.Text = 'Threadline watched branch test'
-    $focusForm.Width = 320
-    $focusForm.Height = 100
-    $focusForm.Show()
-    $focusForm.Activate()
-    [Windows.Forms.Application]::DoEvents()
-    if ([ThreadlineWinInput]::GetForegroundWindow() -ne $focusForm.Handle) { Stop-Blocked 'The owned test form did not receive foreground.' }
-    [ThreadlineWinInput]::TargetWindow = $focusForm.Handle
-    if (!(Invoke-FixtureCenterClick $focusForm.Handle -InvokeOnly)) { Stop-Blocked 'The signed shell did not offer default Invoke for the unique fixture card.' }
+    $origin = Get-ForegroundBranchApp
+    $report.foreground_owner = 'installed app'
+    if ($origin -eq [IntPtr]::Zero) {
+        $script:focusForm = New-Object Windows.Forms.Form
+        $focusForm.Text = 'Threadline watched branch test'
+        $focusForm.Width = 320
+        $focusForm.Height = 100
+        $focusForm.Show()
+        $focusForm.Activate()
+        [Windows.Forms.Application]::DoEvents()
+        if ([ThreadlineWinInput]::GetForegroundWindow() -eq $focusForm.Handle) {
+            $origin = $focusForm.Handle
+            $report.foreground_owner = 'owned fixture form'
+        } else {
+            $origin = Get-ForegroundBranchApp
+        }
+    }
+    if ($origin -eq [IntPtr]::Zero) {
+        $report.foreground_owner = 'neither fixture window'
+        Stop-Blocked 'Neither the verified installed window nor the owned test form has foreground.'
+    }
+    [ThreadlineWinInput]::TargetWindow = $origin
+    if (!(Invoke-FixtureCenterClick $origin -InvokeOnly)) { Stop-Blocked 'The signed shell did not offer default Invoke for the unique fixture card.' }
     $label = 'Direct comparison ' + [char]0x00b7 + ' ' + $base + ' ' + [char]0x2192 + ' ' + $head
     $null = Wait-Activity 'the full base and head in the installed history view' {
         $control = Find-OwnedId (Get-OwnedWindow $child) $child.Id 'history-comparison-mode'
