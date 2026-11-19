@@ -13,6 +13,37 @@ use threadline_storage::{
 pub(crate) mod diff_preparation;
 
 #[gpui_kit::test]
+fn ui_003_cached_timestamp_exports_its_static_text_to_accessibility(cx: &mut TestAppContext) {
+    let setup = ReaderHarness::seeded();
+    let layout = setup
+        .store
+        .workspace(setup.fixture.account)
+        .unwrap()
+        .unwrap();
+    setup.one_pane(&layout.panes[0].tabs[0]);
+    let profile = tempfile::tempdir().unwrap();
+    let clock = crate::display_time::DisplayClock::open(Some(profile.path()))
+        .unwrap()
+        .save("America/New_York")
+        .unwrap();
+    cx.update(|cx| cx.set_global(clock));
+    let (window, _reader) = setup.open(cx);
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        let times = window.find("reader-item-times-0");
+        assert!(times.visible());
+        assert_eq!(times.role(), Some(gpui_kit::Role::Label));
+        assert_eq!(
+            times.value(),
+            Some(
+                "fixture-author · Created not yet recorded · Updated 2023-11-14 17:13 EST (-05:00)"
+            )
+        );
+    })
+    .unwrap();
+}
+
+#[gpui_kit::test]
 fn ui_008_inactive_tab_labels_restore_and_follow_cached_title_updates(cx: &mut TestAppContext) {
     let setup = ReaderHarness::seeded();
     let account = setup.fixture.account;

@@ -2053,8 +2053,9 @@ pub(super) fn item_metadata(
             div()
                 .id(format!("reader-item-times-{pane}"))
                 .accessibility_id(format!("reader-item-times-{pane}"))
+                .test_support()
                 .role(Role::Label)
-                .aria_label(times.clone())
+                .aria_value(times.clone())
                 .child(times),
         )
         .child(format!(
