@@ -187,6 +187,63 @@ fn respond(
     target == "/user"
 }
 
+fn exact_pair_reply(target: &str) -> Option<serde_json::Value> {
+    use serde_json::json;
+    let oid = |digit: char| digit.to_string().repeat(40);
+    let object = |path, mode, kind, digit, size| {
+        json!({
+            "path":path,"mode":mode,"type":kind,"sha":oid(digit),"size":size
+        })
+    };
+    let blob = |digit, size, content| {
+        json!({
+            "sha":oid(digit),"size":size,"encoding":"base64","content":content
+        })
+    };
+    let response = if target
+        == format!(
+            "/repositories/73/compare/{}...{}?per_page=20&page=1",
+            oid('b'),
+            oid('d')
+        ) {
+        json!({"base_commit":{"sha":oid('b')},"merge_base_commit":{"sha":oid('a')},"files":[{
+            "filename":"three-dot-only.txt","status":"added","additions":1,"deletions":0,"patch":"@@ -0,0 +1 @@\n+Different scope"
+        }]})
+    } else if target == format!("/repositories/73/git/commits/{}", oid('b')) {
+        json!({"sha":oid('b'),"tree":{"sha":oid('0')}})
+    } else if target == format!("/repositories/73/git/commits/{}", oid('d')) {
+        json!({"sha":oid('d'),"tree":{"sha":oid('1')}})
+    } else if target == format!("/repositories/73/git/trees/{}", oid('0')) {
+        json!({"sha":oid('0'),"truncated":false,"tree":[
+            object("note.txt","100644","blob",'2',Some(5)),
+            object("removed.txt","100644","blob",'2',Some(5)),
+            object("shared","040000","tree",'6',None),
+            object("src","040000","tree",'7',None)
+        ]})
+    } else if target == format!("/repositories/73/git/trees/{}", oid('1')) {
+        json!({"sha":oid('1'),"truncated":false,"tree":[
+            object("note.txt","100644","blob",'3',Some(6)),
+            object("binary.bin","100644","blob",'4',Some(3)),
+            object("capped.bin","100644","blob",'5',Some(100000)),
+            object("shared","040000","tree",'6',None),
+            object("src","040000","tree",'8',None)
+        ]})
+    } else if target == format!("/repositories/73/git/trees/{}", oid('7')) {
+        json!({"sha":oid('7'),"truncated":false,"tree":[object("unknown.txt","100644","blob",'2',Some(5))]})
+    } else if target == format!("/repositories/73/git/trees/{}", oid('8')) {
+        json!({"sha":oid('8'),"truncated":true,"tree":[]})
+    } else if target == format!("/repositories/73/git/blobs/{}", oid('2')) {
+        blob('2', 5, "bGVmdAo=")
+    } else if target == format!("/repositories/73/git/blobs/{}", oid('3')) {
+        blob('3', 6, "cmlnaHQK")
+    } else if target == format!("/repositories/73/git/blobs/{}", oid('4')) {
+        blob('4', 3, "AHh5")
+    } else {
+        return None;
+    };
+    Some(response)
+}
+
 fn reader_reply(
     target: &str,
     private: &str,
@@ -212,6 +269,16 @@ fn reader_reply(
         })
     };
     let success = |data: serde_json::Value| ("200 OK", String::new(), data.to_string());
+    if let Some(response) = exact_pair_reply(target) {
+        if page_two && target == format!("/repositories/73/git/blobs/{}", "3".repeat(40)) {
+            return Some((
+                "403 Forbidden",
+                String::new(),
+                json!({"message":"Fixture contents denied"}).to_string(),
+            ));
+        }
+        return Some(success(response));
+    }
     if target == "/repos/fixture-org/private/issues/12" {
         return Some(success(
             json!({"id":120,"node_id":"I_12","number":12,"title":"Linked issue","body":"Context fixture",
@@ -1525,4 +1592,158 @@ fn wait_form(
         thread::sleep(Duration::from_millis(10));
     }
     panic!("The account form did not finish the isolated identity check");
+}
+
+#[tokio::test]
+async fn divergent_pair_uses_exact_trees_and_preserves_bounded_patch_evidence() {
+    use crate::reader::{ReaderError, ReaderService};
+    use threadline_storage::{
+        history::{ComparisonOptions, HistoryCoverage, HistoryEntry, HistoryRef},
+        pr::{PatchEvidence, PrRecord},
+        resources::{CommitOid, ComparisonMode, GraphCommit},
+    };
+    let fixture = Simulator::start_with_reader(true);
+    let dir = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open_profile(dir.path()).unwrap());
+    let accounts = AccountService {
+        store: store.clone(),
+        credentials: Arc::new(FixtureVault::default()),
+        github: GitHubClient::loopback(fixture.address).unwrap(),
+        fixture: true,
+    };
+    let cancel = Cancellation::new();
+    let connected = accounts
+        .execute(
+            AccountCommand::Connect {
+                repository: "fixture-org/private".into(),
+                pat: Pat::from_input("threadline-test-fixture".into()),
+                renew: None,
+            },
+            &cancel,
+        )
+        .await;
+    assert!(connected.github_error.is_none());
+    let account = connected.view.active.unwrap();
+    let repo = connected
+        .view
+        .repositories
+        .iter()
+        .find(|repo| repo.name == "public")
+        .unwrap()
+        .clone();
+    let repository = repo.id;
+    let selected = accounts
+        .execute(
+            AccountCommand::Select {
+                profile: connected.view.profiles[0].clone(),
+                repository: repo,
+            },
+            &cancel,
+        )
+        .await;
+    assert!(selected.github_error.is_none());
+    let profile = &selected.view.profiles[0];
+    let oid = |digit: char| CommitOid::parse(&digit.to_string().repeat(40)).unwrap();
+    for (reference, tip) in [("left", oid('b')), ("right", oid('d'))] {
+        let reference = HistoryRef::Branch(reference.into());
+        store
+            .observe_history_ref(profile, repository, &reference, Some(&tip), 10)
+            .unwrap();
+        let walk = store
+            .begin_history_page(profile, repository, &reference)
+            .unwrap()
+            .unwrap();
+        store
+            .commit_history_page(
+                &walk,
+                &[HistoryEntry {
+                    commit: GraphCommit {
+                        oid: tip,
+                        title: "Fixture endpoint".into(),
+                        committed_at_ms: 5,
+                        parents: vec![],
+                    },
+                    message: "Fixture endpoint".into(),
+                    author: None,
+                    authored_at_ms: None,
+                }],
+                None,
+                true,
+                11,
+            )
+            .unwrap();
+    }
+    let comparison = store
+        .comparison_between(
+            account,
+            repository,
+            &oid('b'),
+            &oid('d'),
+            ComparisonMode::Direct,
+            ComparisonOptions {
+                ignore_whitespace: false,
+                context_lines: 3,
+            },
+        )
+        .unwrap();
+    let before = fixture.requests.load(Ordering::Relaxed);
+    let reader = ReaderService::new(accounts);
+    let result = reader
+        .fetch_history_diff(&comparison, &cancel)
+        .await
+        .unwrap();
+    assert!(result.contacted && !result.complete && !result.has_more);
+    let result = store
+        .history_diff_page(account, &comparison, None, 10)
+        .unwrap();
+    assert_eq!(result.coverage, HistoryCoverage::Limited);
+    let files: Vec<_> = result
+        .files
+        .iter()
+        .filter_map(|row| match &row.record {
+            PrRecord::File {
+                path,
+                status,
+                previous_path,
+                patch,
+                ..
+            } => {
+                assert!(previous_path.is_none());
+                Some((path.as_str(), status.as_str(), patch))
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(files.len(), 4);
+    assert_eq!(files[0], ("binary.bin", "added", &PatchEvidence::Binary));
+    assert_eq!(files[1], ("capped.bin", "added", &PatchEvidence::ApiCapped));
+    assert!(
+        matches!(files[2], ("note.txt", "modified", PatchEvidence::Text(patch)) if patch.contains("-left\n+right\n"))
+    );
+    assert!(
+        matches!(files[3], ("removed.txt", "removed", PatchEvidence::Text(patch)) if patch.contains("-left\n"))
+    );
+    let total = fixture.requests.load(Ordering::Relaxed) - before;
+    assert_eq!(total, 13);
+
+    store
+        .retry_limited_history_diff(profile, &comparison)
+        .unwrap();
+    fixture.page_two_ready.store(true, Ordering::Relaxed);
+    assert!(
+        matches!(reader.fetch_history_diff(&comparison, &cancel).await,
+        Err(ReaderError::Remote(error)) if error.kind == AccessKind::PermissionDenied)
+    );
+    let retained = store
+        .history_diff_page(account, &comparison, None, 10)
+        .unwrap();
+    let prior: Vec<_> = result.files.iter().map(|row| &row.record).collect();
+    assert_eq!(
+        retained
+            .files
+            .iter()
+            .map(|row| &row.record)
+            .collect::<Vec<_>>(),
+        prior
+    );
 }

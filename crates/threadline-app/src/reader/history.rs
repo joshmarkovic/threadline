@@ -1,4 +1,5 @@
 use super::*;
+mod exact;
 use threadline_core::github::reader::{
     history::{HistoryCommit, HistoryDiff, HistoryFiles, HistoryRefKind, HistoryTagObject},
     refresh::Refresh,
@@ -248,27 +249,48 @@ impl ReaderService {
         }
         let bound = self.binding(&scope, cancel).await?;
         self.admit(account, cancel).await?;
-        let HistoryFiles {
-            effective_base,
-            page,
-        } = self
-            .history_value(
-                account,
-                bound.reader().history_files(query, page, cancel).await,
-            )
-            .await?;
+        let reader = bound.reader();
+        let fetched = self
+            .history_value(account, reader.history_files(query, page, cancel).await)
+            .await;
         self.check_scope(&scope, cancel)?;
-        let effective_base = effective_base
-            .as_deref()
-            .map(CommitOid::parse)
-            .transpose()?;
-        let next = if page.limited { None } else { page.next_page };
+        let exact_pair = matches!(comparison, HistoryComparison::Pair { .. })
+            && identity.semantics == DiffSemantics::Direct
+            && match &fetched {
+                Ok(files) => files.effective_base.is_none(),
+                Err(ReaderError::Remote(error)) => error.kind == AccessKind::MissingOrInaccessible,
+                _ => false,
+            };
+        let (effective_base, records, next, limited) = if exact_pair {
+            let base = base.ok_or(ReaderError::InvalidIdentity)?;
+            let exact = exact::Objects {
+                service: self,
+                scope: &scope,
+                reader,
+                cancel,
+            }
+            .compare(base, head)
+            .await?;
+            (identity.base.clone(), exact.records, None, exact.limited)
+        } else {
+            let HistoryFiles {
+                effective_base,
+                page,
+            } = fetched?;
+            let effective_base = effective_base
+                .as_deref()
+                .map(CommitOid::parse)
+                .transpose()?;
+            let next = if page.limited { None } else { page.next_page };
+            let records = page
+                .records
+                .into_iter()
+                .map(pr_reads::convert::file)
+                .collect();
+            (effective_base, records, next, page.limited)
+        };
+        self.check_scope(&scope, cancel)?;
         let cursor = next.map(|next| next.to_string());
-        let records = page
-            .records
-            .into_iter()
-            .map(pr_reads::convert::file)
-            .collect();
         self.store.commit_history_diff_page(
             &walk,
             HistoryDiffInput {
@@ -276,11 +298,11 @@ impl ReaderService {
                 effective_base: effective_base.as_ref(),
                 files: records,
                 next_cursor: cursor.as_deref(),
-                complete: next.is_none() && !page.limited,
+                complete: next.is_none() && !limited,
                 observed_at_ms: UtcMillis::now()?.0,
             },
         )?;
-        Ok(PageStatus::from_next(next, page.limited))
+        Ok(PageStatus::from_next(next, limited))
     }
 
     async fn history_value<T>(

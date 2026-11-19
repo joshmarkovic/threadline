@@ -49,7 +49,10 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == "S10-HISTORY-MONITOR" {
         return Some("s10-history-monitor-v1");
     }
-    if matches!(case, "UT-016" | "S10-HISTORY-HTTP" | "E2E-011") {
+    if case == "E2E-011" {
+        return Some("s10-history-endpoints-v2");
+    }
+    if matches!(case, "UT-016" | "S10-HISTORY-HTTP") {
         return Some("s10-history-dag-v1");
     }
     if matches!(case, "IT-011" | "IT-013" | "UI-004" | "E2E-007" | "E2E-008") {

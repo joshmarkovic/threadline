@@ -64,19 +64,40 @@ function Invoke-HistoryProof([IntPtr]$Window, [string]$Profile) {
     }
     Click-AccountControl $Window 'history-file-0'
     $null = Wait-History 'the native direct comparison file' { param($history) $history.displayed_file -ceq 'pair.txt' }
+    Click-AccountControl $Window 'history-commit-2'
+    $null = Wait-History 'the independent second parent is now selected' {
+        param($history) $history.selected -ceq $secondParent
+    }
+    Click-AccountControl $Window 'history-compare-1'
+    $null = Wait-History 'the exact endpoints of a divergent two-commit comparison' {
+        param($history)
+        $history.comparison -ceq 'Pair' -and $history.comparison_base -ceq $firstParent -and
+            $history.comparison_head -ceq $secondParent
+    }
+    Click-AccountControl $Window 'history-fetch-comparison'
+    $null = Wait-History 'the exact trees and available blobs produced one complete endpoint patch' {
+        param($history) $history.comparison_coverage -ceq 'Complete' -and $history.files -eq 1
+    }
+    Click-AccountControl $Window 'history-file-0'
+    $null = Wait-History 'the divergent endpoint file is rendered' {
+        param($history) $history.displayed_file -ceq 'divergent.txt'
+    }
+    Add-Evidence 'Compare the two independent commits with exact cached Git objects' ([ordered]@{
+        base = $firstParent; head = $secondParent; file = 'divergent.txt'
+    })
     Set-WriteFixtureOffline $Window $true
     $restarted = Restart-Reader $Profile
     Click-AccountControl $restarted 'reader-repository-1'
     Click-AccountControl $restarted 'reader-history'
     $null = Wait-History 'the same cached comparison, file, and branch ancestry on offline restart' {
         param($history, $reader)
-        $reader.offline -and $history.commits -eq 3 -and $history.selected -ceq $head -and
+        $reader.offline -and $history.commits -eq 3 -and $history.selected -ceq $secondParent -and
             $history.comparison -ceq 'Pair' -and $history.comparison_base -ceq $firstParent -and
-            $history.comparison_head -ceq $head -and $history.displayed_file -ceq 'pair.txt'
+            $history.comparison_head -ceq $secondParent -and $history.displayed_file -ceq 'divergent.txt'
     }
     Add-Evidence 'Preserve the exact two-commit comparison and selected file offline after restart' ([ordered]@{
-        base = $firstParent; head = $head; file = 'pair.txt'; offline = $true
+        base = $firstParent; head = $secondParent; file = 'divergent.txt'; offline = $true
     })
     Stop-ThroughUi
-    $script:report.detail = 'Native history followed the exact immutable continuation, opened a labeled merge parent and restored a separate exact two-commit comparison after an offline restart.'
+    $script:report.detail = 'Native history followed the exact immutable continuation, opened a labeled merge parent and restored an exact divergent comparison after an offline restart.'
 }

@@ -10,6 +10,9 @@ use crate::github::access::response::RequestMode;
 use serde::Deserialize;
 use std::num::NonZeroU64;
 
+mod objects;
+pub use objects::*;
+
 #[derive(Clone, Copy)]
 pub enum HistoryRefKind {
     Branch,

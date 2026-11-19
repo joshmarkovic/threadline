@@ -160,6 +160,8 @@ enum Route {
     HistoryOlder,
     HistoryParentDiff,
     HistoryPairDiff,
+    HistoryDivergentPair,
+    HistoryExactObject(history::ExactObject),
     CommentCreated,
     CommentReplyLost,
     BacklogIssue,

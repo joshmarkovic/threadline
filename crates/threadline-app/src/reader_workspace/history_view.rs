@@ -113,6 +113,7 @@ pub(crate) struct HistoryObservation {
     pub comparison: Option<&'static str>,
     pub comparison_base: Option<String>,
     pub comparison_head: Option<String>,
+    pub comparison_coverage: Option<String>,
     pub parent: Option<usize>,
     pub files: usize,
     pub displayed_file: Option<String>,
@@ -153,6 +154,7 @@ impl HistoryState {
                 .and_then(|(_, page)| page.identity.base.as_ref())
                 .map(|oid| oid.as_str().to_owned()),
             comparison_head: comparison.map(|(_, page)| page.identity.head.as_str().to_owned()),
+            comparison_coverage: comparison.map(|(_, page)| format!("{:?}", page.coverage)),
             parent,
             files: comparison.map_or(0, |(_, page)| page.files.len()),
             displayed_file: self.diff.as_ref().map(|diff| diff.path.clone()),

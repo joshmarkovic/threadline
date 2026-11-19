@@ -242,3 +242,128 @@ async fn pinned_history_resumes_by_commit_and_never_relabels_a_three_dot_result(
             .all(|row| row.matched && row.authorization_sent && row.versioned)
     );
 }
+
+#[tokio::test]
+async fn immutable_object_reads_are_shallow_and_reject_mismatched_or_truncated_evidence() {
+    let sim = Simulator::start().await;
+    let cancel = CancellationToken::new();
+    sim.enqueue(
+        Method::GET,
+        "/user",
+        reply(json!({"id":41,"login":"fixture-user"})),
+    );
+    sim.enqueue(
+        Method::GET,
+        "/repos/fixture-org/private",
+        reply(json!({
+            "id":71,"node_id":"R_71","name":"private","private":true,"owner":{"login":"fixture-org"}
+        })),
+    );
+    let session = Arc::new(
+        GitHubClient::loopback(sim.address)
+            .unwrap()
+            .authenticate(
+                SecretToken::fixture(),
+                OwnerScope::new("fixture-org").unwrap(),
+                NonZeroU64::new(41),
+                &cancel,
+            )
+            .await
+            .unwrap(),
+    );
+    let (bound, _) = session
+        .bind_reader(
+            &RepositoryName::new("fixture-org", "private").unwrap(),
+            71.try_into().unwrap(),
+            &cancel,
+        )
+        .await
+        .unwrap();
+    let reader = bound.reader();
+    let commit = format!("/repositories/71/git/commits/{HEAD}");
+    let tree = format!("/repositories/71/git/trees/{COMMON}");
+    let blob = format!("/repositories/71/git/blobs/{TAG}");
+    sim.enqueue(
+        Method::GET,
+        &commit,
+        reply(json!({"sha":HEAD,"tree":{"sha":COMMON,"url":"https://ignored.example/"}})),
+    );
+    assert_eq!(
+        reader
+            .history_commit_tree(HEAD, &cancel)
+            .await
+            .unwrap()
+            .value
+            .as_deref(),
+        Some(COMMON)
+    );
+    sim.enqueue(
+        Method::GET,
+        &tree,
+        reply(json!({"sha":COMMON,"truncated":false,"tree":[
+            {"path":"exact.txt","mode":"100644","type":"blob","size":3,"sha":TAG}
+        ]})),
+    );
+    let entries = reader
+        .history_tree(COMMON, &cancel)
+        .await
+        .unwrap()
+        .value
+        .unwrap();
+    assert!(!entries.truncated);
+    assert_eq!(entries.entries["exact.txt"].oid, TAG);
+    sim.enqueue(
+        Method::GET,
+        &tree,
+        reply(json!({"sha":COMMON,"truncated":true,"tree":[
+            {"path":"exact.txt","mode":"100644","type":"blob","size":3,"sha":TAG}
+        ]})),
+    );
+    let limited = reader
+        .history_tree(COMMON, &cancel)
+        .await
+        .unwrap()
+        .value
+        .unwrap();
+    assert!(limited.truncated && limited.entries.is_empty());
+    sim.enqueue(
+        Method::GET,
+        &tree,
+        reply(json!({"sha":BASE,"truncated":false,"tree":[]})),
+    );
+    assert!(
+        matches!(reader.history_tree(COMMON, &cancel).await, Err(error) if error.kind == AccessKind::IdentityMismatch)
+    );
+    sim.enqueue(
+        Method::GET,
+        &blob,
+        reply(json!({"sha":TAG,"size":3,"encoding":"base64","content":"eHkK\n"})),
+    );
+    assert_eq!(
+        reader
+            .history_blob(TAG, 3, &cancel)
+            .await
+            .unwrap()
+            .value
+            .as_deref(),
+        Some(b"xy\n".as_slice())
+    );
+    sim.enqueue(
+        Method::GET,
+        &blob,
+        reply(json!({"sha":TAG,"size":3,"encoding":"base64","content":"eA=="})),
+    );
+    assert!(
+        matches!(reader.history_blob(TAG, 3, &cancel).await, Err(error) if error.kind == AccessKind::IdentityMismatch)
+    );
+    assert!(
+        matches!(reader.history_blob(TAG, 100_000, &cancel).await, Err(error) if error.kind == AccessKind::WrongScope)
+    );
+    let observations = sim.take_observations();
+    assert_eq!(observations.len(), 8);
+    assert!(
+        observations
+            .iter()
+            .all(|row| row.matched && row.versioned && row.authorization_sent)
+    );
+}
