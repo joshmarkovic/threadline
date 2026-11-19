@@ -179,8 +179,7 @@ impl Store {
                 WriteFailure::InvalidInput => ("mutation_invalid_input", true, None),
                 WriteFailure::Ambiguous => unreachable!(),
             };
-            let burst:u32=tx.query_row("SELECT COUNT(*) FROM operation_attempts WHERE account_id=? AND operation_id=?
-                        AND claimed_at >= COALESCE((SELECT retry_epoch FROM write_timing WHERE account_id=?),0)",params![account,id,account],|r|r.get(0))?;
+            let burst = super::control::attempts_in_burst(tx, &claim)?;
             let entropy = claim.operation_id().bytes().fold(attempt as u64, |v, b| {
                 v.wrapping_mul(31).wrapping_add(u64::from(b))
             });

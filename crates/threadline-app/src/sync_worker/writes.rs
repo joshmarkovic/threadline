@@ -37,15 +37,24 @@ pub(super) fn due(
         .min())
 }
 
+pub(super) enum Recovery {
+    Connectivity,
+    Credential,
+}
+
 pub(super) fn resume(
     store: &Store,
     account: AccountId,
     now: i64,
-) -> threadline_storage::Result<()> {
-    store.resume_writes(account, now)?;
-    store.resume_reviews(account, now)?;
-    store.resume_merges(account, now)?;
-    Ok(())
+    recovery: Recovery,
+) -> threadline_storage::Result<bool> {
+    let issues = match recovery {
+        Recovery::Connectivity => store.resume_writes(account, now)?,
+        Recovery::Credential => store.resume_writes_after_credential_repair(account, now)?,
+    };
+    let reviews = store.resume_reviews(account, now)?;
+    let merges = store.resume_merges(account, now)?;
+    Ok(issues > 0 || reviews > 0 || merges > 0)
 }
 
 pub(super) async fn execute(

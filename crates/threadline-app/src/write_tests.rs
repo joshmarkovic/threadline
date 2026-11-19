@@ -28,6 +28,12 @@ struct WriteFixture {
     server: Option<thread::JoinHandle<()>>,
 }
 
+#[derive(Default)]
+struct PreflightFault {
+    failing: AtomicBool,
+    attempts: AtomicUsize,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum MergeStage {
     Accepted,
@@ -52,6 +58,10 @@ impl WriteFixture {
     }
 
     fn with_merge_fault(fault: Option<MergeFault>) -> Self {
+        Self::with_faults(fault, None)
+    }
+
+    fn with_faults(fault: Option<MergeFault>, preflight: Option<Arc<PreflightFault>>) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         listener.set_nonblocking(true).unwrap();
         let address = listener.local_addr().unwrap();
@@ -62,7 +72,15 @@ impl WriteFixture {
             let merged = AtomicBool::new(false);
             while !stopping.load(Ordering::Acquire) {
                 match listener.accept() {
-                    Ok((stream, _)) => serve(stream, &writes, &merged, fault.as_ref()),
+                    Ok((stream, _)) => {
+                        serve(
+                            stream,
+                            &writes,
+                            &merged,
+                            fault.as_ref(),
+                            preflight.as_deref(),
+                        );
+                    }
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                         thread::sleep(Duration::from_millis(2))
                     }
@@ -96,6 +114,7 @@ fn serve(
     writes: &AtomicUsize,
     merged: &AtomicBool,
     fault: Option<&MergeFault>,
+    preflight: Option<&PreflightFault>,
 ) {
     stream.set_nonblocking(false).unwrap();
     stream
@@ -140,6 +159,17 @@ fn serve(
         ("GET", "/user") => ("200 OK", json!({"id":41,"login":"fixture-user"})),
         ("GET", "/repos/fixture-org/private") => ("200 OK", repo),
         ("GET", "/user/repos?per_page=100&page=1") => ("200 OK", json!([repo])),
+        ("GET", "/repos/fixture-org/private/issues/42")
+            if preflight.is_some_and(|fault| {
+                fault.attempts.fetch_add(1, Ordering::SeqCst);
+                fault.failing.load(Ordering::SeqCst)
+            }) =>
+        {
+            (
+                "503 Service Unavailable",
+                json!({"message": "Synthetic issue preflight unavailable"}),
+            )
+        }
         ("GET", "/repos/fixture-org/private/issues/42") => (
             "200 OK",
             json!({
@@ -631,6 +661,219 @@ async fn write_dispatch_uses_durable_offline_outbox_and_stops_after_lost_respons
     tokio::time::sleep(Duration::from_millis(1250)).await;
     assert_eq!(fixture.sent.load(Ordering::SeqCst), 2);
     assert_eq!(state(LOST), State::OutcomeUnknown);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn write_dispatch_exhausted_issue_write_survives_probes_and_resumes_the_original_after_reconnect()
+ {
+    use threadline_core::connectivity::ConnectionStatus;
+
+    const ID: &str = "60000000-0000-4000-8000-000000000064";
+    const BODY: &str = "confirmed fixture";
+    let fault = Arc::new(PreflightFault::default());
+    fault.failing.store(true, Ordering::SeqCst);
+    let fixture = WriteFixture::with_faults(None, Some(Arc::clone(&fault)));
+    let directory = tempfile::tempdir().unwrap();
+    let store = Arc::new(Store::open_profile(directory.path()).unwrap());
+    let accounts = AccountService {
+        store: Arc::clone(&store),
+        credentials: Arc::new(FixtureVault::default()),
+        github: GitHubClient::loopback(fixture.address).unwrap(),
+        fixture: true,
+    };
+    let connected = accounts
+        .execute(
+            AccountCommand::Connect {
+                repository: "fixture-org/private".into(),
+                pat: Pat::from_input("threadline-test-fixture".into()),
+                renew: None,
+            },
+            &Cancellation::new(),
+        )
+        .await;
+    assert!(connected.github_error.is_none());
+    let account = connected.view.active.unwrap();
+    let repository = connected.view.repositories[0].id;
+    store
+        .select_github_repository(account, repository, true)
+        .unwrap();
+    store
+        .update_sync_settings(account, |settings| {
+            settings.controls.pause_background = true;
+        })
+        .unwrap();
+    let item = store
+        .ingest(
+            account,
+            ItemLocator {
+                repository,
+                number: 42,
+            },
+            ItemUpdate {
+                representation: ItemRepresentation::Issue(IssueRecord {
+                    id: 55.try_into().unwrap(),
+                    node_id: None,
+                    classification: IssueClassification::Issue,
+                }),
+                remote_updated_at: UtcMillis(1_672_531_200_000),
+                title: Change::Value("Existing issue".into()),
+                body: Change::Null,
+                closed: Change::Value(false),
+            },
+        )
+        .unwrap();
+    let now = || UtcMillis::now().unwrap().0;
+    store
+        .submit_write(
+            account,
+            WriteSubmission {
+                id: ID,
+                item,
+                intent: &WriteIntent::CreateComment { body: BODY.into() },
+                draft: None,
+                dependencies: &[],
+                submitted_at_ms: now(),
+            },
+        )
+        .unwrap();
+    let operation = || store.operation(account, ID).unwrap().unwrap();
+    let original = operation().snapshot;
+    let db =
+        rusqlite::Connection::open(directory.path().join(threadline_storage::DATABASE_FILENAME))
+            .unwrap();
+    db.busy_timeout(Duration::from_secs(2)).unwrap();
+    let worker = SyncWorker::start_fixture(accounts.clone(), &tokio::runtime::Handle::current());
+    worker.wake(Some(ProbeTrigger::Startup));
+    for (attempt, delay) in [5_000, 15_000, 30_000, 60_000, 900_000]
+        .into_iter()
+        .enumerate()
+    {
+        let attempt = i64::try_from(attempt).unwrap() + 1;
+        let queued = tokio::time::timeout(Duration::from_secs(12), async {
+            loop {
+                let queued = operation();
+                if queued.attempt == attempt && queued.state == State::Queued {
+                    break queued;
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .unwrap();
+        let elapsed = now();
+        assert!((delay - 1_500..=delay + 500).contains(&(queued.retry_at - elapsed)));
+        assert_eq!(queued.snapshot, original);
+        assert_eq!(queued.original_number, 42);
+        assert_eq!(queued.original_repository, repository);
+        assert_eq!(fixture.sent.load(Ordering::SeqCst), 0);
+        assert_eq!(fault.attempts.load(Ordering::SeqCst), attempt as usize);
+        if attempt < 5 {
+            assert_eq!(queued.reason.as_deref(), Some("temporary_preflight"));
+            // The fixture advances only the real wait already asserted above. The normal worker
+            // still claims the persisted attempt, validates it over HTTP, and records the result.
+            assert_eq!(db.execute(
+                "UPDATE operations SET retry_at=?4 WHERE account_id=?1 AND id=?2 AND attempt=?3 AND state='queued'",
+                rusqlite::params![account.0, ID, attempt, elapsed],
+            ).unwrap(), 1);
+            worker.wake(None);
+        }
+    }
+    let exhausted = operation();
+    assert_eq!(exhausted.reason.as_deref(), Some("retry_burst_exhausted"));
+    drop(worker);
+
+    let worker = SyncWorker::start_fixture(accounts, &tokio::runtime::Handle::current());
+    let mut observations = worker.watch();
+    worker.wake(Some(ProbeTrigger::Startup));
+    let startup_probe = tokio::time::timeout(
+        Duration::from_secs(8),
+        observations.wait_for(|update| {
+            update.connection.status == ConnectionStatus::Reachable
+                && update.connection.reason.is_none()
+        }),
+    )
+    .await
+    .unwrap()
+    .unwrap()
+    .connection
+    .last_checked_ms
+    .unwrap();
+    worker.wake(Some(ProbeTrigger::CheckNow));
+    tokio::time::timeout(
+        Duration::from_secs(8),
+        observations.wait_for(|update| {
+            update.connection.status == ConnectionStatus::Reachable
+                && update
+                    .connection
+                    .last_checked_ms
+                    .is_some_and(|latest| latest > startup_probe)
+        }),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(operation(), exhausted);
+    assert_eq!(fault.attempts.load(Ordering::SeqCst), 5);
+    assert_eq!(fixture.sent.load(Ordering::SeqCst), 0);
+
+    store
+        .update_sync_settings(account, |settings| settings.controls.work_offline = true)
+        .unwrap();
+    worker.interrupt(None);
+    tokio::time::timeout(
+        Duration::from_secs(6),
+        observations.wait_for(|update| update.connection.status == ConnectionStatus::Offline),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(operation(), exhausted);
+    fault.failing.store(false, Ordering::SeqCst);
+    store
+        .update_sync_settings(account, |settings| settings.controls.work_offline = false)
+        .unwrap();
+    worker.interrupt(Some(ProbeTrigger::NetworkChanged));
+    let confirmed = tokio::time::timeout(Duration::from_secs(12), async {
+        loop {
+            let current = operation();
+            if current.state == State::Confirmed {
+                break current;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(confirmed.id, ID);
+    assert_eq!(confirmed.snapshot, original);
+    assert_eq!(confirmed.attempt, 6);
+    assert_eq!(confirmed.item, item);
+    assert_eq!(confirmed.original_number, 42);
+    assert_eq!(confirmed.original_repository, repository);
+    let previous_check = observations.borrow().connection.last_checked_ms;
+    worker.wake(Some(ProbeTrigger::CheckNow));
+    tokio::time::timeout(
+        Duration::from_secs(8),
+        observations.wait_for(|update| {
+            update.connection.status == ConnectionStatus::Reachable
+                && update.connection.last_checked_ms > previous_check
+        }),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(operation(), confirmed);
+    assert_eq!(fault.attempts.load(Ordering::SeqCst), 6);
+    assert_eq!(fixture.sent.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        store
+            .own_write(account, ID)
+            .unwrap()
+            .unwrap()
+            .remote_id
+            .get(),
+        92
+    );
 }
 
 #[cfg(feature = "e2e")]

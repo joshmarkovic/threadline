@@ -380,7 +380,8 @@ async fn run(
     let mut probe_retry = Duration::ZERO;
     let mut prefer_write = true;
     let mut next_write_family = 0;
-    let mut was_reachable = false;
+    let mut recovery_pending = false;
+    let mut checked_profiles = Vec::new();
     while !core.shutdown.is_cancelled() {
         digest = digest.wrapping_add(core.download_updates.swap(0, Ordering::AcqRel));
         let Ok(now) = UtcMillis::now() else {
@@ -424,13 +425,15 @@ async fn run(
                 bound = BoundReaders::default();
                 requested = Some(ProbeTrigger::Startup);
                 probe_retry = Duration::ZERO;
-                was_reachable = false;
+                recovery_pending = false;
+                checked_profiles.clear();
                 prefer_write = true;
                 next_write_family = 0;
             } else {
                 observer.set_offline(offline);
             }
         }
+        recovery_pending |= offline;
         publish(&core, &sender, Some(&local), digest, history_digest);
         let deadline = core
             .observer
@@ -448,12 +451,17 @@ async fn run(
                 .expect("connectivity observer")
                 .snapshot(elapsed)
                 .status;
-            let reachable = status == ConnectionStatus::Reachable;
-            if reachable && !was_reachable {
+            if checked_profiles != local.profiles {
                 let account = local.account;
-                let _ = blocking(&store, move |store| writes::resume(store, account, now)).await;
+                if let Ok(changed) = blocking(&store, move |store| {
+                    writes::resume(store, account, now, writes::Recovery::Credential)
+                })
+                .await
+                {
+                    checked_profiles.clone_from(&local.profiles);
+                    digest = digest.wrapping_add(u64::from(changed));
+                }
             }
-            was_reachable = reachable;
             let floor = elapsed
                 .saturating_add(until(now, local.status.budget_not_before_ms.unwrap_or(now)));
             if let Some(profile) = local.probe_profile() {
@@ -484,10 +492,19 @@ async fn run(
                     let attempted =
                         probe(&accounts, &store, &core, &mut bound, profile, id, &cancel).await;
                     core.finish_read();
-                    if attempted == ProbeResult::Authenticated {
+                    if attempted == ProbeResult::UnavailableResponse {
+                        recovery_pending = true;
+                    }
+                    if attempted == ProbeResult::Authenticated && recovery_pending {
                         let account = local.account;
-                        let _ = blocking(&store, move |store| writes::resume(store, account, now))
-                            .await;
+                        if let Ok(changed) = blocking(&store, move |store| {
+                            writes::resume(store, account, now, writes::Recovery::Connectivity)
+                        })
+                        .await
+                        {
+                            recovery_pending = false;
+                            digest = digest.wrapping_add(u64::from(changed));
+                        }
                     }
                     if attempted != ProbeResult::Deferred {
                         requested = None;
@@ -590,6 +607,7 @@ async fn run(
 enum ProbeResult {
     Authenticated,
     Attempted,
+    UnavailableResponse,
     Deferred,
     Unavailable,
 }
@@ -641,10 +659,13 @@ async fn probe(
             let (reachability, reason, rate) = evidence(&error);
             core.record(id, reachability, reason);
             hold(store, account, rate, reason).await;
-            if reachability == Reachability::NotAttempted {
-                ProbeResult::Unavailable
-            } else {
-                ProbeResult::Attempted
+            match reachability {
+                Reachability::NotAttempted => ProbeResult::Unavailable,
+                Reachability::NoResponse => ProbeResult::UnavailableResponse,
+                Reachability::ReceivedResponse if reason == Some(AccessKind::ServiceFailure) => {
+                    ProbeResult::UnavailableResponse
+                }
+                Reachability::ReceivedResponse => ProbeResult::Attempted,
             }
         }
     }

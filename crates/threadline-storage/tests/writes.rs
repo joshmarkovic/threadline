@@ -576,6 +576,108 @@ fn it_009_throttle_survives_restart_and_unknown_work_cannot_skip_the_floor_or_re
 }
 
 #[test]
+fn it_009_credential_repair_releases_only_its_original_exhausted_owner() {
+    use threadline_storage::access::*;
+
+    let directory = tempfile::tempdir().unwrap();
+    let db = Store::open_profile(directory.path()).unwrap();
+    let (account, _, original) = setup(&db);
+    let verify = |owner, repository, previous| {
+        let profile = db
+            .reserve_access_profile_credential(
+                account,
+                id(81),
+                "reader",
+                owner,
+                CredentialKind::FineGrained,
+                previous,
+            )
+            .unwrap();
+        db.install_current_credential(&profile, || Ok::<_, ()>(()))
+            .unwrap()
+            .unwrap();
+        db.record_access_result(
+            &profile,
+            profile.kind,
+            AccessState::Readable,
+            DiscoveryState::Complete,
+            2,
+        )
+        .unwrap();
+        let repository = db
+            .observe_github_repository(
+                &profile,
+                &RepositoryObservation {
+                    provider_id: id(repository),
+                    owner,
+                    name: "main",
+                    private: true,
+                    source: RepositoryObservationSource::Direct,
+                },
+                3,
+            )
+            .unwrap();
+        db.select_github_repository(account, repository, true)
+            .unwrap();
+        repository
+    };
+    let other = issue(&db, account, verify("another", 201, None), 42);
+    let exhaust = |item, start| {
+        let operation = submit(&db, account, item, &edit(), start);
+        let mut now = start;
+        for _ in 0..5 {
+            let claim = db.claim_write(account, now, now + 5000).unwrap().unwrap();
+            assert_eq!(claim.operation_id(), operation);
+            db.fail_write_preflight(&claim, WritePreflightFailure::Transient, now + 1)
+                .unwrap();
+            now = db.operation(account, &operation).unwrap().unwrap().retry_at;
+        }
+        assert_eq!(
+            db.operation(account, &operation)
+                .unwrap()
+                .unwrap()
+                .reason
+                .as_deref(),
+            Some("retry_burst_exhausted")
+        );
+        operation
+    };
+    let first = exhaust(original, 10);
+    let other = exhaust(other, 130_000);
+    let first_held = db.operation(account, &first).unwrap().unwrap();
+    let other_held = db.operation(account, &other).unwrap().unwrap();
+    assert_eq!(
+        db.resume_writes_after_credential_repair(account, 300_000)
+            .unwrap(),
+        0
+    );
+    let prior = db.github_access_profile(account, "work").unwrap().unwrap();
+    verify("work", 200, Some(&prior));
+    db.hold_sync_budget(account, 360_000).unwrap();
+    assert_eq!(
+        db.resume_writes_after_credential_repair(account, 300_000)
+            .unwrap(),
+        1
+    );
+    assert_eq!(db.operation(account, &other).unwrap().unwrap(), other_held);
+    let resumed = db.operation(account, &first).unwrap().unwrap();
+    assert_eq!(resumed.snapshot, first_held.snapshot);
+    assert_eq!(resumed.attempt, 5);
+    assert_eq!(resumed.retry_at, 360_000);
+    assert!(db.claim_write(account, 359_999, 380_000).unwrap().is_none());
+    let resumed = db.claim_write(account, 360_000, 380_000).unwrap().unwrap();
+    assert_eq!(resumed.operation_id(), first);
+    db.fail_write_preflight(&resumed, WritePreflightFailure::Transient, 360_001)
+        .unwrap();
+    let restarted_burst = db.operation(account, &first).unwrap().unwrap();
+    assert_eq!(
+        restarted_burst.reason.as_deref(),
+        Some("temporary_preflight")
+    );
+    assert!((365_001..=365_501).contains(&restarted_burst.retry_at));
+}
+
+#[test]
 fn it_012_cached_repository_options_and_numeric_edit_base_survive_offline_restart() {
     let dir = tempfile::tempdir().unwrap();
     let db = Store::open_profile(dir.path()).unwrap();

@@ -79,21 +79,35 @@ impl Store {
         })
     }
 
-    /// Coalesce a reconnect/wake signal. A changed owner or user cannot release held work.
+    /// Reopen a definite retry burst after verified connectivity returns or an explicit Outbox resume.
     pub fn resume_writes(&self, account: AccountId, now: i64) -> Result<usize> {
+        self.resume_writes_in(account, now, true)
+    }
+
+    /// Recover work bound to a repaired original credential without resetting unrelated bursts.
+    pub fn resume_writes_after_credential_repair(
+        &self,
+        account: AccountId,
+        now: i64,
+    ) -> Result<usize> {
+        self.resume_writes_in(account, now, false)
+    }
+
+    fn resume_writes_in(&self, account: AccountId, now: i64, reconnect: bool) -> Result<usize> {
         self.write(|tx| {
             let floor = deadline(tx, account)?.unwrap_or(now).max(now);
             let changed=tx.execute("UPDATE operations AS q SET state='queued',retry_at=?2,reason='eligible_after_recovery'
                         WHERE q.account_id=?1 AND q.cancel_requested=0 AND EXISTS(
                             SELECT 1 FROM write_intents w JOIN operation_gates g ON g.account_id=w.account_id AND g.id=w.operation_id
                             WHERE w.account_id=q.account_id AND w.operation_id=q.id AND g.hold IS NULL)
-                        AND ((q.state='queued' AND q.reason='retry_burst_exhausted') OR
-                             (q.state='attention' AND q.reason IN ('mutation_access_rejected','write_permission_unavailable') AND EXISTS(
+                        AND ((?3 AND q.state='queued' AND q.reason='retry_burst_exhausted') OR
+                             (((q.state='queued' AND q.reason='retry_burst_exhausted') OR
+                               (q.state='attention' AND q.reason IN ('mutation_access_rejected','write_permission_unavailable'))) AND EXISTS(
                                 SELECT 1 FROM write_evidence e JOIN github_operation_scopes sc USING(account_id,operation_id)
                                 JOIN github_access_profiles p ON p.account_id=sc.account_id AND p.owner_scope=sc.owner_scope
                                 WHERE e.account_id=q.account_id AND e.operation_id=q.id AND e.attempt=q.attempt
-                                AND p.credential_generation>e.credential_generation)))",params![account,floor])?;
-            if changed > 0 {
+                                AND p.credential_generation>e.credential_generation)))",params![account,floor,reconnect])?;
+            if reconnect && changed > 0 {
                 tx.execute("INSERT INTO write_timing(account_id,not_before,retry_epoch) VALUES(?,0,?)
                             ON CONFLICT(account_id) DO UPDATE SET retry_epoch=MAX(write_timing.retry_epoch,excluded.retry_epoch)",params![account,now])?;
             }
@@ -281,9 +295,7 @@ impl Store {
                 WritePreflightFailure::InvalidResponse => ("attention", "invalid_preflight_response", None),
             };
             let due = if state == "queued" {
-                let burst:u32=tx.query_row("SELECT COUNT(*) FROM operation_attempts WHERE account_id=?1 AND operation_id=?2
-                            AND claimed_at >= COALESCE((SELECT retry_epoch FROM write_timing WHERE account_id=?1),0)",
-                            params![claim.route.account,claim.operation_id()],|r|r.get(0))?;
+                let burst = attempts_in_burst(tx, claim)?;
                 let step = threadline_core::sync::policy::retry_delay(burst, std::time::Duration::ZERO);
                 if step.is_none() {
                     reason = "retry_burst_exhausted";
@@ -336,4 +348,16 @@ impl Store {
             crate::mutations::reserve_transport(tx,&claim.claim,claim.intent.action(),now)
         })
     }
+}
+
+pub(super) fn attempts_in_burst(db: &Connection, claim: &WriteClaim) -> Result<u32> {
+    Ok(db.query_row(
+        "SELECT COUNT(*) FROM operation_attempts a WHERE a.account_id=?1 AND a.operation_id=?2
+           AND (a.attempt=?3 OR (a.claimed_at >= COALESCE(
+             (SELECT retry_epoch FROM write_timing WHERE account_id=?1),0)
+             AND EXISTS(SELECT 1 FROM write_evidence e WHERE e.account_id=a.account_id
+               AND e.operation_id=a.operation_id AND e.attempt=a.attempt AND e.credential_generation=?4)))",
+        params![claim.route.account, claim.operation_id(), claim.attempt(), claim.route.credential_generation],
+        |row| row.get(0),
+    )?)
 }
