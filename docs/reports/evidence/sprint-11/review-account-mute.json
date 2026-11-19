@@ -1,0 +1,44 @@
+{
+  "requirement": "NOTIFY-09",
+  "status": "Pass",
+  "environment": "Windows x64; synthetic repository and local SQLite",
+  "ui": {
+    "case": "UI-007",
+    "source": "b230bbd23d639e447e89a70d7715d2bb10285a2e",
+    "test": "ui_007_preview_review_author_mute_and_keep_the_downloaded_review",
+    "binary_sha256": "a9ea6fa29fd2f6bcbb7970b2595c3151109b52555d9c7045cb0d6193893844ce",
+    "raw_log_sha256": "9fcb6d2d8b215db8b599f97b896f74da4ce9e30053f403ccc72aadae1ccc2b32",
+    "group": {
+      "passed": 5,
+      "failed": 0,
+      "seconds": 72.75,
+      "exit_code": 0
+    },
+    "observed": [
+      "A downloaded review with a stable user ID offered the action. A review with the same login and no stable ID did not.",
+      "The preview identified user 72, the fixture repository and the review and inline-comment scope. Dismissal left the policy unchanged.",
+      "Confirmation stored one repository rule and left the account-wide rules empty. Both downloaded review records matched their original values."
+    ]
+  },
+  "storage": {
+    "case": "IT-018",
+    "source": "10e1a781b50099f9f1cf36c6a839cdd772375aae",
+    "test": "it_018_contextual_review_muting_uses_provider_identity_and_preserves_existing_activity",
+    "binary_sha256": "7a6408e394fc321ab95a21ab32415d5a0ef9f5f31696287a3cb8e0ef7685db3d",
+    "raw_log_sha256": "d0af0a2826ad5ab361deab39422124aa85ac52759c5d123972d48c034fe6f024",
+    "passed": 1,
+    "failed": 0,
+    "seconds": 0.23,
+    "exit_code": 0,
+    "observed": [
+      "Activity identified user and GitHub App review actors. Ordinary comments and unidentified reviews had no contextual review actor.",
+      "A later review by the muted actor was suppressed. Earlier activity, ordinary comments, and another reviewer's activity remained. A different account could not read the rule."
+    ]
+  },
+  "linux_development": {
+    "gpui_test_passed": 1,
+    "gpui_log_sha256": "06f61b30e1bf1a422a5f5b646ea0f0f9265ab71e31810044e759c30feed86103",
+    "sqlite_test_passed": 1,
+    "sqlite_log_sha256": "6309658c90201db63f6477e184aeb79116cd331fd470742f711eb1da349a4fd3"
+  }
+}
