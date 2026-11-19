@@ -158,6 +158,7 @@ pub(crate) struct ReaderWorkspace {
     tab_generation: u64,
     generation: u64,
     list_generation: u64,
+    initial_browse: Option<u64>,
     filter: BrowseFilter,
     saved: Vec<(String, BrowseFilter)>,
     rows: Vec<threadline_storage::reader::BrowseRow>,
@@ -521,6 +522,7 @@ impl ReaderWorkspace {
             tab_generation: 0,
             generation: 0,
             list_generation: 0,
+            initial_browse: None,
             filter: BrowseFilter::default(),
             saved: Vec::new(),
             rows: Vec::new(),
@@ -708,6 +710,9 @@ impl ReaderWorkspace {
                 self.sync_render_watch = None;
             }
             self.rows.clear();
+            self.next = None;
+            self.saved.clear();
+            self.list_busy = false;
             self.queue.clear();
             self.outbox = outbox::OutboxState::default();
             self.tab_views.clear();
@@ -725,6 +730,7 @@ impl ReaderWorkspace {
             self.back.clear();
             self.forward.clear();
             self.layout_busy = account.is_some();
+            self.initial_browse = account.map(|_| self.list_generation);
         }
         self.repositories = repositories;
         if changed {
@@ -767,6 +773,7 @@ impl ReaderWorkspace {
                             }
                         }
                         this.load_visible(window, cx);
+                        this.browse_after_visible_restore(window, cx);
                         this.maybe_start_sync();
                         this.restore_active_draft(window, cx);
                         this.focus_active(window);
@@ -775,7 +782,7 @@ impl ReaderWorkspace {
                     },
                 );
             }
-            if changed || scope_changed {
+            if !changed && scope_changed && self.initial_browse.is_none() {
                 self.browse(false, window, cx);
             }
         }
@@ -924,6 +931,7 @@ impl ReaderWorkspace {
         if more && (self.next.is_none() || self.list_busy) {
             return;
         }
+        self.initial_browse = None;
         let after = more.then_some(self.next).flatten();
         self.surface = Surface::Browse;
         let scope = self.scope;
@@ -975,6 +983,24 @@ impl ReaderWorkspace {
             },
         );
         cx.notify();
+    }
+
+    fn browse_after_visible_restore(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(generation) = self.initial_browse else {
+            return;
+        };
+        if self.surface != Surface::Browse || generation != self.list_generation {
+            self.initial_browse = None;
+        } else if !self.layout_busy
+            && !self.layout.panes.iter().any(|pane| {
+                pane.active
+                    .and_then(|index| pane.tabs.get(index))
+                    .is_some_and(|tab| self.pending_tabs.contains_key(&tab.id))
+            })
+        {
+            // Browse counts scan the selected scope using the same SQLite reader as cached tabs.
+            self.browse(false, window, cx);
+        }
     }
 
     fn local_search(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1175,6 +1201,7 @@ impl ReaderWorkspace {
             .find(|tab| tab.id == id && tab.item == item)
             .cloned()
         else {
+            self.browse_after_visible_restore(window, cx);
             return;
         };
         match result {
@@ -1236,6 +1263,7 @@ impl ReaderWorkspace {
             }
             Err(_) => self.status = Some("The cached item could not be loaded."),
         }
+        self.browse_after_visible_restore(window, cx);
         self.maybe_start_sync();
     }
 

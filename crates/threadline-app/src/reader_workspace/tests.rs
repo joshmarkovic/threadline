@@ -503,6 +503,8 @@ impl ReaderHarness {
                         window,
                         cx,
                     );
+                    assert!(reader.initial_browse.is_some());
+                    assert!(!reader.list_busy, "saved panes get first access to SQLite");
                     reader
                 })
             })
@@ -933,6 +935,11 @@ fn ui_008_observed_reader_controls_follow_the_visible_panes(cx: &mut TestAppCont
     let (window, reader) = setup.open(cx);
     until(cx, |cx| {
         cx.read(|cx| !reader.read(cx).list_busy && !reader.read(cx).rows.is_empty())
+    });
+    cx.read(|cx| {
+        let reader = reader.read(cx);
+        assert_eq!(reader.cached_active_panes(), 2);
+        assert!(reader.initial_browse.is_none());
     });
     let (observation, writer) = crate::observation::Observer::new(
         setup._directory.path().join("bounds.json"),
