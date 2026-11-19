@@ -63,6 +63,8 @@ pub(crate) struct PrObservation {
     diff_mode: String,
     files_coverage: Option<String>,
     files_on_page: Option<usize>,
+    threads_coverage: Option<String>,
+    threads_on_page: Option<usize>,
     patch_change_lines: Option<usize>,
     source_anchor: Option<PrSourceObservation>,
     selected_source_line: Option<usize>,
@@ -92,6 +94,12 @@ impl ReaderWorkspace {
         (cached.data.item.as_ref()?.kind == threadline_storage::ItemKind::PullRequest).then(|| {
             let settings = tab_settings(tab);
             let pr = cached.pr.as_deref();
+            let threads = pr.and_then(|pr| {
+                pr.data
+                    .pages
+                    .iter()
+                    .find_map(|(family, page)| (*family == PrFamily::Threads).then_some(page))
+            });
             PrObservation {
                 section: format!("{:?}", settings.section),
                 context_mode: format!("{:?}", settings.context_mode),
@@ -108,6 +116,8 @@ impl ReaderWorkspace {
                 files_on_page: pr
                     .and_then(|pr| pr.data.files.as_ref())
                     .map(|files| files.rows.len()),
+                threads_coverage: threads.map(|page| format!("{:?}", page.state.coverage)),
+                threads_on_page: threads.map(|page| page.rows.len()),
                 patch_change_lines: pr
                     .and_then(|pr| pr.data.files.as_ref()?.selected.as_ref()?.patch.as_ref())
                     .map(|patch| patch.additions() + patch.deletions()),
@@ -489,6 +499,17 @@ impl ReaderWorkspace {
                     ));
                 }
             }
+        }
+        #[cfg(feature = "e2e")]
+        if settings.section == PrSection::Conversation
+            && let Some(observer) = self.observer.as_ref()
+        {
+            return div()
+                .relative()
+                .min_h_0()
+                .child(viewport)
+                .child(observer.visible_control_bounds(format!("pr-{pane}-conversation-records")))
+                .into_any_element();
         }
         viewport.into_any_element()
     }

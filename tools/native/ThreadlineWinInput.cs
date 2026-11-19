@@ -123,6 +123,10 @@ public static class ThreadlineWinInput
     private static extern IntPtr SendMessageTimeout(IntPtr window, uint message, UIntPtr count,
         [Out] StringBuilder text, uint flags, uint timeout, out UIntPtr result);
 
+    [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW")]
+    private static extern IntPtr SendWindowMessage(IntPtr window, uint message, UIntPtr wparam,
+        IntPtr lparam, uint flags, uint timeout, out UIntPtr result);
+
     [DllImport("shell32.dll")]
     public static extern int SHQueryUserNotificationState(out int state);
 
@@ -658,6 +662,42 @@ public static class ThreadlineWinInput
         Rect clip;
         if (!GetClipCursor(out clip) || !Contains(clip, target))
             throw new TargetUnavailableException("Cursor clipping does not allow the planned wheel point.");
+    }
+
+    internal static IntPtr PackScreenPoint(Point point)
+    {
+        if (point.X < short.MinValue || point.X > short.MaxValue ||
+            point.Y < short.MinValue || point.Y > short.MaxValue)
+            throw new TargetUnavailableException("The conversation viewport is outside the Win32 message coordinate range.");
+        return new IntPtr(unchecked((int)((uint)(ushort)point.X | ((uint)(ushort)point.Y << 16))));
+    }
+
+    public static void ScrollOwnedConversation(IntPtr window, uint child, uint dpi, Point client, int direction)
+    {
+        if (direction != -1 && direction != 1)
+            throw new ArgumentOutOfRangeException("direction");
+        IntPtr previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        if (previous == IntPtr.Zero)
+            throw new TargetUnavailableException("Could not use physical coordinates for the conversation viewport.");
+        try
+        {
+            Rect bounds;
+            var screen = client;
+            if (window == IntPtr.Zero || child == 0 || WindowProcessId(window) != child ||
+                GetAncestor(window, 2) != window || !IsWindowVisible(window) || IsIconic(window) ||
+                dpi == 0 || GetDpiForWindow(window) != dpi ||
+                !GetClientRect(window, out bounds) || !Contains(bounds, client) || !ClientToScreen(window, ref screen))
+                throw new TargetUnavailableException("The expected conversation viewport is no longer in the owned Threadline window.");
+            var delta = new UIntPtr((uint)(ushort)(direction * 120) << 16);
+            const uint abortIfHungOrExited = 0x0002 | 0x0020;
+            UIntPtr result;
+            if (SendWindowMessage(window, 0x020a, delta, PackScreenPoint(screen), abortIfHungOrExited, 1000, out result) == IntPtr.Zero)
+                throw new TargetUnavailableException("The owned Threadline window did not respond to the conversation scroll message.");
+        }
+        finally
+        {
+            SetThreadDpiAwarenessContext(previous);
+        }
     }
 
     public static void Scroll(IntPtr window, uint child, uint dpi, Point client, WheelEvidence evidence)

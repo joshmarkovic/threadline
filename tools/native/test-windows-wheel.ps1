@@ -63,6 +63,16 @@ public static class ThreadlineWheelChecks
         Check(!evidence.Complete, "A missing physical readback must prevent a valid measurement.");
         evidence.PhysicalReadbacks++;
         Check(evidence.Complete, "A complete calibrated gesture must permit measurement.");
+
+        var screen = new ThreadlineWinInput.Point { X = -1250, Y = 360 };
+        long packed = ThreadlineWinInput.PackScreenPoint(screen).ToInt64();
+        Check((short)packed == screen.X && (short)(packed >> 16) == screen.Y,
+            "Synthetic HWND scroll coordinates must retain their signed Win32 values.");
+        screen.Y = short.MinValue;
+        packed = ThreadlineWinInput.PackScreenPoint(screen).ToInt64();
+        Check((short)(packed >> 16) == screen.Y, "South/north monitor coordinates must round trip.");
+        screen.X = short.MaxValue + 1;
+        Reject<ThreadlineWinInput.TargetUnavailableException>(() => ThreadlineWinInput.PackScreenPoint(screen), "coordinate range");
     }
 }
 '@)

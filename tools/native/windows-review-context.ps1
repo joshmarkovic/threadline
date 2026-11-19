@@ -335,6 +335,37 @@ function Invoke-ReviewDecisionsProof([IntPtr]$Window, [string]$Profile, [switch]
     }
 }
 
+function Show-FixtureThreadControl([IntPtr]$Window, [long]$Item, [string]$Id, [string]$Name, [int]$Direction, [switch]$Edit) {
+    $head = 'b' * 40
+    $viewportId = 'pr-0-conversation-records'
+    for ($step = 0; $step -le 5; $step++) {
+        $observed = Wait-PrReader 'the original PR and its downloaded review thread in Conversation' {
+            param($pr, $reader)
+            $coverage = $pr.PSObject.Properties['threads_coverage']
+            $count = $pr.PSObject.Properties['threads_on_page']
+            $reader.active_item -eq $Item -and $pr.head -ceq $head -and $pr.section -ceq 'Conversation' -and
+                $null -ne $coverage -and $coverage.Value -ceq 'Complete' -and $null -ne $count -and $count.Value -eq 1
+        }
+        if ($observed.pid -ne $script:app.Id -or !(Test-OwnedFixtureWindow $Window)) {
+            Stop-Blocked 'The isolated Threadline conversation is no longer owned by the expected process.'
+        }
+        if ($null -ne $observed.bounds.PSObject.Properties[$Id] -and
+            $null -ne (Find-OwnedFixtureControl $Window $Id $Name -Edit:$Edit)) { return }
+        $viewport = $observed.bounds.PSObject.Properties[$viewportId]
+        if ($step -eq 5 -or $null -eq $viewport) { break }
+        $rect = $viewport.Value
+        if ($rect.Count -ne 4 -or $rect[2] -le 0 -or $rect[3] -le 0) { break }
+        $point = To-ClientPoint ($rect[0] + $rect[2] / 2) ($rect[1] + $rect[3] / 2) $observed.scale_factor
+        $dpi = [uint32][Math]::Round(96 * $observed.scale_factor)
+        [ThreadlineWinInput]::ScrollOwnedConversation($Window, [uint32]$script:app.Id, $dpi, $point, $Direction)
+        Add-Evidence 'Reveal a review thread control with a synthetic window message' ([ordered]@{
+            automation_id = $Id; direction = $Direction; step = $step + 1; input = 'Owned HWND WM_MOUSEWHEEL'
+        })
+        Start-Sleep -Milliseconds 100
+    }
+    throw "The exact visible review thread control remained unavailable after bounded Conversation scrolling ($Id)."
+}
+
 function Invoke-ThreadQueueProof([IntPtr]$Window, [string]$Profile) {
     $head = 'b' * 40
     Wait-SeededFixtureAccount
@@ -350,18 +381,25 @@ function Invoke-ThreadQueueProof([IntPtr]$Window, [string]$Profile) {
     Click-AccountControl $Window 'reader-maximize-pane'
     Click-AccountControl $Window 'pr-0-conversation'
     Click-AccountControl $Window 'pr-0-threads-fetch'
-    $null = Wait-AccountControl 'pr-0-thread-0-reply'
+    Show-FixtureThreadControl $Window $item 'pr-0-thread-0-reply' 'Reply' -1
     Set-WriteFixtureOffline $Window $true
+    Show-FixtureThreadControl $Window $item 'pr-0-thread-0-reply' 'Reply' -1
     Click-AccountControl $Window 'pr-0-thread-0-reply'
     $reply = 'Threadline synthetic queued thread reply.'
-    Wait-For 'the owned original review reply editor' {
+    $null = Wait-Reader 'the original thread reply draft is opened for editing' {
+        param($reader) $reader.active_item -eq $item -and $null -ne $reader.active_draft_saved
+    }
+    Show-FixtureThreadControl $Window $item 'pr-0-thread-0-reply-input' 'Reply to review thread' -1 -Edit
+    Wait-For 'the owned review reply editor receives its exact synthetic text' {
         Set-OwnedFixtureEditValue $Window 'pr-0-thread-0-reply-input' 'Reply to review thread' $reply
     }
     Wait-WriteFixtureDraft $item $reply
+    Show-FixtureThreadControl $Window $item 'pr-0-thread-0-reply-submit' 'Queue reply' -1
     Click-AccountControl $Window 'pr-0-thread-0-reply-submit'
     $null = Wait-Reader 'the original thread reply is queued offline' {
         param($reader) $reader.offline -and $reader.active_item -eq $item -and $reader.outbox -eq 1
     }
+    Show-FixtureThreadControl $Window $item 'pr-0-thread-0-resolution' 'Queue resolution' 1
     Click-AccountControl $Window 'pr-0-thread-0-resolution'
     $null = Wait-Reader 'the native thread resolution is queued behind the reply' {
         param($reader) $reader.offline -and $reader.active_item -eq $item -and $reader.outbox -eq 2
@@ -390,6 +428,7 @@ function Invoke-ThreadQueueProof([IntPtr]$Window, [string]$Profile) {
     Click-AccountControl $Window 'reader-outbox-open'
     Click-AccountControl $Window 'pr-0-conversation'
     Set-WriteFixtureOffline $Window $true
+    Show-FixtureThreadControl $Window $item 'pr-0-thread-0-resolution' 'Queue reopening' -1
     Wait-For 'the confirmed thread provides a native reopening action' {
         Invoke-OwnedFixtureControl $Window 'pr-0-thread-0-resolution' $null 'Queue reopening'
     }

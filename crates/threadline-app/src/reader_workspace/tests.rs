@@ -1019,6 +1019,125 @@ fn ui_008_observed_reader_controls_follow_the_visible_panes(cx: &mut TestAppCont
     setup.runtime.block_on(writer.finish()).unwrap();
 }
 
+#[cfg(feature = "e2e")]
+#[gpui_kit::test]
+fn scroll_within_pr_conversation_reveals_cached_thread_actions(cx: &mut TestAppContext) {
+    use gpui_kit::{Modifiers, PlatformInput, ScrollDelta, ScrollEvent, ScrollSource, TouchPhase};
+    use threadline_storage::{
+        pr::{InlineComment, PrFamily, PrHeader, PrInputPage, PrRecord, PrSection, PrTabView},
+        resources::{CommitOid, WalkMode},
+    };
+
+    let setup = ReaderHarness::seeded();
+    let account = setup.fixture.account;
+    let item = setup.fixture.reviewed_pr;
+    let stamp = 1_900_000_000_000;
+    let base = CommitOid::parse(&"a".repeat(40)).unwrap();
+    let head = CommitOid::parse(&"b".repeat(40)).unwrap();
+    let revision = setup
+        .store
+        .record_pr_revision(
+            account,
+            item,
+            &base,
+            &head,
+            None,
+            &PrHeader::default(),
+            stamp,
+        )
+        .unwrap();
+    let progress = setup
+        .store
+        .start_pr_fetch(&revision, PrFamily::Threads, WalkMode::Full)
+        .unwrap();
+    setup
+        .store
+        .commit_pr_page(
+            &revision,
+            PrFamily::Threads,
+            &progress,
+            PrInputPage {
+                records: vec![PrRecord::Thread {
+                    node_id: "PRRT_42".into(),
+                    resolved: Some(false),
+                    outdated: Some(false),
+                    comments: vec![InlineComment {
+                        id: 771,
+                        node_id: Some("PRRC_771".into()),
+                        in_reply_to: None,
+                        author: None,
+                        actor: Default::default(),
+                        body: "A long downloaded review note.\n".repeat(24),
+                        created_at_ms: Some(stamp),
+                        updated_at_ms: Some(stamp),
+                        anchor: None,
+                    }],
+                    replies_complete: true,
+                    reply_cursor: None,
+                }],
+                next_cursor: None,
+                validators: None,
+                partial: None,
+                fetched_at_ms: stamp,
+            },
+        )
+        .unwrap();
+    setup.one_pane(&Tab {
+        id: "cached-thread-conversation".into(),
+        item,
+        view: TabView {
+            pr_reader: Some(PrTabView {
+                section: PrSection::Conversation,
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    });
+    let (window, reader) = setup.open(cx);
+    let (observer, writer) = crate::observation::Observer::new(
+        setup._directory.path().join("thread-bounds.json"),
+        std::time::Instant::now(),
+        false,
+        setup.runtime.handle(),
+    );
+    cx.update_window(window, |_, window, cx| {
+        reader.update(cx, |reader, cx| {
+            reader.set_observer(Some(observer.clone()), cx)
+        });
+        observer.begin_frame();
+        window.render_frame(cx);
+        let [x, y, w, h] = observer
+            .test_control_bounds("pr-0-conversation-records")
+            .unwrap();
+        let position = Point::new(px(x + w / 2.), px(y + h / 2.));
+        assert!(
+            observer
+                .test_control_bounds("pr-0-thread-0-reply")
+                .is_none()
+        );
+        window.dispatch_event(
+            PlatformInput::Scroll(ScrollEvent {
+                position,
+                delta: ScrollDelta::Lines(Point::new(0., -30.)),
+                modifiers: Modifiers::default(),
+                touch_phase: TouchPhase::Moved,
+                source: ScrollSource::Pointer,
+            }),
+            cx,
+        );
+        observer.begin_frame();
+        window.render_frame(cx);
+        for id in ["pr-0-thread-0-reply", "pr-0-thread-0-resolution"] {
+            assert!(
+                observer.test_control_bounds(id).is_some(),
+                "{id} was clipped"
+            );
+        }
+    })
+    .unwrap();
+    setup.runtime.block_on(writer.finish()).unwrap();
+}
+
 #[gpui_kit::test]
 fn ui_001_pr_context_changes_keep_the_immutable_native_diff_and_each_tabs_state(
     cx: &mut TestAppContext,
