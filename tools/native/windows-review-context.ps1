@@ -182,9 +182,10 @@ function Invoke-ReviewDraftProof([IntPtr]$Window, [string]$Profile) {
     Set-WriteFixtureOffline $ready $false
     Click-AccountControl $ready 'reader-outbox'
     Click-AccountControl $ready 'reader-outbox-filter-history'
+    # Reconnect and both review steps use eleven requests under the shared pacing limit.
     $null = Wait-Reader 'the exact unchanged review has a confirmed native Outbox row' {
         param($reader) $reader.outbox_visible -and $reader.outbox -eq 0
-    }
+    } -Timeout 30000
     Inspect-WriteFixtureAction $ready 0 'Confirmed'
     Add-Evidence 'Save and resume an unchanged native review with an anchored comment' ([ordered]@{
         draft = $draft; expected_head = $headA; source = 'src/first.rs:1/right'; confirmed = $true

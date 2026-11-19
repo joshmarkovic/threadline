@@ -84,7 +84,9 @@ function Queue-WriteFixtureDraft([IntPtr]$Window, [long]$Item, [int]$Expected, [
     }
 }
 
-function Inspect-WriteFixtureAction([IntPtr]$Window, [int]$Index, [string]$Expected, [string]$ActionLabel) {
+function Inspect-WriteFixtureAction(
+    [IntPtr]$Window, [int]$Index, [string]$Expected, [string]$ActionLabel, [int]$FindTimeout = 8000
+) {
     $id = "reader-outbox-action-$Index"
     if ($ActionLabel) {
         if ($ActionLabel -cnotin @('Comment', 'Issue edit', 'Merge pull request', 'Review', 'Reply', 'Resolve thread')) { throw 'Unknown fixture action label.' }
@@ -97,7 +99,7 @@ function Inspect-WriteFixtureAction([IntPtr]$Window, [int]$Index, [string]$Expec
         $label = $ActionLabel + ' ' + [char]0x00b7 + ' ' + $displayState
         Wait-For 'the exact visible native fixture Outbox row' {
             Invoke-OwnedFixtureControl $Window $id $null $label
-        }
+        } -Timeout $FindTimeout
     } else {
         Click-AccountControl $Window $id
     }

@@ -134,7 +134,8 @@ function Invoke-MergeProof([IntPtr]$Window) {
     Set-WriteFixtureOffline $Window $false
     Click-AccountControl $Window 'reader-outbox'
     Click-AccountControl $Window 'reader-outbox-filter-history'
-    Inspect-WriteFixtureAction $Window 0 'Confirmed' 'Merge pull request'
+    # Reconnect, the checked merge and its authoritative readback use ten paced requests.
+    Inspect-WriteFixtureAction $Window 0 'Confirmed' 'Merge pull request' -FindTimeout 30000
     Click-AccountControl $Window 'reader-outbox-open'
     $null = Wait-PrReader 'the original PR becomes merged only after authoritative provider readback' {
         param($pr, $reader) $reader.active_number -eq 42 -and $pr.head -ceq $firstHead -and $pr.merged -eq $true
