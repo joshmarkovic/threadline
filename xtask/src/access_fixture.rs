@@ -941,7 +941,9 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         (Some("GET"), Some(SCHEDULED_ISSUE), Some("HTTP/1.1"))
             if matches!(
                 phase,
-                Phase::WriteOnline
+                Phase::ReaderFailure
+                    | Phase::ReaderResume
+                    | Phase::WriteOnline
                     | Phase::WriteDrop
                     | Phase::SyncRateReady
                     | Phase::SyncRateThrottle
@@ -1256,7 +1258,9 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
         (Phase::ReaderFailure | Phase::ReaderResume, Route::Items) => {
             result(200, "OK", json!([item()]))
         }
-        (Phase::ReaderFailure | Phase::ReaderResume, Route::Item) => result(200, "OK", item()),
+        (Phase::ReaderFailure | Phase::ReaderResume, Route::Item | Route::ScheduledIssue) => {
+            result(200, "OK", item())
+        }
         (Phase::ReaderFailure, Route::CommentsFirst) => result(
             200,
             "OK",
@@ -1373,6 +1377,7 @@ mod tests {
         };
         fs::write(fixture.phase_file(), "reader-failure").unwrap();
         assert!(fetch(ITEMS).contains("Reader pagination fixture"));
+        assert!(fetch(SCHEDULED_ISSUE).contains("Reader pagination fixture"));
         assert!(
             fetch(COMMENTS_FIRST).contains(&format!("http://{}{COMMENTS_NEXT}", fixture.address()))
         );
