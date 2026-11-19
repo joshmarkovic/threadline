@@ -271,6 +271,32 @@
         "file": "divergent.txt",
         "offline": true
       }
+    },
+    "extended_label_attempt": {
+      "run": "e2e-1795058222910-44928",
+      "relative_case_directory": "windows-history",
+      "app_revision": "fda5d91b8be761e03a165f746d33c84aeea308ee",
+      "driver_revision": "fda5d91b8be761e03a165f746d33c84aeea308ee",
+      "fixture_revision": "s10-history-endpoints-v3",
+      "status": "Fail",
+      "detail": "Timed out waiting for the owned visible history label 'Pull request comparison · merge base cccccccccccccccccccccccccccccccccccccccc → head bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'.",
+      "binary_sha256": "3db1074323d4174608bbfba7526d5cfa9568b668780d553ee887db98d9fdcff6",
+      "native_actions": 9,
+      "dpi": 96,
+      "downloaded_patch": {
+        "section": "Files",
+        "selected_file": "src/first.rs",
+        "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "files_coverage": "Complete",
+        "patch_change_lines": 2
+      },
+      "loopback_requests": 9,
+      "compare_a_http_status": 200,
+      "raw_sha256": {
+        "native": "b8d6ba59e812a5d54317900851b36bd8402182fc4ce66f76074b0b69a71526ca",
+        "app": "ce206a32114ef32f229a92a656cb4ee80a0253f215f11beb4ed39099e62c1a14",
+        "redacted_http_trace": "ae6a6a1891fb0df1b158dec1e295398795673c22d1cc38fd898a3064eab59de4"
+      }
     }
   },
   "portable_monitor": {
