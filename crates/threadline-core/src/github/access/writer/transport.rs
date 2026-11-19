@@ -58,6 +58,15 @@ impl GitHubWriter<'_> {
         request: Request,
         cancel: &CancellationToken,
     ) -> Result<(Vec<u8>, HeaderMap), MutationFailure> {
+        self.send_classifying(request, cancel, |_, _| {}).await
+    }
+
+    pub(super) async fn send_classifying(
+        &self,
+        request: Request,
+        cancel: &CancellationToken,
+        classify: impl FnOnce(StatusCode, &serde_json::Value),
+    ) -> Result<(Vec<u8>, HeaderMap), MutationFailure> {
         let unsent = |access| MutationFailure {
             evidence: DispatchEvidence::DefinitelyUnsent,
             access,
@@ -161,6 +170,9 @@ impl GitHubWriter<'_> {
         }
         if !accepted {
             let payload = serde_json::from_slice::<serde_json::Value>(&bytes).ok();
+            if let Some(payload) = payload.as_ref() {
+                classify(status, payload);
+            }
             let message = payload
                 .as_ref()
                 .and_then(|payload| payload.get("message"))

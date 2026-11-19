@@ -55,6 +55,12 @@ impl OutboxState {
             .map(|inspection| format!("{:?}", inspection.operation.state))
     }
 
+    pub(super) fn selected_merge_queue_required(&self) -> bool {
+        self.selected.as_ref().is_some_and(|inspection| {
+            inspection.operation.reason.as_deref() == Some("required_merge_queue_unsupported")
+        })
+    }
+
     pub(super) fn cancel_requested(&self) -> bool {
         self.selected
             .as_ref()
@@ -595,6 +601,9 @@ fn reason_label(value: &str) -> String {
         }
         "retry_burst_exhausted" => {
             "Automatic retries paused after repeated connection failures.".into()
+        }
+        "required_merge_queue_unsupported" => {
+            "GitHub requires a merge queue for this branch. Direct merge is unavailable.".into()
         }
         _ => value.replace('_', " "),
     }

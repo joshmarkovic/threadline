@@ -1,4 +1,4 @@
-function Queue-FixtureDirectMerge([IntPtr]$Window, [string]$ExpectedHead) {
+function Queue-FixtureDirectMerge([IntPtr]$Window, [string]$ExpectedHead, [int]$Pending = 1) {
     Click-AccountControl $Window 'pr-0-merge-open'
     Click-AccountControl $Window 'pr-0-merge-refresh'
     $null = Wait-PrReader 'the matching unmerged pull request with native squash controls' {
@@ -9,10 +9,52 @@ function Queue-FixtureDirectMerge([IntPtr]$Window, [string]$ExpectedHead) {
     Click-AccountControl $Window 'pr-0-merge-confirm'
     $null = Wait-PrReader 'the saved merge intent while GitHub still reports unmerged' {
         param($pr, $reader)
-        $reader.offline -and $reader.outbox -eq 1 -and $pr.head -ceq $ExpectedHead -and $pr.merged -eq $false
+        $reader.offline -and $reader.outbox -eq $Pending -and $pr.head -ceq $ExpectedHead -and $pr.merged -eq $false
     }
     Click-AccountControl $Window 'reader-outbox'
     Click-AccountControl $Window 'reader-outbox-filter-pending'
+}
+
+function Invoke-MergeQueueProof([IntPtr]$Window) {
+    Wait-SeededFixtureAccount
+    Open-SyncSettings $Window
+    Click-AccountControl $Window 'sync-pause-background'
+    $null = Wait-Sync 'unrelated reads paused with queue dispatch enabled' {
+        param($sync) $sync.controls.pause_background -and !$sync.controls.pause_queued_actions
+    }
+    Click-AccountControl $Window 'reader-repository-1'
+    Click-AccountControl $Window 'reader-fetch-repository'
+    $fixtures = @(
+        @{ index = 0; number = 42; name = 'First fixture pull request'; head = 'b' * 40; path = 'src/first.rs'; phase = 'merge-queue-preflight'; requests = 0 },
+        @{ index = 1; number = 43; name = 'Second fixture pull request'; head = 'e' * 40; path = 'src/second.rs'; phase = 'merge-queue-rejected'; requests = 1 }
+    )
+    foreach ($fixture in $fixtures) {
+        Set-AccessPhase 'merge-prepare'
+        Click-AccountControl $Window 'reader-repository-1'
+        $null = Open-FixturePr $Window 0 $fixture.number $fixture.name $fixture.head $fixture.path
+        Queue-FixtureDirectMerge $Window $fixture.head ($fixture.index + 1)
+        Inspect-WriteFixtureAction $Window $fixture.index 'Queued' 'Merge pull request'
+        Set-AccessPhase $fixture.phase
+        Set-WriteFixtureOffline $Window $false
+        Click-AccountControl $Window 'reader-outbox'
+        Click-AccountControl $Window 'reader-outbox-filter-attention'
+        Inspect-WriteFixtureAction $Window $fixture.index 'NeedsAttention' 'Merge pull request'
+        $null = Wait-Reader 'the selected merge shows the unsupported queue requirement' {
+            param($reader) $reader.outbox_visible -and $reader.outbox_merge_queue_required -and
+                $reader.outbox -eq ($fixture.index + 1)
+        }
+        Click-AccountControl $Window 'reader-outbox-open'
+        $null = Wait-PrReader 'the original unmerged PR and saved head after the queue hold' {
+            param($pr, $reader) $reader.active_number -eq $fixture.number -and
+                $pr.head -ceq $fixture.head -and $pr.merged -eq $false
+        }
+        Add-Evidence 'Retain required-queue intent in native Outbox' ([ordered]@{
+            phase = $fixture.phase; number = $fixture.number; expected_head = $fixture.head
+            needs_attention = $true; expected_direct_puts = $fixture.requests
+        })
+    }
+    Stop-ThroughUi
+    $script:report.detail = 'The native Outbox retained both original unmerged intents when policy required a queue and when GitHub rejected the direct request with a queue requirement.'
 }
 
 function Invoke-MergeProof([IntPtr]$Window) {

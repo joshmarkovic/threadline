@@ -395,6 +395,7 @@ fn known_case(lane: Lane, case: &str) -> bool {
                     | "S12-NATIVE-LIFECYCLE"
             )
             | (Lane::E2e, "S05-WINDOWS-SYNC")
+            | (Lane::E2e, "S09-MERGE-QUEUE")
             | (Lane::E2e, "S01-WINDOWS-TOAST")
             | (Lane::Install, crate::install::LOCAL_CASE)
     ) || catalog_cases(lane).any(|id| id == case)

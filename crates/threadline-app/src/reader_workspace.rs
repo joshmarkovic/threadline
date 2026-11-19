@@ -94,6 +94,7 @@ pub(crate) struct ReaderObservation {
     pub outbox: Option<u64>,
     pub outbox_visible: bool,
     pub outbox_action_state: Option<String>,
+    pub outbox_merge_queue_required: bool,
     pub outbox_action_cancel_requested: bool,
     pub outbox_paused: bool,
     pub active_draft_submitted: Option<bool>,
@@ -439,6 +440,7 @@ impl ReaderWorkspace {
             outbox: self.counts.map(|counts| counts.outbox),
             outbox_visible: self.surface == Surface::Outbox,
             outbox_action_state: self.outbox.selected_state(),
+            outbox_merge_queue_required: self.outbox.selected_merge_queue_required(),
             outbox_action_cancel_requested: self.outbox.cancel_requested(),
             outbox_paused: self.outbox.is_paused(),
             active_draft_submitted: draft

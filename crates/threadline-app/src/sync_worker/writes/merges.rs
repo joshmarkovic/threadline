@@ -342,6 +342,7 @@ fn merged(
 
 fn failure(error: &DirectMergeFailure, now: i64) -> MergeFailure {
     match error.reason {
+        DirectMergeRejection::RequiredMergeQueue => return MergeFailure::RequiredMergeQueue,
         DirectMergeRejection::HeadChanged => return MergeFailure::ChangedHead,
         DirectMergeRejection::NotPermitted => return MergeFailure::RulesRejected,
         DirectMergeRejection::Other => {}

@@ -43,6 +43,9 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == crate::install::LOCAL_CASE {
         return Some("s12-windows-local-installer-v1");
     }
+    if case == "S09-MERGE-QUEUE" {
+        return Some("s09-required-merge-queue-v1");
+    }
     if matches!(case, "UT-017" | "IT-014" | "IT-015" | "E2E-009") {
         return Some("s09-direct-merge-v1");
     }
@@ -179,6 +182,7 @@ pub fn associations(case: &str) -> Associations {
             "CACHE-01;SEARCH-01;SYNC-06;WORKSPACE-08;TEST-08",
             "AC-35;AC-48",
         ),
+        "S09-MERGE-QUEUE" => ("MERGE-01;MERGE-03;MERGE-04;OUTBOX-03;TEST-04", "AC-77"),
         "S12-NATIVE-LIFECYCLE" => (
             "AUTH-05;CACHE-13;OUTBOX-10;TEST-04;TEST-05",
             "AC-68;AC-73;AC-74;AC-91;AC-92",

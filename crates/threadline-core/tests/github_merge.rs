@@ -94,11 +94,9 @@ async fn it_014_direct_merge_requires_known_policy_and_sends_exact_compare_and_s
     let bad = writer.observe_merge_policy(&pull, &cancel).await;
     assert!(matches!(bad,Err(error) if error.kind==AccessKind::IdentityMismatch));
 
-    simulator.enqueue(
-        Method::POST,
-        "/graphql",
-        reply(StatusCode::OK, policy(json!({"id":"Q_71"}), HEAD)),
-    );
+    let mut required = policy(Value::Null, HEAD);
+    required["data"]["node"]["isMergeQueueEnabled"] = json!(true);
+    simulator.enqueue(Method::POST, "/graphql", reply(StatusCode::OK, required));
     let (queued, _) = writer.observe_merge_policy(&pull, &cancel).await.unwrap();
     assert!(queued.eligibility().queue == QueueRequirement::Required);
     let observed = simulator.take_observations();
@@ -145,6 +143,30 @@ async fn it_014_direct_merge_requires_known_policy_and_sends_exact_compare_and_s
         error.transport.access.http_status==Some(409))
     );
 
+    for (message, reason) in [
+        (
+            "This pull request must be merged via the merge queue.",
+            DirectMergeRejection::RequiredMergeQueue,
+        ),
+        (
+            "Merge cannot be performed",
+            DirectMergeRejection::NotPermitted,
+        ),
+    ] {
+        simulator.enqueue(
+            Method::PUT,
+            MERGE,
+            reply(StatusCode::METHOD_NOT_ALLOWED, json!({"message":message}))
+                .expects_json(json!({"sha":HEAD,"merge_method":"squash"})),
+        );
+        let rejected = writer
+            .merge_at_head(&pull, &allowed, MergeMethod::Squash, HEAD, &cancel)
+            .await;
+        assert!(
+            matches!(rejected, Err(error) if error.reason == reason && error.transport.access.http_status == Some(405))
+        );
+    }
+
     simulator.enqueue(
         Method::PUT,
         MERGE,
@@ -158,7 +180,7 @@ async fn it_014_direct_merge_requires_known_policy_and_sends_exact_compare_and_s
     assert_eq!(merged.merge_oid, MERGED);
     assert_eq!(merged.request_id, "S09:42:MERGE");
     let effects = simulator.take_observations();
-    assert_eq!(effects.len(), 2);
+    assert_eq!(effects.len(), 4);
     assert!(
         effects
             .iter()

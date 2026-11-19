@@ -9,7 +9,11 @@ const MERGED_OID: &str = "cccccccccccccccccccccccccccccccccccccccc";
 pub(super) fn applies(phase: Phase) -> bool {
     matches!(
         phase,
-        Phase::MergePrepare | Phase::MergeSend | Phase::MergeWrongHead
+        Phase::MergePrepare
+            | Phase::MergeSend
+            | Phase::MergeWrongHead
+            | Phase::MergeQueuePreflight
+            | Phase::MergeQueueRejected
     )
 }
 
@@ -38,6 +42,11 @@ pub(super) fn put(phase: Phase, path: &str, payload: &Value) -> Route {
         && *payload == json!({"sha": A_HEAD, "merge_method": "squash"})
     {
         Route::MergePut
+    } else if phase == Phase::MergeQueueRejected
+        && path == "/repos/fixture-org/private/pulls/43/merge"
+        && *payload == json!({"sha": B_HEAD, "merge_method": "squash"})
+    {
+        Route::MergeQueueDeniedPut
     } else {
         Route::Unexpected
     }
@@ -61,6 +70,12 @@ pub(super) fn response(phase: Phase, route: Route, sent: bool) -> Option<Respons
         return Some(response);
     }
     match route {
+        Route::MergeQueueDeniedPut if phase == Phase::MergeQueueRejected => Some(Response {
+            status: 405,
+            reason: "Method Not Allowed",
+            body: json!({"message":"This pull request must be merged via the merge queue."}),
+            sso: None,
+        }),
         Route::MergePut if !sent => Some(healthy(json!({"merged":true,"sha":MERGED_OID}))),
         Route::MergeReadback if sent => Some(healthy(json!({"data":{"node":{
             "id":"PR_42","number":42,"baseRefName":"main","baseRefOid":A_BASE,"headRefOid":A_HEAD,
@@ -77,12 +92,52 @@ pub(super) fn response(phase: Phase, route: Route, sent: bool) -> Option<Respons
                 "id":id,"number":number,"baseRefName":"main","baseRefOid":base,"headRefOid":head,
                 "state":"OPEN","isDraft":false,"merged":false,"mergeable":"MERGEABLE",
                 "mergeStateStatus":"CLEAN","reviewDecision":null,"mergeQueue":null,
+                "isMergeQueueEnabled":phase == Phase::MergeQueuePreflight,
                 "repository":{"id":"R_71","viewerPermission":"WRITE","mergeCommitAllowed":true,
                     "squashMergeAllowed":true,"rebaseMergeAllowed":false}
             }}})))
         }
         _ => None,
     }
+}
+
+pub(super) fn trace_queue(records: &[RequestEvidence]) -> bool {
+    let matches = |phase, route, status| {
+        records
+            .iter()
+            .filter(|row| row.phase == phase && row.route == route && row.status == status)
+            .count()
+    };
+    matches(Phase::MergePrepare, Route::MergePolicyA, 200) >= 1
+        && matches(Phase::MergeQueuePreflight, Route::MergePolicyA, 200) >= 1
+        && matches(Phase::MergePrepare, Route::MergePolicyB, 200) >= 1
+        && matches(Phase::MergeQueueRejected, Route::MergePolicyB, 200) >= 1
+        && matches(Phase::MergeQueueRejected, Route::MergeQueueDeniedPut, 405) == 1
+        && records.iter().all(|row| {
+            row.fixture_authorization
+                && match (row.phase, row.route) {
+                    (Phase::MergeQueueRejected, Route::MergeQueueDeniedPut) => row.status == 405,
+                    (
+                        Phase::MergePrepare
+                        | Phase::MergeQueuePreflight
+                        | Phase::MergeQueueRejected,
+                        Route::User
+                        | Route::Repository
+                        | Route::Items
+                        | Route::PullA
+                        | Route::PullB
+                        | Route::CompareA
+                        | Route::CompareB
+                        | Route::MergePolicyA
+                        | Route::MergePolicyB
+                        | Route::UpdatedItems
+                        | Route::UpdatedComments
+                        | Route::UpdatedInlineComments
+                        | Route::OpenPullIndex,
+                    ) => row.status == 200,
+                    _ => false,
+                }
+        })
 }
 
 pub(super) fn trace(records: &[RequestEvidence]) -> bool {
@@ -113,6 +168,52 @@ pub(super) fn trace(records: &[RequestEvidence]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn queue_fixture_accounts_for_the_only_permitted_direct_attempt() {
+        let payload = json!({"sha":B_HEAD,"merge_method":"squash"});
+        let path = "/repos/fixture-org/private/pulls/43/merge";
+        assert_eq!(
+            put(Phase::MergeQueuePreflight, path, &payload),
+            Route::Unexpected
+        );
+        assert_eq!(
+            put(Phase::MergeQueueRejected, path, &payload),
+            Route::MergeQueueDeniedPut
+        );
+        assert_eq!(
+            put(
+                Phase::MergeQueueRejected,
+                &format!("{path}-async"),
+                &payload
+            ),
+            Route::Unexpected
+        );
+        let evidence = [
+            (Phase::MergePrepare, Route::MergePolicyA, 200),
+            (Phase::MergeQueuePreflight, Route::MergePolicyA, 200),
+            (Phase::MergePrepare, Route::MergePolicyB, 200),
+            (Phase::MergeQueueRejected, Route::MergePolicyB, 200),
+            (Phase::MergeQueueRejected, Route::MergeQueueDeniedPut, 405),
+        ];
+        let mut trace: Vec<_> = evidence
+            .into_iter()
+            .map(|(phase, route, status)| RequestEvidence {
+                phase,
+                route,
+                status,
+                fixture_authorization: true,
+            })
+            .collect();
+        assert!(trace_queue(&trace));
+        trace.push(RequestEvidence {
+            phase: Phase::MergeQueueRejected,
+            route: Route::Unexpected,
+            status: 404,
+            fixture_authorization: true,
+        });
+        assert!(!trace_queue(&trace));
+    }
 
     #[test]
     fn fixture_only_merges_the_exact_squash_head_and_reads_back_the_same_pr() {

@@ -86,6 +86,7 @@ pub struct DirectMergeReceipt {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum DirectMergeRejection {
+    RequiredMergeQueue,
     HeadChanged,
     NotPermitted,
     Other,
@@ -97,7 +98,7 @@ pub struct DirectMergeFailure {
     pub transport: MutationFailure,
 }
 
-const POLICY: &str = "query ThreadlineMergePolicy($id:ID!) { node(id:$id) { ... on PullRequest { id number baseRefName baseRefOid headRefOid state isDraft merged mergeable mergeStateStatus reviewDecision mergeQueue { id } repository { id viewerPermission mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed } } } }";
+const POLICY: &str = "query ThreadlineMergePolicy($id:ID!) { node(id:$id) { ... on PullRequest { id number baseRefName baseRefOid headRefOid state isDraft merged mergeable mergeStateStatus reviewDecision isMergeQueueEnabled mergeQueue { id } repository { id viewerPermission mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed } } } }";
 
 const MERGED_PULL: &str = "query ThreadlineMergedPull($id:ID!) { node(id:$id) { ... on PullRequest { id number baseRefName baseRefOid headRefOid repository { id } state merged mergeCommit { oid } mergedBy { __typename ... on User { databaseId } } } } }";
 
@@ -389,8 +390,15 @@ impl GitHubWriter<'_> {
             &payload,
         )
         .map_err(|error| unsent(DirectMergeRejection::Other, error.kind))?;
-        let (raw, headers) = self.send(request, cancel).await.map_err(|transport| {
+        let mut queue_required = false;
+        let reply = self
+            .send_classifying(request, cancel, |status, payload| {
+                queue_required = explicit_queue_rejection(status, payload);
+            })
+            .await;
+        let (raw, headers) = reply.map_err(|transport| {
             let reason = match transport.access.http_status {
+                _ if queue_required => DirectMergeRejection::RequiredMergeQueue,
                 Some(409) => DirectMergeRejection::HeadChanged,
                 Some(405) => DirectMergeRejection::NotPermitted,
                 _ => DirectMergeRejection::Other,
@@ -419,6 +427,26 @@ impl GitHubWriter<'_> {
     }
 }
 
+fn explicit_queue_rejection(status: StatusCode, payload: &serde_json::Value) -> bool {
+    matches!(
+        status,
+        StatusCode::FORBIDDEN | StatusCode::METHOD_NOT_ALLOWED | StatusCode::UNPROCESSABLE_ENTITY
+    ) && (payload["code"] == "merge_queue_required"
+        || payload["errors"].as_array().is_some_and(|errors| {
+            errors
+                .iter()
+                .any(|error| error["code"] == "merge_queue_required")
+        })
+        || payload["message"].as_str().is_some_and(|message| {
+            matches!(
+                message.trim_end_matches('.').to_ascii_lowercase().as_str(),
+                "pull request must be merged via the merge queue"
+                    | "this pull request must be merged via the merge queue"
+                    | "this branch requires a merge queue"
+            )
+        }))
+}
+
 fn decode_policy(node: &serde_json::Value) -> MergeEligibility {
     let repository = &node["repository"];
     let method_flags = [
@@ -442,6 +470,7 @@ fn decode_policy(node: &serde_json::Value) -> MergeEligibility {
         _ => WritePermission::Unknown,
     };
     let queue = match node.get("mergeQueue") {
+        _ if node["isMergeQueueEnabled"] == true => QueueRequirement::Required,
         Some(serde_json::Value::Null) => QueueRequirement::NotRequired,
         Some(queue) if queue["id"].as_str().is_some_and(|id| !id.is_empty()) => {
             QueueRequirement::Required

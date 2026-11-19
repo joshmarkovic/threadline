@@ -615,6 +615,8 @@ fn run_e2e(options: &Options, root: &Path, dir: &Path) -> Vec<CaseResult> {
                 "S04-READER-PERF" | "S12-PHYSICAL-READER" | "S12-READER-CONCURRENT"
             ) {
                 Some(NativeMode::WindowsReaderPerformance)
+            } else if id == "S09-MERGE-QUEUE" {
+                Some(NativeMode::WindowsDirectMerge)
             } else {
                 WINDOWS_CASES
                     .iter()
@@ -865,6 +867,7 @@ fn native_driver(
         NativeMode::WindowsHistory => Some("History"),
         NativeMode::WindowsReviewDraft => Some("ReviewDraft"),
         NativeMode::WindowsReviewContext => Some("ReviewContext"),
+        NativeMode::WindowsDirectMerge if id == "S09-MERGE-QUEUE" => Some("MergeQueue"),
         NativeMode::WindowsDirectMerge => Some("DirectMerge"),
         NativeMode::WindowsCredentialBoundary => Some("CredentialBoundary"),
         NativeMode::WindowsNativeLifecycle => Some("NativeLifecycle"),
@@ -1039,6 +1042,9 @@ fn native_driver(
             (Status::Pass, NativeMode::WindowsHistory) => TraceCheck::HistoryJourney,
             (Status::Pass, NativeMode::WindowsReviewDraft) => TraceCheck::ReviewDraftJourney,
             (Status::Pass, NativeMode::WindowsReviewContext) => TraceCheck::ReviewContextJourney,
+            (Status::Pass, NativeMode::WindowsDirectMerge) if id == "S09-MERGE-QUEUE" => {
+                TraceCheck::MergeQueueJourney
+            }
             (Status::Pass, NativeMode::WindowsDirectMerge) => TraceCheck::MergeJourney,
             (Status::Pass, NativeMode::WindowsCredentialBoundary) => TraceCheck::CredentialBoundary,
             (Status::Pass, NativeMode::WindowsNativeLifecycle) => TraceCheck::NativeLifecycle,
