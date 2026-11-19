@@ -471,6 +471,28 @@ impl Store {
             )? == 1)
         })
     }
+    /// Renew an existing editor only while it still owns the exact saved revision.
+    pub fn renew_editor(
+        &self,
+        account: AccountId,
+        id: &str,
+        editor: &str,
+        revision: i64,
+        now: i64,
+        until: i64,
+    ) -> Result<bool> {
+        if editor.is_empty() || until <= now {
+            return Err(Error::InvalidInput("invalid editor lease"));
+        }
+        self.write(|tx| {
+            Ok(tx.execute(
+                "UPDATE drafts SET editor_until=?5
+                 WHERE account_id=?1 AND id=?2 AND editor=?3 AND revision=?4",
+                params![account, id, editor, revision, until],
+            )? == 1)
+        })
+    }
+
     pub fn release_editor(&self, account: AccountId, id: &str, editor: &str) -> Result<bool> {
         self.write(|tx|Ok(tx.execute("UPDATE drafts SET editor=NULL,editor_until=NULL WHERE account_id=? AND id=? AND editor=?",params![account,id,editor])?==1))
     }

@@ -2143,6 +2143,11 @@ fn ui_006_failed_enqueue_keeps_the_saved_comment_and_reports_the_failure(cx: &mu
         let editor = &reader.drafts[&draft_id];
         assert_eq!(editor.view.read(cx).value().as_ref(), body);
         assert!(editor.submitted.is_none());
+        assert!(
+            editor.saved(),
+            "The lease heartbeat must not invalidate saved text"
+        );
+        assert!(!editor.submitting && !editor.lease_lost);
     })
     .unwrap();
     assert_eq!(setup.store.queue_page(account, 0, 100).unwrap(), previous);

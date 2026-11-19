@@ -252,6 +252,11 @@ impl ReaderWorkspace {
         if editor.submitting {
             return;
         }
+        if editor.lease_lost {
+            self.status = Some(drafts::EDITOR_LEASE_LOST);
+            cx.notify();
+            return;
+        }
         editor.capture(cx);
         if !editor.saved() {
             self.status = Some("The local draft is still saving.");
@@ -279,24 +284,36 @@ impl ReaderWorkspace {
             window,
             cx,
             move |store| {
-                let request_id = store.new_operation_id()?;
                 let now = now_ms();
-                store.submit_write(
+                if !store.renew_editor(
                     account,
-                    WriteSubmission {
-                        id: &request_id,
-                        item,
-                        intent: &intent,
-                        draft: Some(DraftSubmission {
-                            id: &draft_id,
-                            revision: version,
-                            editor: &owned,
-                            now,
-                        }),
-                        dependencies: &[],
-                        submitted_at_ms: now,
-                    },
-                )
+                    &draft_id,
+                    &owned,
+                    version,
+                    now,
+                    now + drafts::EDITOR_LEASE_MS,
+                )? {
+                    return Ok(None);
+                }
+                let request_id = store.new_operation_id()?;
+                store
+                    .submit_write(
+                        account,
+                        WriteSubmission {
+                            id: &request_id,
+                            item,
+                            intent: &intent,
+                            draft: Some(DraftSubmission {
+                                id: &draft_id,
+                                revision: version,
+                                editor: &owned,
+                                now,
+                            }),
+                            dependencies: &[],
+                            submitted_at_ms: now,
+                        },
+                    )
+                    .map(Some)
             },
             move |this, result, window, cx| {
                 if let Some(editor) = this
@@ -305,20 +322,23 @@ impl ReaderWorkspace {
                     .filter(|editor| editor.account == account && editor.lease == lease)
                 {
                     editor.submitting = false;
-                    if result.is_ok() {
+                    if matches!(&result, Ok(Some(_))) {
                         editor.submitted = Some(
                             threadline_storage::queue::DraftSubmissionStatus::queued(version),
                         );
+                    } else if matches!(&result, Ok(None)) {
+                        editor.lease_lost = true;
                     }
                 }
                 match result {
-                    Ok(_) => {
+                    Ok(Some(_)) => {
                         this.status = Some("Saved to the Outbox.");
                         this.refresh_write_views(item, window, cx);
                         if let Some(worker) = this.sync_worker.as_ref() {
                             worker.wake(None);
                         }
                     }
+                    Ok(None) => this.status = Some(drafts::EDITOR_LEASE_LOST),
                     Err(_) => {
                         this.status =
                             Some("The action could not be queued. Your local draft is still saved.")
@@ -556,6 +576,7 @@ impl ReaderWorkspace {
             )
             .disabled(
                 editor.submitting
+                    || editor.lease_lost
                     || submitted.is_some()
                     || !editor.saved()
                     || !editor.has_write_changes(cx),

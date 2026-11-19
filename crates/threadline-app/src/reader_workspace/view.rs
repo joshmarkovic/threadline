@@ -1394,7 +1394,9 @@ impl ReaderWorkspace {
                             ),
                         ),
                     )
-                    .child(div().text_xs().child(if editor.failed {
+                    .child(div().text_xs().child(if editor.lease_lost {
+                        super::drafts::EDITOR_LEASE_LOST
+                    } else if editor.failed {
                         "Draft not saved. Edit to retry."
                     } else if editor.saved() {
                         "Local draft saved"

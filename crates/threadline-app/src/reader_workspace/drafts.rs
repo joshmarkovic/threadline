@@ -9,6 +9,9 @@ use threadline_storage::{
 };
 use tokio::{sync::watch, task::JoinHandle};
 
+pub(super) const EDITOR_LEASE_MS: i64 = 10_000;
+pub(super) const EDITOR_LEASE_LOST: &str = "This editor lost ownership of the saved draft.";
+
 #[derive(Clone)]
 struct DraftUpdate {
     serial: u64,
@@ -16,9 +19,21 @@ struct DraftUpdate {
 }
 
 struct Acknowledgement {
-    serial: Option<u64>,
+    serial: u64,
     saved: bool,
-    revision: Option<i64>,
+    revision: i64,
+    lease_lost: bool,
+}
+
+impl Acknowledgement {
+    fn observe_lease(&mut self, renewal: Outcome<bool>) -> bool {
+        let Ok(owned) = renewal else { return false };
+        if self.lease_lost == owned {
+            self.lease_lost = !owned;
+            return true;
+        }
+        false
+    }
 }
 
 struct OwnedDraft {
@@ -34,6 +49,7 @@ pub(super) struct Editor {
     pub(super) view: Entity<TextareaState>,
     pub(super) preview: Option<media::CachedMarkdown>,
     pub(super) failed: bool,
+    pub(super) lease_lost: bool,
     pub(super) account: AccountId,
     pub(super) item: ItemId,
     pub(super) lease: String,
@@ -120,18 +136,36 @@ async fn write_editor(
                 let pending = update.content.clone();
                 let execution = tokio::task::spawn_blocking(move || {
                     let now = now_ms();
-                    store.acquire_editor(account, &id, &lease, now, now + 10_000)?;
-                    store.save_draft(account, &id, &lease, now, revision, &pending)
+                    if !store.renew_editor(
+                        account,
+                        &id,
+                        &lease,
+                        revision,
+                        now,
+                        now + EDITOR_LEASE_MS,
+                    )? {
+                        return Ok(None);
+                    }
+                    store
+                        .save_draft(account, &id, &lease, now, revision, &pending)
+                        .map(Some)
                 })
                 .await;
-                let saved = matches!(&execution, Ok(Ok(_)));
-                if let Ok(Ok(latest)) = execution {
-                    revision = latest;
-                }
-                acknowledgements.send_replace(Acknowledgement {
-                    serial: Some(serial),
-                    saved,
-                    revision: saved.then_some(revision),
+                acknowledgements.send_modify(|state| {
+                    state.serial = serial;
+                    state.saved = false;
+                    match execution {
+                        Ok(Ok(Some(latest))) => {
+                            revision = latest;
+                            state.revision = latest;
+                            state.saved = true;
+                            state.observe_lease(Ok(true));
+                        }
+                        Ok(Ok(None)) => {
+                            state.observe_lease(Ok(false));
+                        }
+                        _ => {}
+                    }
                 });
             }
             None => {
@@ -140,15 +174,11 @@ async fn write_editor(
                 let lease = lease.clone();
                 let owned = tokio::task::spawn_blocking(move || {
                     let now = now_ms();
-                    store.acquire_editor(account, &id, &lease, now, now + 10_000)
+                    store.renew_editor(account, &id, &lease, revision, now, now + EDITOR_LEASE_MS)
                 })
                 .await;
-                if !matches!(owned, Ok(Ok(true))) {
-                    acknowledgements.send_replace(Acknowledgement {
-                        serial: None,
-                        saved: false,
-                        revision: None,
-                    });
+                if let Ok(renewal) = owned {
+                    acknowledgements.send_if_modified(|state| state.observe_lease(renewal));
                 }
             }
         }
@@ -374,7 +404,13 @@ impl ReaderWorkspace {
                     store.create_draft(account, &draft_id, item, kind, &content)?;
                 }
                 let now = now_ms();
-                if !store.acquire_editor(account, &draft_id, &editor_lease, now, now + 10_000)? {
+                if !store.acquire_editor(
+                    account,
+                    &draft_id,
+                    &editor_lease,
+                    now,
+                    now + EDITOR_LEASE_MS,
+                )? {
                     return Ok(None);
                 }
                 let opened = (|| -> Outcome<_> {
@@ -441,9 +477,10 @@ impl ReaderWorkspace {
                 });
                 let (updates, receiver) = watch::channel(None);
                 let (signals, mut acknowledgements) = watch::channel(Acknowledgement {
-                    serial: Some(0),
+                    serial: 0,
                     saved: true,
-                    revision: Some(draft.revision),
+                    revision: draft.revision,
+                    lease_lost: false,
                 });
                 let task = this.runtime.spawn(write_editor(
                     Arc::clone(&this.store),
@@ -464,6 +501,7 @@ impl ReaderWorkspace {
                             serial,
                             saved,
                             revision,
+                            lease_lost,
                         } = *acknowledgements.borrow_and_update();
                         if view
                             .update_in(cx, |this, window, cx| {
@@ -471,17 +509,15 @@ impl ReaderWorkspace {
                                     && editor.account == account
                                     && editor.lease == current_lease
                                 {
+                                    editor.lease_lost = lease_lost;
                                     if saved {
-                                        editor.persisted =
-                                            editor.persisted.max(serial.unwrap_or_default());
-                                        if let Some(revision) = revision {
-                                            editor.durable_revision = revision;
-                                            editor.submitted = editor
-                                                .submitted
-                                                .filter(|status| status.revision == revision);
-                                        }
+                                        editor.persisted = editor.persisted.max(serial);
+                                        editor.durable_revision = revision;
+                                        editor.submitted = editor
+                                            .submitted
+                                            .filter(|status| status.revision == revision);
                                     }
-                                    if serial.is_none_or(|latest| latest == editor.serial) {
+                                    if serial == editor.serial {
                                         editor.failed = !saved;
                                     }
                                     this.settle_departure(window, cx);
@@ -516,6 +552,7 @@ impl ReaderWorkspace {
                         view: editor.clone(),
                         preview: None,
                         failed: false,
+                        lease_lost: false,
                         account,
                         item,
                         lease,
@@ -666,4 +703,102 @@ pub(super) fn draft_base(
         .encode()?;
     }
     Ok(draft)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::{Connection, ErrorCode, TransactionBehavior};
+    use threadline_storage::{
+        DATABASE_FILENAME, Error,
+        fixtures::{Scale, populate_reader},
+        queue::DraftSubmission,
+        writes::{WriteIntent, WriteSubmission},
+    };
+
+    #[test]
+    fn ui_006_editor_busy_renewal_preserves_saved_content_and_replacement_blocks_enqueue() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = Store::open_profile(directory.path()).unwrap();
+        let fixture = populate_reader(&store, 12345, Scale::Small).unwrap();
+        let account = fixture.account;
+        let item = fixture.long_discussion;
+        let id = "saved-comment";
+        let owner = "original-editor";
+        let content = DraftContent {
+            body: "The existing draft body".into(),
+            base: String::new(),
+            anchor: String::new(),
+        };
+        store
+            .create_draft(account, id, item, DraftKind::Comment, &content)
+            .unwrap();
+        let version = store.draft(account, id).unwrap().unwrap().revision;
+        assert!(store.acquire_editor(account, id, owner, 10, 20).unwrap());
+        let original_queue = store.queue_page(account, 0, 100).unwrap();
+        let mut latest = Acknowledgement {
+            serial: 3,
+            saved: true,
+            revision: version,
+            lease_lost: false,
+        };
+        let mut writer = Connection::open(directory.path().join(DATABASE_FILENAME)).unwrap();
+        let reservation = writer
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .unwrap();
+        let failed = store.renew_editor(account, id, owner, version, 15, 30);
+        assert!(
+            matches!(&failed, Err(Error::Sql(error)) if error.sqlite_error_code() == Some(ErrorCode::DatabaseBusy))
+        );
+        assert!(!latest.observe_lease(failed));
+        assert!(latest.saved && !latest.lease_lost);
+        assert_eq!((latest.serial, latest.revision), (3, version));
+        drop(reservation);
+
+        let extended = store.renew_editor(account, id, owner, version, 16, 40);
+        assert!(matches!(&extended, Ok(true)));
+        assert!(!latest.observe_lease(extended));
+        assert!(
+            !store
+                .acquire_editor(account, id, "another-editor", 30, 60)
+                .unwrap()
+        );
+        assert!(
+            store
+                .acquire_editor(account, id, "another-editor", 41, 70)
+                .unwrap()
+        );
+        assert!(latest.observe_lease(store.renew_editor(account, id, owner, version, 42, 75)));
+        assert!(latest.saved && latest.lease_lost);
+        assert_eq!(store.draft(account, id).unwrap().unwrap().content, content);
+        assert!(
+            !store
+                .renew_editor(account, id, owner, version, 71, 100)
+                .unwrap()
+        );
+
+        let error = store
+            .submit_write(
+                account,
+                WriteSubmission {
+                    id: &store.new_operation_id().unwrap(),
+                    item,
+                    intent: &WriteIntent::CreateComment { body: content.body },
+                    draft: Some(DraftSubmission {
+                        id,
+                        revision: version,
+                        editor: owner,
+                        now: 42,
+                    }),
+                    dependencies: &[],
+                    submitted_at_ms: 42,
+                },
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Conflict("submission does not own the requested draft revision")
+        ));
+        assert_eq!(store.queue_page(account, 0, 100).unwrap(), original_queue);
+    }
 }

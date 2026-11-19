@@ -110,6 +110,7 @@ impl ReaderWorkspace {
         .disabled(
             !bound
                 || !editor.saved()
+                || editor.lease_lost
                 || editor.submitting
                 || editor.body.trim().is_empty()
                 || submitted.is_some(),
@@ -128,6 +129,11 @@ impl ReaderWorkspace {
                 ),
             )
             .child(self.observed_control(submit, button, false))
+            .children(
+                editor
+                    .lease_lost
+                    .then(|| div().text_sm().child(drafts::EDITOR_LEASE_LOST)),
+            )
             .children((!bound).then(|| {
                 div()
                     .text_sm()
@@ -154,7 +160,7 @@ impl ReaderWorkspace {
         else {
             return;
         };
-        if editor.submitting || revision_id != current {
+        if editor.submitting || editor.lease_lost || revision_id != current {
             return;
         }
         editor.capture(cx);
@@ -185,21 +191,33 @@ impl ReaderWorkspace {
                     .pr_revision(account, item, revision_id)?
                     .ok_or(threadline_storage::Error::NotFound)?;
                 let now = now_ms();
-                store.submit_review(
-                    &revision,
-                    ReviewSubmission {
-                        id: &store.new_operation_id()?,
-                        intent: &intent,
-                        draft: Some(DraftSubmission {
-                            id: &edit_key,
-                            revision: version,
-                            editor: &edit_lease,
-                            now,
-                        }),
-                        dependencies: &[],
-                        submitted_at_ms: now,
-                    },
-                )
+                if !store.renew_editor(
+                    account,
+                    &edit_key,
+                    &edit_lease,
+                    version,
+                    now,
+                    now + drafts::EDITOR_LEASE_MS,
+                )? {
+                    return Ok(None);
+                }
+                store
+                    .submit_review(
+                        &revision,
+                        ReviewSubmission {
+                            id: &store.new_operation_id()?,
+                            intent: &intent,
+                            draft: Some(DraftSubmission {
+                                id: &edit_key,
+                                revision: version,
+                                editor: &edit_lease,
+                                now,
+                            }),
+                            dependencies: &[],
+                            submitted_at_ms: now,
+                        },
+                    )
+                    .map(Some)
             },
             move |this, result, window, cx| {
                 if let Some(editor) = this
@@ -208,13 +226,20 @@ impl ReaderWorkspace {
                     .filter(|editor| editor.lease == lease)
                 {
                     editor.submitting = false;
-                    if result.is_ok() {
+                    if matches!(&result, Ok(Some(_))) {
                         editor.submitted = Some(
                             threadline_storage::queue::DraftSubmissionStatus::queued(version),
                         );
+                    } else if matches!(&result, Ok(None)) {
+                        editor.lease_lost = true;
                     }
                 }
-                this.finish_thread_action(item, result.is_ok(), window, cx);
+                if matches!(result, Ok(None)) {
+                    this.status = Some(drafts::EDITOR_LEASE_LOST);
+                    this.settle_departure(window, cx);
+                } else {
+                    this.finish_thread_action(item, result.is_ok(), window, cx);
+                }
             },
         );
     }
