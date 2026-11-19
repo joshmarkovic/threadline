@@ -89,6 +89,7 @@ impl Store {
             if body_at!=Some(expected_body_at_ms){return Err(Error::Conflict("Downloaded PR body changed before indexing"));}
             let route=RepositoryName::new(&owner,&repository).map_err(|_|Error::Corrupt)?;
             let refs=closing_references(body.as_deref().unwrap_or_default(),&route);
+            let prior=references_in(tx,account,pr)?;
             let candidates=refs.iter().enumerate().map(|(idx,r)|ReferenceCandidate{
                 position:idx as i64,raw:r.raw.clone(),
                 provenance:format!("PR body: {}/{}#{}",r.repository.owner().to_ascii_lowercase(),r.repository.name().to_ascii_lowercase(),r.number.get()),
@@ -105,10 +106,16 @@ impl Store {
                 params![proof_id,encoded(&body)?])?;
             for (index,link) in refs.into_iter().enumerate(){
                 let number=i64::try_from(link.number.get()).map_err(|_|Error::InvalidInput("Issue number exceeds the storage range"))?;
+                let cached=prior.iter().find(|reference|
+                    reference.verified_item.is_some() && reference.raw==link.raw
+                    && reference.provenance==candidates[index].provenance);
+                let latest=cached.map_or(Verification::Verified,|reference|reference.verification);
+                let checked_at=cached.and_then(|reference|reference.checked_at_ms);
                 tx.execute("INSERT INTO pr_reference_results(account_id,pr_id,position,owner,repository,number,verification,checked_at)
-                    SELECT ?1,?2,?3,?4,?5,?6,CASE WHEN verified_issue IS NULL THEN 'pending' ELSE 'verified' END,verified_at
+                    SELECT ?1,?2,?3,?4,?5,?6,CASE WHEN verified_issue IS NULL THEN 'pending' ELSE ?7 END,
+                        CASE WHEN verified_issue IS NOT NULL THEN coalesce(?8,verified_at) END
                     FROM pr_reference_candidates WHERE account_id=?1 AND pr_id=?2 AND position=?3",
-                    params![account,pr,index as i64,link.repository.owner(),link.repository.name(),number])?;
+                    params![account,pr,index as i64,link.repository.owner(),link.repository.name(),number,latest.code(),checked_at])?;
             }
             references_in(tx,account,pr)
         })

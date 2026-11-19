@@ -1243,7 +1243,7 @@ fn it_006_it_016_scheduled_pr_pages_checkpoint_first_etag_and_reject_changed_acc
 fn it_017_cross_owner_issue_verification_does_not_select_or_monitor_the_other_repository() {
     let dir = tempfile::tempdir().unwrap();
     let store = Store::open_profile(dir.path()).unwrap();
-    let (account, _, pr) = setup(&store);
+    let (account, source, pr) = setup(&store);
     let refs = store
         .index_pr_body(account, pr, None, "body20", 20)
         .unwrap();
@@ -1336,6 +1336,48 @@ fn it_017_cross_owner_issue_verification_does_not_select_or_monitor_the_other_re
     let offline = store.pr_body_references(account, pr).unwrap();
     assert_eq!(offline[2].verified_item, Some(issue));
     assert_eq!(offline[2].verification, Verification::Offline);
+    store
+        .record_pr_reference(
+            account,
+            pr,
+            "body20",
+            2,
+            ReferenceObservation::Inaccessible,
+            66,
+        )
+        .unwrap();
+
+    ingest(
+        &store,
+        account,
+        source,
+        70,
+        true,
+        "New introduction. Closed other/x#7. Resolves #4.",
+        70,
+    );
+    let revised = store
+        .index_pr_body(account, pr, Some("body20"), "body70", 70)
+        .unwrap();
+    assert_eq!(revised[0].number, 7);
+    assert_eq!(revised[0].verified_item, Some(issue));
+    assert_eq!(revised[0].verification, Verification::Inaccessible);
+    assert_eq!(revised[0].checked_at_ms, Some(66));
+    assert!(
+        store
+            .record_pr_reference(account, pr, "body70", 0, ReferenceObservation::Offline, 65)
+            .is_err()
+    );
+
+    ingest(&store, account, source, 70, true, "Closed other/y#7.", 80);
+    let replaced = store
+        .index_pr_body(account, pr, Some("body70"), "body80", 80)
+        .unwrap();
+    assert_eq!(replaced.len(), 1);
+    assert_eq!(replaced[0].repository, "y");
+    assert_eq!(replaced[0].verification, Verification::Pending);
+    assert_eq!(replaced[0].verified_item, None);
+    assert_eq!(replaced[0].checked_at_ms, None);
 }
 
 #[test]
