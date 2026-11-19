@@ -272,7 +272,7 @@ function Get-DefaultFixturePoint($Label, $Card, $Window) {
     return $point
 }
 
-function Invoke-FixtureCenterClick([IntPtr]$AppWindow) {
+function Invoke-FixtureCenterClick([IntPtr]$AppWindow, [switch]$InvokeOnly) {
     $signedShells = @{}
     $foreground = [ThreadlineWinInput]::GetForegroundWindow()
     if ($foreground -ne $AppWindow) { Stop-Blocked 'The verified fixture app was not foreground before Win+N.' }
@@ -298,9 +298,9 @@ function Invoke-FixtureCenterClick([IntPtr]$AppWindow) {
                         if ($null -eq $center) { $center = $native }
                         if (![ThreadlineWinInput]::SameBanner($center, $native)) { return $false }
                         $first = Get-CenterFixtureHit $root $native $stats
-                        if ($null -ne $first) {
+                        if ($null -ne $first -and (!$InvokeOnly -or ($first.Kind -ceq 'default card' -and $first.CanInvoke))) {
                             $preferInvoke = $first.Kind -ceq 'default card' -and $first.CanInvoke
-                            $pointerPrepared = !$preferInvoke -and $null -ne $first.Point -and [ThreadlineWinInput]::MoveToBanner($first.Point, $first.Window)
+                            $pointerPrepared = !$InvokeOnly -and !$preferInvoke -and $null -ne $first.Point -and [ThreadlineWinInput]::MoveToBanner($first.Point, $first.Window)
                             $checked = $clock.ElapsedMilliseconds
                             $sameNative = [ThreadlineWinInput]::ShellWindow([ThreadlineWinInput]::GetForegroundWindow())
                             if ([ThreadlineWinInput]::SameBanner($native, $sameNative)) {

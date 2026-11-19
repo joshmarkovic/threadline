@@ -1,6 +1,8 @@
 //! Create an empty-profile fixture for the installed activity adapter, or inspect its durable state.
 #[path = "notification_fixture/grouped.rs"]
 mod grouped;
+#[path = "notification_fixture/watched.rs"]
+mod watched;
 
 use std::{error::Error, fs, io::Write, num::NonZeroU64, path::Path};
 
@@ -29,6 +31,7 @@ enum Fixture {
     Mentions,
     Runtime,
     Review,
+    Watched,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -44,6 +47,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some("seed") => seed(root, Fixture::Mentions)?,
         Some("seed-runtime") => seed(root, Fixture::Runtime)?,
         Some("seed-review") => seed(root, Fixture::Review)?,
+        Some("seed-watched") => seed(root, Fixture::Watched)?,
+        Some("inspect-watched") => watched::inspect(root)?,
         Some("inspect-review") => grouped::inspect(root)?,
         Some("replay-review") => grouped::replay(root)?,
         Some("inspect-runtime") => inspect_runtime(root)?,
@@ -93,6 +98,7 @@ fn seed(root: &Path, fixture: Fixture) -> Result<Value, Box<dyn Error>> {
         Fixture::Runtime => RUNTIME_MARKER,
         Fixture::Mentions => MARKER,
         Fixture::Review => grouped::MARKER,
+        Fixture::Watched => watched::MARKER,
     };
     let mut marker = fs::OpenOptions::new()
         .create_new(true)
@@ -143,6 +149,11 @@ fn seed(root: &Path, fixture: Fixture) -> Result<Value, Box<dyn Error>> {
         s.controls.pause_queued_actions = true;
         s.controls.work_offline = fixture == Fixture::Runtime;
     })?;
+    if fixture == Fixture::Watched {
+        seed_runtime(&store, account, repo)?;
+        watched::seed(&store, &p, repo)?;
+        return watched::inspect(root);
+    }
     if fixture == Fixture::Review {
         seed_runtime(&store, account, repo)?;
         store.schedule_selected_activity(account, now)?;
@@ -396,4 +407,30 @@ fn inspect_runtime(root: &Path) -> Result<Value, Box<dyn Error>> {
         json!({"fixture":RUNTIME_MARKER,"offline":offline,"tabs":pane.tabs.len(),"active":pane.active,
         "path":pr.and_then(|v|v.selected_path.as_deref()),"mode":pr.map(|v|v.diff_mode)}),
     )
+}
+
+fn owned_activity(
+    root: &Path,
+    marker: &str,
+) -> Result<(Connection, AccountId, RepositoryId), Box<dyn Error>> {
+    if fs::read(root.join(marker))? != marker.as_bytes() {
+        return Err("The activity fixture marker did not match.".into());
+    }
+    let db = Connection::open_with_flags(
+        root.join("threadline.sqlite3"),
+        OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
+    db.busy_timeout(std::time::Duration::from_secs(3))?;
+    let (account, repository) = db.query_row(
+        "SELECT r.account_id, r.id FROM repositories r
+         JOIN github_access_profiles p ON p.account_id = r.account_id
+         JOIN accounts a ON a.id = r.account_id JOIN dispatch_profiles d ON d.account_id = a.id
+         JOIN sync_settings s ON s.account_id = a.id
+         WHERE (SELECT count(*) FROM accounts) = 1 AND (SELECT count(*) FROM repositories) = 1
+         AND a.provider_user_id = 817123456 AND r.provider_repository_id = 917123456
+         AND p.owner_scope = ? AND r.owner = ? AND r.name = 'installed-alerts' AND d.offline = 0 AND d.outbox_paused = 1 AND s.background_paused = 1",
+        [OWNER, OWNER],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    Ok((db, account, repository))
 }

@@ -1,7 +1,7 @@
-use super::{OWNER, number};
-use rusqlite::{Connection, OpenFlags, params};
+use super::number;
+use rusqlite::params;
 use serde_json::{Value, json};
-use std::{error::Error, fs, path::Path, time::Duration};
+use std::{error::Error, path::Path};
 use threadline_storage::{
     AccountId, ItemLocator, RepositoryId, Store, UtcMillis,
     notifications::{Category, DeliveryMode, EventActor, EventFacts},
@@ -114,31 +114,8 @@ pub(super) fn seed(store: &Store, account: AccountId, repository: RepositoryId) 
     )
 }
 
-fn owned(root: &Path) -> Result<(Connection, AccountId, RepositoryId)> {
-    if fs::read(root.join(MARKER))? != MARKER.as_bytes() {
-        return Err("The grouped review fixture marker did not match.".into());
-    }
-    let db = Connection::open_with_flags(
-        root.join("threadline.sqlite3"),
-        OpenFlags::SQLITE_OPEN_READ_ONLY,
-    )?;
-    db.busy_timeout(Duration::from_secs(3))?;
-    let (account, repository) = db.query_row(
-        "SELECT r.account_id, r.id FROM repositories r
-         JOIN github_access_profiles p ON p.account_id = r.account_id
-         JOIN accounts a ON a.id = r.account_id JOIN dispatch_profiles d ON d.account_id = a.id
-         JOIN sync_settings s ON s.account_id = a.id
-         WHERE (SELECT count(*) FROM accounts) = 1 AND (SELECT count(*) FROM repositories) = 1
-         AND a.provider_user_id = 817123456 AND r.provider_repository_id = 917123456
-         AND p.owner_scope = ? AND r.owner = ? AND r.name = 'installed-alerts' AND d.offline = 0 AND d.outbox_paused = 1 AND s.background_paused = 1",
-        [OWNER, OWNER],
-        |r| Ok((r.get(0)?, r.get(1)?)),
-    )?;
-    Ok((db, account, repository))
-}
-
 pub(super) fn inspect(root: &Path) -> Result<Value> {
-    let (mut db, account, repo) = owned(root)?;
+    let (mut db, account, repo) = crate::owned_activity(root, MARKER)?;
     let tx = db.transaction()?;
     let mut events = Vec::new();
     let mut query = tx.prepare(
@@ -187,7 +164,7 @@ pub(super) fn replay(root: &Path) -> Result<Value> {
     let at = state["events"][0]["occurred_at"]
         .as_i64()
         .ok_or("Missing original review time")?;
-    let (_, account, repo) = owned(root)?;
+    let (_, account, repo) = crate::owned_activity(root, MARKER)?;
     let store = Store::open_profile(root)?;
     let rev = revision(&store, account, repo)?;
     observe_review(&store, &rev, at)?;
@@ -227,7 +204,7 @@ mod tests {
         assert_eq!(before["events"][1]["categories"], json!(["InlineComment"]));
         assert_eq!(before["events"][1]["actor_id"], ACTOR);
         assert!(replay(root).is_err());
-        let (_, account, _) = owned(root).unwrap();
+        let (_, account, _) = crate::owned_activity(root, MARKER).unwrap();
         let store = Store::open_profile(root).unwrap();
         let now = UtcMillis::now().unwrap().0;
         assert_eq!(

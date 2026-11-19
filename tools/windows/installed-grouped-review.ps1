@@ -20,15 +20,6 @@ function Get-GroupedHistoryCount {
         $_.Tag -ceq $group.Substring(0,16) -and $_.Group -ceq $group.Substring(16)
     }).Count
 }
-function Start-GroupedReviewProcess {
-    $endpoint = 'http://127.0.0.1:' + $reviewProxy.LocalEndpoint.Port
-    $info = New-Object Diagnostics.ProcessStartInfo
-    $info.FileName = $exe
-    $info.UseShellExecute = $false
-    foreach ($name in @('HTTP_PROXY','HTTPS_PROXY','ALL_PROXY')) { $info.EnvironmentVariables[$name] = $endpoint }
-    $info.EnvironmentVariables['NO_PROXY'] = ''
-    return [Diagnostics.Process]::Start($info)
-}
 function Test-InstalledGroupedReview {
     $before = Read-Fixture seed-review
     Assert-GroupedReviewEvents $before
@@ -36,10 +27,9 @@ function Test-InstalledGroupedReview {
         throw 'The original observations must be new to the installed application.'
     }
     Add-Evidence 'Commit the two synthetic PR pages through the ordinary observation code with both network queues paused' $before
-    $script:reviewProxy = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
-    $reviewProxy.Start()
+    Start-ActivityFixtureProxy
     $script:toastHistory = [Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime]::History
-    $script:child = Start-GroupedReviewProcess
+    $script:child = Start-ActivityFixtureProcess
     $report.initial_pid = $child.Id
     $first = Wait-Activity 'the single real native review group' {
         if ($child.HasExited) { throw 'The installed process exited before delivery.' }
@@ -70,7 +60,7 @@ function Test-InstalledGroupedReview {
     if ($pending.event_count -ne 3 -or $pending.events[2].kind -cne 'check_completed' -or $pending.events[2].published) {
         throw 'Replay did not preserve the two source keys and create one pending feed-only check.'
     }
-    $script:child = Start-GroupedReviewProcess
+    $script:child = Start-ActivityFixtureProcess
     $report.restarted_pid = $child.Id
     if ($child.Id -eq $report.initial_pid) { throw 'A separate process restart was not observed.' }
     $after = Wait-Activity 'the new process publishing its independent feed-only check' {
@@ -87,7 +77,7 @@ function Test-InstalledGroupedReview {
         $after.events[2].mode -cne 'FeedOnly' -or !$after.events[2].published -or $after.events[2].grouped -or (Get-GroupedHistoryCount) -ne 0) {
         throw 'Restart changed the original delivery or returned the retired card to Windows history.'
     }
-    $report.loopback_proxy_received_connection = $reviewProxy.Pending()
+    $report.loopback_proxy_received_connection = $activityProxy.Pending()
     if ($report.loopback_proxy_received_connection) { throw 'The installed fixture attempted a network request.' }
     Add-Evidence 'Reopen, publish the independent feed-only barrier and retain both original deliveries without a replacement card' $after
 }
