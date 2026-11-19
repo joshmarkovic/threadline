@@ -1,5 +1,6 @@
 use super::{remote::RemoteFamily, *};
 use crate::palette::Palette;
+use gpui_kit::base::TestTextExt;
 use gpui_kit::{
     AnyElement, App, ClickEvent, Div, InteractiveElement, IntoElement, ParentElement, Render, Role,
     StatefulInteractiveElement, Styled, TestSupportExt,
@@ -1870,6 +1871,9 @@ pub(super) fn control(
         .accessibility_id(id)
 }
 
+pub(super) const BADGE_BACKGROUND: u32 = 0x173e70;
+pub(super) const BADGE_FOREGROUND: u32 = 0xffffff;
+
 fn rail(
     id: &'static str,
     label: &'static str,
@@ -1892,9 +1896,18 @@ fn rail(
             )
         }
     };
+    let badge = count.and_then(KnownCount::badge).map(|total| {
+        let digits = gpui_kit::SharedString::from(total.to_string());
+        let diameter = (13. + digits.len() as f32 * 7.).max(23.);
+        (digits, diameter)
+    });
     let button = Button::new(id)
         .small()
         .w_full()
+        .when_some(badge.as_ref(), |button, (_, diameter)| {
+            // Small buttons clip children to their content box inside the border.
+            button.min_h(px(*diameter + 4.))
+        })
         .accessibility_id(id)
         .accessibility_label(description.clone())
         .tooltip(description.clone())
@@ -1906,23 +1919,21 @@ fn rail(
                 .items_center()
                 .justify_between()
                 .gap_2()
-                .child(label)
-                .children(count.and_then(KnownCount::badge).map(|count| {
-                    let number = count.to_string();
-                    let size = (13. + number.len() as f32 * 7.).max(23.);
+                .child(label.test_text(label))
+                .children(badge.map(|(number, diameter)| {
                     div()
                         .id(format!("{id}-badge"))
                         .test_support()
-                        .size(px(size))
+                        .size(px(diameter))
                         .rounded_full()
                         .flex_shrink_0()
                         .flex()
                         .items_center()
                         .justify_center()
                         .text_xs()
-                        .text_color(rgb(0xffffff))
-                        .bg(rgb(0x173e70))
-                        .child(number)
+                        .text_color(rgb(BADGE_FOREGROUND))
+                        .bg(rgb(BADGE_BACKGROUND))
+                        .child(number.clone().test_text(number))
                 })),
         );
     div()

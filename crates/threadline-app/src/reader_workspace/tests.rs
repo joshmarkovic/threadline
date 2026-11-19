@@ -3851,3 +3851,5 @@ fn ui_007_notification_opens_the_exact_downloaded_provider_comment(cx: &mut Test
         });
     }
 }
+
+mod badges;
