@@ -1,8 +1,8 @@
 use super::*;
 use crate::palette::Palette;
 use gpui_kit::{
-    AnyElement, InteractiveElement, IntoElement, ParentElement, Role, StatefulInteractiveElement,
-    Styled,
+    AnyElement, Element, InteractiveElement, IntoElement, ParentElement, Role,
+    StatefulInteractiveElement, Styled,
     component::{Disableable, Selectable},
     div,
 };
@@ -535,15 +535,7 @@ impl ReaderWorkspace {
                     .text_sm()
                     .child(format!("Depends on {}", operation.dependencies.join(", ")))
             }))
-            .children(detail.intent.as_ref().map(|intent| {
-                let preview = intent_preview(intent);
-                div()
-                    .id("reader-outbox-intent")
-                    .role(Role::Group)
-                    .aria_label(preview.replace('\n', ". "))
-                    .text_sm()
-                    .child(preview)
-            }))
+            .children(detail.intent.as_ref().map(intent_element))
             .children(
                 detail
                     .conflict
@@ -795,19 +787,86 @@ fn conflict_view(conflict: &WriteConflict, palette: Palette) -> AnyElement {
     view.into_any_element()
 }
 
-fn conflict_value(id: &'static str, field: &str, value: &str) -> AnyElement {
+fn intent_element(intent: &WriteIntent) -> impl Element {
+    let preview = intent_preview(intent);
+    outbox_text("reader-outbox-intent", preview.replace('\n', ". "), preview)
+}
+
+fn conflict_value(id: &'static str, field: &str, value: &str) -> impl Element {
     let presentation = format!("{field} · {value}");
+    outbox_text(id, presentation.clone(), presentation)
+}
+
+fn outbox_text(id: &'static str, label: String, text: String) -> impl Element {
     div()
         .id(id)
+        .accessibility_id(id)
         .role(Role::Group)
-        .aria_label(presentation.clone())
-        .child(presentation)
-        .into_any_element()
+        .aria_label(label)
+        .text_sm()
+        .child(text)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::DraftStatusLookup;
+    use super::{DraftStatusLookup, conflict_value, intent_element};
+    use gpui_kit::{Element, Role, accesskit::Node};
+    use threadline_storage::writes::{FieldEdit, IssueChanges, WriteIntent};
+
+    #[test]
+    fn issue_conflict_nodes_publish_their_native_author_ids_and_names() {
+        fn check(element: impl Element, id: &str, name: &str) {
+            let mut node = Node::new(element.a11y_role().unwrap());
+            element.write_a11y_info(&mut node);
+            assert_eq!(node.role(), Role::Group);
+            assert_eq!(node.author_id(), Some(id));
+            assert_eq!(node.label(), Some(name));
+        }
+        for (id, field, value) in [
+            (
+                "reader-conflict-original-title",
+                "Original title",
+                "Initial",
+            ),
+            (
+                "reader-conflict-remote-title",
+                "Current GitHub title",
+                "Remote",
+            ),
+            (
+                "reader-conflict-original-description",
+                "Original description",
+                "No description",
+            ),
+            (
+                "reader-conflict-remote-description",
+                "Current GitHub description",
+                "Unavailable",
+            ),
+        ] {
+            check(
+                conflict_value(id, field, value),
+                id,
+                &format!("{field} · {value}"),
+            );
+        }
+        let intent = WriteIntent::EditIssue(IssueChanges {
+            title: Some(FieldEdit {
+                base: "Initial".into(),
+                wanted: "Mine".into(),
+            }),
+            body: Some(FieldEdit {
+                base: None,
+                wanted: Some("Draft".into()),
+            }),
+            ..Default::default()
+        });
+        check(
+            intent_element(&intent),
+            "reader-outbox-intent",
+            "Title · Mine. Description · Draft",
+        );
+    }
 
     #[test]
     fn submitted_status_from_a_closed_editor_cannot_replace_a_reopened_editor() {
