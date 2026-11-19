@@ -53,6 +53,42 @@ fn checkpoint(
 }
 
 impl Store {
+    /// Resolve one downloaded GitHub review comment within a verified PR revision.
+    pub fn pr_review_comment(
+        &self,
+        rev: &PrRevision,
+        comment_id: std::num::NonZeroU64,
+    ) -> Result<Option<(String, InlineComment)>> {
+        self.read(|db| {
+            let tx = db.unchecked_transaction()?;
+            let Some(resource) = family_id(&tx, rev, PrFamily::Threads)? else {
+                return Ok(None);
+            };
+            let mut query = tx.prepare(
+                "SELECT r.record_key,r.body FROM cached_resource_records r
+                 JOIN json_each(r.body,'$.record.Thread.comments') c
+                 WHERE r.resource_id=?1 AND c.value->'$.id' = ?2 LIMIT 2",
+            )?;
+            let mut rows = query.query(params![resource, comment_id.to_string()])?;
+            let Some(first) = rows.next()? else {
+                return Ok(None);
+            };
+            let key: String = first.get(0)?;
+            let body: String = first.get(1)?;
+            if rows.next()?.is_some() {
+                return Ok(None);
+            }
+            let stored: StoredRecord = decoded(&body)?;
+            let PrRecord::Thread { comments, .. } = stored.record else {
+                return Err(Error::Corrupt);
+            };
+            Ok(comments
+                .into_iter()
+                .find(|comment| comment.id == comment_id.get())
+                .map(|comment| (key, comment)))
+        })
+    }
+
     pub fn pr_reply_checkpoint(
         &self,
         rev: &PrRevision,

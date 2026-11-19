@@ -286,6 +286,11 @@ impl ReaderWorkspace {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let settings = tab_settings(tab);
+        let linked_review = tab
+            .view
+            .scroll_anchor
+            .as_deref()
+            .is_some_and(|anchor| anchor.starts_with(super::view::REVIEW_URL_ANCHOR));
         let pr = self
             .tab_views
             .get(&tab.id)
@@ -324,6 +329,13 @@ impl ReaderWorkspace {
             );
         let Some(pr) = pr else {
             return panel
+                .children(linked_review.then(|| {
+                    pr_status(
+                        format!("pr-{pane}-linked-review-comment"),
+                        "The linked review comment is unavailable in the downloaded pull request.",
+                        palette,
+                    )
+                }))
                 .child(
                     div()
                         .p_2()
@@ -347,6 +359,32 @@ impl ReaderWorkspace {
         };
         if settings.section != PrSection::Files {
             panel = panel.child(self.review_view(pane, tab, pr, palette, cx));
+        }
+        if linked_review && settings.section == PrSection::Conversation {
+            let id = format!("pr-{pane}-linked-review-comment");
+            panel = panel.child(match &pr.data.linked_review_comment {
+                Some(comment) => div()
+                    .id(id.clone())
+                    .accessibility_id(id)
+                    .role(Role::Group)
+                    .aria_label("Linked review comment")
+                    .max_h(px(96.))
+                    .overflow_y_scroll()
+                    .p_2()
+                    .child(format!(
+                        "Linked review comment · {} · {}",
+                        comment.author.as_deref().unwrap_or("Unknown reviewer"),
+                        time_label(comment.created_at_ms),
+                    ))
+                    .child(comment.body.clone())
+                    .into_any_element(),
+                None => pr_status(
+                    id,
+                    "The linked review comment is unavailable in the downloaded pull request.",
+                    palette,
+                )
+                .into_any_element(),
+            });
         }
         panel = panel.child(match settings.section {
             PrSection::Conversation => div()

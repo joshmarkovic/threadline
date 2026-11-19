@@ -4,9 +4,9 @@ use gpui_kit::component::diff::{
 };
 use threadline_storage::{
     pr::{
-        BodyReference, NarrowSurface, PatchEvidence, PrContextMode, PrDiffMode, PrDownload,
-        PrFamily, PrHeader, PrPage, PrRecord, PrRevision, PrSection, PrTabView, ReviewAnchor,
-        SourceLine, SourceSide, Verification,
+        BodyReference, InlineComment, NarrowSurface, PatchEvidence, PrContextMode, PrDiffMode,
+        PrDownload, PrFamily, PrHeader, PrPage, PrRecord, PrRevision, PrSection, PrTabView,
+        ReviewAnchor, SourceLine, SourceSide, Verification,
     },
     queue::PrContext,
     resources::ResourceState,
@@ -25,6 +25,7 @@ pub(super) struct PullRequestData {
     pub previous_download: Option<threadline_storage::pr::PreviousPrDownload>,
     pub merge_policy: Option<threadline_storage::merges::CachedMergePolicy>,
     pub merge_status: Vec<threadline_storage::merges::MergeStatus>,
+    pub linked_review_comment: Option<InlineComment>,
 }
 
 pub(super) struct LinkedIssue {
@@ -111,11 +112,18 @@ impl PullRequestData {
             .iter()
             .map(|family| Ok((*family, store.pr_page(&revision, *family, None, PAGE)?)))
             .collect::<Outcome<_>>()?;
-        if let Some(key) = tab
-            .view
-            .scroll_anchor
-            .as_deref()
-            .filter(|key| key.starts_with("thread:"))
+        let anchor = tab.view.scroll_anchor.as_deref();
+        let linked_review = anchor
+            .and_then(|key| key.strip_prefix(super::view::REVIEW_URL_ANCHOR))
+            .and_then(|value| value.parse().ok())
+            .map(|id| store.pr_review_comment(&revision, id))
+            .transpose()?
+            .flatten();
+        let thread_key = linked_review
+            .as_ref()
+            .map(|(key, _)| key.as_str())
+            .or_else(|| anchor.filter(|key| key.starts_with("thread:")));
+        if let Some(key) = thread_key
             && let Some((_, threads)) = pages
                 .iter_mut()
                 .find(|(family, _)| *family == PrFamily::Threads)
@@ -151,6 +159,7 @@ impl PullRequestData {
             previous_download,
             merge_policy,
             merge_status,
+            linked_review_comment: linked_review.map(|(_, comment)| comment),
         }))
     }
 }

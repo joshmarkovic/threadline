@@ -299,7 +299,8 @@ impl ItemData {
             .view
             .scroll_anchor
             .as_deref()
-            .filter(|key| !key.starts_with("thread:"))
+            .filter(|key| !key.starts_with("thread:") && !key.starts_with(view::REVIEW_URL_ANCHOR))
+            .map(|key| key.strip_prefix(view::ISSUE_URL_ANCHOR).unwrap_or(key))
         {
             Some(anchor) => match store.discussion_page_at(account, item, anchor, PAGE) {
                 Ok(page) => (page, false),
@@ -1692,7 +1693,10 @@ impl ReaderWorkspace {
         };
         let preserve_view = anchor.is_none();
         if let Some(anchor) = anchor {
-            if anchor.starts_with("thread:") {
+            if ["thread:", view::REVIEW_URL_ANCHOR, view::ISSUE_URL_ANCHOR]
+                .into_iter()
+                .any(|prefix| anchor.starts_with(prefix))
+            {
                 tab.view
                     .pr_reader
                     .get_or_insert_with(Default::default)

@@ -6,7 +6,7 @@ use threadline_core::{
     github::reader::{IssueSummary, RemoteSearchPage},
     sync::Cancellation,
 };
-use threadline_storage::{ItemKind, RepositoryId};
+use threadline_storage::RepositoryId;
 
 pub(super) struct SearchResults {
     pub(super) repository: RepositoryId,
@@ -338,16 +338,20 @@ impl ReaderWorkspace {
 
     pub(super) fn store_route(
         &mut self,
-        route: threadline_core::domain::RepositoryName,
-        kind: ItemKind,
-        number: u64,
+        link: super::view::ItemUrl,
+        mode: OpenTab,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         let Some(account) = self.account else { return };
-        self.launch(window,cx,move |store| store.resolve_downloaded_route(account,&route,number,Some(kind)),
-            |this,result,window,cx|match result {
-                Ok(Some(item))=>this.open(item,None,OpenTab::Activation,window,cx),
+        self.launch(window,cx,move |store| store.resolve_downloaded_route(account,&link.route,link.number,Some(link.kind)),
+            move |this,result,window,cx|match result {
+                Ok(Some(item))=>{
+                    this.open(item,link.anchor,mode,window,cx);
+                    if link.unsupported_fragment {
+                        this.status=Some("This link location is unavailable in the local reader.");
+                    }
+                }
                 Ok(None)=>this.status=Some("This issue or pull request has not been downloaded for this account. The link remains available."),
                 Err(_)=>this.status=Some("The link could not be looked up in the local profile."),
             });

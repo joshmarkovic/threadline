@@ -128,6 +128,245 @@ fn ui_008_inactive_tab_labels_restore_and_follow_cached_title_updates(cx: &mut T
 }
 
 #[gpui_kit::test]
+fn ui_008_pasted_github_comments_reuse_their_cached_tab_and_keep_other_panes(
+    cx: &mut TestAppContext,
+) {
+    use threadline_storage::{
+        pr::{InlineComment, PrFamily, PrHeader, PrInputPage, PrRecord, PrSection},
+        reader::{DiscussionComment, DiscussionInputPage},
+        resources::{CommitOid, ResourceFamily, ResourceKey, ResourceTarget, WalkMode},
+    };
+    let setup = ReaderHarness::seeded();
+    let store = &setup.store;
+    let account = setup.fixture.account;
+    let issue = setup.fixture.long_discussion;
+    let pull = setup.fixture.reviewed_pr;
+    let comments = ResourceKey {
+        account,
+        target: ResourceTarget::Item(issue),
+        family: ResourceFamily::Comments,
+    };
+    let progress = store
+        .start_resource_fetch(comments, WalkMode::Full)
+        .unwrap();
+    let comment = |id, body: &str| DiscussionComment {
+        provider_id: id,
+        node_id: None,
+        author: None,
+        created_at_ms: id as i64,
+        updated_at_ms: id as i64,
+        body: body.into(),
+    };
+    store
+        .commit_discussion_page(
+            account,
+            issue,
+            &progress,
+            DiscussionInputPage {
+                comments: vec![
+                    comment(801, "Earlier issue comment"),
+                    comment(802, "Linked issue comment"),
+                ],
+                next_cursor: None,
+                completed_validators: None,
+                fetched_at_ms: 900,
+            },
+        )
+        .unwrap();
+    let oid = |c: &str| CommitOid::parse(&c.repeat(40)).unwrap();
+    let revision = store
+        .record_pr_revision(
+            account,
+            pull,
+            &oid("a"),
+            &oid("b"),
+            Some(&oid("c")),
+            &PrHeader::default(),
+            1_900_000_000_000,
+        )
+        .unwrap();
+    let progress = store
+        .start_pr_fetch(&revision, PrFamily::Threads, WalkMode::Full)
+        .unwrap();
+    let review = |id, in_reply_to, body: &str| InlineComment {
+        id,
+        node_id: None,
+        in_reply_to,
+        author: Some("fixture-reader".into()),
+        actor: Default::default(),
+        body: body.into(),
+        created_at_ms: None,
+        updated_at_ms: None,
+        anchor: None,
+    };
+    store
+        .commit_pr_page(
+            &revision,
+            PrFamily::Threads,
+            &progress,
+            PrInputPage {
+                records: vec![PrRecord::Thread {
+                    node_id: "PRRT_linked".into(),
+                    resolved: None,
+                    outdated: None,
+                    location: None,
+                    comments: vec![
+                        review(901, None, "Original review root"),
+                        review(902, Some(901), "Exact downloaded review reply"),
+                    ],
+                    replies_complete: true,
+                    reply_cursor: None,
+                }],
+                next_cursor: None,
+                validators: None,
+                partial: None,
+                fetched_at_ms: 1_900_000_000_001,
+            },
+        )
+        .unwrap();
+
+    let pane = |id: &str, item| Pane {
+        active: Some(0),
+        tabs: vec![Tab {
+            id: id.into(),
+            item,
+            view: TabView::default(),
+        }],
+    };
+    store
+        .save_workspace(
+            account,
+            &Workspace {
+                focused_pane: 0,
+                proportions: vec![0.4, 0.6],
+                panes: vec![pane("original-issue", issue), pane("original-pull", pull)],
+            },
+        )
+        .unwrap();
+    let (window, reader) = setup.open_at(cx, size(px(1750.), px(1000.)));
+    let url = |kind, item, fragment| {
+        let number = store.item(account, item).unwrap().unwrap().locator.number;
+        format!("https://github.com/fixture/relay/{kind}/{number}{fragment}")
+    };
+    let enter = |cx: &mut TestAppContext, url: &str| {
+        cx.update_window(window, |_, window, cx| {
+            reader.read(cx).url.focus_handle(cx).focus(window, cx);
+            window.press("secondary-a", cx);
+            window.input(url, cx);
+            assert_eq!(reader.read(cx).url.read(cx).value().as_ref(), url);
+        })
+        .unwrap();
+        click(cx, window, "reader-open-url");
+    };
+    enter(
+        cx,
+        &url("issues", issue, "?from=threadline#issuecomment-802"),
+    );
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let state = reader.read(cx);
+            !state.layout_busy
+                && state.tab_views.get("original-issue").is_some_and(|view| {
+                    !view.data.anchor_missing
+                        && view
+                            .data
+                            .discussion
+                            .records
+                            .first()
+                            .is_some_and(|comment| comment.body == "Linked issue comment")
+                })
+        })
+    });
+    enter(cx, &url("pull", pull, "#discussion_r902"));
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let state = reader.read(cx);
+            !state.layout_busy
+                && state
+                    .active_tab()
+                    .is_some_and(|tab| tab.id == "original-pull")
+                && state
+                    .tab_views
+                    .get("original-pull")
+                    .and_then(|view| view.pr.as_ref())
+                    .and_then(|pr| pr.data.linked_review_comment.as_ref())
+                    .is_some_and(|comment| {
+                        comment.id == 902 && comment.body == "Exact downloaded review reply"
+                    })
+        })
+    });
+    let saved = store.workspace(account).unwrap().unwrap();
+    assert_eq!(saved.proportions, [0.4, 0.6]);
+    assert_eq!(
+        saved
+            .panes
+            .iter()
+            .map(|pane| pane.tabs.len())
+            .collect::<Vec<_>>(),
+        [1, 1]
+    );
+    assert_eq!(
+        saved.panes[0].tabs[0].view.scroll_anchor.as_deref(),
+        Some("00000000000000000802")
+    );
+    let pull_view = &saved.panes[1].tabs[0].view;
+    assert_eq!(
+        pull_view.scroll_anchor.as_deref(),
+        Some("review-comment:902")
+    );
+    assert_eq!(
+        pull_view.pr_reader.as_ref().unwrap().section,
+        PrSection::Conversation
+    );
+
+    enter(cx, &url("pull", pull, "#discussion_r919"));
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let state = reader.read(cx);
+            !state.layout_busy
+                && state.active_tab().is_some_and(|tab| {
+                    tab.view.scroll_anchor.as_deref() == Some("review-comment:919")
+                })
+                && state
+                    .tab_views
+                    .get("original-pull")
+                    .and_then(|view| view.pr.as_ref())
+                    .is_some_and(|pr| pr.data.linked_review_comment.is_none())
+        })
+    });
+    cx.update_window(window, |_, window, cx| {
+        reader.update(cx, |reader, cx| {
+            reader.navigate_markdown_url(&url("issues", issue, "#issuecomment-801"), window, cx)
+        })
+    })
+    .unwrap();
+    until(cx, |cx| {
+        cx.read(|cx| {
+            let state = reader.read(cx);
+            !state.layout_busy
+                && state.layout.focused_pane == 1
+                && state.active_tab().is_some_and(|tab| {
+                    tab.item == issue
+                        && tab.id != "original-issue"
+                        && tab.view.scroll_anchor.as_deref() == Some("00000000000000000801")
+                })
+        })
+    });
+    let saved = store.workspace(account).unwrap().unwrap();
+    assert_eq!(
+        saved.panes[0].tabs[0].view.scroll_anchor.as_deref(),
+        Some("00000000000000000802")
+    );
+    assert_eq!(saved.panes[1].tabs[0].id, "original-pull");
+    assert!(
+        view::parse_item_url("https://other.example/fixture/relay/pull/1#discussion_r902")
+            .is_none()
+    );
+    let diff = view::parse_item_url("https://github.com/fixture/relay/pull/1#diff-902").unwrap();
+    assert!(diff.unsupported_fragment && diff.anchor.is_none());
+}
+
+#[gpui_kit::test]
 fn cached_navigation_shows_an_existing_tab_immediately_and_saves_both_open_and_switch(
     cx: &mut TestAppContext,
 ) {

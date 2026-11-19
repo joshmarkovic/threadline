@@ -142,7 +142,7 @@ impl ReaderWorkspace {
             })
             .on_link_click(move |url, _, window, cx| {
                 if super::view::parse_item_url(url).is_some() {
-                    let _ = weak.update(cx, |this, cx| this.navigate_url(url, window, cx));
+                    let _ = weak.update(cx, |this, cx| this.navigate_markdown_url(url, window, cx));
                 } else if ordinary_github_link(url) {
                     cx.open_url(url);
                 }

@@ -220,12 +220,31 @@ impl ReaderWorkspace {
     }
 
     pub(super) fn navigate_url(&mut self, raw: &str, window: &mut Window, cx: &mut Context<Self>) {
-        let Some((route, kind, number)) = parse_item_url(raw) else {
+        self.navigate_item_url(raw, OpenTab::Activation, window, cx);
+    }
+
+    pub(super) fn navigate_markdown_url(
+        &mut self,
+        raw: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.navigate_item_url(raw, OpenTab::CurrentPane, window, cx);
+    }
+
+    fn navigate_item_url(
+        &mut self,
+        raw: &str,
+        mode: OpenTab,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(link) = parse_item_url(raw) else {
             self.status = Some("Enter an issue or pull request URL on github.com.");
             cx.notify();
             return;
         };
-        self.store_route(route, kind, number, window, cx);
+        self.store_route(link, mode, window, cx);
     }
 
     fn downloaded_action(
@@ -2031,11 +2050,21 @@ pub(super) fn resource_problem(
         .child(accessible)
 }
 
-pub(super) fn parse_item_url(
-    raw: &str,
-) -> Option<(threadline_core::domain::RepositoryName, ItemKind, u64)> {
+pub(super) const ISSUE_URL_ANCHOR: &str = "issue-comment:";
+pub(super) const REVIEW_URL_ANCHOR: &str = "review-comment:";
+
+pub(super) struct ItemUrl {
+    pub route: threadline_core::domain::RepositoryName,
+    pub kind: ItemKind,
+    pub number: u64,
+    pub anchor: Option<String>,
+    pub unsupported_fragment: bool,
+}
+
+pub(super) fn parse_item_url(raw: &str) -> Option<ItemUrl> {
     let path = raw.trim().strip_prefix("https://github.com/")?;
-    let path = path.split(['#', '?']).next()?;
+    let (path, fragment) = path.split_once('#').unwrap_or((path, ""));
+    let path = path.split('?').next()?;
     let mut parts = path.trim_end_matches('/').split('/');
     let route = threadline_core::domain::RepositoryName::new(parts.next()?, parts.next()?).ok()?;
     let kind = match parts.next()? {
@@ -2048,7 +2077,43 @@ pub(super) fn parse_item_url(
         .parse::<u64>()
         .ok()
         .filter(|number| *number > 0)?;
-    parts.next().is_none().then_some((route, kind, number))
+    if parts.next().is_some() {
+        return None;
+    }
+    let comment = fragment
+        .strip_prefix("issuecomment-")
+        .and_then(comment_number);
+    let review = (kind == ItemKind::PullRequest)
+        .then(|| {
+            fragment
+                .strip_prefix("discussion_r")
+                .and_then(comment_number)
+        })
+        .flatten();
+    let anchor = comment
+        .map(|id| {
+            let prefix = if kind == ItemKind::PullRequest {
+                ISSUE_URL_ANCHOR
+            } else {
+                ""
+            };
+            format!("{prefix}{:020}", id.get())
+        })
+        .or_else(|| review.map(|id| format!("{REVIEW_URL_ANCHOR}{id}")));
+    Some(ItemUrl {
+        route,
+        kind,
+        number,
+        unsupported_fragment: !fragment.is_empty() && anchor.is_none(),
+        anchor,
+    })
+}
+
+fn comment_number(value: &str) -> Option<std::num::NonZeroU64> {
+    if !value.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    value.parse().ok()
 }
 
 fn parse_date(value: &str) -> Option<i64> {
