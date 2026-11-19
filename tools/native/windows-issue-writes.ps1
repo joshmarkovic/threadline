@@ -26,7 +26,7 @@ function Set-WriteFixtureOffline([IntPtr]$Window, [bool]$Offline) {
 function Type-WriteFixtureField([IntPtr]$Window, [string]$Id, [string]$Value) {
     $name = switch -CaseSensitive ($Id) {
         'reader-issue-title-0' {
-            if ($Value -ceq 'Cancelled fixture issue title') { 'Issue title' }
+            if ($Value -cin @('Cancelled fixture issue title', 'Local change to the same issue')) { 'Issue title' }
         }
         'reader-draft-input-0' {
             if ($Value -cin @(
@@ -34,6 +34,7 @@ function Type-WriteFixtureField([IntPtr]$Window, [string]$Id, [string]$Value) {
                 'Threadline S07 explicitly queued comment.',
                 'Threadline S07 unsent local draft.',
                 'Threadline S07 accepted comment with a lost response.',
+                'Retain the local issue description across the conflict.',
                 'Threadline dependency original comment.',
                 'Threadline dependency revised comment.',
                 'Threadline dependency comment with a lost response.',
@@ -84,7 +85,7 @@ function Queue-WriteFixtureDraft([IntPtr]$Window, [long]$Item, [int]$Expected, [
 function Inspect-WriteFixtureAction([IntPtr]$Window, [int]$Index, [string]$Expected, [string]$ActionLabel) {
     $id = "reader-outbox-action-$Index"
     if ($ActionLabel) {
-        if ($ActionLabel -cnotin @('Comment', 'Merge pull request', 'Review', 'Reply', 'Resolve thread')) { throw 'Unknown fixture action label.' }
+        if ($ActionLabel -cnotin @('Comment', 'Issue edit', 'Merge pull request', 'Review', 'Reply', 'Resolve thread')) { throw 'Unknown fixture action label.' }
         $displayState = switch -CaseSensitive ($Expected) {
             'Queued' { 'Queued' }
             'Confirmed' { 'Confirmed' }
@@ -101,6 +102,68 @@ function Inspect-WriteFixtureAction([IntPtr]$Window, [int]$Index, [string]$Expec
     $null = Wait-Reader 'the selected action has the expected durable state' {
         param($reader) $reader.outbox_visible -and $reader.outbox_action_state -ceq $Expected
     }
+}
+
+function Wait-IssueConflictField([IntPtr]$Window, [string]$Id, [string]$Expected) {
+    Wait-For "the exact visible native conflict field $Id" {
+        $null -ne (Find-OwnedFixtureControl $Window $Id $Expected -AllowDisabled)
+    }
+}
+
+function Invoke-IssueConflictProof([IntPtr]$Window, [string]$Profile) {
+    Set-AccessPhase 'issue-edit-baseline'
+    Wait-SeededFixtureAccount
+    $item = Open-WriteFixtureIssue $Window -UserConnected
+    Set-WriteFixtureOffline $Window $true
+    $title = 'Local change to the same issue'
+    $description = 'Retain the local issue description across the conflict.'
+    Click-AccountControl $Window 'reader-edit-issue-0'
+    Type-WriteFixtureField $Window 'reader-issue-title-0' $title
+    Type-WriteFixtureField $Window 'reader-draft-input-0' $description
+    Wait-WriteFixtureDraft $item $description
+    Queue-WriteFixtureDraft $Window $item 1 'Queue issue edit'
+    Add-Evidence 'Queue the exact existing issue title and description while offline' ([ordered]@{ issue_number = 41; queued = 1 })
+
+    $restarted = Restart-Reader $Profile -FixturePhaseAfterQuit 'issue-edit-remote-change'
+    Wait-WriteFixtureDraft $item $description
+    $null = Wait-Reader 'the submitted edit and original issue survive the offline restart' {
+        param($reader)
+        $reader.active_item -eq $item -and $reader.active_number -eq 41 -and $reader.offline -and
+            $reader.active_draft_submitted -and $reader.outbox -eq 1
+    }
+    Set-WriteFixtureOffline $restarted $false
+    Wait-SeededFixtureAccount
+    Click-AccountControl $restarted 'reader-outbox'
+    Inspect-WriteFixtureAction $restarted 0 'NeedsAttention' 'Issue edit'
+    $dot = ' ' + [char]0x00b7 + ' '
+    Wait-IssueConflictField $restarted 'reader-conflict-original-title' ('Original title' + $dot + 'Existing issue for offline edits')
+    Wait-IssueConflictField $restarted 'reader-conflict-remote-title' ('Current GitHub title' + $dot + 'Remote change to the same issue')
+    Wait-IssueConflictField $restarted 'reader-conflict-original-description' ('Original description' + $dot + 'Synthetic existing issue.')
+    Wait-IssueConflictField $restarted 'reader-conflict-remote-description' ('Current GitHub description' + $dot + 'The original issue was changed remotely.')
+    $intent = ('Title' + $dot + $title) + '. ' + ('Description' + $dot + $description)
+    Wait-IssueConflictField $restarted 'reader-outbox-intent' $intent
+    Add-Evidence 'Read the original, local and remote values in the same pending native action' ([ordered]@{
+        issue_number = 41; exact_original_local_remote_values = $true; operation_state = 'NeedsAttention'
+    })
+
+    Click-AccountControl $restarted 'reader-outbox-open'
+    $null = Wait-Reader 'the exact issue and conflict draft remain in the original reader' {
+        param($reader)
+        $reader.active_item -eq $item -and $reader.active_number -eq 41 -and !$reader.outbox_visible -and
+            $reader.active_draft_submitted -and $reader.outbox -eq 1
+    }
+    Wait-WriteFixtureDraft $item $description
+    Wait-For 'the original native issue editor retains the local title' {
+        $pattern = Get-OwnedFixtureEditPattern $restarted 'reader-issue-title-0' 'Issue title'
+        try {
+            $null -ne $pattern -and $pattern.Current.Value -ceq $title
+        } catch [Windows.Automation.ElementNotAvailableException] {
+            $false
+        }
+    }
+    Add-Evidence 'Reopen the exact existing issue and verify the saved local edit' ([ordered]@{ issue_number = 41; draft_retained = $true })
+    Stop-ThroughUi
+    $script:report.detail = 'The native reader restored the queued edit after restart, detected changed GitHub fields during preflight, showed its original, local and remote values, and kept the original issue draft available.'
 }
 
 function Invoke-IssueWriteProof([IntPtr]$Window, [string]$Profile) {

@@ -461,12 +461,15 @@ impl ReaderWorkspace {
                     .text_sm()
                     .child(format!("Depends on {}", operation.dependencies.join(", ")))
             }))
-            .children(
-                detail
-                    .intent
-                    .as_ref()
-                    .map(|intent| div().text_sm().child(intent_preview(intent))),
-            )
+            .children(detail.intent.as_ref().map(|intent| {
+                let preview = intent_preview(intent);
+                div()
+                    .id("reader-outbox-intent")
+                    .role(Role::Group)
+                    .aria_label(preview.replace('\n', ". "))
+                    .text_sm()
+                    .child(preview)
+            }))
             .children(
                 detail
                     .conflict
@@ -593,7 +596,7 @@ pub(super) fn state_label(state: State, cancelled: bool) -> &'static str {
 
 fn reason_label(value: &str) -> String {
     match value {
-        "remote_edit_conflict" | "changed_fields" => {
+        "remote_edit_conflict" | "changed_fields" | "issue_fields_conflict" => {
             "The GitHub issue or comment changed before this edit was sent.".into()
         }
         "mutation_access_rejected" | "write_permission_unavailable" => {
@@ -672,24 +675,50 @@ fn conflict_view(conflict: &WriteConflict, palette: Palette) -> AnyElement {
                         .child(format!("Current GitHub comment\n{}", comment.body));
                 }
             }
-            WriteIntent::EditIssue(_) => {
-                view = view
-                    .child(format!(
-                        "Current GitHub title · {}",
-                        current.fields.title.as_deref().unwrap_or("Unavailable")
-                    ))
-                    .child(format!(
-                        "Current GitHub description\n{}",
-                        current
-                            .fields
-                            .body
-                            .as_ref()
-                            .and_then(|body| body.as_deref())
-                            .unwrap_or("Unavailable")
+            WriteIntent::EditIssue(fields) => {
+                if let Some(edit) = &fields.title {
+                    view = view.child(conflict_value(
+                        "reader-conflict-original-title",
+                        "Original title",
+                        &edit.base,
                     ));
+                }
+                view = view.child(conflict_value(
+                    "reader-conflict-remote-title",
+                    "Current GitHub title",
+                    current.fields.title.as_deref().unwrap_or("Unavailable"),
+                ));
+                if let Some(edit) = &fields.body {
+                    view = view.child(conflict_value(
+                        "reader-conflict-original-description",
+                        "Original description",
+                        edit.base.as_deref().unwrap_or("No description"),
+                    ));
+                }
+                let observed = current
+                    .fields
+                    .body
+                    .as_ref()
+                    .map(|body| body.as_deref().unwrap_or("No description"))
+                    .unwrap_or("Unavailable");
+                view = view.child(conflict_value(
+                    "reader-conflict-remote-description",
+                    "Current GitHub description",
+                    observed,
+                ));
             }
             WriteIntent::CreateComment { .. } => {}
         }
     }
     view.into_any_element()
+}
+
+fn conflict_value(id: &'static str, field: &str, value: &str) -> AnyElement {
+    let presentation = format!("{field} · {value}");
+    div()
+        .id(id)
+        .role(Role::Group)
+        .aria_label(presentation.clone())
+        .child(presentation)
+        .into_any_element()
 }

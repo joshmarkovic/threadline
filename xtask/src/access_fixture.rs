@@ -95,6 +95,8 @@ enum Phase {
     History,
     WriteOnline,
     WriteDrop,
+    IssueEditBaseline,
+    IssueEditRemoteChange,
     BacklogAuth,
     BacklogHold,
     BacklogDrain,
@@ -157,6 +159,8 @@ impl Phase {
             "history" => Ok(Self::History),
             "write-online" => Ok(Self::WriteOnline),
             "write-drop" => Ok(Self::WriteDrop),
+            "issue-edit-baseline" => Ok(Self::IssueEditBaseline),
+            "issue-edit-remote-change" => Ok(Self::IssueEditRemoteChange),
             "backlog-auth" => Ok(Self::BacklogAuth),
             "backlog-hold" => Ok(Self::BacklogHold),
             "backlog-drain" => Ok(Self::BacklogDrain),
@@ -299,6 +303,7 @@ pub enum TraceCheck {
     NativeLifecycle,
     NativeActivity,
     CommentDependency,
+    IssueEditConflict,
     ReaderResume,
     SyncJourney,
     NotificationSchedule,
@@ -385,6 +390,7 @@ impl AccessFixture {
             TraceCheck::NativeLifecycle => lifecycle::trace(&records),
             TraceCheck::NativeActivity => activity::trace(&records),
             TraceCheck::CommentDependency => comment_dependency::trace(&records),
+            TraceCheck::IssueEditConflict => writes::issue_conflict_trace(&records),
             TraceCheck::ReaderResume => complete_reader_resume(&records),
             TraceCheck::SyncJourney => complete_sync_journey(&records),
             TraceCheck::NotificationSchedule => complete_notification_schedule(&records),
@@ -774,6 +780,8 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
                 phase,
                 Phase::WriteOnline
                     | Phase::WriteDrop
+                    | Phase::IssueEditBaseline
+                    | Phase::IssueEditRemoteChange
                     | Phase::SyncNotificationSend
                     | Phase::CredentialReady
                     | Phase::CredentialOther

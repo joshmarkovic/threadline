@@ -24,6 +24,8 @@ pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
         phase,
         Phase::WriteOnline
             | Phase::WriteDrop
+            | Phase::IssueEditBaseline
+            | Phase::IssueEditRemoteChange
             | Phase::SyncNotificationSend
             | Phase::CredentialReady
             | Phase::CredentialOther
@@ -32,10 +34,23 @@ pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
         return None;
     }
     let issue = || {
+        let (title, body, stamp) = if phase == Phase::IssueEditRemoteChange {
+            (
+                "Remote change to the same issue",
+                "The original issue was changed remotely.",
+                "2018-01-01T02:00:00Z",
+            )
+        } else {
+            (
+                "Existing issue for offline edits",
+                "Synthetic existing issue.",
+                "2018-01-01T00:00:00Z",
+            )
+        };
         json!({
-            "id":410,"node_id":"I_410","number":41,"title":"Existing issue for offline edits",
-            "body":"Synthetic existing issue.","state":"open","locked":false,
-            "created_at":"2018-01-01T00:00:00Z","updated_at":"2018-01-01T00:00:00Z",
+            "id":410,"node_id":"I_410","number":41,"title":title,
+            "body":body,"state":"open","locked":false,
+            "created_at":"2018-01-01T00:00:00Z","updated_at":stamp,
             "repository_url":"https://api.github.com/repos/fixture-org/private",
             "user":{"id":41,"login":"fixture-user"},"labels":[],"assignees":[],"milestone":null
         })
@@ -63,6 +78,38 @@ pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
         body,
         sso: None,
     })
+}
+
+pub(super) fn issue_conflict_trace(records: &[RequestEvidence]) -> bool {
+    let observed = |phase, route| {
+        records
+            .iter()
+            .any(|entry| entry.phase == phase && entry.route == route)
+    };
+    observed(Phase::IssueEditBaseline, Route::Items)
+        && observed(Phase::IssueEditRemoteChange, Route::Item)
+        && records.iter().all(|entry| {
+            entry.fixture_authorization
+                && entry.status == 200
+                && matches!(
+                    entry.phase,
+                    Phase::Ready | Phase::IssueEditBaseline | Phase::IssueEditRemoteChange
+                )
+                && matches!(
+                    entry.route,
+                    Route::User
+                        | Route::Repository
+                        | Route::Items
+                        | Route::Item
+                        | Route::ScheduledIssue
+                        | Route::CommentsFirst
+                        | Route::Timeline
+                        | Route::OpenPullIndex
+                        | Route::UpdatedItems
+                        | Route::UpdatedComments
+                        | Route::UpdatedInlineComments
+                )
+        })
 }
 
 pub(super) fn trace(records: &[RequestEvidence], include_loss: bool) -> bool {
@@ -97,6 +144,61 @@ pub(super) fn trace(records: &[RequestEvidence], include_loss: bool) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn issue_conflict_preserves_provider_identity_and_refuses_any_mutation() {
+        let base = response(Phase::IssueEditBaseline, Route::Item)
+            .unwrap()
+            .body;
+        let remote = response(Phase::IssueEditRemoteChange, Route::Item)
+            .unwrap()
+            .body;
+        for key in ["id", "node_id", "number", "repository_url"] {
+            assert_eq!(base[key], remote[key]);
+        }
+        assert_ne!(base["title"], remote["title"]);
+        assert_ne!(base["body"], remote["body"]);
+
+        let mut observed = vec![
+            RequestEvidence {
+                phase: Phase::IssueEditBaseline,
+                route: Route::Items,
+                fixture_authorization: true,
+                status: 200,
+            },
+            RequestEvidence {
+                phase: Phase::IssueEditRemoteChange,
+                route: Route::Item,
+                fixture_authorization: true,
+                status: 200,
+            },
+        ];
+        assert!(issue_conflict_trace(&observed));
+
+        let fixture_root = tempfile::tempdir().unwrap();
+        let fixture = AccessFixture::start(fixture_root.path()).unwrap();
+        fs::write(fixture.phase_file(), "issue-edit-remote-change").unwrap();
+        for (method, path) in [
+            ("PATCH", ITEM),
+            ("POST", "/repos/fixture-org/private/issues"),
+        ] {
+            let body = r#"{"title":"Wrongly sent during preflight"}"#;
+            let mut socket = TcpStream::connect(fixture.address()).unwrap();
+            write!(socket, "{method} {path} HTTP/1.1\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\nContent-Length: {}\r\n\r\n{body}", body.len()).unwrap();
+            let mut reply = String::new();
+            socket.read_to_string(&mut reply).unwrap();
+            assert!(reply.starts_with("HTTP/1.1 404"));
+        }
+        let fixture_run = fixture.finish(fixture_root.path(), TraceCheck::Observe);
+        assert!(fixture_run.is_ok());
+        observed.push(RequestEvidence {
+            phase: Phase::IssueEditRemoteChange,
+            route: Route::Unexpected,
+            fixture_authorization: true,
+            status: 404,
+        });
+        assert!(!issue_conflict_trace(&observed));
+    }
 
     #[test]
     fn sends_only_the_exact_scoped_comments_and_records_the_lost_response() {
