@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    Change, ItemLocator, ItemRepresentation, ItemUpdate, NodeId, PullRequestRecord,
+    Change, ItemKind, ItemLocator, ItemRepresentation, ItemUpdate, NodeId, PullRequestRecord,
     PullRequestUpdate, UtcMillis,
     access::{
         AccessState, CredentialKind, DiscoveryState, RepositoryObservation,
@@ -8,11 +8,13 @@ use crate::{
     },
     history::{HistoryMonitoring, HistoryRef},
     notifications::{ActorRule, DeliveryMode, RuleActor, RuleScope},
+    pr::{PrFamily, PrRecord},
     reader::ReaderScope,
 };
 use std::num::NonZeroU64;
+use threadline_core::domain::RepositoryName;
 
-pub const ACTIVITY_FIXTURE_REVISION: &str = "s11-native-activity-v3";
+pub const ACTIVITY_FIXTURE_REVISION: &str = "s11-native-activity-v4";
 pub const WATCH_BASE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 pub fn prepare_native_activity(store: &Store, now: i64) -> Result<()> {
@@ -159,6 +161,7 @@ pub fn inspect_native_activity(store: &Store) -> Result<serde_json::Value> {
     let human_content = store
         .search_downloaded(account, ReaderScope::Selected, "fixture human retained", 10)?
         .len();
+    let retained_thread = inspected_activity_thread(store, account)?;
     Ok(serde_json::json!({
         "fixture_revision": ACTIVITY_FIXTURE_REVISION,
         "feed": details,
@@ -167,7 +170,50 @@ pub fn inspect_native_activity(store: &Store) -> Result<serde_json::Value> {
         "opened_tabs": opened_tabs,
         "bot_content": bot_content,
         "human_content": human_content,
+        "retained_thread": retained_thread,
     }))
+}
+
+fn inspected_activity_thread(
+    store: &Store,
+    account: AccountId,
+) -> Result<Option<serde_json::Value>> {
+    let repo = RepositoryName::new(BACKLOG_OWNER, BACKLOG_REPO_NAME)
+        .map_err(|_| Error::InvalidInput("Invalid fixture repository"))?;
+    let Some(item) =
+        store.resolve_downloaded_route(account, &repo, 42, Some(ItemKind::PullRequest))?
+    else {
+        return Ok(None);
+    };
+    let Some((revision, _)) = store.current_pr_revision(account, item)? else {
+        return Ok(None);
+    };
+    let page = store.pr_page(&revision, PrFamily::Threads, None, 10)?;
+    for (_, record) in page.rows {
+        let PrRecord::Thread {
+            node_id,
+            comments,
+            replies_complete,
+            ..
+        } = record
+        else {
+            continue;
+        };
+        let [root, reply] = comments.as_slice() else {
+            continue;
+        };
+        if node_id == "PRRT_6201" && replies_complete && root.id == 6201 && reply.id == 6202 {
+            return Ok(Some(serde_json::json!({
+                "item": item.0, "thread": node_id,
+                "root": root.id, "reply": reply.id, "reply_to": reply.in_reply_to,
+                "root_author": root.actor.user_id.map(NonZeroU64::get),
+                "reply_author": reply.actor.user_id.map(NonZeroU64::get),
+                "root_body_retained": root.body == "Fixture bot thread root retained after muting.",
+                "reply_body_retained": reply.body == "Fixture human reply retained under the muted bot root.",
+            })));
+        }
+    }
+    Ok(None)
 }
 
 #[cfg(test)]

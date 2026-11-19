@@ -38,7 +38,7 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
         return Some("s08-native-review-decisions-v1");
     }
     if case == "S11-NATIVE-ACTIVITY" {
-        return Some("s11-native-activity-v3");
+        return Some("s11-native-activity-v4");
     }
     if case == "S12-NATIVE-LIFECYCLE" {
         return Some("s12-native-lifecycle-v2");

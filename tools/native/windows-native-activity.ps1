@@ -17,7 +17,7 @@ function Read-NativeActivityFixture([string]$Profile, [string]$Stage, [string]$N
 
 function Initialize-NativeActivity([string]$Profile, [string]$Receipt) {
     $seeded = Read-NativeActivityFixture $Profile 'seed' $Receipt
-    if ($seeded.fixture_revision -cne 's11-native-activity-v3' -or @($seeded.feed).Count -ne 0 -or
+    if ($seeded.fixture_revision -cne 's11-native-activity-v4' -or @($seeded.feed).Count -ne 0 -or
         $seeded.delivered_groups -ne 0 -or $seeded.opened_tabs -ne 0) {
         throw 'The initial repository fixture contained current delivery, activity, or opened-item state.'
     }
@@ -128,14 +128,30 @@ function Invoke-NativeActivityProof([IntPtr]$Window, [string]$Profile) {
     Click-AccountControl $Window 'reader-browse'
     Activate-FixturePr $Window 'reader-result-' 42 'Activity fixture pull request 42' -Result
     Click-AccountControl $Window 'pr-0-conversation'
+    Click-AccountControl $Window 'pr-0-threads-fetch'
+    $null = Wait-PrReader 'the exact pull request shows its complete downloaded review thread' {
+        param($pr, $reader)
+        $reader.active_item -eq $reviewTarget -and $reader.active_number -eq 42 -and
+            $pr.threads_coverage -ceq 'Complete' -and $pr.threads_on_page -eq 1
+    }
     Click-AccountControl $Window 'pr-0-reviews-fetch'
-    Wait-For 'retained bot and human review bodies at the same stable PR' {
+    Wait-For 'both formal reviews and the linked human reply remain in the downloaded PR' {
         $probe = Read-NativeActivityFixture $Profile 'inspect' ('native-activity-content-' + [guid]::NewGuid().ToString('N') + '.json')
-        $probe.bot_content -eq 1 -and $probe.human_content -eq 1
+        $thread = $probe.retained_thread
+        $probe.bot_content -eq 1 -and $probe.human_content -eq 1 -and $null -ne $thread -and
+            $thread.item -eq $reviewTarget -and $thread.thread -ceq 'PRRT_6201' -and
+            $thread.root -eq 6201 -and $thread.reply -eq 6202 -and $thread.reply_to -eq 6201 -and
+            $thread.root_author -eq 91 -and $thread.reply_author -eq 92 -and
+            $thread.root_body_retained -and $thread.reply_body_retained
     } 15000 750
     Stop-ThroughUi
     $firstClosed = Read-NativeActivityFixture $Profile 'inspect' 'native-activity-first-closed.json'
-    Add-Evidence 'Preserve both original review bodies in the cached PR after actor suppression' $firstClosed
+    if ($firstClosed.delivered_groups -ne 2 -or $firstClosed.suppressed -ne 2 -or
+        $firstClosed.retained_thread.reply_to -ne 6201 -or
+        !$firstClosed.retained_thread.root_body_retained -or !$firstClosed.retained_thread.reply_body_retained) {
+        throw 'Downloading the verified thread changed its content or repeated delivery.'
+    }
+    Add-Evidence 'Preserve the muted bot root, its linked human reply and both formal review bodies after normal exit' $firstClosed
 
     Set-AccessPhase 'activity-offline'
     $catchupProfile = Join-Path $script:ProfileDir ('initial-' + [guid]::NewGuid().ToString('N'))
@@ -181,5 +197,5 @@ function Invoke-NativeActivityProof([IntPtr]$Window, [string]$Profile) {
         throw 'Restarted provider observations duplicated a delivery or feed entry.'
     }
     Add-Evidence 'Replay overlapping provider updates after restart without repeating activity' $final
-    $script:report.detail = 'Normal native synchronization and reader controls verified baseline silence, unopened-item activity, exact actor suppression with retained review bodies, a grouped human review, long-offline catch-up, watched-ref movement and one merge transition. A scoped fixture captured the planned delivery boundary without displaying native shell banners.'
+    $script:report.detail = 'Normal native synchronization and reader controls verified a muted bot root with its linked human reply and retained review bodies, baseline silence, unopened activity, human review grouping, offline catch-up, watched-ref movement and a merge transition. The isolated delivery adapter captured requests at the app boundary.'
 }

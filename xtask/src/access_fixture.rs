@@ -260,6 +260,7 @@ enum Route {
     LifecycleComment,
     ActivityCheckRuns,
     ActivityReviews,
+    ActivityThreads,
     ActivityCommitStatuses,
     ActivityBranches,
     ActivityWatched,

@@ -7,6 +7,11 @@ const HEAD: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const MOVED: &str = "8888888888888888888888888888888888888888";
 const QUIET_BRANCH: &str = "9999999999999999999999999999999999999999";
 const API: &str = "https://api.github.com/repos/fixture-org/private";
+const BOT_ROOT: u64 = 6201;
+const HUMAN_REPLY: u64 = 6202;
+const THREAD: &str = "PRRT_6201";
+const ROOT_BODY: &str = "Fixture bot thread root retained after muting.";
+const REPLY_BODY: &str = "Fixture human reply retained under the muted bot root.";
 
 pub(super) fn active(phase: Phase) -> bool {
     matches!(
@@ -84,14 +89,15 @@ pub(super) fn graphql(phase: Phase, value: &Value) -> Option<Route> {
             _ => None,
         };
     }
-    if query.starts_with("query ThreadlineReviews(")
-        && variables.get("id")?.as_str()? == "PR_42"
-        && variables.get("cursor")?.is_null()
-    {
-        Some(Route::ActivityReviews)
-    } else {
-        None
+    if *variables == json!({"id":"PR_42","cursor":null}) {
+        if query.starts_with("query ThreadlineReviews(") {
+            return Some(Route::ActivityReviews);
+        }
+        if phase == Phase::ActivityFresh && query.starts_with("query ThreadlineThreads(") {
+            return Some(Route::ActivityThreads);
+        }
     }
+    None
 }
 
 fn summary(number: u64, closed: bool, stamp: &str) -> Value {
@@ -141,6 +147,20 @@ fn review(id: u64, at: &str, bot: bool) -> Value {
         "author":{"__typename":if bot {"Bot"} else {"User"},"databaseId":if bot {91} else {92}}})
 }
 
+fn inline_thread_comment(id: u64, at: &str, bot: bool) -> Value {
+    json!({
+        "id": format!("comment-{id}"), "fullDatabaseId": id,
+        "replyTo": if bot { Value::Null } else { json!({"fullDatabaseId":BOT_ROOT}) },
+        "author": if bot {
+            json!({"login":"fixture-bot","databaseId":91,"__typename":"Bot"})
+        } else {
+            json!({"login":"fixture-human","databaseId":92,"__typename":"User"})
+        },
+        "body": if bot { ROOT_BODY } else { REPLY_BODY },
+        "createdAt":at,"updatedAt":at,"path":"src/first.rs","originalLine":1,"originalCommit":{"oid":HEAD}
+    })
+}
+
 fn merge(at: &str) -> Value {
     json!({"__typename":"MergedEvent","createdAt":at,"actor":{"__typename":"User","databaseId":92},"commit":{"oid":MOVED}})
 }
@@ -186,10 +206,14 @@ pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
             message(6102, 44, &delayed, 92, false),
             message(6103, 45, &delayed, 92, false)
         ])),
-        Route::UpdatedInlineComments if fresh => reply(json!([
-            message(6201, 42, &recent, 91, true),
-            message(6202, 42, &recent, 92, true)
-        ])),
+        Route::UpdatedInlineComments if fresh => {
+            let mut root = message(BOT_ROOT, 42, &recent, 91, true);
+            root["body"] = json!(ROOT_BODY);
+            let mut human = message(HUMAN_REPLY, 42, &recent, 92, true);
+            human["body"] = json!(REPLY_BODY);
+            human["in_reply_to_id"] = json!(BOT_ROOT);
+            reply(json!([root, human]))
+        }
         Route::UpdatedComments | Route::UpdatedInlineComments => reply(json!([])),
         Route::OpenPullIndex if catchup => reply(json!([])),
         Route::OpenPullIndex => reply(json!([{"id":762,"node_id":"PR_42","number":42,
@@ -229,6 +253,20 @@ pub(super) fn response(phase: Phase, route: Route) -> Option<Response> {
                 "body":"Fixture human retained original review","submittedAt":recent,
                 "author":{"login":"fixture-human","__typename":"User","databaseId":92},"commit":{"oid":HEAD}}
             ]});
+            reply(json!({"data":{"node":pull}}))
+        }
+        Route::ActivityThreads if fresh => {
+            let mut pull = revision_identity(42, false);
+            pull["repository"] =
+                json!({"id":"R_71","name":"private","owner":{"login":"fixture-org"}});
+            let page = json!({"hasNextPage":false,"endCursor":null});
+            pull["reviewThreads"] = json!({"pageInfo":page,"nodes":[{
+                "id":THREAD,"diffSide":"RIGHT","isResolved":false,"isOutdated":false,
+                "comments":{"pageInfo":page,"nodes":[
+                    inline_thread_comment(BOT_ROOT, &recent, true),
+                    inline_thread_comment(HUMAN_REPLY, &recent, false)
+                ]}
+            }]});
             reply(json!({"data":{"node":pull}}))
         }
         Route::ActivityBranches => reply(json!([
@@ -274,6 +312,8 @@ pub(super) fn trace(records: &[RequestEvidence]) -> bool {
         && has(Phase::ActivityFresh, Route::UpdatedComments)
         && has(Phase::ActivityFresh, Route::UpdatedInlineComments)
         && has(Phase::ActivityFresh, Route::PullActivityA)
+        && has(Phase::ActivityFresh, Route::ActivityReviews)
+        && has(Phase::ActivityFresh, Route::ActivityThreads)
         && has(Phase::ActivityCatchup, Route::PullActivityA)
         && has(Phase::ActivityCatchup, Route::ActivityMovedTip)
         && has(Phase::ActivityReplay, Route::UpdatedComments)
@@ -304,6 +344,21 @@ mod tests {
         assert!(ms(occurred) >= ms(baseline));
         assert_eq!(inline.body[0]["created_at"], occurred);
         assert_eq!(rows[1]["submittedAt"], occurred);
+        let query = json!({"query":"query ThreadlineThreads($id:ID!,$cursor:String)","variables":{"id":"PR_42","cursor":null}});
+        assert_eq!(graphql(phase, &query), Some(Route::ActivityThreads));
+        assert_eq!(graphql(Phase::ActivityBaseline, &query), None);
+        let graph = response(phase, Route::ActivityThreads).unwrap().body;
+        let thread = &graph["data"]["node"]["reviewThreads"]["nodes"][0];
+        let comments = &thread["comments"]["nodes"];
+        assert_eq!(thread["id"], THREAD);
+        assert_eq!(inline.body[1]["in_reply_to_id"], BOT_ROOT);
+        assert_eq!(comments[1]["replyTo"]["fullDatabaseId"], BOT_ROOT);
+        assert!(comments[0]["replyTo"].is_null());
+        for index in [0, 1] {
+            assert_eq!(comments[index]["fullDatabaseId"], inline.body[index]["id"]);
+            assert_eq!(comments[index]["body"], inline.body[index]["body"]);
+            assert_eq!(comments[index]["createdAt"], occurred);
+        }
         let retry = response(phase, Route::UpdatedComments).unwrap();
         assert_eq!(retry.body, ordinary.body);
     }
