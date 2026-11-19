@@ -120,9 +120,44 @@ pub(super) fn trace(records: &[RequestEvidence]) -> bool {
         })
 }
 
+pub(super) fn scope_hold_trace(records: &[RequestEvidence]) -> bool {
+    !records.is_empty()
+        && records.iter().all(|entry| {
+            entry.phase == Phase::LifecycleReady
+                && entry.route == Route::User
+                && entry.fixture_authorization
+                && entry.status == 200
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scoped_outbox_trace_requires_online_probe_and_refuses_all_other_traffic() {
+        let row = |phase, route| RequestEvidence {
+            phase,
+            route,
+            fixture_authorization: true,
+            status: 200,
+        };
+        assert!(!scope_hold_trace(&[]));
+        let online = row(Phase::LifecycleReady, Route::User);
+        assert!(scope_hold_trace(std::slice::from_ref(&online)));
+        for (phase, route) in [
+            (Phase::LifecycleOffline, Route::User),
+            (Phase::LifecycleReady, Route::Repository),
+            (Phase::LifecycleReady, Route::IssueEditCommitted),
+            (Phase::LifecycleReady, Route::ReviewCreated),
+            (Phase::LifecycleReady, Route::MergePut),
+        ] {
+            assert!(!scope_hold_trace(&[
+                row(Phase::LifecycleReady, Route::User),
+                row(phase, route)
+            ]));
+        }
+    }
 
     #[test]
     fn native_lifecycle_fixture_holds_an_authenticated_startup_and_records_one_lost_write() {

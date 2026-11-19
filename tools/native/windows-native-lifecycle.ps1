@@ -1,6 +1,6 @@
 function Read-NativeLifecycle([string]$Profile, [string]$Stage, [string]$Name) {
-    if ($script:ReaderProof -cnotin @('NativeLifecycle', 'OfflineMixedOutbox')) {
-        throw 'The protected fixture is scoped to the native lifecycle and offline Outbox cases.'
+    if ($script:ReaderProof -cnotin @('NativeLifecycle', 'OfflineMixedOutbox', 'ScopeHold')) {
+        throw 'The protected fixture is scoped to the native lifecycle and Outbox cases.'
     }
     $receipt = Join-Path $script:ReportDir $Name
     if (Test-Path -LiteralPath $receipt) { throw 'Refusing to reuse the protected lifecycle receipt.' }
@@ -20,6 +20,19 @@ function Read-NativeLifecycle([string]$Profile, [string]$Stage, [string]$Name) {
 
 function Initialize-NativeLifecycle([string]$Profile) {
     Set-AccessPhase 'lifecycle-offline'
+    if ($script:ReaderProof -ceq 'ScopeHold') {
+        $script:lifecycleSeed = Read-NativeLifecycle $Profile 'seed-scope-hold' 'scope-hold-seeded.json'
+        if ($lifecycleSeed.fixture_revision -cne 's09-deselected-outbox-v1' -or !$lifecycleSeed.offline -or
+            !$lifecycleSeed.outbox_paused -or !$lifecycleSeed.protected_token_present -or
+            ($lifecycleSeed.selected -join ',') -cne '72,71' -or
+            ($lifecycleSeed.actions.kind -join ',') -cne 'Comment,EditIssue,Review,Merge' -or
+            ($lifecycleSeed.actions.state -join ',') -cne 'NeedsAttention,Queued,Queued,Queued' -or
+            ($lifecycleSeed.actions.attempts -join ',') -cne '1,0,0,0') {
+            throw 'The scope fixture did not seed the exact independent denied and pending actions.'
+        }
+        Add-Evidence 'Seed independent actions against the original selected repository' $lifecycleSeed
+        return
+    }
     $mixedOutbox = $script:ReaderProof -ceq 'OfflineMixedOutbox'
     $stage = if ($mixedOutbox) { 'seed-offline-outbox' } else { 'seed' }
     $revision = if ($mixedOutbox) { 's12-offline-mixed-outbox-v1' } else { 's12-native-lifecycle-v2' }
@@ -313,6 +326,82 @@ function Invoke-OfflineMixedOutboxProof([IntPtr]$Window, [string]$Profile) {
         initial_pid = $initial.pid; before = $before; after = $after
     })
     $script:report.detail = 'The native offline cache clear retained four unsent drafts and all four inspectable submitted snapshots. The cancelled prerequisite remained in History and each queued child still showed its original payload and dependency.'
+}
+
+function Assert-ScopedOutbox($Before, $After, [bool]$Offline) {
+    if ($After.fixture_revision -cne $Before.fixture_revision -or
+        $After.account -ne $Before.account -or $After.user -ne $Before.user -or
+        $After.owner -cne $Before.owner -or !$After.protected_token_present -or
+        $After.offline -ne $Offline -or $After.outbox_paused -ne $Offline -or
+        ($After.selected -join ',') -cne '72' -or
+        ($After.drafts | ConvertTo-Json -Compress -Depth 6) -cne ($Before.drafts | ConvertTo-Json -Compress -Depth 6)) {
+        throw 'The original identity, offline controls, alternate selection or draft set changed.'
+    }
+    if (@($After.actions).Count -ne 4) { throw 'The original four actions were not all retained.' }
+    $dispatchHold = if ($Offline) { 'offline' } else { 'repository_unselected' }
+    for ($index = 0; $index -lt 4; $index++) {
+        $original = $Before.actions[$index]
+        $retained = $After.actions[$index]
+        foreach ($property in @('id', 'kind', 'item', 'snapshot_sha256', 'state', 'reason', 'attempts')) {
+            if ($retained.PSObject.Properties[$property].Value -cne $original.PSObject.Properties[$property].Value) {
+                throw "The original action's $property changed after repository removal."
+            }
+        }
+        if (($retained.target -join ',') -cne ($original.target -join ',') -or
+            @($retained.dependencies).Count -ne 0 -or $retained.send_starts -ne 0 -or $retained.cancel_requested -or
+            $retained.scope_hold -cne 'repository_unselected' -or $retained.dispatch_hold -cne $dispatchHold) {
+            throw 'An action left its original target or was not held as expected.'
+        }
+    }
+}
+
+function Invoke-RepositoryScopeHoldProof([IntPtr]$Window, [string]$Profile) {
+    $before = $script:lifecycleSeed
+    $null = Wait-Account 'the original cached account and both synthetic repositories' {
+        param($account) $account.active_user_id -eq 41 -and $account.selected_count -eq 2 -and !$account.busy
+    }
+    Click-AccountControl $Window 'account-open'
+    Wait-For 'remove only the native original repository row' {
+        Invoke-OwnedFixtureControl $Window 'account-remove-1' $null 'Remove'
+    }
+    $null = Wait-Account 'the same user with only the other repository selected' {
+        param($account) $account.active_user_id -eq 41 -and $account.selected_count -eq 1 -and !$account.busy
+    }
+    Click-AccountControl $Window 'account-close'
+    Stop-ThroughUi
+    $offline = Read-NativeLifecycle $Profile 'scope-hold' 'scope-hold-before-restart.json'
+    Assert-ScopedOutbox $before $offline $true
+    Add-Evidence 'Remove the original repository in Work Offline and persist all original action snapshots' $offline
+
+    $restarted = Start-LifecycleWindow $Profile 'scope-hold-restart-observation.json'
+    Open-SyncSettings $restarted
+    $null = Wait-Sync 'restore Work Offline and the Outbox pause after restart' {
+        param($sync) Test-LifecycleSync $sync $true $true
+    }
+    Click-AccountControl $restarted 'sync-pause-outbox'
+    $null = Wait-Sync 'release the Outbox pause while still offline' {
+        param($sync) Test-LifecycleSync $sync $true $false
+    }
+    Set-AccessPhase 'lifecycle-ready'
+    Click-AccountControl $restarted 'sync-work-offline'
+    $null = Wait-Sync 'verify authenticated connectivity with dispatch enabled and no eligible scope work' {
+        param($sync) (Test-LifecycleSync $sync $false $false -Reachable) -and $sync.eligible_outbox -eq 0
+    }
+    Click-AccountControl $restarted 'reader-outbox'
+    Click-AccountControl $restarted 'reader-outbox-filter-all'
+    $labels = @('Comment', 'Issue edit', 'Review', 'Merge pull request')
+    for ($index = 0; $index -lt 4; $index++) {
+        $action = $before.actions[$index]
+        Inspect-WriteFixtureAction $restarted $index $action.state $labels[$index]
+        Wait-LifecycleOutboxText $restarted 'reader-outbox-target' @("fixture-org/private #$($action.target[1])")
+        Wait-LifecycleOutboxText $restarted 'reader-outbox-scope-hold' @('A repository required by this action is no longer selected.')
+        Add-Evidence 'Read the original target and visible repository hold from the native Outbox' $action.id
+    }
+    Stop-ThroughUi
+    $after = Read-NativeLifecycle $Profile 'scope-hold' 'scope-hold-after-reconnect.json'
+    Assert-ScopedOutbox $before $after $false
+    Add-Evidence 'Verify exact retained denied and pending actions after reconnect without another submission' $after
+    $script:report.detail = 'The original pending issue, review, merge and denied comment survived deselection and offline restart. Online dispatch stayed held with the other repository selected.'
 }
 
 function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {

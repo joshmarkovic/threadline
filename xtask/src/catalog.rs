@@ -67,6 +67,9 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == "S12-OFFLINE-MIXED-OUTBOX" {
         return Some("s12-offline-mixed-outbox-v1");
     }
+    if case == "S09-REPOSITORY-HOLD" {
+        return Some("s09-deselected-outbox-v1");
+    }
     if matches!(case, "S12-PANE-POSITIONS" | "S12-PANE-LIFECYCLE") {
         return Some("s12-pane-positions-v1");
     }
@@ -261,6 +264,7 @@ pub fn associations(case: &str) -> Associations {
         "S08-REVIEW-PREDECESSOR" => ("REVIEW-04;OUTBOX-03;TEST-04", "AC-63"),
         "S09-MERGE-QUEUE" => ("MERGE-01;MERGE-03;MERGE-04;OUTBOX-03;TEST-04", "AC-77"),
         "S09-MERGE-CANCEL" => ("MERGE-02;MERGE-04;OUTBOX-03;TEST-04", "AC-62;AC-66"),
+        "S09-REPOSITORY-HOLD" => ("AUTH-11;OUTBOX-09;TEST-04", "AC-67"),
         crate::install::LOCAL_CASE => (
             "TEST-04;INSTALL-04;INSTALL-05;INSTALL-06;INSTALL-07",
             "AC-96;AC-97;AC-98",

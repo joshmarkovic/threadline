@@ -13,7 +13,7 @@ use threadline_storage::{
     Error, Store, UtcMillis,
     fixtures::{
         BACKLOG_OWNER, BACKLOG_USER, LIFECYCLE_REVISION, lifecycle_checkpoint,
-        populate_native_lifecycle, populate_native_offline_outbox,
+        populate_native_lifecycle, populate_native_offline_outbox, populate_native_scope_hold,
     },
 };
 use zeroize::Zeroize;
@@ -127,7 +127,7 @@ impl CredentialStore for LifecycleVault {
     }
 }
 
-fn seed(scope: FixtureScope, offline_outbox: bool) -> Result<serde_json::Value, String> {
+fn seed(scope: FixtureScope, stage: &str) -> Result<serde_json::Value, String> {
     if fs::read_dir(&scope.root)
         .map_err(|_| ERROR)?
         .next()
@@ -161,28 +161,37 @@ fn seed(scope: FixtureScope, offline_outbox: bool) -> Result<serde_json::Value, 
             )
             .map_err(|_| Error::Conflict("The isolated Windows protected credential failed"))
     };
-    let fixture = if offline_outbox {
-        populate_native_offline_outbox(
+    let fixture = match stage {
+        "seed-offline-outbox" => populate_native_offline_outbox(
             &store,
             seed,
             &scope.credential.name,
             now,
             install_credential,
-        )
-    } else {
-        populate_native_lifecycle(
+        ),
+        "seed-scope-hold" => populate_native_scope_hold(
             &store,
             seed,
             &scope.credential.name,
             now,
             install_credential,
-        )
+        ),
+        _ => populate_native_lifecycle(
+            &store,
+            seed,
+            &scope.credential.name,
+            now,
+            install_credential,
+        ),
     }
     .map_err(|error| format!("Could not seed the isolated lifecycle profile. {error}"))?;
     crate::reader_workspace::lifecycle_fixture::seed_drafts(&store, fixture.account)
         .map_err(|error| format!("Could not seed the isolated lifecycle drafts. {error}"))?;
+    if stage == "seed-scope-hold" {
+        return scope_hold(&scope, &store);
+    }
     let mut snapshot = inspect(&scope, &store, "seeded")?;
-    if offline_outbox {
+    if stage == "seed-offline-outbox" {
         snapshot["fixture_revision"] = fixture.revision.into();
         snapshot["offline_outbox"] =
             crate::reader_workspace::lifecycle_fixture::offline_outbox_checkpoint(
@@ -191,6 +200,29 @@ fn seed(scope: FixtureScope, offline_outbox: bool) -> Result<serde_json::Value, 
             )
             .map_err(|error| error.to_string())?;
     }
+    Ok(snapshot)
+}
+
+fn scope_hold(scope: &FixtureScope, store: &Store) -> Result<serde_json::Value, String> {
+    let account = store
+        .active_github_account()
+        .map_err(|_| ERROR)?
+        .ok_or(ERROR)?;
+    let profile = store
+        .github_access_profile(account, BACKLOG_OWNER)
+        .map_err(|_| ERROR)?
+        .filter(|profile| {
+            profile.user_id.get() == BACKLOG_USER && profile.credential_ref == scope.credential.name
+        })
+        .ok_or(ERROR)?;
+    let mut snapshot =
+        crate::reader_workspace::lifecycle_fixture::scope_hold_checkpoint(store, profile.account)
+            .map_err(|error| error.to_string())?;
+    snapshot["protected_token_present"] = NativeCredentialStore
+        .read(&scope.credential)
+        .map_err(|_| ERROR)?
+        .is_some_and(sentinel)
+        .into();
     Ok(snapshot)
 }
 
@@ -224,7 +256,11 @@ fn inspect(scope: &FixtureScope, store: &Store, stage: &str) -> Result<serde_jso
 fn run_command(stage: &str, report: &Path) -> Result<(), String> {
     let scope = FixtureScope::from_environment().ok_or(ERROR)?;
     let snapshot = match stage {
-        "seed" | "seed-offline-outbox" => seed(scope, stage == "seed-offline-outbox")?,
+        "seed" | "seed-offline-outbox" | "seed-scope-hold" => seed(scope, stage)?,
+        "scope-hold" if scope.marked() => {
+            let store = Store::open_profile(&scope.root).map_err(|_| ERROR)?;
+            scope_hold(&scope, &store)?
+        }
         "inspect" if scope.marked() => {
             let store = Store::open_profile(&scope.root).map_err(|_| ERROR)?;
             inspect(&scope, &store, "closed")?

@@ -95,6 +95,28 @@ $lifecycleRestored.controls.pause_queued_actions = $false
 if (!(Test-LifecycleSync $lifecycleRestored $false $false -Reachable)) {
     throw 'Native lifecycle did not recognize restored online state after interruption.'
 }
+
+$scopeActions = @(0..3 | ForEach-Object {
+    [pscustomobject]@{
+        id = "operation-$_"; kind = 'Review'; item = $_; snapshot_sha256 = "snapshot-$_"
+        state = 'Queued'; reason = $null; attempts = 0; target = @(1, $_)
+        dependencies = @(); send_starts = 0; cancel_requested = $false
+        scope_hold = 'repository_unselected'; dispatch_hold = 'repository_unselected'
+    }
+})
+$scope = [pscustomobject]@{
+    fixture_revision = 's09-deselected-outbox-v1'; account = 1; user = 41; owner = 'fixture-org'
+    protected_token_present = $true; offline = $false; outbox_paused = $false
+    selected = @(72); drafts = @([pscustomobject]@{ id = 'saved' }); actions = $scopeActions
+}
+$originalScope = $scope | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+Assert-ScopedOutbox $originalScope $scope $false
+$scope.actions[2].snapshot_sha256 = 'replaced'
+$refused = $false
+try { Assert-ScopedOutbox $originalScope $scope $false } catch {
+    $refused = $_.Exception.Message -like '*snapshot_sha256 changed*'
+}
+if (!$refused) { throw 'The scope check accepted a different submitted review snapshot.' }
 $lifecycleReader = '{"cached_content_ready":true,"cached_visible_panes":2,"focused_pane":1,"active_item":3,"tab_counts":[10,10],"outbox":4,"offline":false,"signed_out":true}' | ConvertFrom-Json
 if (!(Test-LifecycleWorkspace $lifecycleReader 3 $false $true) -or
     (Test-LifecycleWorkspace $lifecycleReader 3 $false $false) -or

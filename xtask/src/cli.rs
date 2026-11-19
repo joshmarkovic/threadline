@@ -396,6 +396,7 @@ fn known_case(lane: Lane, case: &str) -> bool {
                     | "S12-HISTORICAL-READER"
                     | "S12-NATIVE-LIFECYCLE"
                     | "S12-OFFLINE-MIXED-OUTBOX"
+                    | "S09-REPOSITORY-HOLD"
                     | "S12-PANE-POSITIONS"
                     | "S12-PANE-LIFECYCLE"
             )

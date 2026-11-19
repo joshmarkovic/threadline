@@ -14,12 +14,15 @@ use crate::{
     resources::{ActivityEvent, DeliveryPhase, Validators, WalkMode},
     reviews::{DraftInline, ReviewDraft, ReviewEvent, ReviewIntent, ReviewSubmission},
     sync::{ObservationPage, ReadPriority, ReadTarget},
-    writes::{FieldEdit, IssueChanges, Permission, WriteIntent, WriteSubmission},
+    writes::{
+        FieldEdit, IssueChanges, Permission, WriteIntent, WritePreflightFailure, WriteSubmission,
+    },
 };
 use std::num::NonZeroU64;
 
 pub const LIFECYCLE_REVISION: &str = "s12-native-lifecycle-v2";
 pub const OFFLINE_OUTBOX_REVISION: &str = "s12-offline-mixed-outbox-v1";
+pub const SCOPE_HOLD_REVISION: &str = "s09-deselected-outbox-v1";
 pub const LIFECYCLE_ALT_USER: u64 = 42;
 pub const LIFECYCLE_EVENT: &str = "lifecycle-delivered-once";
 pub const LIFECYCLE_COMMENT: &str = "Threadline lifecycle submitted comment.";
@@ -118,7 +121,14 @@ pub fn populate_native_lifecycle(
     now: i64,
     install_credential: impl FnOnce() -> Result<()>,
 ) -> Result<Fixture> {
-    populate_lifecycle(store, seed, credential_key, now, false, install_credential)
+    populate_lifecycle(
+        store,
+        seed,
+        credential_key,
+        now,
+        LIFECYCLE_REVISION,
+        install_credential,
+    )
 }
 
 pub fn populate_native_offline_outbox(
@@ -128,7 +138,31 @@ pub fn populate_native_offline_outbox(
     now: i64,
     install_credential: impl FnOnce() -> Result<()>,
 ) -> Result<Fixture> {
-    populate_lifecycle(store, seed, credential_key, now, true, install_credential)
+    populate_lifecycle(
+        store,
+        seed,
+        credential_key,
+        now,
+        OFFLINE_OUTBOX_REVISION,
+        install_credential,
+    )
+}
+
+pub fn populate_native_scope_hold(
+    store: &Store,
+    seed: u64,
+    credential_key: &str,
+    now: i64,
+    install_credential: impl FnOnce() -> Result<()>,
+) -> Result<Fixture> {
+    populate_lifecycle(
+        store,
+        seed,
+        credential_key,
+        now,
+        SCOPE_HOLD_REVISION,
+        install_credential,
+    )
 }
 
 fn populate_lifecycle(
@@ -136,9 +170,10 @@ fn populate_lifecycle(
     seed: u64,
     credential_key: &str,
     now: i64,
-    inspect_inline_submission: bool,
+    fixture_revision: &'static str,
     install_credential: impl FnOnce() -> Result<()>,
 ) -> Result<Fixture> {
+    let independent = fixture_revision == SCOPE_HOLD_REVISION;
     if credential_key.len() != 32 || !credential_key.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(Error::InvalidInput("invalid lifecycle fixture key"));
     }
@@ -334,6 +369,30 @@ fn populate_lifecycle(
     });
     store.save_reader_layout(account, &workspace, None)?;
 
+    let dependencies = if independent {
+        &[][..]
+    } else {
+        &LIFECYCLE_ACTIONS[0..1]
+    };
+    let separate_target = |original, kind| {
+        for tab in workspace.panes.iter().flat_map(|pane| &pane.tabs) {
+            let item = store.item(account, tab.item)?.ok_or(Error::NotFound)?;
+            if item.id != original
+                && item.kind == kind
+                && item.locator.repository == fixture.repository
+            {
+                return Ok(item.id);
+            }
+        }
+        Err(Error::Conflict(
+            "The scope fixture needs distinct original repository targets",
+        ))
+    };
+    let denied_item = if independent {
+        separate_target(fixture.long_discussion, crate::ItemKind::Issue)?
+    } else {
+        fixture.long_discussion
+    };
     for (index, intent) in [
         WriteIntent::CreateComment {
             body: LIFECYCLE_COMMENT.into(),
@@ -353,19 +412,19 @@ fn populate_lifecycle(
             account,
             WriteSubmission {
                 id: LIFECYCLE_ACTIONS[index],
-                item: fixture.long_discussion,
+                item: if index == 0 {
+                    denied_item
+                } else {
+                    fixture.long_discussion
+                },
                 intent: &intent,
                 draft: None,
-                dependencies: if index == 0 {
-                    &[]
-                } else {
-                    &LIFECYCLE_ACTIONS[0..1]
-                },
+                dependencies: if index == 0 { &[] } else { dependencies },
                 submitted_at_ms: FIXTURE_TIME_MS,
             },
         )?;
     }
-    let comments = if inspect_inline_submission {
+    let comments = if fixture_revision != LIFECYCLE_REVISION {
         vec![DraftInline {
             key: "lifecycle-submitted-line".into(),
             body: "Threadline lifecycle held inline note.".into(),
@@ -384,13 +443,32 @@ fn populate_lifecycle(
                 comments,
             }),
             draft: None,
-            dependencies: &LIFECYCLE_ACTIONS[0..1],
+            dependencies,
             submitted_at_ms: FIXTURE_TIME_MS,
         },
     )?;
+    let merge_revision = if independent {
+        let other = separate_target(fixture.reviewed_pr, crate::ItemKind::PullRequest)?;
+        store.record_pr_revision(
+            account,
+            other,
+            base,
+            &fixture.head,
+            Some(base),
+            &PrHeader {
+                base_ref: Some("main".into()),
+                head_ref: Some("scope-hold".into()),
+                draft: Some(false),
+                ..Default::default()
+            },
+            FIXTURE_TIME_MS,
+        )?
+    } else {
+        rev.clone()
+    };
     store.record_merge_policy(
         &current,
-        &rev,
+        &merge_revision,
         &MergePolicy {
             allowed_methods: Some([MergeMethod::Squash].into()),
             viewer_permission: Permission::Allowed,
@@ -406,14 +484,28 @@ fn populate_lifecycle(
         FIXTURE_TIME_MS,
     )?;
     store.submit_merge(
-        &rev,
+        &merge_revision,
         MergeSubmission {
             id: LIFECYCLE_ACTIONS[3],
             method: MergeMethod::Squash,
-            dependencies: &LIFECYCLE_ACTIONS[0..1],
+            dependencies,
             submitted_at_ms: FIXTURE_TIME_MS,
         },
     )?;
+    if independent {
+        store.update_sync_settings(account, |settings| {
+            settings.controls.pause_queued_actions = false
+        })?;
+        let denied = store
+            .claim_write(account, now, now.saturating_add(10_000))?
+            .ok_or(Error::NotFound)?;
+        if denied.operation_id() != LIFECYCLE_ACTIONS[0] {
+            return Err(Error::Conflict(
+                "Expected the fixture's separate ordinary comment",
+            ));
+        }
+        store.fail_write_preflight(&denied, WritePreflightFailure::Forbidden, now)?;
+    }
 
     store.update_notification_settings(account, |settings| {
         settings.fallback = DeliveryMode::Popup
@@ -440,11 +532,12 @@ fn populate_lifecycle(
         PopupOutcome::Delivered,
         now + 30_000,
     )?;
-    store.update_sync_settings(account, |settings| settings.controls.work_offline = true)?;
+    store.update_sync_settings(account, |settings| {
+        settings.controls.work_offline = true;
+        settings.controls.pause_queued_actions = true;
+    })?;
     let mut seeded = fixture;
-    if inspect_inline_submission {
-        seeded.revision = OFFLINE_OUTBOX_REVISION;
-    }
+    seeded.revision = fixture_revision;
     seeded.outbox_count = LIFECYCLE_ACTIONS.len();
     seeded.typed_outbox_count = LIFECYCLE_ACTIONS.len();
     Ok(seeded)
