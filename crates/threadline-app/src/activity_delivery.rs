@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     mpsc,
 };
+use std::time::Duration;
 use threadline_core::sync::policy::system_timezone;
 use threadline_platform::{ActivityId, ActivityNotification, PlatformControls, PlatformError};
 use threadline_storage::{
@@ -41,23 +42,38 @@ fn run(
     wake: mpsc::Receiver<()>,
     stop: Arc<AtomicBool>,
 ) {
-    while wake.recv().is_ok() && !stop.load(Ordering::Acquire) {
-        let Some(store) = store.upgrade() else { break };
-        if let Err(error) = deliver(&store, &native, &stop) {
-            eprintln!("Threadline activity delivery: {error}");
+    let mut delay = None;
+    loop {
+        let awake = match delay {
+            Some(delay) => !matches!(
+                wake.recv_timeout(delay),
+                Err(mpsc::RecvTimeoutError::Disconnected)
+            ),
+            None => wake.recv().is_ok(),
+        };
+        if !awake || stop.load(Ordering::Acquire) {
+            break;
         }
+        let Some(store) = store.upgrade() else { break };
+        delay = match deliver(&store, &native, &stop) {
+            Ok(next) => next,
+            Err(error) => {
+                eprintln!("Threadline activity delivery: {error}");
+                None
+            }
+        };
     }
 }
 fn deliver(
     store: &Store,
     native: &PlatformControls,
     stop: &AtomicBool,
-) -> threadline_storage::Result<()> {
+) -> threadline_storage::Result<Option<Duration>> {
     let Some(account) = store.active_github_account()? else {
-        return Ok(());
+        return Ok(None);
     };
     if !store.notification_work_pending(account)? {
-        return Ok(());
+        return Ok(None);
     }
     let zone = system_timezone().map_err(threadline_storage::Error::InvalidInput)?;
     use threadline_platform::ActivityPermission;
@@ -84,8 +100,12 @@ fn deliver(
         )? == 128
     {}
     while !stop.load(Ordering::Acquire) {
-        let Some(group) =
-            store.claim_notification_popup(account, UtcMillis::now()?.0, &zone, availability)?
+        let Some(group) = store.claim_ready_notification_popup(
+            account,
+            UtcMillis::now()?.0,
+            &zone,
+            availability,
+        )?
         else {
             break;
         };
@@ -112,7 +132,10 @@ fn deliver(
             UtcMillis::now()?.0,
         )?;
     }
-    Ok(())
+    let now = UtcMillis::now()?.0;
+    Ok(store
+        .next_notification_popup_at(account)?
+        .map(|at| Duration::from_millis(at.saturating_sub(now).clamp(0, 30_000) as u64)))
 }
 
 /// A wake-up for cached readers. SQLite retains Open destinations until the matching workspace acknowledges them.

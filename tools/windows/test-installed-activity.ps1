@@ -211,7 +211,7 @@ try {
                 if ($state.os_feed_only -gt 0) { Stop-Blocked 'Windows disabled notifications for this registered sender; the feed retained the events.' }
             }
             if ($state.outcome -ceq 'delivered' -and $state.group_count -eq 1 -and $state.native_id -cmatch '^[a-f0-9]{32}$') { return $state }
-        }
+        } 65000
         $group = $delivered.native_id
         $null = Wait-Activity 'the exact app-scoped history record' { Get-ExactHistory }
         Add-Evidence 'Verify Windows history, opaque Open/Snooze/Mark read payloads and the delivered journal' $delivered

@@ -235,3 +235,78 @@ fn it_018_delivery_rechecks_current_preferences_before_native_boundary_and_summa
             .is_err()
     );
 }
+
+#[test]
+fn it_018_popup_waits_for_separately_committed_pages_and_survives_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Store::open_profile(dir.path()).unwrap();
+    let (account, repo, item) = write_profile::setup(&db);
+    let profile = db.github_access_profile(account, "work").unwrap().unwrap();
+    let popup = PopupAvailability::Enabled;
+    let at = 1_700_000_000_000;
+    db.enroll_notification_stream(&profile, repo, "comments", at - 100)
+        .unwrap();
+    db.update_notification_settings(account, |settings| settings.fallback = DeliveryMode::Popup)
+        .unwrap();
+
+    let review = facts(item, Category::CommentOnlyReview);
+    assert!(record(&db, &profile, repo, "submitted-review", at, &review));
+    assert_eq!(
+        db.process_notification_events(account, at, "UTC", popup, 10)
+            .unwrap(),
+        1
+    );
+    let deadline = db.next_notification_popup_at(account).unwrap().unwrap();
+    assert!(deadline > at + 1_000);
+    assert!(
+        db.claim_ready_notification_popup(account, at, "UTC", popup)
+            .unwrap()
+            .is_none()
+    );
+
+    let mut inline = facts(item, Category::InlineComment);
+    inline.target = NotificationTarget::Item {
+        item,
+        thread: Some("fixture-thread".into()),
+    };
+    assert!(record(
+        &db,
+        &profile,
+        repo,
+        "review-inline-note",
+        at + 1_000,
+        &inline
+    ));
+    assert_eq!(
+        db.process_notification_events(account, at + 1_000, "UTC", popup, 10)
+            .unwrap(),
+        1
+    );
+    drop(db);
+
+    let db = Store::open_profile(dir.path()).unwrap();
+    assert_eq!(
+        db.next_notification_popup_at(account).unwrap(),
+        Some(deadline)
+    );
+    assert!(
+        db.claim_ready_notification_popup(account, deadline - 1, "UTC", popup)
+            .unwrap()
+            .is_none()
+    );
+    let grouped = db
+        .claim_ready_notification_popup(account, deadline, "UTC", popup)
+        .unwrap()
+        .unwrap();
+    assert_eq!(grouped.event_count, 2);
+    assert_eq!(
+        grouped.destination.target,
+        NotificationTarget::Item { item, thread: None }
+    );
+    assert_eq!(db.next_notification_popup_at(account).unwrap(), None);
+    assert!(
+        db.claim_ready_notification_popup(account, deadline + 1, "UTC", popup)
+            .unwrap()
+            .is_none()
+    );
+}

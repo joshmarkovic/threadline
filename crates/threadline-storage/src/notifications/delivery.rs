@@ -353,6 +353,23 @@ impl Store {
                 [account],|r|r.get(0))?)
         })
     }
+    /// Give separately fetched parts of a review or reconnect batch one collection window.
+    /// The deadline lives with the group, so closing and reopening the app preserves it.
+    pub fn next_notification_popup_at(&self, account: AccountId) -> Result<Option<i64>> {
+        self.read(|db| {
+            if !dispatch_allowed(db, account)? {
+                return Ok(None);
+            }
+            let created: Option<i64> = db.query_row(
+                "SELECT MIN(created_at) FROM native_notification_groups
+                 WHERE account_id=? AND state='pending'",
+                [account],
+                |row| row.get(0),
+            )?;
+            Ok(created.map(|at| at.saturating_add(BURST_MS)))
+        })
+    }
+
     pub fn process_notification_events(
         &self,
         a: AccountId,
@@ -408,7 +425,33 @@ impl Store {
         zone: &str,
         popup: impl Into<PopupAvailability>,
     ) -> Result<Option<PopupGroup>> {
-        let popup = popup.into();
+        self.claim_notification_popup_before(a, now, zone, popup.into(), now)
+    }
+
+    pub fn claim_ready_notification_popup(
+        &self,
+        account: AccountId,
+        now: i64,
+        zone: &str,
+        popup: PopupAvailability,
+    ) -> Result<Option<PopupGroup>> {
+        self.claim_notification_popup_before(
+            account,
+            now,
+            zone,
+            popup,
+            now.saturating_sub(BURST_MS),
+        )
+    }
+
+    fn claim_notification_popup_before(
+        &self,
+        a: AccountId,
+        now: i64,
+        zone: &str,
+        popup: PopupAvailability,
+        ready_before: i64,
+    ) -> Result<Option<PopupGroup>> {
         self.write(|tx| {
             if !dispatch_allowed(tx, a)? {
                 return Ok(None);
@@ -425,8 +468,9 @@ impl Store {
             }
             loop {
                 let group=tx.query_row(
-                            "SELECT id,native_id FROM native_notification_groups WHERE account_id=? AND state='pending' ORDER BY id LIMIT 1",
-                            [a], |r| Ok((r.get::<_,i64>(0)?,r.get::<_,String>(1)?)),
+                            "SELECT id,native_id FROM native_notification_groups
+                             WHERE account_id=? AND state='pending' AND created_at<=? ORDER BY id LIMIT 1",
+                            params![a,ready_before], |r| Ok((r.get::<_,i64>(0)?,r.get::<_,String>(1)?)),
                         ).optional()?;
                 let Some((id, native_id)) = group else {
                     return Ok(None);
