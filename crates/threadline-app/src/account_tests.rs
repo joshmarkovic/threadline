@@ -681,31 +681,48 @@ async fn pr_service_commits_verified_files_context_and_cross_repository_referenc
         .request_pr_download(&revision, false, false, UtcMillis::now().unwrap().0)
         .unwrap();
     assert_eq!(job.state, PrDownloadState::Pending);
-    assert!(matches!(
-        reader
-            .run_pr_download(&revision, job.generation, &cancel)
-            .await,
-        Err(ReaderError::Offline)
-    ));
-    settings.controls.work_offline = false;
-    store.save_sync_settings(account, &settings).unwrap();
     // The ordinary worker owns the persisted request even with no reader workspace or tabs.
     let worker =
         crate::sync_worker::SyncWorker::start_fixture(service, &tokio::runtime::Handle::current());
+    let mut updates = worker.watch();
     worker.wake(Some(threadline_core::connectivity::ProbeTrigger::Startup));
-    tokio::time::timeout(Duration::from_secs(12), async {
-        loop {
-            let downloaded = store.pr_download(&revision).unwrap().unwrap();
-            assert_eq!(downloaded.generation, job.generation);
-            if downloaded.state == PrDownloadState::Complete {
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(20)).await;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while updates.borrow().connection.status
+            != threadline_core::connectivity::ConnectionStatus::Offline
+        {
+            updates.changed().await.unwrap();
         }
     })
     .await
     .unwrap();
-    drop(worker);
+    assert!(store.next_pr_download_due(account).unwrap().is_none());
+    assert_eq!(
+        store.pr_download(&revision).unwrap().unwrap().state,
+        PrDownloadState::Pending
+    );
+    let wait_for_job = |generation, expected| {
+        let (store, revision) = (&store, &revision);
+        async move {
+            tokio::time::timeout(Duration::from_secs(12), async {
+                loop {
+                    let downloaded = store.pr_download(revision).unwrap().unwrap();
+                    assert_eq!(downloaded.generation, generation);
+                    if downloaded.state == expected {
+                        break downloaded;
+                    }
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                }
+            })
+            .await
+            .unwrap()
+        }
+    };
+    settings.controls.work_offline = false;
+    store.save_sync_settings(account, &settings).unwrap();
+    worker.interrupt(Some(
+        threadline_core::connectivity::ProbeTrigger::NetworkChanged,
+    ));
+    wait_for_job(job.generation, PrDownloadState::Complete).await;
     assert_eq!(
         store
             .pr_page(&revision, PrFamily::Files, None, 10)
@@ -717,20 +734,16 @@ async fn pr_service_commits_verified_files_context_and_cross_repository_referenc
     let optional = store
         .request_pr_download(&revision, true, true, UtcMillis::now().unwrap().0)
         .unwrap();
-    assert_eq!(
-        reader
-            .run_pr_download(&revision, optional.generation, &cancel)
-            .await
-            .unwrap(),
-        PrDownloadState::Partial
-    );
+    assert!(optional.generation > job.generation);
+    worker.wake(None);
+    let job = wait_for_job(optional.generation, PrDownloadState::Partial).await;
     let media = store.pr_page(&revision, PrFamily::Media, None, 1).unwrap();
-    let job = store.pr_download(&revision).unwrap().unwrap();
     assert_eq!(
         job.unselected_optional_resources().collect::<Vec<_>>(),
         [PrFamily::Media]
     );
     assert!(!media.state.shows_empty(media.rows.len()));
+    drop(worker);
 
     fixture.check_arrived.store(false, Ordering::Release);
     fixture.hold_check_response.store(true, Ordering::Release);

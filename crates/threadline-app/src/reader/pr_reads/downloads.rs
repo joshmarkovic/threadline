@@ -3,38 +3,14 @@ use threadline_storage::pr::{PrDownloadClaim, PrDownloadState};
 use super::*;
 
 impl ReaderService {
-    #[cfg(test)]
-    pub(crate) async fn run_pr_download(
-        &self,
-        rev: &PrRevision,
-        generation: i64,
-        cancel: &Cancellation,
-    ) -> Result<PrDownloadState, ReaderError> {
-        if self.store.dispatch_profile(rev.account)?.offline {
-            return Err(ReaderError::Offline);
-        }
-        self.store.start_pr_download(rev, generation)?;
-        self.run_pr_download_attempt(rev, PrDownloadAttempt::unleased(generation), cancel, || {})
-            .await
-    }
-
     pub(crate) async fn run_claimed_pr_download(
         &self,
         claim: &PrDownloadClaim,
         cancel: &Cancellation,
         publish_progress: impl Fn(),
     ) -> Result<PrDownloadState, ReaderError> {
-        self.run_pr_download_attempt(&claim.revision, claim.attempt, cancel, publish_progress)
-            .await
-    }
-
-    async fn run_pr_download_attempt(
-        &self,
-        rev: &PrRevision,
-        attempt: PrDownloadAttempt,
-        cancel: &Cancellation,
-        publish_progress: impl Fn(),
-    ) -> Result<PrDownloadState, ReaderError> {
+        let rev = &claim.revision;
+        let attempt = claim.attempt;
         self.check_pr_download(rev, Some(attempt))?;
         let mut prepared = self.prepare_pr(rev.account, rev.pr, cancel).await?;
         if prepared.revision.id != rev.id
