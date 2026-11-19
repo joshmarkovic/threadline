@@ -9,7 +9,7 @@ use threadline_core::{
     github::{
         AccessKind, CancellationToken, GitHubClient, GitHubSession, OwnerScope, SecretToken,
         reader::{
-            pr::{PatchEvidence, PrSide, PrSource, PrSourceRange},
+            pr::{PatchEvidence, PrSide, PrSource, PrSourceRange, PrThreadLocation},
             refresh::ReadValidators,
         },
     },
@@ -426,8 +426,13 @@ async fn graph_reads_verify_current_pr_identity_and_resume_a_single_thread_witho
     assert!(review.records[0].actor.known_automation);
 
     let mut thread_page = identity();
-    thread_page["reviewThreads"] = json!({"nodes":[{"id":"PRRT_1","diffSide":"RIGHT","isResolved":true,"isOutdated":false,
-        "comments":{"nodes":[comment(51, Value::Null)],"pageInfo":{"hasNextPage":true,"endCursor":"next-reply"}}}],
+    thread_page["reviewThreads"] = json!({"nodes":[
+        {"id":"PRRT_1","path":"src/renamed.rs","line":17,"diffSide":"RIGHT","subjectType":"LINE","isResolved":true,"isOutdated":false,
+            "comments":{"nodes":[comment(51, Value::Null)],"pageInfo":{"hasNextPage":true,"endCursor":"next-reply"}}},
+        {"id":"PRRT_2","path":"src/renamed.rs","line":23,"diffSide":"LEFT","subjectType":"LINE","isResolved":false,"isOutdated":false,
+            "comments":{"nodes":[comment(53, Value::Null)],"pageInfo":{"hasNextPage":false,"endCursor":null}}},
+        {"id":"PRRT_3","path":"src/renamed.rs","line":null,"diffSide":"RIGHT","subjectType":"FILE","isResolved":false,"isOutdated":false,
+            "comments":{"nodes":[comment(54, Value::Null)],"pageInfo":{"hasNextPage":false,"endCursor":null}}}],
         "pageInfo":{"hasNextPage":false,"endCursor":null}});
     send(
         "ThreadlineThreads",
@@ -439,6 +444,36 @@ async fn graph_reads_verify_current_pr_identity_and_resume_a_single_thread_witho
     let first = &threads.records[0];
     assert_eq!(first.node_id(), "PRRT_1");
     assert_eq!(first.resolved, Some(true));
+    assert_eq!(
+        first.location,
+        Some(PrThreadLocation::Line {
+            path: "src/renamed.rs".into(),
+            side: PrSide::Right,
+            line: 17
+        })
+    );
+    assert_eq!(
+        threads.records[1].location,
+        Some(PrThreadLocation::Line {
+            path: "src/renamed.rs".into(),
+            side: PrSide::Left,
+            line: 23
+        })
+    );
+    assert_eq!(
+        threads.records[1].comments[0]
+            .anchor
+            .as_ref()
+            .unwrap()
+            .original_oid,
+        HEAD
+    );
+    assert_eq!(
+        threads.records[2].location,
+        Some(PrThreadLocation::File {
+            path: "src/renamed.rs".into()
+        })
+    );
     assert!(!first.replies_complete);
     assert_eq!(first.comments[0].actor, review.records[0].actor);
     let anchor = first.comments[0].anchor.as_ref().unwrap();
@@ -446,6 +481,7 @@ async fn graph_reads_verify_current_pr_identity_and_resume_a_single_thread_witho
         (anchor.side, anchor.line, anchor.original_oid.as_str()),
         (PrSide::Right, 5, HEAD)
     );
+    assert_eq!(anchor.path, "src/lib.rs");
     let cursor = first.reply_cursor.as_deref().unwrap();
     send(
         "ThreadlineReplies",

@@ -281,6 +281,7 @@ fn populate_lifecycle(
                 node_id: LIFECYCLE_THREAD.into(),
                 resolved: Some(false),
                 outdated: Some(false),
+                location: None,
                 comments: vec![InlineComment {
                     id: LIFECYCLE_THREAD_ROOT,
                     node_id: Some("TL_LIFECYCLE_ROOT".into()),

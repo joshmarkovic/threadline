@@ -44,12 +44,23 @@ impl PrRecord {
             }
             Self::Thread {
                 node_id,
+                location,
                 comments,
                 replies_complete,
                 reply_cursor,
                 ..
             } => {
                 label(node_id)?;
+                match location {
+                    Some(ReviewThreadLocation::Line { path, line, .. }) => {
+                        label(path)?;
+                        if *line == 0 {
+                            return Err(Error::InvalidInput("Invalid current review thread line"));
+                        }
+                    }
+                    Some(ReviewThreadLocation::File { path }) => label(path)?,
+                    None => {}
+                }
                 if let Some(cursor) = reply_cursor {
                     label(cursor)?;
                     if *replies_complete {

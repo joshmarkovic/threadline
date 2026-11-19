@@ -56,6 +56,7 @@ pub(super) struct SelectedFile {
     pub patch: Option<DiffFile>,
     pub problem: Option<&'static str>,
     pub changes: Vec<DiffLinePosition>,
+    source_lines: [Vec<u32>; 2],
     evidence: PatchEvidence,
 }
 
@@ -179,11 +180,25 @@ impl FilePage {
             let changes = patch.as_ref().map_or_else(Vec::new, |patch| {
                 change_positions(patch, &source, revision.merge_base.is_some())
             });
+            let mut source_lines = [
+                source
+                    .iter()
+                    .filter_map(|line| line.left)
+                    .collect::<Vec<_>>(),
+                source
+                    .iter()
+                    .filter_map(|line| line.right)
+                    .collect::<Vec<_>>(),
+            ];
+            source_lines
+                .iter_mut()
+                .for_each(|lines| lines.sort_unstable());
             Some(SelectedFile {
                 summary,
                 patch,
                 problem,
                 changes,
+                source_lines,
                 evidence,
             })
         });
@@ -193,6 +208,22 @@ impl FilePage {
             state: page.state,
             api_capped: page.api_capped,
             selected,
+        })
+    }
+}
+
+impl SelectedFile {
+    pub fn has_source_line(&self, side: SourceSide, line: u32) -> bool {
+        let lines = match side {
+            SourceSide::Left => &self.source_lines[0],
+            SourceSide::Right => &self.source_lines[1],
+        };
+        lines.binary_search(&line).is_ok_and(|index| {
+            index
+                .checked_sub(1)
+                .and_then(|previous| lines.get(previous))
+                != Some(&line)
+                && lines.get(index + 1) != Some(&line)
         })
     }
 }

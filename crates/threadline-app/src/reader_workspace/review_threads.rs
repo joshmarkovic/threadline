@@ -305,24 +305,22 @@ impl ReaderWorkspace {
 }
 
 use super::pr::PullRequestView;
+use super::pr::SelectedFile;
 use gpui_kit::{
     ElementId, SharedString,
     component::diff::{DiffAnnotation, DiffLinePosition, DiffSide},
 };
-use threadline_storage::pr::{PrFamily, ReviewAnchor, SourceSide};
+use threadline_storage::pr::{PrFamily, ReviewAnchor, ReviewThreadLocation, SourceSide};
 
 pub(super) struct AnchoredAnnotations {
     pub rows: Vec<DiffAnnotation>,
     pub labels: HashMap<ElementId, SharedString>,
+    pub unavailable: bool,
 }
 
 impl AnchoredAnnotations {
     fn add(&mut self, key: String, path: &str, side: SourceSide, line: u32, note: String) {
-        let side = match side {
-            SourceSide::Left => DiffSide::Original,
-            SourceSide::Right => DiffSide::Modified,
-        };
-        let position = DiffLinePosition::new(path.to_owned(), side, line as usize);
+        let position = DiffLinePosition::new(path.to_owned(), diff_side(side), line as usize);
         let annotation = DiffAnnotation::line(key, position);
         self.labels.insert(annotation.id().clone(), note.into());
         self.rows.push(annotation);
@@ -340,12 +338,7 @@ fn matches_source(revision: &PrRevision, side: SourceSide, oid: &str) -> bool {
 }
 
 fn root_anchor(record: &PrRecord) -> Option<&ReviewAnchor> {
-    let PrRecord::Thread {
-        outdated: Some(false),
-        comments,
-        ..
-    } = record
-    else {
+    let PrRecord::Thread { comments, .. } = record else {
         return None;
     };
     comments
@@ -355,16 +348,51 @@ fn root_anchor(record: &PrRecord) -> Option<&ReviewAnchor> {
         .as_ref()
 }
 
+fn diff_side(side: SourceSide) -> DiffSide {
+    match side {
+        SourceSide::Left => DiffSide::Original,
+        SourceSide::Right => DiffSide::Modified,
+    }
+}
+
+fn current_anchor(revision: &PrRevision, record: &PrRecord) -> Option<ReviewAnchor> {
+    let PrRecord::Thread {
+        outdated: Some(false),
+        location: Some(ReviewThreadLocation::Line { path, side, line }),
+        ..
+    } = record
+    else {
+        return None;
+    };
+    let source = match side {
+        SourceSide::Left => revision.merge_base.as_ref()?,
+        SourceSide::Right => &revision.head,
+    };
+    Some(ReviewAnchor {
+        path: path.clone(),
+        side: *side,
+        line: *line,
+        original_oid: source.as_str().to_owned(),
+    })
+}
+
+fn downloaded_line(file: &SelectedFile, anchor: &ReviewAnchor) -> bool {
+    file.summary.path == anchor.path
+        && file.patch.is_some()
+        && file.has_source_line(anchor.side, anchor.line)
+}
+
 impl ReaderWorkspace {
     pub(super) fn review_annotations(
         &self,
         tab: &Tab,
         pr: &PullRequestView,
-        path: &str,
+        file: &SelectedFile,
     ) -> AnchoredAnnotations {
         let mut result = AnchoredAnnotations {
             rows: Vec::new(),
             labels: HashMap::new(),
+            unavailable: false,
         };
         let revision = &pr.data.revision;
         for (key, record) in pr
@@ -374,51 +402,74 @@ impl ReaderWorkspace {
             .filter(|(family, _)| *family == PrFamily::Threads)
             .flat_map(|(_, page)| &page.rows)
         {
-            let Some(anchor) = root_anchor(record).filter(|anchor| {
-                anchor.path == path && matches_source(revision, anchor.side, &anchor.original_oid)
-            }) else {
-                continue;
-            };
             let PrRecord::Thread {
-                comments, resolved, ..
+                comments,
+                resolved,
+                location,
+                replies_complete,
+                ..
             } = record
             else {
                 continue;
             };
-            if let Some(comment) = comments
-                .iter()
-                .find(|comment| comment.in_reply_to.is_none())
-            {
-                let state = match resolved {
-                    Some(true) => "Resolved",
-                    Some(false) => "Unresolved",
-                    None => "Resolution unknown",
-                };
-                result.add(
-                    key.clone(),
-                    path,
-                    anchor.side,
-                    anchor.line,
-                    format!(
-                        "{state} · {}\n{}",
-                        comment.author.as_deref().unwrap_or("Unknown reviewer"),
-                        comment.body
-                    ),
-                );
+            let path = match location {
+                Some(
+                    ReviewThreadLocation::Line { path, .. } | ReviewThreadLocation::File { path },
+                ) => Some(path.as_str()),
+                None => root_anchor(record).map(|anchor| anchor.path.as_str()),
+            };
+            if path != Some(file.summary.path.as_str()) || comments.is_empty() {
+                continue;
             }
+            let Some(anchor) =
+                current_anchor(revision, record).filter(|anchor| downloaded_line(file, anchor))
+            else {
+                result.unavailable = true;
+                continue;
+            };
+            let Some(patch) = &file.patch else { continue };
+            let state = match resolved {
+                Some(true) => "Resolved",
+                Some(false) => "Unresolved",
+                None => "Resolution unknown",
+            };
+            let mut body = state.to_owned();
+            for comment in comments {
+                body.push_str("\n\n");
+                if comment.in_reply_to.is_some() {
+                    body.push_str("Reply from ");
+                }
+                body.push_str(comment.author.as_deref().unwrap_or("Unknown reviewer"));
+                body.push('\n');
+                body.push_str(&comment.body);
+            }
+            if !replies_complete {
+                body.push_str("\n\nSome replies are unavailable.");
+            }
+            result.add(key.clone(), patch.path(), anchor.side, anchor.line, body);
         }
         if let Some(editor) = self
             .review_editors
             .get(&tab.item)
             .filter(|editor| editor.revision().id == revision.id)
+            && let Some(patch) = &file.patch
         {
             for draft in &editor.inline {
                 let anchor = &draft.anchor;
-                if anchor.path == path && matches_source(revision, anchor.side, &anchor.source_oid)
+                let full_path = match anchor.side {
+                    SourceSide::Left => file
+                        .summary
+                        .previous_path
+                        .as_ref()
+                        .unwrap_or(&file.summary.path),
+                    SourceSide::Right => &file.summary.path,
+                };
+                if &anchor.path == full_path
+                    && matches_source(revision, anchor.side, &anchor.source_oid)
                 {
                     result.add(
                         draft.key.clone(),
-                        path,
+                        patch.path(),
                         anchor.side,
                         anchor.last_line,
                         "Local inline review draft".into(),
@@ -452,8 +503,19 @@ impl ReaderWorkspace {
                     }
                 )
             })
-            .filter_map(|(_, record)| root_anchor(record))
-            .filter(|anchor| matches_source(revision, anchor.side, &anchor.original_oid))
+            .filter_map(|(_, record)| current_anchor(revision, record))
+            .filter(|anchor| {
+                pr.data.files.as_ref().is_some_and(|files| {
+                    files
+                        .selected
+                        .as_ref()
+                        .filter(|file| file.summary.path == anchor.path)
+                        .map_or_else(
+                            || files.rows.iter().any(|file| file.path == anchor.path),
+                            |file| downloaded_line(file, anchor),
+                        )
+                })
+            })
             .collect::<Vec<_>>();
         let current = tab
             .view
@@ -461,9 +523,9 @@ impl ReaderWorkspace {
             .as_ref()
             .and_then(|settings| settings.code_anchor.as_ref());
         let next = current
-            .and_then(|current| anchors.iter().position(|anchor| *anchor == current))
+            .and_then(|current| anchors.iter().position(|anchor| anchor == current))
             .map_or(0, |position| (position + 1) % anchors.len());
-        let anchor = (*anchors.get(next)?).clone();
+        let anchor = anchors.get(next)?.clone();
         let target = tab.clone();
         let id = format!("pr-{pane}-next-unresolved-thread");
         let button = control(id.clone(), "Next unresolved thread")
@@ -473,15 +535,18 @@ impl ReaderWorkspace {
                     .tab_views
                     .get(&target.id)
                     .and_then(|view| view.pr.as_ref())
-                    .and_then(|pr| pr.diff.as_ref())
+                    .and_then(|pr| {
+                        let selected = pr.data.files.as_ref()?.selected.as_ref()?;
+                        (selected.summary.path == anchor.path).then_some(pr.diff.as_ref()?)
+                    })
                 {
-                    let side = match anchor.side {
-                        SourceSide::Left => DiffSide::Original,
-                        SourceSide::Right => DiffSide::Modified,
-                    };
                     diff.update(cx, |state, cx| {
                         state.scroll_to_line(
-                            DiffLinePosition::new(anchor.path.clone(), side, anchor.line as usize),
+                            DiffLinePosition::new(
+                                anchor.path.clone(),
+                                diff_side(anchor.side),
+                                anchor.line as usize,
+                            ),
                             cx,
                         )
                     });

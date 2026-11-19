@@ -100,6 +100,7 @@ fn rev(db: &Store, a: AccountId, r: RepositoryId, num: u64, head: char, at: i64)
         node_id: "THREAD".into(),
         resolved: Some(false),
         outdated: Some(false),
+        location: None,
         comments: vec![InlineComment {
             id: 600,
             node_id: None,

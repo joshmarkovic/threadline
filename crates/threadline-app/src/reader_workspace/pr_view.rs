@@ -17,7 +17,7 @@ use gpui_kit::{
 use threadline_storage::{
     pr::{
         BodyReference, NarrowSurface, PrContextMode, PrDiffMode, PrFamily, PrRecord, PrRevision,
-        PrSection, SourceSide, Verification,
+        PrSection, ReviewThreadLocation, SourceSide, Verification,
     },
     queue::PrContext,
     resources::{ResourceError, ResourceState},
@@ -1321,8 +1321,15 @@ impl ReaderWorkspace {
                 .child(div().text_xs().p_1().child("Loading the selected file…"))
                 .into_any_element();
         }
+        let annotations = self.review_annotations(tab, pr, file);
+        if annotations.unavailable {
+            panel = panel.child(pr_status(
+                format!("pr-{pane}-thread-placement"),
+                "Review threads without a matching downloaded source line are available in Conversation.",
+                palette,
+            ));
+        }
         if let Some(diff) = &pr.diff {
-            let annotations = self.review_annotations(tab, pr, &file.summary.path);
             let tab = tab.clone();
             let revision = pr.data.revision.clone();
             let entity = cx.weak_entity();
@@ -1339,10 +1346,28 @@ impl ReaderWorkspace {
                         .size_full()
                         .annotations(annotations.rows)
                         .render_annotation(move |annotation, _, _| {
+                            let body = annotations.labels.get(annotation.id()).cloned();
+                            let position = annotation.position().map(|position| {
+                                let side = match position.side() {
+                                    DiffSide::Original => "Original",
+                                    DiffSide::Modified => "Modified",
+                                };
+                                format!("Review on {side} line {}", position.line())
+                            });
+                            let label = match (&position, &body) {
+                                (Some(position), Some(body)) => format!("{position}. {body}"),
+                                (Some(position), None) => position.clone(),
+                                _ => "Inline review".to_owned(),
+                            };
+                            let id = format!("pr-{pane}-annotation-{}", annotation.id());
                             div()
+                                .id(id.clone())
+                                .accessibility_id(id)
+                                .role(Role::Group)
+                                .aria_label(label)
                                 .p_1()
                                 .text_xs()
-                                .children(annotations.labels.get(annotation.id()).cloned())
+                                .children(body)
                         })
                         .on_line_click(move |position, _, window, cx| {
                             let _ = entity.update(cx, |this, cx| {
@@ -1937,6 +1962,7 @@ fn pr_record(record: &PrRecord, palette: Palette) -> AnyElement {
         PrRecord::Thread {
             resolved,
             outdated,
+            location,
             comments,
             replies_complete,
             ..
@@ -1946,12 +1972,29 @@ fn pr_record(record: &PrRecord, palette: Palette) -> AnyElement {
                 Some(false) => "Unresolved",
                 None => "Resolution unknown",
             };
+            let placement = match (outdated, location) {
+                (Some(false), Some(ReviewThreadLocation::Line { path, side, line })) => {
+                    let side = match side {
+                        SourceSide::Left => "Original",
+                        SourceSide::Right => "Modified",
+                    };
+                    format!("Current position · {path} · {side} line {line}")
+                }
+                (_, Some(ReviewThreadLocation::File { path })) => {
+                    format!("File-level thread · {path}")
+                }
+                (Some(false), None) => "Current source position unavailable".to_owned(),
+                _ => String::new(),
+            };
             let outdated = match outdated {
                 Some(true) => "Outdated",
                 Some(false) => "Current",
                 None => "Outdated state unknown",
             };
-            let mut thread = card.child(format!("{resolved} · {outdated}"));
+            let mut thread = card.child(format!("{resolved} · {outdated}")).children(
+                (!placement.is_empty())
+                    .then(|| div().text_xs().text_color(palette.muted).child(placement)),
+            );
             for comment in comments {
                 let author = comment.author.as_deref().unwrap_or("Unknown reviewer");
                 thread = thread.child(
@@ -1960,8 +2003,8 @@ fn pr_record(record: &PrRecord, palette: Palette) -> AnyElement {
                         .child(format!("{author} · {}", time_label(comment.created_at_ms)))
                         .children(comment.anchor.as_ref().map(|anchor| {
                             div().text_xs().text_color(palette.muted).child(format!(
-                                "{} · {:?} line {}",
-                                anchor.path, anchor.side, anchor.line
+                                "Original position · {} · {:?} line {} · {}",
+                                anchor.path, anchor.side, anchor.line, anchor.original_oid
                             ))
                         }))
                         .child(comment.body.clone()),

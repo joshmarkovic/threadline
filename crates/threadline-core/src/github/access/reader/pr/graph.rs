@@ -47,6 +47,7 @@ pub struct PrThread {
     node_id: String,
     pub resolved: Option<bool>,
     pub outdated: Option<bool>,
+    pub location: Option<PrThreadLocation>,
     pub comments: Vec<PrInlineComment>,
     pub replies_complete: bool,
     pub reply_cursor: Option<String>,
@@ -76,6 +77,18 @@ pub struct PrInlineComment {
 pub enum PrSide {
     Left,
     Right,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum PrThreadLocation {
+    Line {
+        path: String,
+        side: PrSide,
+        line: u32,
+    },
+    File {
+        path: String,
+    },
 }
 
 pub struct PrReviewAnchor {
@@ -119,7 +132,7 @@ impl GitHubReader<'_> {
         let pull = self.require_snapshot(snapshot)?;
         let comments = comments();
         let query = format!("query ThreadlineThreads($id:ID!,$cursor:String) {{ node(id:$id) {{ ... on PullRequest {{ {PR_IDENTITY}
-            reviewThreads(first:10,after:$cursor) {{ nodes {{ id diffSide isResolved isOutdated comments(first:20) {{ {comments} }} }}
+            reviewThreads(first:10,after:$cursor) {{ nodes {{ id path line diffSide subjectType isResolved isOutdated comments(first:20) {{ {comments} }} }}
             pageInfo {{ hasNextPage endCursor }} }} }} }} }}");
         let data: GraphData<ThreadData> =
             self.pr_graph(query, &pull.node_id, cursor, cancel).await?;
@@ -469,6 +482,9 @@ struct RepliesData {
 #[serde(rename_all = "camelCase")]
 struct ThreadWire {
     id: String,
+    path: Option<String>,
+    line: Option<u32>,
+    subject_type: Option<ThreadSubject>,
     diff_side: Option<WireSide>,
     is_resolved: Option<bool>,
     is_outdated: Option<bool>,
@@ -485,10 +501,29 @@ impl ThreadWire {
             None,
             |comment| comment.read(self.diff_side),
         )?;
+        let location = match (
+            self.subject_type,
+            self.path,
+            self.diff_side,
+            self.line.filter(|line| *line > 0),
+        ) {
+            (Some(ThreadSubject::Line), Some(path), Some(side), Some(line)) => {
+                Some(PrThreadLocation::Line {
+                    path: checked_path(path)?,
+                    side: side.into(),
+                    line,
+                })
+            }
+            (Some(ThreadSubject::File), Some(path), _, _) => Some(PrThreadLocation::File {
+                path: checked_path(path)?,
+            }),
+            _ => None,
+        };
         Ok(PrThread {
             node_id: opaque_id(self.id)?,
             resolved: self.is_resolved,
             outdated: self.is_outdated,
+            location,
             comments: children.records,
             replies_complete: !children.partial && children.next_cursor.is_none(),
             reply_cursor: children.next_cursor,
@@ -498,11 +533,29 @@ impl ThreadWire {
     }
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum ThreadSubject {
+    Line,
+    File,
+    #[serde(other)]
+    Unknown,
+}
+
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum WireSide {
     Left,
     Right,
+}
+
+impl From<WireSide> for PrSide {
+    fn from(value: WireSide) -> Self {
+        match value {
+            WireSide::Left => Self::Left,
+            WireSide::Right => Self::Right,
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -543,10 +596,7 @@ impl Comment {
         ) {
             (Some(side), Some(line), Some(commit)) => Some(PrReviewAnchor {
                 path: checked_path(self.path)?,
-                side: match side {
-                    WireSide::Left => PrSide::Left,
-                    WireSide::Right => PrSide::Right,
-                },
+                side: side.into(),
                 line,
                 original_oid: oid(commit.oid)?,
             }),

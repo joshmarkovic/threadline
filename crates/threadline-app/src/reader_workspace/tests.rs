@@ -1504,6 +1504,7 @@ fn default_shared_pr_panes_keep_conversation_and_cached_thread_actions_reachable
                     node_id: "PRRT_42".into(),
                     resolved: Some(false),
                     outdated: Some(false),
+                    location: None,
                     comments: vec![InlineComment {
                         id: 771,
                         node_id: Some("PRRC_771".into()),
@@ -1659,6 +1660,207 @@ fn ui_004_anchored_review_draft_survives_pr_context_changes_and_queues_the_origi
     cx: &mut TestAppContext,
 ) {
     exercise_pr_context(cx, true);
+}
+
+#[gpui_kit::test]
+fn ui_004_existing_threads_follow_verified_source_lines_in_both_diff_modes(
+    cx: &mut TestAppContext,
+) {
+    use gpui_kit::component::diff::{DiffLineRange, DiffMode, DiffSide};
+    use threadline_storage::{
+        pr::{
+            InlineComment, PatchEvidence, PrFamily, PrHeader, PrInputPage, PrRecord, PrTabView,
+            ReviewAnchor, ReviewThreadLocation, SourceSide,
+        },
+        resources::{CommitOid, WalkMode},
+    };
+
+    let setup = ReaderHarness::seeded();
+    let account = setup.fixture.account;
+    let item = setup.fixture.reviewed_pr;
+    let stamp = 1_900_000_000_000;
+    let oid = |letter: &str| CommitOid::parse(&letter.repeat(40)).unwrap();
+    let revision = setup
+        .store
+        .record_pr_revision(
+            account,
+            item,
+            &oid("a"),
+            &oid("b"),
+            Some(&oid("c")),
+            &PrHeader::default(),
+            stamp,
+        )
+        .unwrap();
+    let path = "current.rs";
+    let line = |side, line| {
+        Some(ReviewThreadLocation::Line {
+            path: path.into(),
+            side,
+            line,
+        })
+    };
+    let comment = |id, in_reply_to, body: &str, side| InlineComment {
+        id,
+        node_id: Some(format!("review-{id}")),
+        in_reply_to,
+        author: Some("Fixture reviewer".into()),
+        actor: Default::default(),
+        body: body.into(),
+        created_at_ms: Some(stamp),
+        updated_at_ms: Some(stamp),
+        anchor: Some(ReviewAnchor {
+            path: "original.rs".into(),
+            side,
+            line: 4,
+            original_oid: oid("d").as_str().to_owned(),
+        }),
+    };
+    let thread = |id: &str, location, outdated, comments| PrRecord::Thread {
+        node_id: id.into(),
+        resolved: Some(false),
+        outdated,
+        location,
+        comments,
+        replies_complete: true,
+        reply_cursor: None,
+    };
+    let threads = vec![
+        thread(
+            "right",
+            line(SourceSide::Right, 17),
+            Some(false),
+            vec![
+                comment(610, None, "Moved root on modified line.", SourceSide::Right),
+                comment(
+                    611,
+                    Some(610),
+                    "Downloaded reply on the same thread.",
+                    SourceSide::Right,
+                ),
+            ],
+        ),
+        thread(
+            "left",
+            line(SourceSide::Left, 9),
+            Some(false),
+            vec![comment(
+                620,
+                None,
+                "Deletion-side thread.",
+                SourceSide::Left,
+            )],
+        ),
+        thread(
+            "outdated",
+            line(SourceSide::Right, 17),
+            Some(true),
+            vec![comment(630, None, "Outdated body.", SourceSide::Right)],
+        ),
+        thread(
+            "file",
+            Some(ReviewThreadLocation::File { path: path.into() }),
+            Some(false),
+            vec![comment(640, None, "File-level body.", SourceSide::Right)],
+        ),
+        thread(
+            "unavailable",
+            line(SourceSide::Right, 99),
+            Some(false),
+            vec![comment(
+                650,
+                None,
+                "Undownloaded source line.",
+                SourceSide::Right,
+            )],
+        ),
+    ];
+    let files = vec![PrRecord::File {
+        path: path.into(),
+        previous_path: Some("original.rs".into()),
+        status: "renamed".into(),
+        additions: Some(1),
+        deletions: Some(1),
+        patch: PatchEvidence::Text("@@ -9,2 +17,2 @@\n-old\n+new\n context".into()),
+    }];
+    for (family, records) in [(PrFamily::Files, files), (PrFamily::Threads, threads)] {
+        let progress = setup
+            .store
+            .start_pr_fetch(&revision, family, WalkMode::Full)
+            .unwrap();
+        setup
+            .store
+            .commit_pr_page(
+                &revision,
+                family,
+                &progress,
+                PrInputPage {
+                    records,
+                    next_cursor: None,
+                    validators: None,
+                    partial: None,
+                    fetched_at_ms: stamp,
+                },
+            )
+            .unwrap();
+    }
+    setup.one_pane(&Tab {
+        id: "verified-thread-source".into(),
+        item,
+        view: TabView {
+            pr_reader: Some(PrTabView {
+                context_collapsed: true,
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    });
+    let (window, reader) = setup.open(cx);
+    let check = |cx: &mut TestAppContext, mode| {
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            let state = reader.read(cx);
+            let tab = state.active_tab().unwrap();
+            let pr = state.tab_views[&tab.id].pr.as_ref().unwrap();
+            let diff = pr.diff.as_ref().unwrap().clone();
+            assert_eq!(diff.read(cx).mode(), mode);
+            let file = pr.data.files.as_ref().unwrap().selected.as_ref().unwrap();
+            let annotations = state.review_annotations(tab, pr, file);
+            assert!(annotations.unavailable);
+            assert_eq!(annotations.rows.len(), 2);
+            assert_eq!(
+                window.find("pr-0-thread-placement").role(),
+                Some(gpui_kit::Role::Status)
+            );
+            for (id, side, line, text) in [
+                ("thread:left", DiffSide::Original, 9, "old"),
+                ("thread:right", DiffSide::Modified, 17, "new"),
+            ] {
+                let marker = annotations
+                    .rows
+                    .iter()
+                    .find(|row| row.id() == &id.into())
+                    .unwrap();
+                let source = marker.position().unwrap();
+                assert_eq!(
+                    (source.path().as_ref(), source.side(), source.line()),
+                    (path, side, line)
+                );
+                diff.update(cx, |state, cx| {
+                    state.set_selected_lines(Some(DiffLineRange::new(path, side, line, line)), cx);
+                });
+                assert_eq!(diff.read(cx).selected_text(cx).trim(), text);
+            }
+            let right = &annotations.labels[&"thread:right".into()];
+            assert!(right.contains("Moved root on modified line."));
+            assert!(right.contains("Downloaded reply on the same thread."));
+        })
+        .unwrap();
+    };
+    check(cx, DiffMode::Unified);
+    click(cx, window, "pr-0-diff-split");
+    until(cx, |cx| cx.read(|cx| !reader.read(cx).layout_busy));
+    check(cx, DiffMode::Split);
 }
 
 fn exercise_pr_context(cx: &mut TestAppContext, review: bool) {

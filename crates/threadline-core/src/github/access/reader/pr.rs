@@ -4,7 +4,9 @@ pub(super) mod graph;
 mod source;
 pub(super) mod wire;
 
-pub use graph::{PrGraphPage, PrInlineComment, PrReview, PrReviewAnchor, PrSide, PrThread};
+pub use graph::{
+    PrGraphPage, PrInlineComment, PrReview, PrReviewAnchor, PrSide, PrThread, PrThreadLocation,
+};
 pub use source::{PrSource, PrSourceRange, SourceUnavailable};
 
 use serde::de::DeserializeOwned;

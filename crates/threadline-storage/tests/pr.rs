@@ -756,6 +756,11 @@ fn it_016_nested_inline_pages_keep_distinct_replies_anchors_and_category_baselin
         node_id: "T1".into(),
         resolved: None,
         outdated: None,
+        location: Some(ReviewThreadLocation::Line {
+            path: "src/updated.rs".into(),
+            side: SourceSide::Left,
+            line: 15,
+        }),
         comments,
         replies_complete,
     };
@@ -828,6 +833,13 @@ fn it_016_nested_inline_pages_keep_distinct_replies_anchors_and_category_baselin
             80,
         )
         .unwrap();
+    assert!(matches!(
+        reopened.pr_record(&rev, PrFamily::Threads, "thread:T1").unwrap(),
+        Some(PrRecord::Thread {
+            location: Some(ReviewThreadLocation::Line { path, side: SourceSide::Left, line: 15 }),
+            ..
+        }) if path == "src/updated.rs"
+    ));
     assert!(
         store
             .commit_pr_replies(&rev, &nested, vec![], None, 81)
@@ -1014,6 +1026,7 @@ fn it_018_review_actor_suppression_keeps_content_and_human_replies_after_restart
         node_id: "T1".into(),
         resolved: Some(false),
         outdated: Some(false),
+        location: None,
         comments: vec![
             inline(21, None, bot, "Automated detail"),
             inline(22, Some(21), human, "I checked this"),

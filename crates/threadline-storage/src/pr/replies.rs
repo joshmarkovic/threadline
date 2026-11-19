@@ -123,6 +123,7 @@ impl Store {
                 node_id: expected.thread_node.clone(),
                 resolved: None,
                 outdated: None,
+                location: None,
                 comments,
                 replies_complete: next.is_none(),
                 reply_cursor: next.map(str::to_owned),
@@ -136,13 +137,25 @@ impl Store {
                     .optional()?;
                 let Some(raw) = original else { continue };
                 let mut saved: StoredRecord = decoded(&raw)?;
-                let PrRecord::Thread { reply_cursor, .. } = &saved.record else {
+                let PrRecord::Thread {
+                    reply_cursor,
+                    location,
+                    ..
+                } = &saved.record
+                else {
                     return Err(Error::Corrupt);
                 };
                 if reply_cursor.as_deref() != Some(expected.cursor.as_str()) {
                     continue;
                 }
                 let mut merged = record.clone();
+                if let PrRecord::Thread {
+                    location: merged_location,
+                    ..
+                } = &mut merged
+                {
+                    *merged_location = location.clone();
+                }
                 records::merge_thread(&mut merged, &saved.record, true);
                 saved.search = merged.searchable();
                 saved.record = merged;

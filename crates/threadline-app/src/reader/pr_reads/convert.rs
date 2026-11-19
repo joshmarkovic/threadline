@@ -1,5 +1,5 @@
 use threadline_core::github::reader::pr as remote;
-use threadline_storage::pr::{InlineComment, PatchEvidence, ReviewAnchor};
+use threadline_storage::pr::{InlineComment, PatchEvidence, ReviewAnchor, ReviewThreadLocation};
 
 use super::*;
 
@@ -133,6 +133,14 @@ pub(super) fn thread(value: remote::PrThread) -> PrRecord {
         node_id: value.node_id().to_owned(),
         resolved: value.resolved,
         outdated: value.outdated,
+        location: value.location.map(|location| match location {
+            remote::PrThreadLocation::Line { path, side, line } => ReviewThreadLocation::Line {
+                path,
+                side: source_side(side),
+                line,
+            },
+            remote::PrThreadLocation::File { path } => ReviewThreadLocation::File { path },
+        }),
         comments: value.comments.into_iter().map(inline_comment).collect(),
         replies_complete: value.replies_complete,
         reply_cursor: value.reply_cursor,
@@ -153,10 +161,14 @@ pub(super) fn inline_comment(value: remote::PrInlineComment) -> InlineComment {
             path: anchor.path,
             line: anchor.line,
             original_oid: anchor.original_oid,
-            side: match anchor.side {
-                PrSide::Left => SourceSide::Left,
-                PrSide::Right => SourceSide::Right,
-            },
+            side: source_side(anchor.side),
         }),
+    }
+}
+
+fn source_side(side: PrSide) -> SourceSide {
+    match side {
+        PrSide::Left => SourceSide::Left,
+        PrSide::Right => SourceSide::Right,
     }
 }

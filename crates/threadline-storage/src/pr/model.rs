@@ -96,6 +96,19 @@ pub struct ReviewAnchor {
     pub original_oid: String,
 }
 
+/// GitHub's placement on the exact PR revision that supplied the thread page.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum ReviewThreadLocation {
+    Line {
+        path: String,
+        side: SourceSide,
+        line: u32,
+    },
+    File {
+        path: String,
+    },
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct InlineComment {
     pub id: u64,
@@ -142,6 +155,8 @@ pub enum PrRecord {
         node_id: String,
         resolved: Option<bool>,
         outdated: Option<bool>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        location: Option<ReviewThreadLocation>,
         comments: Vec<InlineComment>,
         replies_complete: bool,
         #[serde(default)]
