@@ -123,6 +123,22 @@ function Restart-Reader([string]$Profile, [hashtable]$Startup, [switch]$SeedQuie
     return $window
 }
 
+function Test-OwnedOfflineDraftFocus([IntPtr]$Window, [string]$Id) {
+    if (!(Test-OwnedFixtureWindow $Window) -or [ThreadlineWinInput]::GetForegroundWindow() -ne $Window) {
+        Stop-Blocked 'The isolated offline reader lost its verified foreground before typing.'
+    }
+    $editor = Find-OwnedFixtureControl $Window $Id 'Local Markdown draft' -Edit
+    if ($null -eq $editor) { return $false }
+    try {
+        if ($editor.Current.HasKeyboardFocus) { return $true }
+        $focused = [Windows.Automation.AndCondition]::new([Windows.Automation.Condition[]]@(
+            [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty, [int]$script:app.Id)
+            [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::HasKeyboardFocusProperty, $true)
+        ))
+        return $null -ne $editor.FindFirst([Windows.Automation.TreeScope]::Descendants, $focused)
+    } catch [Windows.Automation.ElementNotAvailableException] { return $false }
+}
+
 function Invoke-OfflineReaderProof([IntPtr]$Window, [string]$Profile) {
     $initial = Wait-Reader 'downloaded workspaces while signed out and offline' {
         param($reader) $reader.offline -and $reader.signed_out -and $reader.cached_content_ready -and $reader.pane_count -eq 2
@@ -130,23 +146,36 @@ function Invoke-OfflineReaderProof([IntPtr]$Window, [string]$Profile) {
     $pane = $initial.cached_reader.focused_pane
     $item = $initial.cached_reader.active_item
     $tabCounts = $initial.cached_reader.tab_counts -join ','
-    # The normal shortcut focuses the Markdown editor even when the conversation is tall.
     Click-AccountControl $Window "reader-tab-$pane-0"
+    # The seeded PR starts in Files. Ordinary comment drafts are visible in Conversation.
+    Click-AccountControl $Window "pr-$pane-conversation"
+    $null = Wait-Reader 'the same downloaded pull request in Conversation' {
+        param($reader)
+        $pr = $reader.PSObject.Properties['pull_request']
+        $reader.active_item -eq $item -and $reader.focused_pane -eq $pane -and
+            $reader.offline -and $reader.signed_out -and $null -ne $pr -and $null -ne $pr.Value -and
+            $pr.Value.section -ceq 'Conversation'
+    }
     [ThreadlineWinInput]::Chord(@(0x11, 0x12, 0x44))
-    $null = Wait-Reader 'the native local Markdown draft editor' {
-        param($reader) $reader.active_item -eq $item -and $null -ne $reader.active_draft_chars
+    $editor = "reader-draft-input-$pane"
+    Wait-For 'keyboard focus on the exact owned local Markdown draft editor' {
+        Test-OwnedOfflineDraftFocus $Window $editor
     }
     $draft = 'Offline synthetic draft 04'
     $hash = [Security.Cryptography.SHA256]::Create()
     try {
         $digest = [BitConverter]::ToString($hash.ComputeHash([Text.Encoding]::UTF8.GetBytes($draft))).Replace('-', '').ToLowerInvariant()
     } finally { $hash.Dispose() }
-    [ThreadlineWinInput]::Chord(@(0x11, 0x41))
-    [ThreadlineWinInput]::TypeText($draft)
+    if (!(Test-OwnedOfflineDraftFocus $Window $editor)) { Stop-Blocked 'The owned draft editor lost keyboard focus before typing.' }
+    [ThreadlineWinInput]::ReplaceFixtureText($Window, $script:app.Id, $draft)
     $null = Wait-Reader 'the exact native draft saved in the offline profile' {
-        param($reader) $reader.active_draft_saved -and $reader.active_draft_sha256 -ceq $digest
+        param($reader)
+        $reader.active_item -eq $item -and $reader.focused_pane -eq $pane -and
+            $reader.active_draft_saved -and $reader.active_draft_sha256 -ceq $digest
     }
-    Add-Evidence 'Type and save a local Markdown draft offline' ([ordered]@{ item = $item; draft_sha256 = $digest })
+    Add-Evidence 'Type and save a local Markdown draft offline' ([ordered]@{
+        item = $item; draft_sha256 = $digest; owned_editor_focused = $true; input = 'guarded Win32 SendInput'
+    })
 
     $null = Restart-Reader $Profile
     $null = Wait-Reader 'the original item, pane layout and saved draft without login' {

@@ -969,10 +969,10 @@ try {
         }
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
-    if ($AccessibilityProof -or $AccessProof -or $ReaderProof -eq 'SidebarBadges' -or $script:UsesNativeLifecycleFixture -or $script:UsesPaneFixture -or $ReaderProof -in @('CachedCommentLinks', 'Resume', 'CursorRecovery', 'Historical', 'Sync', 'RateLimit', 'NotificationSchedule', 'PullRequest', 'SharedPullRequest', 'PullRequestMergeState', 'MixedCatchup', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ThreadPlacement', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'CredentialBoundary', 'NativeActivity', 'History', 'CommentDependency', 'IssueConflict', 'IssuePropagation', 'Writes', 'WriteSurface', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) {
+    if ($AccessibilityProof -or $AccessProof -or $script:UsesNativeLifecycleFixture -or $script:UsesPaneFixture -or $ReaderProof -in @('Offline', 'SidebarBadges', 'CachedCommentLinks', 'Resume', 'CursorRecovery', 'Historical', 'Sync', 'RateLimit', 'NotificationSchedule', 'PullRequest', 'SharedPullRequest', 'PullRequestMergeState', 'MixedCatchup', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ThreadPlacement', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'CredentialBoundary', 'NativeActivity', 'History', 'CommentDependency', 'IssueConflict', 'IssuePropagation', 'Writes', 'WriteSurface', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) {
         Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
         . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
-        $script:UseOwnedUiAutomation = !$AccessibilityProof -and $ReaderProof -ne 'PerformancePhysical'
+        $script:UseOwnedUiAutomation = !$AccessibilityProof -and $ReaderProof -notin @('Offline', 'PerformancePhysical')
         $report.driver = 'Windows PowerShell / owned UI Automation and guarded Win32 SendInput'
     }
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
