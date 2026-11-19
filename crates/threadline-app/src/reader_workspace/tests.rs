@@ -3428,10 +3428,14 @@ fn ui_005_offline_merge_targets_the_confirmed_pane_and_updates_the_outbox_badge(
 
 #[gpui_kit::test]
 fn history_view_selects_exact_parents_and_restores_an_offline_comparison(cx: &mut TestAppContext) {
+    use gpui_kit::component::diff::{DiffLineRange, DiffSide};
     use threadline_storage::{
         access::{AccessState, DiscoveryState, RepositoryObservation, RepositoryObservationSource},
-        history::{HistoryComparison, HistoryEntry, HistoryRef},
-        resources::{CommitOid, GraphCommit},
+        history::{
+            ComparisonOptions, HistoryComparison, HistoryDiffInput, HistoryEntry, HistoryRef,
+        },
+        pr::{PatchEvidence, PrRecord},
+        resources::{CommitOid, ComparisonMode, GraphCommit},
     };
     let setup = ReaderHarness::seeded();
     let store = &setup.store;
@@ -3515,6 +3519,50 @@ fn history_view_selects_exact_parents_and_restores_an_offline_comparison(cx: &mu
             now + 1,
         )
         .unwrap();
+    let options = ComparisonOptions {
+        ignore_whitespace: false,
+        context_lines: 3,
+    };
+    let parents = store
+        .comparison_for_parent(account, repository, &oid('f'), Some(&oid('e')), options)
+        .unwrap();
+    let pair = store
+        .comparison_between(
+            account,
+            repository,
+            &oid('d'),
+            &oid('f'),
+            ComparisonMode::Direct,
+            options,
+        )
+        .unwrap();
+    for (plan, text) in [
+        (parents, "parent-specific text"),
+        (pair, "pair-specific text"),
+    ] {
+        let walk = store.begin_history_diff(&profile, &plan).unwrap().unwrap();
+        let identity = plan.diff_identity();
+        store
+            .commit_history_diff_page(
+                &walk,
+                HistoryDiffInput {
+                    identity: &identity,
+                    effective_base: identity.base.as_ref(),
+                    files: vec![PrRecord::File {
+                        path: "same.rs".into(),
+                        previous_path: None,
+                        status: "modified".into(),
+                        additions: Some(1),
+                        deletions: Some(1),
+                        patch: PatchEvidence::Text(format!("@@ -1 +1 @@\n-old\n+{text}")),
+                    }],
+                    next_cursor: None,
+                    complete: true,
+                    observed_at_ms: now + 2,
+                },
+            )
+            .unwrap();
+    }
 
     let (window, reader) = setup.open(cx);
     click(cx, window, "reader-history");
@@ -3561,6 +3609,27 @@ fn history_view_selects_exact_parents_and_restores_an_offline_comparison(cx: &mu
             .parent,
         Some(oid('e'))
     );
+    let check_file = |cx: &mut TestAppContext, window, reader: &Entity<ReaderWorkspace>, text| {
+        until(cx, |cx| {
+            cx.read(|cx| {
+                !reader.read(cx).history.busy && reader.read(cx).history.selected_diff().is_some()
+            })
+        });
+        cx.update_window(window, |_, _, cx| {
+            let diff = reader.read(cx).history.selected_diff().unwrap().clone();
+            diff.update(cx, |state, cx| {
+                state.set_selected_lines(
+                    Some(DiffLineRange::new("same.rs", DiffSide::Modified, 1, 1)),
+                    cx,
+                )
+            });
+            assert_eq!(diff.read(cx).selected_text(cx).trim(), text);
+            diff
+        })
+        .unwrap()
+    };
+    click(cx, window, "history-file-0");
+    let parent_diff = check_file(cx, window, &reader, "parent-specific text");
     let graph = store
         .history_page(account, repository, &oid('f'), None, 48)
         .unwrap();
@@ -3580,6 +3649,15 @@ fn history_view_selects_exact_parents_and_restores_an_offline_comparison(cx: &mu
         Some(HistoryComparison::Pair { key }) if key.base == oid('d') && key.head == oid('f'))
         })
     });
+    assert!(cx.read(|cx| reader.read(cx).history.selected_diff().is_none()));
+    click(cx, window, "history-file-0");
+    let pair_diff = check_file(cx, window, &reader, "pair-specific text");
+    assert_ne!(pair_diff, parent_diff);
+    click(cx, window, "history-file-0");
+    assert_eq!(
+        check_file(cx, window, &reader, "pair-specific text"),
+        pair_diff
+    );
     let state = store
         .history_view(account, repository, "reader-commit-history")
         .unwrap()
@@ -3677,6 +3755,7 @@ fn history_view_selects_exact_parents_and_restores_an_offline_comparison(cx: &mu
         Some(HistoryComparison::Pair { key }) if key.base == oid('d') && key.head == oid('f'))
         })
     });
+    check_file(cx, reopened, &restored, "pair-specific text");
 }
 
 #[gpui_kit::test]

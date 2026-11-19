@@ -9,7 +9,7 @@ use gpui_kit::{
     StatefulInteractiveElement, Styled, canvas,
     component::{
         Disableable, Selectable,
-        diff::{Diff, DiffState},
+        diff::{Diff, DiffFile, DiffState},
         input::Input,
     },
     div,
@@ -82,6 +82,10 @@ impl HistoryState {
             .as_ref()
             .map(|(plan, _)| plan)
     }
+
+    pub(super) fn selected_diff(&self) -> Option<&Entity<DiffState>> {
+        self.diff.as_ref().map(|diff| &diff.state)
+    }
 }
 
 struct HistoryData {
@@ -97,8 +101,23 @@ struct HistoryData {
 struct VisibleDiff {
     state: Entity<DiffState>,
     path: String,
+    binding: Arc<HistoryPatch>,
+}
+
+struct HistoryPatch {
     comparison: HistoryComparison,
-    proof: threadline_storage::pr::PatchEvidence,
+    effective_base: Option<CommitOid>,
+    record: PrRecord,
+}
+
+enum PreparedHistoryDiff {
+    Unavailable,
+    Unchanged(Arc<HistoryPatch>),
+    File {
+        binding: Arc<HistoryPatch>,
+        path: String,
+        diff: DiffFile,
+    },
 }
 
 #[cfg(feature = "e2e")]
@@ -301,6 +320,64 @@ impl HistoryData {
             comparison,
         })
     }
+
+    fn prepare_diff(&self, previous: Option<Arc<HistoryPatch>>) -> PreparedHistoryDiff {
+        let Some((comparison, page)) = &self.comparison else {
+            return PreparedHistoryDiff::Unavailable;
+        };
+        let Some(path) = self.view.as_ref().and_then(|view| view.file.as_deref()) else {
+            return PreparedHistoryDiff::Unavailable;
+        };
+        if page.identity != comparison.diff_identity() {
+            return PreparedHistoryDiff::Unavailable;
+        }
+        let Some(record) = page.files.iter().find_map(|row| match &row.record {
+            PrRecord::File {
+                path: candidate, ..
+            } if candidate == path => Some(&row.record),
+            _ => None,
+        }) else {
+            return PreparedHistoryDiff::Unavailable;
+        };
+        if let Some(previous) = previous.filter(|previous| {
+            previous.comparison == *comparison
+                && previous.effective_base == page.effective_base
+                && previous.record == *record
+        }) {
+            return PreparedHistoryDiff::Unchanged(previous);
+        }
+        let PrRecord::File {
+            path,
+            previous_path,
+            status,
+            additions,
+            deletions,
+            patch,
+        } = record
+        else {
+            return PreparedHistoryDiff::Unavailable;
+        };
+        let summary = FileSummary {
+            path: path.clone(),
+            previous_path: previous_path.clone(),
+            status: status.clone(),
+            additions: *additions,
+            deletions: *deletions,
+            viewed: false,
+        };
+        let Some(diff) = parse_patch(&summary, patch).0 else {
+            return PreparedHistoryDiff::Unavailable;
+        };
+        PreparedHistoryDiff::File {
+            path: path.clone(),
+            diff,
+            binding: Arc::new(HistoryPatch {
+                comparison: comparison.clone(),
+                effective_base: page.effective_base.clone(),
+                record: record.clone(),
+            }),
+        }
+    }
 }
 
 fn new_view(reference: HistoryRef, tip: CommitOid) -> HistoryView {
@@ -448,12 +525,14 @@ impl ReaderWorkspace {
                 let mut view = new_view(reference, head.clone());
                 view.selected = Some(head);
                 view.second = Some(base);
-                HistoryData::load(
+                let data = HistoryData::load(
                     store,
                     account,
                     repository,
                     Some((view_generation, view, None)),
-                )
+                )?;
+                let diff = data.prepare_diff(None);
+                Ok((data, diff))
             },
             move |this, result, window, cx| {
                 if this.history.request != generation || this.history.repository != Some(repository)
@@ -462,8 +541,8 @@ impl ReaderWorkspace {
                 }
                 this.history.busy = false;
                 match result {
-                    Ok(data) => {
-                        this.set_history_diff(&data, cx);
+                    Ok((data, diff)) => {
+                        this.set_history_diff(diff, cx);
                         this.history.data = Some(data);
                         this.history.scroll.set_offset(point(px(0.), px(0.)));
                     }
@@ -526,6 +605,11 @@ impl ReaderWorkspace {
         self.history.repository = Some(repository);
         self.history.request += 1;
         let generation = self.history.request;
+        let previous_diff = self
+            .history
+            .diff
+            .as_ref()
+            .map(|diff| Arc::clone(&diff.binding));
         self.history.busy = true;
         self.launch(window, cx, move |store| {
             let persist = request.is_some();
@@ -537,16 +621,17 @@ impl ReaderWorkspace {
                 }
                 data.generation = Some(store.save_history_view(account, repository, VIEW_ID, data.generation, view)?);
             }
-            Ok(data)
+            let diff = data.prepare_diff(previous_diff);
+            Ok((data, diff))
         }, move |this, outcome, window, cx| {
             if this.history.request != generation || this.history.repository != Some(repository) {
                 return;
             }
             this.history.busy = false;
             match outcome {
-                Ok(data) => {
+                Ok((data, diff)) => {
                     let offset = data.view.as_ref().map_or(0, |view| view.scroll_offset);
-                    this.set_history_diff(&data, cx);
+                    this.set_history_diff(diff, cx);
                     this.history.data = Some(data);
                     let scroll = this.history.scroll.clone();
                     window.on_next_frame(move |_, _| scroll.set_offset(point(px(0.), -px(offset as f32))));
@@ -614,48 +699,24 @@ impl ReaderWorkspace {
         );
     }
 
-    fn set_history_diff(&mut self, data: &HistoryData, cx: &mut Context<Self>) {
-        let next = data.comparison.as_ref().and_then(|(comparison, page)| {
-            let view = data.view.as_ref()?;
-            let file = view.file.as_deref()?;
-            let selected = page.files.iter().find_map(|row| match &row.record {
-                PrRecord::File {
-                    path,
-                    previous_path,
-                    status,
-                    additions,
-                    deletions,
-                    patch,
-                } if path == file => Some((
-                    FileSummary {
-                        path: path.clone(),
-                        previous_path: previous_path.clone(),
-                        status: status.clone(),
-                        additions: *additions,
-                        deletions: *deletions,
-                        viewed: false,
-                    },
-                    patch,
-                )),
-                _ => None,
-            })?;
-            Some((comparison, file, selected))
-        });
-        if let Some((comparison, path, (summary, patch))) = next {
-            if self.history.diff.as_ref().is_some_and(|diff| {
-                &diff.comparison == comparison && diff.path == path && &diff.proof == patch
-            }) {
-                return;
-            }
-            self.history.diff = parse_patch(&summary, patch).0.map(|diff| VisibleDiff {
+    fn set_history_diff(&mut self, prepared: PreparedHistoryDiff, cx: &mut Context<Self>) {
+        self.history.diff = match prepared {
+            PreparedHistoryDiff::Unavailable => None,
+            PreparedHistoryDiff::Unchanged(binding) => self
+                .history
+                .diff
+                .take()
+                .filter(|current| Arc::ptr_eq(&current.binding, &binding)),
+            PreparedHistoryDiff::File {
+                binding,
+                path,
+                diff,
+            } => Some(VisibleDiff {
                 state: cx.new(|cx| DiffState::new([diff], cx)),
-                path: path.to_owned(),
-                comparison: comparison.clone(),
-                proof: patch.clone(),
-            });
-        } else {
-            self.history.diff = None;
-        }
+                path,
+                binding,
+            }),
+        };
     }
 
     fn history_action(
