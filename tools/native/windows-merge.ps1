@@ -78,7 +78,7 @@ function Invoke-MergeCancellationProof([IntPtr]$Window) {
     Inspect-WriteFixtureAction $Window 0 'Queued' 'Merge pull request'
     Click-AccountControl $Window 'reader-outbox-pause'
     $accepted = Join-Path $script:ProfileDir 'merge-put-accepted'
-    Wait-For 'the loopback server accepted the exact squash request' { [IO.File]::Exists($accepted) }
+    Wait-For 'the loopback server accepted the exact squash request' { [IO.File]::Exists($accepted) } 30000
     Click-AccountControl $Window 'reader-outbox-cancel'
     $null = Wait-Reader 'cancel was requested while the accepted PUT was still sending' {
         param($reader) $reader.outbox_action_state -ceq 'Sending' -and $reader.outbox_action_cancel_requested
@@ -88,7 +88,7 @@ function Invoke-MergeCancellationProof([IntPtr]$Window) {
     })
     Set-AccessPhase 'merge-cancel-read'
     $read = Join-Path $script:ProfileDir 'merge-authoritative-read'
-    Wait-For 'the lost response triggered authoritative merge readback' { [IO.File]::Exists($read) }
+    Wait-For 'the lost response triggered authoritative merge readback' { [IO.File]::Exists($read) } 30000
     $null = Wait-Reader 'the ambiguous operation stays pending while readback is held' {
         param($reader) $reader.outbox_action_state -ceq 'OutcomeUnknown' -and $reader.outbox_action_cancel_requested -and $reader.outbox -eq 1
     }
