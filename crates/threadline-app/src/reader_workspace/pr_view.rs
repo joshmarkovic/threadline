@@ -99,6 +99,8 @@ pub(crate) struct PrObservation {
     issue_rest_id: Option<u64>,
     pull_request_rest_id: Option<u64>,
     linked_issue: Option<i64>,
+    linked_review_comment: Option<u64>,
+    linked_review_source: Option<PrSourceObservation>,
     verified_targets: usize,
     download_state: Option<String>,
     review_draft: Option<super::review_editor::ReviewObservation>,
@@ -257,6 +259,16 @@ impl ReaderWorkspace {
                 linked_issue: pr
                     .and_then(|pr| pr.data.linked.as_ref())
                     .map(|issue| issue.item.id.0),
+                linked_review_comment: pr
+                    .and_then(|pr| pr.data.linked_review_comment.as_ref())
+                    .map(|comment| comment.id),
+                linked_review_source: pr
+                    .and_then(|pr| pr.data.linked_review_comment.as_ref()?.anchor.as_ref())
+                    .map(|anchor| PrSourceObservation {
+                        side: format!("{:?}", anchor.side),
+                        line: anchor.line,
+                        path: anchor.path.clone(),
+                    }),
                 verified_targets: pr.and_then(|pr| pr.data.references.as_ref()).map_or(
                     0,
                     |(_, refs)| {

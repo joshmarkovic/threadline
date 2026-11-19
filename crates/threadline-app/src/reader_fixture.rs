@@ -11,6 +11,7 @@ use threadline_storage::{
     writes::{WriteIntent, WriteSubmission},
 };
 
+mod comment_links;
 mod mixed;
 mod panes;
 mod recovery;
@@ -21,6 +22,7 @@ enum ReaderFixture {
     Section16,
     Backlog,
     PanePositions,
+    CommentLinks,
 }
 
 pub fn run() -> Option<Result<(), String>> {
@@ -47,6 +49,7 @@ pub fn run() -> Option<Result<(), String>> {
                     Some("section-16") => ReaderFixture::Section16,
                     Some("section-16-backlog") => ReaderFixture::Backlog,
                     Some("small-pane-positions") => ReaderFixture::PanePositions,
+                    Some("small-comment-links") => ReaderFixture::CommentLinks,
                     _ => {
                         return Err("Select a known isolated reader fixture.".to_owned());
                     }
@@ -241,7 +244,7 @@ fn seed_profile(
         .map_err(|_| "Could not create the reader fixture report.")?;
     let store = Store::open_profile(&profile).map_err(|error| error.to_string())?;
     let fixture = match variant {
-        ReaderFixture::Small | ReaderFixture::PanePositions => {
+        ReaderFixture::Small | ReaderFixture::PanePositions | ReaderFixture::CommentLinks => {
             populate_reader(&store, seed, Scale::Small)
         }
         ReaderFixture::Section16 => populate_reader(&store, seed, Scale::Section16),
@@ -256,6 +259,10 @@ fn seed_profile(
     } else {
         None
     };
+    let comment_links = matches!(variant, ReaderFixture::CommentLinks)
+        .then(|| comment_links::seed(&store, &fixture))
+        .transpose()
+        .map_err(|error| error.to_string())?;
     let unresolved = store
         .sidebar_counts(
             fixture.account,
@@ -277,13 +284,18 @@ fn seed_profile(
     }
     drop(store);
     let mut receipt = serde_json::json!({
-        "fixture_revision": if pane_positions.is_some() { "s12-pane-positions-v1" } else { fixture.revision },
+        "fixture_revision": match variant {
+            ReaderFixture::PanePositions => "s12-pane-positions-v1",
+            ReaderFixture::CommentLinks => "s12-cached-comment-links-v1",
+            _ => fixture.revision,
+        },
         "seed": seed,
         "scale": match variant {
             ReaderFixture::Small => "small",
             ReaderFixture::Section16 => "section-16",
             ReaderFixture::Backlog => "section-16-backlog",
             ReaderFixture::PanePositions => "small-pane-positions",
+            ReaderFixture::CommentLinks => "small-comment-links",
         },
         "account_id": fixture.account.0,
         "repository_id": fixture.repository.0,
@@ -303,6 +315,12 @@ fn seed_profile(
             .into();
         receipt["pane_positions"] = serde_json::to_value(pane_positions)
             .map_err(|_| "Could not encode pane-position fixture evidence.")?;
+    }
+    if let Some(comment_links) = comment_links {
+        receipt["open_tabs"] = 3.into();
+        receipt["items"] = comment_links["cached_items"].clone();
+        receipt["comments"] = comment_links["cached_comments"].clone();
+        receipt["comment_links"] = comment_links;
     }
     let mut output = BufWriter::new(report);
     serde_json::to_writer_pretty(&mut output, &receipt)

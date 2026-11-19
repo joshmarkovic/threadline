@@ -8,7 +8,7 @@ param(
     [switch]$PlatformProof,
     [switch]$ToastProof,
     [switch]$AccessProof,
-    [ValidateSet('Offline', 'PanePositions', 'PaneLifecycle', 'Resume', 'CursorRecovery', 'Historical', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace', 'Sync', 'RateLimit', 'NotificationSchedule', 'PullRequest', 'SharedPullRequest', 'PullRequestMergeState', 'MixedCatchup', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ThreadPlacement', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'CredentialBoundary', 'NativeLifecycle', 'OfflineMixedOutbox', 'NativeActivity', 'History', 'CommentDependency', 'IssueConflict', 'IssuePropagation', 'Writes', 'WriteSurface')][string]$ReaderProof,
+    [ValidateSet('Offline', 'PanePositions', 'PaneLifecycle', 'CachedCommentLinks', 'Resume', 'CursorRecovery', 'Historical', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace', 'Sync', 'RateLimit', 'NotificationSchedule', 'PullRequest', 'SharedPullRequest', 'PullRequestMergeState', 'MixedCatchup', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ThreadPlacement', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'CredentialBoundary', 'NativeLifecycle', 'OfflineMixedOutbox', 'NativeActivity', 'History', 'CommentDependency', 'IssueConflict', 'IssuePropagation', 'Writes', 'WriteSurface')][string]$ReaderProof,
     [switch]$AccessibilityProof,
     [string]$AccessAddress,
     [string]$AccessPhaseFile,
@@ -39,6 +39,8 @@ $reportName = if ($Measure) {
     'sync-native.json'
 } elseif ($ReaderProof -ceq 'CursorRecovery') {
     'reader-cursor-recovery-native.json'
+} elseif ($ReaderProof -ceq 'CachedCommentLinks') {
+    'cached-comment-links-native.json'
 } elseif ($ReaderProof -eq 'NotificationSchedule') {
     'notification-schedule-native.json'
 } elseif ($ReaderProof -eq 'MixedCatchup') {
@@ -258,7 +260,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     }
     if ($ReaderProof -eq 'SharedPullRequest') { $info.EnvironmentVariables['THREADLINE_E2E_SHARED_PR'] = '1' }
     if ($ReaderProof -eq 'PanePositions') { $info.EnvironmentVariables['THREADLINE_E2E_PANE_POSITIONS'] = '1' }
-    if ($ReaderProof -eq 'PaneLifecycle') { $info.EnvironmentVariables['THREADLINE_E2E_PANE_POSITIONS'] = 'layout' }
+    if ($ReaderProof -in @('PaneLifecycle','CachedCommentLinks')) { $info.EnvironmentVariables['THREADLINE_E2E_PANE_POSITIONS'] = 'layout' }
     if ($ReaderProof -in @('Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) { $info.EnvironmentVariables['THREADLINE_E2E_READER_TIMING'] = '1' }
     if ($ReaderIdle) { $info.EnvironmentVariables['THREADLINE_E2E_READER_IDLE'] = '1' }
     if ($ToastProof -and $null -ne $script:toastFixture) {
@@ -956,7 +958,7 @@ try {
         }
         . (Join-Path $PSScriptRoot 'windows-github-access.ps1')
     }
-    if ($AccessibilityProof -or $AccessProof -or $script:UsesNativeLifecycleFixture -or $script:UsesPaneFixture -or $ReaderProof -in @('Resume', 'CursorRecovery', 'Historical', 'Sync', 'RateLimit', 'NotificationSchedule', 'PullRequest', 'SharedPullRequest', 'PullRequestMergeState', 'MixedCatchup', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ThreadPlacement', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'CredentialBoundary', 'NativeActivity', 'History', 'CommentDependency', 'IssueConflict', 'IssuePropagation', 'Writes', 'WriteSurface', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) {
+    if ($AccessibilityProof -or $AccessProof -or $script:UsesNativeLifecycleFixture -or $script:UsesPaneFixture -or $ReaderProof -in @('CachedCommentLinks', 'Resume', 'CursorRecovery', 'Historical', 'Sync', 'RateLimit', 'NotificationSchedule', 'PullRequest', 'SharedPullRequest', 'PullRequestMergeState', 'MixedCatchup', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ThreadPlacement', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'CredentialBoundary', 'NativeActivity', 'History', 'CommentDependency', 'IssueConflict', 'IssuePropagation', 'Writes', 'WriteSurface', 'Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) {
         Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
         . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
         $script:UseOwnedUiAutomation = !$AccessibilityProof -and $ReaderProof -ne 'PerformancePhysical'
@@ -964,9 +966,9 @@ try {
     }
     if ($ReaderProof) { . (Join-Path $PSScriptRoot 'windows-cached-reader.ps1') }
     if ($script:UsesPaneFixture) { . (Join-Path $PSScriptRoot 'windows-pane-positions.ps1') }
-    if ($ReaderProof -eq 'Historical') { . (Join-Path $PSScriptRoot 'windows-historical-reader.ps1') }
+    if ($ReaderProof -in @('Historical', 'CachedCommentLinks')) { . (Join-Path $PSScriptRoot 'windows-historical-reader.ps1') }
     if ($ReaderProof -in @('Resume', 'CursorRecovery', 'Historical', 'Sync', 'RateLimit', 'NotificationSchedule', 'MixedCatchup', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'NativeLifecycle', 'NativeActivity', 'PerformanceConcurrent')) { . (Join-Path $PSScriptRoot 'windows-sync.ps1') }
-    if ($ReaderProof -in @('PullRequest', 'SharedPullRequest', 'PullRequestMergeState', 'MixedCatchup', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ThreadPlacement', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'NativeLifecycle', 'NativeActivity', 'History')) { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
+    if ($ReaderProof -in @('CachedCommentLinks', 'PullRequest', 'SharedPullRequest', 'PullRequestMergeState', 'MixedCatchup', 'PullRequestOfflinePin', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ThreadPlacement', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'NativeLifecycle', 'NativeActivity', 'History')) { . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1') }
     if ($script:UsesPaneFixture -or $ReaderProof -in @('CursorRecovery', 'RateLimit', 'NotificationSchedule', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'DirectMerge', 'MergeQueue', 'MergeCancel', 'CredentialBoundary', 'History', 'CommentDependency', 'IssueConflict', 'IssuePropagation', 'Writes', 'WriteSurface', 'PullRequestMergeState', 'MixedCatchup', 'PullRequestOfflinePin', 'OfflineMixedOutbox')) { . (Join-Path $PSScriptRoot 'windows-issue-writes.ps1') }
     if ($ReaderProof -in @('SharedPullRequest', 'ReviewDraft', 'ReviewDecisions', 'ReviewPredecessor', 'ThreadQueue', 'ReviewContext', 'NativeLifecycle', 'History')) { . (Join-Path $PSScriptRoot 'windows-review-context.ps1') }
     if ($ReaderProof -in @('DirectMerge', 'MergeQueue', 'MergeCancel')) { . (Join-Path $PSScriptRoot 'windows-merge.ps1') }
@@ -976,11 +978,13 @@ try {
     if ($ReaderProof -eq 'MixedCatchup') { . (Join-Path $PSScriptRoot 'windows-mixed-catchup.ps1') }
     if ($ReaderProof -eq 'PullRequestOfflinePin') { . (Join-Path $PSScriptRoot 'windows-pr-offline-pin.ps1') }
     if ($ReaderProof -ceq 'ThreadPlacement') { . (Join-Path $PSScriptRoot 'windows-review-thread-placement.ps1') }
+    if ($ReaderProof -ceq 'CachedCommentLinks') { . (Join-Path $PSScriptRoot 'windows-cached-comment-links.ps1') }
     if ($ReaderProof -ceq 'CursorRecovery') { . (Join-Path $PSScriptRoot 'windows-reader-cursor-recovery.ps1') }
     if ($ReaderProof -in @('History', 'NativeLifecycle')) { . (Join-Path $PSScriptRoot 'windows-history.ps1') }
     $firstProfile = Join-Path $ProfileDir ('initial-' + [guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $firstProfile -Force
     if ($ReaderProof -eq 'Offline') { Initialize-ReaderProfile $firstProfile 'small' }
+    if ($ReaderProof -ceq 'CachedCommentLinks') { Initialize-ReaderProfile $firstProfile 'small-comment-links' }
     if ($script:UsesPaneFixture) { Initialize-ReaderProfile $firstProfile 'small-pane-positions' }
     if ($ReaderProof -in @('Performance', 'PerformancePhysical')) { Initialize-ReaderProfile $firstProfile 'section-16' }
     if ($ReaderProof -in @('LargeWorkspace', 'PerformanceConcurrent')) { Initialize-ReaderProfile $firstProfile 'section-16-backlog' }
@@ -1070,6 +1074,7 @@ try {
         switch ($ReaderProof) {
             Offline { Invoke-OfflineReaderProof $window $firstProfile }
             PanePositions { Invoke-CrossRepositoryPaneProof $window }
+            CachedCommentLinks { Invoke-CachedCommentLinksProof $window }
             PaneLifecycle { Invoke-PaneLifecycleProof $window $firstProfile }
             Historical { Invoke-HistoricalReader $window $firstProfile }
             Resume { Invoke-ReaderResumeProof $window $firstProfile }

@@ -16,6 +16,9 @@ pub fn scenario_ids() -> impl Iterator<Item = &'static str> {
 }
 
 pub fn fixture_revision(case: &str) -> Option<&'static str> {
+    if case == "S12-CACHED-COMMENT-LINKS" {
+        return Some("s12-cached-comment-links-v1");
+    }
     if case == "S08-REVIEW-THREAD-PLACEMENT" {
         return Some("s08-review-thread-placement-v1");
     }
@@ -243,6 +246,10 @@ pub fn associations(case: &str) -> Associations {
         ),
         "S08-THREAD-QUEUE" => ("REVIEW-01;REVIEW-04;OUTBOX-03;TEST-04", "AC-63;AC-65"),
         "S08-REVIEW-THREAD-PLACEMENT" => ("DIFF-01;DIFF-02;REVIEW-02;TEST-04", "AC-21"),
+        "S12-CACHED-COMMENT-LINKS" => (
+            "DATA-08;SEARCH-04;WORKSPACE-03;WORKSPACE-11;TEST-04",
+            "AC-47;AC-53",
+        ),
         "S06-SHARED-PR-PANES" => ("WORKSPACE-07;CACHE-02;PR-02;TEST-04", "AC-44"),
         "S06-PR-MERGE-STATE" => ("DATA-07;DATA-09;PR-01;TEST-04", "AC-52"),
         "S06-MIXED-CATCHUP" => ("SYNC-06;SYNC-07;SYNC-11;PR-02;PR-03;TEST-04", "AC-75"),

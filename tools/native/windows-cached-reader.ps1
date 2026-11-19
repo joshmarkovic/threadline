@@ -23,6 +23,7 @@ function Initialize-ReaderProfile([string]$Profile, [string]$Scale) {
     $revision = switch ($Scale) {
         'section-16-backlog' { 's12-large-workspace-v2' }
         'small-pane-positions' { 's12-pane-positions-v1' }
+        'small-comment-links' { 's12-cached-comment-links-v1' }
         default { 's04-reader-v1' }
     }
     if ($receipt.fixture_revision -cne $revision -or $receipt.scale -cne $Scale -or
@@ -43,6 +44,13 @@ function Initialize-ReaderProfile([string]$Profile, [string]$Scale) {
         $script:PanePositionsSeed = $receipt
         if ($receipt.pane_positions.archive -eq $receipt.repository_id -or $receipt.pane_positions.comments -ne 28 -or $receipt.open_tabs -ne 20) {
             throw 'The isolated pane-position fixture must retain two repositories and both tab strips.'
+        }
+    }
+    if ($Scale -eq 'small-comment-links') {
+        $script:CachedCommentLinksSeed = $receipt
+        if ($receipt.open_tabs -ne 3 -or $receipt.comment_links.query -cne 'QuasarLedger' -or
+            $receipt.comment_links.issue.item -eq $receipt.comment_links.pull_request.item) {
+            throw 'The cached comment fixture must have three tabs and independent issue and PR targets.'
         }
     }
     Add-Evidence 'Seed the isolated profile with the application and bundled SQLite' $receipt
