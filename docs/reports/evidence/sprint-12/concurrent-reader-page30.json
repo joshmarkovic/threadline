@@ -1,0 +1,28 @@
+{
+  "case": "S12-READER-CONCURRENT",
+  "run": "e2e-1795053621355-35036",
+  "fixture": "s12-large-workspace-v2",
+  "seed": 12345,
+  "source_revision": "43bd2fc625043687f9d5fec86637f1243e754739",
+  "source_dirty": false,
+  "windows": "x64 build 22631",
+  "dpi": 96,
+  "app_sha256": "c98a01e1fa629040243835b6dc27b555816b9a6b7add69e67ab91b3aa6c5bb86",
+  "app_bytes": 45313536,
+  "canonical_status": "Fail",
+  "canonical_exit": 1,
+  "driver_status": "Blocked",
+  "driver_exit": 78,
+  "required_per_series": 20,
+  "matched_samples": {"cached_open": 14, "local_search": 15, "cached_tab_switch": 0},
+  "completed_feed_pages": {"first": 1, "last": 29},
+  "driver_detail": "Scheduled loopback feed page 30 could not be correlated through the useful native paint.",
+  "runner_detail": "Could not verify the isolated GitHub trace.",
+  "requests_receipt_written": false,
+  "full_series_p95": null,
+  "raw_sha256": {
+    "result": "bf74e56429d73aa96c5ba9c32823ba5877b0262682fba3a5fa98b44e6901d7fa",
+    "reader_performance": "ccf51b7fd63598c2e27d5904c5b001e55a9eb2609fc313e469393b8b96e363a1",
+    "binary": "94c26fad52abb31ea06b104be2cd7fb26cc22357c3a3acd872a64b9e59a8475e"
+  }
+}

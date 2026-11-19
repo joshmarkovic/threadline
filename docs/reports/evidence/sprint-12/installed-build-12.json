@@ -1,0 +1,243 @@
+{
+  "platform": "Windows 11 Enterprise x64, build 22631",
+  "scope": "Unsigned per-user local package and separate synthetic Windows Credential Manager entries",
+  "build": {
+    "source_revision": "43bd2fc625043687f9d5fec86637f1243e754739",
+    "source_dirty": false,
+    "profile": "release",
+    "target": "x86_64-pc-windows-msvc",
+    "e2e_feature": false,
+    "cargo_offline": true,
+    "cargo_locked": true,
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "nsis": "v3.11-1",
+    "lock_sha256": "83587d235ce28277e15e3c6e2a0c2ad93f9826339812983027253991e5ebe8ab",
+    "linker": "lld-link",
+    "rustc_wrapper_sha256": "167d929041d8147d9d5dac0954065cc18e54c5cc4ccc3f77c19c265e276b6568",
+    "release_shaders_sha256": "25a6de757b67d4439a18b7a8d3b9b2400479892e02cb3f7a3915a9e30b9b3c34",
+    "notification_registration_helper_sha256": "2e08784447cff4c1bf2547a878689d72c90d0cc1a7da6295e7126172a062baec",
+    "app_sha256": "60bfb8eb9b01f1343035814df7a9fb93d531416def276e5dcda9cd4cf8e8915b",
+    "fixture_sha256": "61d7814c0e060c0bfe9c17fe63f50d0c51926e0afa2395275565f606744ed80a",
+    "bootstrap_sha256": "2d1bca4378f47a034290c2e3ac091f424e7fd7b79d4ace0852ee61b90b8d2976",
+    "installer_sha256": "9d0224dc281a434108efa17a20a54ba928d959f5859bea94bea0228b78558f64",
+    "installer_bytes": 11066821,
+    "runtime_inventory_sha256": "1eb5648094ff9c37f208e4735ca505c5bb2c45b04945e45b652613deafc3af84",
+    "package_build": 12,
+    "schema": 15,
+    "channel": "unsigned local fixture"
+  },
+  "predecessor": {
+    "package_build": 11,
+    "app_sha256": "cac705787ed57ad09e84d333d88fcbed1e24e019299722f9a82449fd565da4ed"
+  },
+  "tools": {
+    "retention_binary_sha256": "c167c9300896d66cf41f9b649056879e7bf6abfe844d4a420ee477c7012f0d5a",
+    "retention_driver_sha256": "288a0f6b51cf97eb7426e780634bde283a9871adec8fd7a780e4d2eb5797e1f0",
+    "checkpoint_binary_sha256": "e6dfc3dfc6988030a51b75109725db6dee1c485491a974871b4eaf9204a5dbe7",
+    "conpty_binary_sha256": "442d6d8e46e1601902badce37cbb723800cac451ba6d7510031a7ecf685f19c4",
+    "installed_smoke_driver_sha256": "cace215f380b106ac3a2a23093d56d9d927348d8c3efb825cb8d478424e2284c",
+    "installed_control_helper_sha256": "95290236e69948ff082a2f0c4e847b72a29be58f11582f9956c73a345b7f03ba"
+  },
+  "lifecycle": {
+    "upgrade_exit": 0,
+    "repair_exit": 0,
+    "uninstall_exit": 0,
+    "reinstall_exit": 0,
+    "final_uninstall_exit": 0,
+    "highest_build_after_final_uninstall": 12,
+    "installed_uninstaller_sha256": "3b5466395979b8c9806dd254ee410ef00de806833539a8521e875d94069031dc",
+    "initial_database_sha256": "eea76de125df97753fcb22b310552ca2b7f6b2387b225202ff1c5f966c9af001",
+    "closed_database_sha256": "a6d1093eaeff2ae1b331d9bd197291b1047c14dc7adff8ab029db32f6ee0922f",
+    "database_after_final_uninstall_sha256": "a6d1093eaeff2ae1b331d9bd197291b1047c14dc7adff8ab029db32f6ee0922f",
+    "matching_fixture_checks": 8,
+    "checked_at": [
+      "before upgrade",
+      "after upgrade",
+      "after repair",
+      "after installed app quit",
+      "before uninstall",
+      "after uninstall",
+      "after reinstall",
+      "after final uninstall"
+    ],
+    "retained_projection": {
+      "protected_credential_present": true,
+      "profile_bound": true,
+      "work_offline": true,
+      "outbox_paused": true,
+      "drafts": 1,
+      "queued_operations": 8,
+      "step_receipts": 1,
+      "saved_comment_page_cursor": "2",
+      "page_watermark_ms": 1700000499975,
+      "durable_projection_sha256": "ec2b1a22b0566c874607f933434e4396d21c0b729f1325887023ab7f70ed0359"
+    },
+    "prior_five_file_archive_unchanged": true,
+    "default_directory_absent_after_archive": true,
+    "test_owned_credential_removed_after_final_inspection": true
+  },
+  "installed_app": {
+    "installed_executable_sha256": "60bfb8eb9b01f1343035814df7a9fb93d531416def276e5dcda9cd4cf8e8915b",
+    "owned_window": true,
+    "tab_automation_id": "reader-tab-0-1",
+    "selected_before_invocation": false,
+    "tab_invoke_supported": true,
+    "tab_invoke_attempts": 1,
+    "tab_activated": true,
+    "initial_selection_signals": {
+      "active_label": false,
+      "selection_item": null,
+      "toggle_on": null
+    },
+    "final_selection_signals": {
+      "active_label": true,
+      "selection_item": null,
+      "toggle_on": null
+    },
+    "orderly_exit": true
+  },
+  "first_native_attempt": {
+    "status": "Fail",
+    "stage": "original installed tab selection verification",
+    "original_database_sha256": "eea76de125df97753fcb22b310552ca2b7f6b2387b225202ff1c5f966c9af001",
+    "closed_database_sha256": "f72ba34be3b0b740c6d3fa71ace8673ed33531f040a82d4b6bb1f54d2e232174",
+    "original_selected_pane": 1,
+    "original_selected_tab_in_first_pane": 0,
+    "final_selected_pane": 0,
+    "final_selected_tab_in_first_pane": 1,
+    "durable_projection_unchanged": true,
+    "original_preserved": true,
+    "restaged_original_verified": true
+  },
+  "exact_label_predicate": {
+    "status": "Pass",
+    "powershell": "5.1.22621.7649",
+    "source_sha256": "87c4816d4f6a7be4478b4fde841b7a397babcbb63704f84f4af6ebc8a6a8a07a",
+    "plain_title_rejected": true,
+    "actual_separator_selected": true,
+    "other_number_rejected": true
+  },
+  "copied_checkpoint_resume": {
+    "source_database_sha256": "a6d1093eaeff2ae1b331d9bd197291b1047c14dc7adff8ab029db32f6ee0922f",
+    "scheduler_claimed_page": 2,
+    "completed_page_watermark_ms": 1700000500010,
+    "next_cursor_empty": true,
+    "archived_bytes_unchanged": true,
+    "network_requests": 0,
+    "queued_operations": 8,
+    "step_receipts": 1,
+    "queued_payloads_and_step_receipts_unchanged": true
+  },
+  "separate_confirmed_removal": {
+    "bootstrap_sha256": "2d1bca4378f47a034290c2e3ac091f424e7fd7b79d4ace0852ee61b90b8d2976",
+    "normal_preview_exit": 0,
+    "normal_confirmation_exit": 0,
+    "conpty_prompt_verified": true,
+    "accounts": 1,
+    "drafts": 1,
+    "unresolved_operations": 9,
+    "databases_and_backups": 2,
+    "recorded_credential_references": 1,
+    "backup_drafts": 1,
+    "backup_unresolved": 9,
+    "actual_confirmation_sent_once": true,
+    "current_db_and_backup_removed": true,
+    "bound_protected_credential_removed": true,
+    "independent_export_unchanged": true,
+    "independent_credential_preserved_then_fixture_cleaned": true,
+    "old_five_files_and_local12_archive_unchanged": true,
+    "default_profile_absent_before_and_after": true
+  },
+  "raw_receipt_sha256": {
+    "build": "a3731972a13761eea1bfec937872a853214f95b5c1804a8906904f2c1a55c97b",
+    "upgrade_and_repair": "dbc90f3e3813631b600cb256d09fe3f54e7e787c0f43fdaf8752217e8299c52b",
+    "native_app": "122e52821e928a26fa579f68e5225128c42734cda4207388413b1edf4ba222ff",
+    "uninstall_and_reinstall": "0269b24c215168feb89874a6e76c8a820c093fa00b18f9993e21881a6ad9c3ee",
+    "copied_checkpoint_resume": "94f9541002d0dc1896147a4274d36a12808c262d52a42ec5cabed3e5acc36067",
+    "separate_confirmed_removal": "9078d014c07002f5cbb9861fa727bf3c9bb9db228467690f350859797c6bbf88",
+    "first_native_attempt": "da0f0c09be9499ba42ca3f5ee3678512be866ace52dc5c1c3785b1b9d21c6ea4",
+    "exact_label_predicate": "83cb808e1bbad9906c9de920c2c05ac30777b6ccc0ff06f55f42147d908f8ef2",
+    "portable_fixture_first_attempt": "7b00dedee80b75bedaea17cd16a85b1397c8aab250d9e16d1b60428ee24c9f83",
+    "portable_fixture_scratch": "f3e1a499dac4b811ec7e9f73891c1e703a1f3abf55ed7ddd70879aca6dc74daf",
+    "portable_fixture_confirmation": "6583c9ccb9fcb0fbe567c25c4b3b79aa0d104012160f2122d13410fdd8c372f7",
+    "portable_preflight": "0c56cd838f02eb78a3a159bb3d81e91b75dcc32f2102dd143f3142d16e3c3dd8"
+  },
+  "portable_fixture": {
+    "scope": "The portable helper was verified on fresh generated profiles. The selected 11-to-12 installation used the phased lifecycle driver.",
+    "helper_sha256": "6836cb1162b49c0498bc97bbdce7ca4ed902a928c7688151a76baff953f5ff7e",
+    "first_attempt": {
+      "status": "Fail",
+      "confirmed": false,
+      "reason": "generated WAL and SHM on independent read-only schema query",
+      "archived_files": 6,
+      "archived_database_sha256": "878b77d0c70d6b8597395d2c8cca833c1ede478cff8005777b9139969a901e1e",
+      "wal_bytes": 0,
+      "shm_bytes": 32768,
+      "default_data_absent": true
+    },
+    "temp_seed_and_resume": {
+      "seed": {
+        "drafts": 1,
+        "durable_projection_sha256": "ec2b1a22b0566c874607f933434e4396d21c0b729f1325887023ab7f70ed0359",
+        "outbox_paused": true,
+        "page_watermark_ms": 1700000499975,
+        "profile_bound": true,
+        "protected_credential_present": true,
+        "queued_operations": 8,
+        "saved_comment_page_cursor": "2",
+        "schema": 15,
+        "status": "Pass",
+        "step_receipts": 1,
+        "work_offline": true
+      },
+      "inspect_matches": true,
+      "resume": {
+        "archived_bytes_unchanged": true,
+        "completed_page_watermark_ms": 1700000500010,
+        "network_requests": 0,
+        "next_cursor_empty": true,
+        "queued_operations": 8,
+        "queued_payloads_and_step_receipts_unchanged": true,
+        "scheduler_claimed_page": 2,
+        "source_database_sha256": "9960d6374d22fa08860a808dc39f3b52d3e3e939a161d170f6f1d09b7bab1b7c",
+        "status": "Pass",
+        "step_receipts": 1,
+        "test_clock_ms": 1700000502001
+      },
+      "terminal": {
+        "child_stdin_terminal": true,
+        "prompt_and_answer_verified": true,
+        "status": "Pass"
+      },
+      "key_removed": true,
+      "default_profile_accessed": false
+    },
+    "separate_normal_bootstrap_removal": {
+      "accounts": 1,
+      "actual_confirmation_sent_once": true,
+      "backup_drafts": 1,
+      "backup_unresolved": 9,
+      "bootstrap_sha256": "2d1bca4378f47a034290c2e3ac091f424e7fd7b79d4ace0852ee61b90b8d2976",
+      "bound_protected_credential_removed": true,
+      "conpty_prompt_verified": true,
+      "current_db_and_backup_removed": true,
+      "databases_and_backups": 2,
+      "default_profile_absent_before_and_after": true,
+      "drafts": 1,
+      "independent_credential_preserved_then_fixture_cleaned": true,
+      "independent_export_unchanged": true,
+      "normal_confirmation_exit": 0,
+      "normal_preview_exit": 0,
+      "prior_retention_archive_unchanged": true,
+      "recorded_credential_references": 1,
+      "status": "Pass",
+      "unresolved_operations": 9
+    },
+    "powershell_preflight": {
+      "status": "Pass",
+      "redirected_local_refused": true,
+      "redirected_temp_refused": true,
+      "ordinary_created": true
+    }
+  }
+}
