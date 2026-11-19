@@ -601,3 +601,27 @@ $script:fixtureQueued = $true
 $refused = $false
 try { Wait-HistoryUnsubmittedDraft 'fixture-draft' ('b' * 40) 3 } catch { $refused = $_.Exception.Message -like '*unsubmitted draft*' }
 if (!$refused) { throw 'The history driver accepted a submitted review as an unsent draft.' }
+
+. (Join-Path $PSScriptRoot 'windows-pane-positions.ps1')
+$script:positionReads = 0
+function Read-Observation {
+    $script:positionReads++
+    $archiveRepo = if ($script:positionReads -eq 1) { 1 } else { 2 }
+    [pscustomobject]@{
+        bounds = [pscustomobject]@{ 'reader-tab-0-1' = @(0, 0, 12, 12); 'reader-tab-1-0' = @(12, 0, 12, 12) }
+        cached_reader = [pscustomobject]@{ tab_counts = @(10, 10); pane_positions = [pscustomobject]@{
+            panes = @(
+                [pscustomobject]@{ item = 2; repository = $archiveRepo; discussion_anchor = '00000000000000050009'; pull_request = $false }
+                [pscustomobject]@{ item = 3; repository = 1; discussion_anchor = $null; pull_request = $true }
+            )
+        } }
+    }
+}
+$position = Wait-PanePositions 'the exact archive and PR panes' {
+    param($left, $right)
+    $left.item -eq 2 -and $left.repository -eq 2 -and $left.discussion_anchor -ceq '00000000000000050009' -and
+        !$left.pull_request -and $right.item -eq 3 -and $right.repository -eq 1 -and $right.pull_request
+}
+if ($script:positionReads -ne 3 -or $position.cached_reader.pane_positions.panes[0].repository -ne 2) {
+    throw 'The pane predicate did not wait for the exact archive repository beside the original PR.'
+}

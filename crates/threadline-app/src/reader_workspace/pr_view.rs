@@ -892,8 +892,13 @@ impl ReaderWorkspace {
             .child(content);
         #[cfg(feature = "e2e")]
         let viewport = if let Some(observer) = self.observer.as_ref() {
-            viewport
+            div()
                 .relative()
+                .flex()
+                .flex_col()
+                .flex_1()
+                .min_h_0()
+                .child(viewport)
                 .child(observer.visible_control_bounds(context_id))
         } else {
             viewport

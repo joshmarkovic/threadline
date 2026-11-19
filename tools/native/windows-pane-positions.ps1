@@ -1,4 +1,4 @@
-function Wait-PanePositions([string]$Description, [scriptblock]$Check) {
+function Wait-PanePositions([string]$Description, [scriptblock]$PositionCheck) {
     return Wait-State $Description {
         param($state)
         $reader = $state.PSObject.Properties['cached_reader']
@@ -8,7 +8,7 @@ function Wait-PanePositions([string]$Description, [scriptblock]$Check) {
             @($position.Value.panes).Count -ne 2 -or ($reader.Value.tab_counts -join ',') -cne '10,10' -or
             $null -eq $state.bounds.PSObject.Properties['reader-tab-0-1'] -or
             $null -eq $state.bounds.PSObject.Properties['reader-tab-1-0']) { return $false }
-        & $Check $position.Value.panes[0] $position.Value.panes[1] $position.Value $reader.Value
+        & $PositionCheck $position.Value.panes[0] $position.Value.panes[1] $position.Value $reader.Value
     }
 }
 
