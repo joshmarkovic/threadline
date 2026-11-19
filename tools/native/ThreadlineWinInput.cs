@@ -552,6 +552,37 @@ public static class ThreadlineWinInput
         return process;
     }
 
+    // Zero width and height read the test window's physical bounds.
+    public static Rect SizeOwnedWindow(IntPtr window, uint child, uint dpi, int physicalWidth, int physicalHeight)
+    {
+        if (physicalWidth < 0 || physicalHeight < 0 || (physicalWidth == 0) != (physicalHeight == 0))
+            throw new ArgumentException("Supply both physical dimensions or leave both at zero.");
+        IntPtr previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        if (previous == IntPtr.Zero)
+            throw new TargetUnavailableException("Could not select physical window coordinates.");
+        try
+        {
+            Rect bounds;
+            if (window == IntPtr.Zero || child == 0 || WindowProcessId(window) != child ||
+                GetAncestor(window, 2) != window || !IsWindowVisible(window) || IsIconic(window) ||
+                dpi == 0 || GetDpiForWindow(window) != dpi || !GetWindowRect(window, out bounds) ||
+                bounds.Right <= bounds.Left || bounds.Bottom <= bounds.Top)
+                throw new TargetUnavailableException("The owned Threadline window or its display changed before sizing.");
+            if (physicalWidth == 0)
+                return bounds;
+            const uint noMoveAndNoActivation = 0x0002 | 0x0004 | 0x0010 | 0x0200;
+            if (!SetWindowPos(window, IntPtr.Zero, 0, 0, physicalWidth, physicalHeight, noMoveAndNoActivation) ||
+                !GetWindowRect(window, out bounds) || bounds.Right - bounds.Left != physicalWidth ||
+                bounds.Bottom - bounds.Top != physicalHeight)
+                throw new TargetUnavailableException("Windows did not give the owned Threadline window the requested size.");
+            return bounds;
+        }
+        finally
+        {
+            SetThreadDpiAwarenessContext(previous);
+        }
+    }
+
     public static bool FocusByPointer(IntPtr window)
     {
         const uint flags = 0x0001 | 0x0002 | 0x0010;

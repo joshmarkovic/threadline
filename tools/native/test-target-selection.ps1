@@ -22,6 +22,21 @@ function Test-Assert([bool]$Condition, [string]$Description) {
     if (!$Condition) { throw $Description }
 }
 
+$invalidSizeRefused = $false
+try {
+    $null = [ThreadlineWinInput]::SizeOwnedWindow([IntPtr]::Zero, 1, 96, 940, 0)
+} catch {
+    $invalidSizeRefused = $_.Exception.InnerException -is [ArgumentException]
+}
+Test-Assert $invalidSizeRefused 'Refuse a resize with only one physical dimension.'
+$missingWindowRefused = $false
+try {
+    $null = [ThreadlineWinInput]::SizeOwnedWindow([IntPtr]::Zero, 1, 96, 940, 820)
+} catch {
+    $missingWindowRefused = $_.Exception.InnerException -is [ThreadlineWinInput+TargetUnavailableException]
+}
+Test-Assert $missingWindowRefused 'Refuse to size a window without an owned native handle.'
+
 function New-TestNode([string]$Identity, [int]$Owner, $Parent, [string]$Name = '', [string]$Role = 'ControlType.Custom', [string]$Class = '', [string]$AutomationId = '') {
     $value = [pscustomobject]@{ ID = $Identity; Parent = $Parent; Current = [pscustomobject]@{
         ProcessId = $Owner; Name = $Name; ControlType = [pscustomobject]@{ ProgrammaticName = $Role }; ClassName = $Class; AutomationId = $AutomationId

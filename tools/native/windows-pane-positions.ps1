@@ -179,8 +179,10 @@ function Invoke-PaneLifecycleProof([IntPtr]$Window, [string]$Profile) {
             (Test-PaneLayoutOrder $layout.strips[0] $leftOrder) -and
             ($layout.strips[1].tabs[0..9].id -join ',') -ceq ($rightOrder -join ',')
     }
-    Wait-For 'the original PR title stays visible while its tab is inactive' {
-        $null -ne (Find-OwnedFixtureControl $Window 'reader-tab-1-0' 'Pull request fixture/relay #3 Improve relay workflow 3')
+    $draftMarker = [char]0x00b7
+    $originalPrName = "Pull request fixture/relay #3 Improve relay workflow 3 $draftMarker Draft"
+    Wait-For 'the original PR title and draft marker stay visible while its tab is inactive' {
+        $null -ne (Find-OwnedFixtureControl $Window 'reader-tab-1-0' $originalPrName)
     }
     Add-Evidence 'Open the archive search result beside the original workspace and retain the inactive PR title' $beside.cached_reader.pane_positions.layout
     Click-AccountControl $Window 'reader-close-tab'
@@ -231,6 +233,41 @@ function Invoke-PaneLifecycleProof([IntPtr]$Window, [string]$Profile) {
             $pane.discussion_anchor -ceq $archive.anchor -and $pane.discussion_offset -eq $savedOffset -and
             $pane.saved_draft_sha256 -ceq $draftSha
     }
+    $owner = [uint32]$script:app.Id
+    $dpi = [uint32][Math]::Round(96 * $anchored.scale_factor)
+    $originalBounds = [ThreadlineWinInput]::SizeOwnedWindow($Window, $owner, $dpi, 0, 0)
+    $originalWidth = $originalBounds.Right - $originalBounds.Left
+    $originalHeight = $originalBounds.Bottom - $originalBounds.Top
+    $compactWidth = [int][Math]::Round(940 * $dpi / 96)
+    if ($originalWidth -le $compactWidth) { Stop-Blocked 'The owned Threadline window cannot exercise narrowing from two visible panes.' }
+    try {
+        $narrowBounds = [ThreadlineWinInput]::SizeOwnedWindow($Window, $owner, $dpi, $compactWidth, $originalHeight)
+        $narrow = Wait-PaneLayout 'the actual narrower window hides the other pane without changing either tab strip' {
+            param($layout, $panes, $reader, $bounds)
+            !$layout.maximized -and $reader.pane_count -eq 2 -and $reader.focused_pane -eq 0 -and
+                $panes.Count -eq 2 -and $panes[0].tab -ceq $archiveId -and
+                $panes[0].discussion_anchor -ceq $archive.anchor -and $panes[0].saved_draft_sha256 -ceq $draftSha -and
+                (Test-PaneLayoutOrder $layout.strips[0] $leftOrder) -and (Test-PaneLayoutOrder $layout.strips[1] $rightOrder) -and
+                $null -ne $bounds.PSObject.Properties['reader-tab-0-0'] -and $null -eq $bounds.PSObject.Properties['reader-tab-1-0']
+        }
+    } finally {
+        $normalBounds = [ThreadlineWinInput]::SizeOwnedWindow($Window, $owner, $dpi, $originalWidth, $originalHeight)
+    }
+    if ($normalBounds.Left -ne $originalBounds.Left -or $normalBounds.Top -ne $originalBounds.Top -or
+        $normalBounds.Bottom -ne $originalBounds.Bottom) {
+        throw 'Restoring the owned window width changed its original location or height.'
+    }
+    $null = Wait-PaneLayout 'restore both visible panes with their original selections and the archive reading position' {
+        param($layout, $panes, $reader, $bounds)
+        !$layout.maximized -and $panes.Count -eq 2 -and (& $archiveViewMatches $panes[0]) -and
+            $panes[1].item -eq $fixture.review_item -and $null -ne $bounds.PSObject.Properties['reader-tab-1-0']
+    }
+    Add-Evidence 'Narrow and restore only the owned application window while preserving the saved pane state' ([ordered]@{
+        input = 'Owned HWND SetWindowPos'; dpi = $dpi; physical_width_before = $originalWidth
+        physical_width_narrow = $narrowBounds.Right - $narrowBounds.Left
+        physical_width_restored = $normalBounds.Right - $normalBounds.Left
+        physical_height = $originalHeight; tab_counts = $narrow.cached_reader.tab_counts
+    })
     $reordered = @($leftOrder[1], $leftOrder[0]) + @($leftOrder | Select-Object -Skip 2)
     Click-AccountControl $Window 'reader-reorder-tab'
     $null = Wait-PaneLayout 'the original archive tab moves one slot left in the same pane' {
