@@ -60,6 +60,7 @@ function Invoke-ReaderCursorRecoveryProof([IntPtr]$Window, [string]$Profile) {
     }
     Click-AccountControl $Window 'reader-browse'
     $item = Open-WriteFixtureIssue $Window -UserConnected
+    Click-AccountControl $Window 'reader-fetch-metadata-0'
     Click-AccountControl $Window 'reader-fetch-timeline-0'
     $null = Wait-Reader 'the committed original timeline' {
         param($reader) $reader.active_item -eq $item -and $reader.timeline_coverage -ceq 'Complete'
@@ -67,6 +68,10 @@ function Invoke-ReaderCursorRecoveryProof([IntPtr]$Window, [string]$Profile) {
     Click-AccountControl $Window 'reader-fetch-comments-0'
     $null = Wait-Reader 'the committed first discussion page' {
         param($reader) $reader.active_item -eq $item -and $reader.comments_coverage -ceq 'Partial' -and $reader.comment_count -eq 1
+    }
+    $baseline = Read-RecoveryFixture $Profile 'snapshot' 'reader-recovery-baseline.json'
+    if ($baseline.completed_other_resources -ne 2 -or $baseline.discussion.cursor -cne '2') {
+        throw 'Refresh details, Download timeline page, and Download discussion page did not establish their separate checkpoints.'
     }
 
     Set-WriteFixtureOffline $Window $true
