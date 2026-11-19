@@ -475,5 +475,86 @@
       },
       "outcome": "After restart the panel painted, but the already-published offline snapshot had been dropped before the account loaded."
     }
+  },
+  "windows_rate_limit": {
+    "run": "e2e-1795059987737-46340",
+    "source_revision": "fc916579c6205df66cc4765b397ac71b9425317a",
+    "source_dirty": false,
+    "app_revision": "fc916579c6205df66cc4765b397ac71b9425317a",
+    "runner_revision": "fc916579c6205df66cc4765b397ac71b9425317a",
+    "driver_revision": "fc916579c6205df66cc4765b397ac71b9425317a",
+    "package_version": "0.1.0",
+    "cargo_lock_sha256": "ba1fa2481ba47ebb082dae4aff8bf1a099cea5775b4196b096aeb3bb094d4efb",
+    "fixture_revision": "s05-native-rate-limit-v1",
+    "host": {
+      "os": "windows",
+      "architecture": "x86_64",
+      "version": "Microsoft Windows [Version 10.0.22631.7652]",
+      "display_session": "Windows desktop availability is checked by native driver"
+    },
+    "status": "Pass",
+    "exit_code": 0,
+    "command": {
+      "program": "xtask",
+      "argv": [
+        "test",
+        "e2e",
+        "--suite",
+        "full",
+        "--case",
+        "S05-WINDOWS-RATE-LIMIT",
+        "--binary",
+        "<binary-path>",
+        "--seed",
+        "12345",
+        "--report-dir",
+        "<report-dir>"
+      ],
+      "redacted": true
+    },
+    "started_at_unix_ms": 1795059987737,
+    "finished_at_unix_ms": 1795060032740,
+    "seed": 12345,
+    "case": "S05-WINDOWS-RATE-LIMIT",
+    "requirement_ids": [
+      "SYNC-10",
+      "CONNECT-03",
+      "CACHE-03",
+      "TEST-04"
+    ],
+    "acceptance_ids": [
+      "AC-12"
+    ],
+    "app_sha256": "f88478a2857f77a6fb9615c99d5637cac3641a6d176d49bba8ec7a3a3b84dd2e",
+    "bytes": 45408256,
+    "evidence_class": "test-build native process",
+    "dpi": 96,
+    "native_actions": 18,
+    "observed": {
+      "item": 1,
+      "fixture_http_status": 429,
+      "retry_after_seconds": 180,
+      "seconds_since_throttle_phase_begin": 23.5990434,
+      "search_results": 1,
+      "second_probe_requested": true,
+      "discussion_fetch": "Failed",
+      "work_offline": false,
+      "draft_sha256": "29a2cd07d635da2bd7de9acc854eb8371a8b9e76b63b10e6cb5981772b894e8e",
+      "outbox": 0
+    },
+    "responses_before_throttle": 12,
+    "delivered_throttle": {
+      "phase": "sync_rate_throttle",
+      "route": "user",
+      "status": 429
+    },
+    "requests_after_throttle": 0,
+    "all_fixture_authenticated": true,
+    "raw_sha256": {
+      "result": "8e90632cd6f761c5e169110e87243b8c949c960c8fa64fb1b090904b797cd0d0",
+      "native": "08dee09cf3ec84a5cf57667ca3eb0e2cbaabb184b93ddab8c05bdb023b05a62a",
+      "redacted_http_trace": "eb2a1cdab5df082b3ba4577db873f4f6a536051e2b3b65d90b15decc0c0ddd39",
+      "binary": "b8b6f2edf1159356cccadddb76fe3ecc3ee14beb8600b544ca5dcdf81b722722"
+    }
   }
 }
