@@ -104,7 +104,7 @@ fn input(
     PrInputPage {
         records,
         next_cursor: cursor,
-        partial: reason,
+        partial: reason.map(PrPageProblem::Resource),
         validators: None,
         fetched_at_ms: 100,
     }
@@ -583,6 +583,81 @@ fn it_016_selected_offline_download_pins_one_revision_and_safe_retry_survives_re
             .len(),
         1
     );
+}
+
+#[test]
+fn it_016_capped_comparison_keeps_all_returned_files_and_the_api_limit_after_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open_profile(dir.path()).unwrap();
+    let (account, _, item) = setup(&store);
+    let header = PrHeader::default();
+    let rev = store
+        .record_pr_revision(
+            account,
+            item,
+            &oid('a'),
+            &oid('b'),
+            Some(&oid('c')),
+            &header,
+            25,
+        )
+        .unwrap();
+    let file = |index| PrRecord::File {
+        path: format!("src/{index:03}.dat"),
+        previous_path: None,
+        status: "modified".into(),
+        additions: None,
+        deletions: None,
+        patch: PatchEvidence::Binary,
+    };
+    let family = PrFamily::Files;
+    let first = store.start_pr_fetch(&rev, family, WalkMode::Full).unwrap();
+    store
+        .commit_pr_page(
+            &rev,
+            family,
+            &first,
+            input((0..101).map(file).collect(), None, None),
+        )
+        .unwrap();
+    let ordinary = store.pr_page(&rev, family, None, 1).unwrap();
+    assert_eq!(ordinary.state.coverage, Coverage::Complete);
+    assert!(!ordinary.api_capped);
+
+    let cap = threadline_core::github::reader::pr::COMPARE_FILES_CAP;
+    let bounded = store.start_pr_fetch(&rev, family, WalkMode::Full).unwrap();
+    store
+        .commit_pr_page(
+            &rev,
+            family,
+            &bounded,
+            PrInputPage {
+                partial: Some(PrPageProblem::ComparisonFilesCap),
+                ..input((0..cap).map(file).collect(), None, None)
+            },
+        )
+        .unwrap();
+    store.request_pr_download(&rev, false, false, 101).unwrap();
+    store.clear_cache(account).unwrap();
+    drop(store);
+
+    let reopened = Store::open_profile(dir.path()).unwrap();
+    let mut count = 0;
+    let mut after = None;
+    loop {
+        let page = reopened
+            .pr_page(&rev, family, after.as_deref(), 100)
+            .unwrap();
+        assert_eq!(page.state.coverage, Coverage::Partial);
+        assert!(page.api_capped);
+        count += page.rows.len();
+        after = page.next;
+        if after.is_none() {
+            break;
+        }
+    }
+    assert_eq!(count, cap);
+    assert!(!reopened.pr_download(&rev).unwrap().unwrap().fully_cached());
 }
 
 #[test]

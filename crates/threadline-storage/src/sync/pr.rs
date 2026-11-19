@@ -122,7 +122,7 @@ impl Store {
             let stored=PrInputPage{validators:if next.is_none() && reason.is_none(){Some(&validators)}else{None},..page};
             crate::pr::publish_page(tx,&rev,family,expected,stored)?;
             if let Some(reason)=reason {
-                let suspended=matches!(reason,ResourceError::Forbidden|ResourceError::Unauthorized|ResourceError::NotFound);
+                let suspended=matches!(reason.resource_error(),ResourceError::Forbidden|ResourceError::Unauthorized|ResourceError::NotFound);
                 // The cache kept usable rows but this limited response cannot advance the walk.
                 tx.execute("UPDATE scheduled_reads SET cursor=NULL,walk_started=NULL,lease_until=NULL,leased_generation=NULL,
                     failure='partial-pr-resource',failures=failures+1,suspended=?2,due_at=?3 WHERE id=?1",

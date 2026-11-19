@@ -17,7 +17,8 @@ use super::{
 };
 use crate::github::access::response::{ReadResponse, RequestMode};
 
-const COMPARE_FILES_CAP: usize = 300;
+/// GitHub supplies at most this many changed files in an immutable comparison.
+pub const COMPARE_FILES_CAP: usize = 300;
 
 pub struct PrSnapshot {
     repository: RepositoryApiId,
@@ -70,6 +71,7 @@ pub struct PrPage<T> {
 pub struct PrFiles {
     pub records: Vec<PrFile>,
     pub partial: bool,
+    pub api_capped: bool,
 }
 
 pub struct PrCommit {

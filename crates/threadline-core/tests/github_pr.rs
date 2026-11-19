@@ -204,7 +204,7 @@ async fn pr_compare_checks_and_statuses_keep_immutable_source_and_explicit_parti
     sim.enqueue(
         Method::GET,
         &compare,
-        reply(StatusCode::OK, page).header(header::ETAG, "\"compare-page\""),
+        reply(StatusCode::OK, page.clone()).header(header::ETAG, "\"compare-page\""),
     );
     let comparison = reader
         .pr_comparison(&pinned, 1, &validators, &cancel)
@@ -216,6 +216,7 @@ async fn pr_compare_checks_and_statuses_keep_immutable_source_and_explicit_parti
     assert!(!data.commits.partial);
     let files = data.files.as_ref().unwrap();
     assert!(files.partial);
+    assert!(!files.api_capped);
     assert_eq!(files.records[0].previous_path.as_deref(), Some("old.rs"));
     assert!(matches!(files.records[0].patch, PatchEvidence::Text(_)));
     assert!(matches!(
@@ -235,6 +236,51 @@ async fn pr_compare_checks_and_statuses_keep_immutable_source_and_explicit_parti
             .value
             .is_none()
     );
+
+    let mut capped = page;
+    let records = capped["files"].as_array_mut().unwrap();
+    for index in records.len()..threadline_core::github::reader::pr::COMPARE_FILES_CAP {
+        records.push(
+            json!({"filename":format!("src/fill-{index}.rs"),"status":"added",
+            "additions":1, "deletions":0,"patch":"@@ -0,0 +1 @@\n+line"}),
+        );
+    }
+    sim.enqueue(Method::GET, &compare, reply(StatusCode::OK, capped.clone()));
+    let capped_comparison = reader
+        .pr_comparison(&pinned, 1, &validators, &cancel)
+        .await
+        .unwrap()
+        .value
+        .unwrap();
+    let files = capped_comparison.files.unwrap();
+    assert!(files.partial && files.api_capped);
+    assert_eq!(
+        files.records.len(),
+        threadline_core::github::reader::pr::COMPARE_FILES_CAP
+    );
+
+    let mut exact = pull();
+    exact["changed_files"] = json!(300);
+    sim.enqueue(
+        Method::GET,
+        "/repositories/71/pulls/42",
+        reply(StatusCode::OK, exact),
+    );
+    let exact = reader
+        .pr_snapshot(number, &validators, &cancel)
+        .await
+        .unwrap()
+        .value
+        .unwrap();
+    sim.enqueue(Method::GET, &compare, reply(StatusCode::OK, capped));
+    let exact_comparison = reader
+        .pr_comparison(&exact, 1, &validators, &cancel)
+        .await
+        .unwrap()
+        .value
+        .unwrap();
+    let files = exact_comparison.files.unwrap();
+    assert!(!files.partial && !files.api_capped);
 
     let checks =
         format!("/repositories/71/commits/{HEAD}/check-runs?filter=all&per_page=20&page=1");
@@ -308,7 +354,7 @@ async fn pr_compare_checks_and_statuses_keep_immutable_source_and_explicit_parti
     );
 
     let observations = sim.take_observations();
-    assert_eq!(observations.len(), 9);
+    assert_eq!(observations.len(), 12);
     assert!(observations.iter().all(|event| event.matched
         && event.expected_media_type
         && event.authorization_sent

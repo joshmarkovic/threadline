@@ -57,10 +57,13 @@ impl Comparison {
                     Ok(PrFiles {
                         records: Vec::new(),
                         partial: pull.presentation.changed_files != Some(0) || limited,
+                        api_capped: false,
                     })
                 },
                 |files| {
                     let count = files.len();
+                    let api_capped = count >= COMPARE_FILES_CAP
+                        && pull.presentation.changed_files != Some(count as u64);
                     let records = files
                         .into_iter()
                         .map(File::read)
@@ -68,11 +71,12 @@ impl Comparison {
                     Ok::<_, AccessError>(PrFiles {
                         records,
                         partial: limited
-                            || count >= COMPARE_FILES_CAP
+                            || api_capped
                             || pull
                                 .presentation
                                 .changed_files
                                 .is_some_and(|total| total > count as u64),
+                        api_capped,
                     })
                 },
             )?)

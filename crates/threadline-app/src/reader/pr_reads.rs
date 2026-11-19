@@ -11,7 +11,9 @@ use threadline_core::github::reader::{
     pr::{PrSide, PrSnapshot, PrSource, PrSourceRange},
     refresh::{ReadValidators, Refresh},
 };
-use threadline_storage::pr::{PrFamily, PrHeader, PrInputPage, PrRecord, PrRevision, SourceSide};
+use threadline_storage::pr::{
+    PrFamily, PrHeader, PrInputPage, PrPageProblem, PrRecord, PrRevision, SourceSide,
+};
 use threadline_storage::resources::CommitOid;
 
 use super::*;
@@ -37,7 +39,7 @@ struct Prepared {
 pub(crate) struct FetchPage {
     pub(crate) records: Vec<PrRecord>,
     pub(crate) next: Option<String>,
-    pub(crate) partial: Option<ResourceError>,
+    pub(crate) partial: Option<PrPageProblem>,
     pub(crate) validators: Validators,
     pub(crate) merge_base: Option<String>,
     pub(crate) review_decision: Option<String>,
@@ -396,7 +398,8 @@ impl ReaderService {
             let update = PrInputPage {
                 records: fetched.records,
                 next_cursor: fetched.next.as_deref(),
-                validators: (progress.cursor.is_none() && !more).then_some(&fetched.validators),
+                validators: (progress.cursor.is_none() && !more && partial.is_none())
+                    .then_some(&fetched.validators),
                 partial,
                 fetched_at_ms: UtcMillis::now()?.0,
             };

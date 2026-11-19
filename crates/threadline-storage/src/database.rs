@@ -15,7 +15,7 @@ use tempfile::{Builder, NamedTempFile};
 use crate::{Error, Result, queue::hold_restored_dispatch};
 
 pub const DATABASE_FILENAME: &str = "threadline.sqlite3";
-pub const SCHEMA_VERSION: u32 = 15;
+pub const SCHEMA_VERSION: u32 = 16;
 const APPLICATION_ID: u32 = 0x5448_5244;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(3);
 const BACKUP_TIMEOUT: Duration = Duration::from_secs(30);
@@ -296,6 +296,13 @@ fn migrate(connection: &mut Connection, path: &Path) -> Result<Option<PathBuf>> 
                         group_id INTEGER PRIMARY KEY REFERENCES native_notification_groups(id) ON DELETE CASCADE
                     ) STRICT;")?;
             tx.pragma_update(None, "user_version", 15)?;
+        }
+        if version < 16 {
+            tx.execute_batch(
+                "ALTER TABLE pr_family_resources ADD COLUMN api_capped INTEGER NOT NULL
+                 DEFAULT 0 CHECK(api_capped IN (0,1));",
+            )?;
+            tx.pragma_update(None, "user_version", 16)?;
         }
         check_foreign_keys(tx)?;
         Ok(backup)

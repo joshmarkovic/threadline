@@ -20,14 +20,14 @@ use threadline_storage::{
         PrSection, SourceSide, Verification,
     },
     queue::PrContext,
-    resources::ResourceState,
+    resources::{ResourceError, ResourceState},
 };
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(super) struct PrReadKey(ItemId, &'static str, String);
 
-fn pr_state_status(pane: usize, text: String, palette: Palette) -> impl Element {
-    let id = format!("pr-{pane}-merge-state");
+fn pr_status(id: String, text: impl Into<String>, palette: Palette) -> impl Element {
+    let text = text.into();
     div()
         .id(id.clone())
         .accessibility_id(id)
@@ -36,6 +36,12 @@ fn pr_state_status(pane: usize, text: String, palette: Palette) -> impl Element 
         .text_xs()
         .text_color(palette.muted)
         .child(text)
+}
+
+struct FamilyCoverage<'a> {
+    state: &'a ResourceState,
+    next: Option<&'a str>,
+    api_capped: bool,
 }
 
 #[derive(Clone)]
@@ -432,8 +438,8 @@ impl ReaderWorkspace {
                 h.base_ref.as_deref().unwrap_or("Unknown target branch")
             );
             header = header
-                .child(pr_state_status(
-                    pane,
+                .child(pr_status(
+                    format!("pr-{pane}-merge-state"),
                     format!(
                         "{state} · {draft} · {} · {refs}",
                         h.author.as_deref().unwrap_or("Unknown author")
@@ -454,7 +460,7 @@ impl ReaderWorkspace {
                 .child(self.pr_download_header(pane, tab, pr, palette, cx))
                 .child(self.merge_view(pane, tab, pr, palette, cx));
         } else {
-            header = header.child(pr_state_status(pane, state.into(), palette));
+            header = header.child(pr_status(format!("pr-{pane}-merge-state"), state, palette));
         }
         header.into_any_element()
     }
@@ -587,8 +593,11 @@ impl ReaderWorkspace {
                 pane,
                 tab,
                 *family,
-                &page.state,
-                page.next.as_deref(),
+                FamilyCoverage {
+                    state: &page.state,
+                    next: page.next.as_deref(),
+                    api_capped: page.api_capped,
+                },
                 palette,
                 cx,
             ));
@@ -619,17 +628,16 @@ impl ReaderWorkspace {
         viewport.into_any_element()
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "A resource section displays a cache receipt, continuation and stable pane identity"
-    )]
     fn pr_family_bar(
         &self,
         pane: usize,
         tab: &Tab,
         family: PrFamily,
-        state: &ResourceState,
-        next: Option<&str>,
+        FamilyCoverage {
+            state,
+            next,
+            api_capped,
+        }: FamilyCoverage<'_>,
         palette: Palette,
         cx: &mut Context<Self>,
     ) -> AnyElement {
@@ -645,16 +653,18 @@ impl ReaderWorkspace {
         };
         let name = family.name();
         let coverage_id = format!("pr-{pane}-{name}-coverage");
-        let coverage = div()
-            .id(coverage_id.clone())
-            .role(Role::Status)
-            .text_xs()
-            .text_color(palette.muted)
-            .child(coverage_label(
-                label,
-                state.coverage,
-                state.last_validation_at_ms,
-            ));
+        let coverage = pr_status(
+            coverage_id.clone(),
+            coverage_label(label, state.coverage, state.last_validation_at_ms),
+            palette,
+        );
+        let limitation = api_capped.then(|| {
+            pr_status(
+                format!("pr-{pane}-{name}-api-cap"),
+                "GitHub returned its 300-file comparison limit. Other changed files may be missing.",
+                palette,
+            )
+        });
         div()
             .flex()
             .flex_col()
@@ -696,7 +706,12 @@ impl ReaderWorkspace {
                         cx,
                     )),
             )
-            .child(resource_problem(label, state, palette))
+            .children(limitation)
+            .children(
+                (state.error.is_some()
+                    && (!api_capped || state.error != Some(ResourceError::InvalidResponse)))
+                    .then(|| resource_problem(label, state, palette)),
+            )
             .into_any_element()
     }
 
@@ -1132,8 +1147,11 @@ impl ReaderWorkspace {
                 pane,
                 tab,
                 PrFamily::Files,
-                &files.state,
-                files.next.as_deref(),
+                FamilyCoverage {
+                    state: &files.state,
+                    next: files.next.as_deref(),
+                    api_capped: files.api_capped,
+                },
                 palette,
                 cx,
             )))
@@ -1210,11 +1228,12 @@ impl ReaderWorkspace {
     ) -> AnyElement {
         let Some(file) = &files.selected else {
             return div()
-                .id(format!("pr-{pane}-patch-state"))
                 .p_2()
-                .text_sm()
-                .role(Role::Status)
-                .child("No downloadable file patch is selected.")
+                .child(pr_status(
+                    format!("pr-{pane}-patch-state"),
+                    "No downloadable file patch is selected.",
+                    palette,
+                ))
                 .into_any_element();
         };
         let settings = tab_settings(tab);
@@ -1241,15 +1260,11 @@ impl ReaderWorkspace {
             ));
         }
         if let Some(problem) = file.problem {
-            panel = panel.child(
-                div()
-                    .id(format!("pr-{pane}-patch-state"))
-                    .role(Role::Status)
-                    .p_1()
-                    .text_xs()
-                    .text_color(palette.muted)
-                    .child(problem),
-            );
+            panel = panel.child(div().p_1().child(pr_status(
+                format!("pr-{pane}-patch-state"),
+                problem,
+                palette,
+            )));
         }
         if settings
             .selected_path

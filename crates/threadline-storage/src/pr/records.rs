@@ -184,8 +184,16 @@ pub(crate) fn publish_page(
     expected: &ResourceProgress,
     page: PrInputPage<'_>,
 ) -> Result<Option<ResourceProgress>> {
-    if page.records.len() > 100 {
+    let max = match family {
+        PrFamily::Files => threadline_core::github::reader::pr::COMPARE_FILES_CAP,
+        _ => 100,
+    };
+    if page.records.len() > max {
         return Err(Error::InvalidInput("PR page exceeds GitHub's page size"));
+    }
+    let api_capped = page.partial == Some(PrPageProblem::ComparisonFilesCap);
+    if api_capped && (family != PrFamily::Files || page.records.len() != max) {
+        return Err(Error::InvalidInput("Invalid capped PR comparison evidence"));
     }
     let id = family_id(tx, rev, family)?.ok_or(Error::NotFound)?;
     require_walk_id(tx, id, expected)?;
@@ -249,7 +257,7 @@ pub(crate) fn publish_page(
         let body = encoded(&record)?;
         records.push(ResourceRecord { key, body });
     }
-    commit_page_by_id(
+    let saved = commit_page_by_id(
         tx,
         id,
         expected,
@@ -259,6 +267,13 @@ pub(crate) fn publish_page(
             completed_validators: page.validators,
             fetched_at_ms: page.fetched_at_ms,
         },
-        page.partial,
-    )
+        page.partial.map(PrPageProblem::resource_error),
+    )?;
+    if family == PrFamily::Files && page.next_cursor.is_none() {
+        tx.execute(
+            "UPDATE pr_family_resources SET api_capped=?2 WHERE resource_id=?1",
+            params![id, api_capped],
+        )?;
+    }
+    Ok(saved)
 }

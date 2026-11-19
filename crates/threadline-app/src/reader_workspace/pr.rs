@@ -36,6 +36,7 @@ pub(super) struct FilePage {
     pub rows: Vec<FileSummary>,
     pub next: Option<String>,
     pub state: ResourceState,
+    pub api_capped: bool,
     pub selected: Option<SelectedFile>,
 }
 
@@ -187,6 +188,7 @@ impl FilePage {
             rows,
             next: page.next,
             state: page.state,
+            api_capped: page.api_capped,
             selected,
         })
     }

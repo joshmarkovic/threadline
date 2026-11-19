@@ -24,13 +24,30 @@ pub struct PrPage {
     pub rows: Vec<(String, PrRecord)>,
     pub next: Option<String>,
     pub state: ResourceState,
+    pub api_capped: bool,
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PrPageProblem {
+    Resource(ResourceError),
+    ComparisonFilesCap,
+}
+
+impl PrPageProblem {
+    pub(crate) fn resource_error(self) -> ResourceError {
+        match self {
+            Self::Resource(error) => error,
+            Self::ComparisonFilesCap => ResourceError::InvalidResponse,
+        }
+    }
+}
+
 pub struct PrInputPage<'a> {
     pub records: Vec<PrRecord>,
     pub next_cursor: Option<&'a str>,
     pub validators: Option<&'a Validators>,
     /// Terminal inaccessible, capped or otherwise incomplete result.
-    pub partial: Option<ResourceError>,
+    pub partial: Option<PrPageProblem>,
     pub fetched_at_ms: i64,
 }
 
@@ -352,7 +369,9 @@ impl Store {
         }
         self.read(|db|{
             let tx=db.unchecked_transaction()?;
-            let Some(id)=family_id(&tx,rev,family)? else {return Ok(PrPage{rows:vec![],next:None,state:missing_state()})};
+            let Some(id)=family_id(&tx,rev,family)? else {
+                return Ok(PrPage{rows:vec![],next:None,state:missing_state(),api_capped:false});
+            };
             let start=match after {
                 None=>-1,
                 Some(after)=>tx.query_row("SELECT json_extract(body,'$.ordinal') FROM cached_resource_records WHERE resource_id=? AND record_key=?",
@@ -368,7 +387,11 @@ impl Store {
                 rows.push((key,value.record));
             }
             let next=if rows.len()>usize::from(limit){rows.pop();rows.last().map(|r|r.0.clone())}else{None};
-            Ok(PrPage{rows,next,state:state_by_id(&tx,id)?})
+            let state = state_by_id(&tx,id)?;
+            let api_capped = family == PrFamily::Files && state.coverage == Coverage::Partial
+                && tx.query_row("SELECT api_capped FROM pr_family_resources WHERE resource_id=?",
+                    [id], |row| row.get::<_,bool>(0))?;
+            Ok(PrPage{rows,next,state,api_capped})
         })
     }
 }

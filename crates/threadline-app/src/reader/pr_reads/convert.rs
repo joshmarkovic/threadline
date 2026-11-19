@@ -27,13 +27,17 @@ pub(super) fn page<T>(
 }
 
 pub(super) fn files(data: remote::PrFiles, validators: Validators) -> FetchPage {
-    receipt(
+    let mut page = receipt(
         data.records.into_iter().map(file).collect(),
         None,
         data.partial,
         validators,
         None,
-    )
+    );
+    if data.api_capped {
+        page.partial = Some(PrPageProblem::ComparisonFilesCap);
+    }
+    page
 }
 
 pub(super) fn graph<T>(data: remote::PrGraphPage<T>, read: impl Fn(T) -> PrRecord) -> FetchPage {
@@ -56,7 +60,7 @@ fn receipt(
     FetchPage {
         records,
         next: if incomplete { None } else { next },
-        partial: incomplete.then_some(ResourceError::InvalidResponse),
+        partial: incomplete.then_some(PrPageProblem::Resource(ResourceError::InvalidResponse)),
         validators,
         merge_base: None,
         review_decision,
