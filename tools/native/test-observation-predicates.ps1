@@ -21,6 +21,7 @@ if (@($helpers.Name | Sort-Object -Unique).Count -ne 5 -or $helpers.Count -ne 5)
 . (Join-Path $PSScriptRoot 'windows-sync.ps1')
 . (Join-Path $PSScriptRoot 'windows-native-lifecycle.ps1')
 . (Join-Path $PSScriptRoot 'windows-native-activity.ps1')
+. (Join-Path $PSScriptRoot 'windows-issue-writes.ps1')
 . (Join-Path $PSScriptRoot 'windows-pr-reader.ps1')
 . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
 . (Join-Path $PSScriptRoot 'windows-review-context.ps1')
@@ -294,6 +295,19 @@ if (!(Test-NativeActivityBaselineComparison $activityBaseline)) {
 $activityBaseline.cached_reader.active_number = 42
 if (Test-NativeActivityBaselineComparison $activityBaseline) {
     throw 'The native baseline accepted a different pull request.'
+}
+
+$issuePanes = [pscustomobject]@{ pane_positions = [pscustomobject]@{ panes = @(
+    [pscustomobject]@{ index = 1; item = 17; repository = 9; pull_request = $false; tab = 'right-fixture' }
+    [pscustomobject]@{ index = 0; item = 17; repository = 9; pull_request = $false; tab = 'left-fixture' }
+) } }
+if (((Get-FixtureIssueTabs $issuePanes 17) -join ',') -cne 'left-fixture,right-fixture' -or
+    @(Get-FixtureIssueTabs $issuePanes 19).Count -ne 0) {
+    throw 'The issue edit driver did not bind both pane indexes to the exact existing issue.'
+}
+$issuePanes.pane_positions.panes[0].tab = 'left-fixture'
+if (@(Get-FixtureIssueTabs $issuePanes 17).Count -ne 0) {
+    throw 'The issue edit driver accepted the same tab twice.'
 }
 
 $script:observations.Clear()

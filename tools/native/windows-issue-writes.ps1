@@ -227,6 +227,22 @@ function Confirm-FixtureIssuePaneTitles([IntPtr]$Window, [string]$Title) {
     }
 }
 
+function Get-FixtureIssueTabs($Reader, [long]$Item) {
+    if ($null -eq $Reader -or !$Reader.PSObject.Properties['pane_positions'] -or
+        $null -eq $Reader.pane_positions) {
+        return
+    }
+    $panes = @($Reader.pane_positions.panes | Sort-Object index)
+    if ($panes.Count -ne 2 -or $panes[0].index -ne 0 -or $panes[1].index -ne 1 -or
+        $panes[0].item -ne $Item -or $panes[1].item -ne $Item -or
+        $panes[0].pull_request -or $panes[1].pull_request -or
+        $panes[0].repository -le 0 -or $panes[0].repository -ne $panes[1].repository -or
+        !$panes[0].tab -or !$panes[1].tab -or $panes[0].tab -ceq $panes[1].tab) {
+        return
+    }
+    return $panes.tab
+}
+
 function Invoke-IssuePropagationProof([IntPtr]$Window) {
     Wait-SeededFixtureAccount
     $item = Open-WriteFixtureIssue $Window -UserConnected
@@ -235,11 +251,14 @@ function Invoke-IssuePropagationProof([IntPtr]$Window) {
     Wait-For 'duplicate the exact issue beside its original view' {
         Invoke-OwnedFixtureControl $Window 'reader-duplicate-tab' $null 'Duplicate view beside'
     }
-    $null = Wait-Reader 'both native panes retain separate tabs for the issue' {
+    $duplicated = Wait-Reader 'both native panes retain separate tabs for the issue' {
         param($reader)
         $reader.active_item -eq $item -and $reader.pane_count -eq 2 -and
-            ($reader.tab_counts -join ',') -ceq '1,1' -and $reader.cached_visible_panes -eq 2
+            ($reader.tab_counts -join ',') -ceq '1,1' -and $reader.cached_visible_panes -eq 2 -and
+            @(Get-FixtureIssueTabs $reader $item).Count -eq 2
     }
+    $tabIds = (Get-FixtureIssueTabs $duplicated.cached_reader $item) -join ','
+    if (!$tabIds) { throw 'The issue tab identities changed while taking the native observation.' }
     Confirm-FixtureIssuePaneTitles $Window $base
     Click-AccountControl $Window 'reader-tab-0-0'
     $null = Wait-Reader 'the first native pane is focused for its edit' {
@@ -250,6 +269,11 @@ function Invoke-IssuePropagationProof([IntPtr]$Window) {
     Type-WriteFixtureField $Window 'reader-issue-title-0' $title
     Wait-WriteFixtureDraft $item 'Synthetic existing issue.'
     Queue-WriteFixtureDraft $Window $item 1 'Queue issue edit'
+    $null = Wait-Reader 'the queued edit leaves both original issue tabs open' {
+        param($reader)
+        $reader.offline -and $reader.outbox -eq 1 -and
+            ((Get-FixtureIssueTabs $reader $item) -join ',') -ceq $tabIds
+    }
     $pending = 'Pending local action ' + [char]0x00b7 + ' Queued'
     foreach ($pane in 0, 1) {
         Wait-For "the queued issue edit is visibly separate from confirmed title in pane $pane" {
@@ -257,17 +281,18 @@ function Invoke-IssuePropagationProof([IntPtr]$Window) {
         }
     }
     Confirm-FixtureIssuePaneTitles $Window $base
-    Add-Evidence 'Show the same pending issue edit beside the unchanged confirmed title in both native panes' ([ordered]@{item = $item; issue_number = 41; panes = 2; queued_actions = 1})
+    Add-Evidence 'Show the same pending issue edit beside the unchanged confirmed title in both native panes' ([ordered]@{item = $item; issue_number = 41; distinct_tabs = 2; queued_actions = 1})
 
     Set-AccessPhase 'issue-edit-commit'
     Set-WriteFixtureOffline $Window $false
     $null = Wait-Reader 'the issue edit is confirmed with both original native panes still open' {
         param($reader)
         $reader.active_item -eq $item -and $reader.active_number -eq 41 -and $reader.outbox -eq 0 -and
-            $reader.cached_visible_panes -eq 2 -and ($reader.tab_counts -join ',') -ceq '1,1'
+            $reader.cached_visible_panes -eq 2 -and ($reader.tab_counts -join ',') -ceq '1,1' -and
+            ((Get-FixtureIssueTabs $reader $item) -join ',') -ceq $tabIds
     }
     Confirm-FixtureIssuePaneTitles $Window $title
-    Add-Evidence 'Read the confirmed title on the same issue in both native panes' ([ordered]@{item = $item; issue_number = 41; panes = 2; pending = 0})
+    Add-Evidence 'Read the confirmed title on the same issue in both native panes' ([ordered]@{item = $item; issue_number = 41; original_tabs = 2; pending = 0})
     Click-AccountControl $Window 'reader-outbox'
     Click-AccountControl $Window 'reader-outbox-filter-history'
     Inspect-WriteFixtureAction $Window 0 'Confirmed' 'Issue edit'

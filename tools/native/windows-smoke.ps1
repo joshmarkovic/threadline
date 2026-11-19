@@ -237,7 +237,7 @@ function Start-Threadline([string]$Profile, [string]$Observation, [switch]$OpenR
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_SHARED_PR')
     $info.EnvironmentVariables.Remove('THREADLINE_E2E_PANE_POSITIONS')
     if ($ReaderProof -eq 'SharedPullRequest') { $info.EnvironmentVariables['THREADLINE_E2E_SHARED_PR'] = '1' }
-    if ($ReaderProof -eq 'PanePositions') { $info.EnvironmentVariables['THREADLINE_E2E_PANE_POSITIONS'] = '1' }
+    if ($ReaderProof -in @('PanePositions', 'IssuePropagation')) { $info.EnvironmentVariables['THREADLINE_E2E_PANE_POSITIONS'] = '1' }
     if ($ReaderProof -in @('Performance', 'PerformancePhysical', 'PerformanceConcurrent', 'LargeWorkspace')) { $info.EnvironmentVariables['THREADLINE_E2E_READER_TIMING'] = '1' }
     if ($ReaderIdle) { $info.EnvironmentVariables['THREADLINE_E2E_READER_IDLE'] = '1' }
     if ($ToastProof -and $null -ne $script:toastFixture) {
