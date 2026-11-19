@@ -111,6 +111,31 @@ pub(crate) struct ReaderObservation {
 pub(crate) struct PanePositionsObservation {
     proportions: Vec<f64>,
     panes: Vec<PanePositionObservation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    layout: Option<PaneLayoutObservation>,
+}
+
+#[cfg(feature = "e2e")]
+#[derive(serde::Serialize)]
+struct PaneLayoutObservation {
+    maximized: bool,
+    settled: bool,
+    strips: Vec<PaneTabStripObservation>,
+}
+
+#[cfg(feature = "e2e")]
+#[derive(serde::Serialize)]
+struct PaneTabStripObservation {
+    active: Option<usize>,
+    tabs: Vec<PaneTabObservation>,
+}
+
+#[cfg(feature = "e2e")]
+#[derive(serde::Serialize)]
+struct PaneTabObservation {
+    id: String,
+    item: i64,
+    title_sha256: Option<String>,
 }
 
 #[cfg(feature = "e2e")]
@@ -377,11 +402,14 @@ impl ReaderWorkspace {
     #[cfg(feature = "e2e")]
     fn pane_positions(&self, cx: &gpui_kit::App) -> Option<PanePositionsObservation> {
         use sha2::{Digest, Sha256};
-        static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-        if !*ENABLED.get_or_init(|| {
-            std::env::var_os("THREADLINE_E2E_PANE_POSITIONS").is_some_and(|value| value == "1")
-        }) || self.surface != Surface::Browse
-            || self.maximized
+        static MODE: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+        let mode = MODE
+            .get_or_init(|| std::env::var("THREADLINE_E2E_PANE_POSITIONS").ok())
+            .as_deref();
+        let inspect_layout = mode == Some("layout");
+        if !(mode == Some("1") || inspect_layout)
+            || self.surface != Surface::Browse
+            || self.maximized && !inspect_layout
         {
             return None;
         }
@@ -422,6 +450,31 @@ impl ReaderWorkspace {
         Some(PanePositionsObservation {
             proportions: self.layout.proportions.clone(),
             panes,
+            layout: inspect_layout.then(|| PaneLayoutObservation {
+                maximized: self.maximized,
+                settled: !self.layout_busy,
+                strips: self
+                    .layout
+                    .panes
+                    .iter()
+                    .map(|pane| PaneTabStripObservation {
+                        active: pane.active,
+                        tabs: pane
+                            .tabs
+                            .iter()
+                            .map(|tab| PaneTabObservation {
+                                id: tab.id.clone(),
+                                item: tab.item.0,
+                                title_sha256: self
+                                    .tab_summaries
+                                    .get(&tab.item)
+                                    .and_then(|summary| summary.title.as_ref())
+                                    .map(|title| format!("{:x}", Sha256::digest(title.as_bytes()))),
+                            })
+                            .collect(),
+                    })
+                    .collect(),
+            }),
         })
     }
 

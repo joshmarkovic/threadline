@@ -55,7 +55,7 @@ pub fn fixture_revision(case: &str) -> Option<&'static str> {
     if case == "S12-OFFLINE-MIXED-OUTBOX" {
         return Some("s12-offline-mixed-outbox-v1");
     }
-    if case == "S12-PANE-POSITIONS" {
+    if matches!(case, "S12-PANE-POSITIONS" | "S12-PANE-LIFECYCLE") {
         return Some("s12-pane-positions-v1");
     }
     if matches!(case, "E2E-014" | "S12-READER-CONCURRENT") {
@@ -277,6 +277,10 @@ pub fn associations(case: &str) -> Associations {
         "S12-PANE-POSITIONS" => (
             "WORKSPACE-01;WORKSPACE-02;WORKSPACE-04;WORKSPACE-07;TEST-04",
             "AC-42",
+        ),
+        "S12-PANE-LIFECYCLE" => (
+            "WORKSPACE-01;WORKSPACE-02;WORKSPACE-04;WORKSPACE-07;CACHE-13;TEST-04",
+            "AC-43;AC-46",
         ),
         _ => catalog_associations(case).unwrap_or_default(),
     };

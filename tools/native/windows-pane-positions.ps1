@@ -114,3 +114,170 @@ function Invoke-CrossRepositoryPaneProof([IntPtr]$Window) {
     Stop-ThroughUi
     $script:report.detail = 'Two visible panes kept different selected repositories. Switching and resizing the PR pane preserved the archive issue, anchored reading position and unsent draft.'
 }
+
+function Wait-PaneLayout([string]$Description, [scriptblock]$LayoutCheck) {
+    return Wait-State $Description {
+        param($snapshot)
+        $reader = $snapshot.PSObject.Properties['cached_reader']
+        if ($null -eq $reader -or $null -eq $reader.Value -or !$reader.Value.offline -or !$reader.Value.signed_out) {
+            return $false
+        }
+        $position = $reader.Value.PSObject.Properties['pane_positions']
+        if ($null -eq $position -or $null -eq $position.Value) { return $false }
+        $layout = $position.Value.PSObject.Properties['layout']
+        if ($null -eq $layout -or $null -eq $layout.Value -or !$layout.Value.settled) { return $false }
+        foreach ($strip in $layout.Value.strips) {
+            foreach ($tab in $strip.tabs) {
+                if ($tab.title_sha256 -cnotmatch '^[0-9a-f]{64}$') { return $false }
+            }
+        }
+        return (& $LayoutCheck $layout.Value $position.Value.panes $reader.Value $snapshot.bounds)
+    }
+}
+
+function Test-PaneLayoutOrder($Strip, [string[]]$Ids) {
+    return @($Strip.tabs).Count -eq $Ids.Count -and ($Strip.tabs.id -join ',') -ceq ($Ids -join ',')
+}
+
+function Invoke-PaneLifecycleProof([IntPtr]$Window, [string]$Profile) {
+    $fixture = $script:PanePositionsSeed
+    $archive = $fixture.pane_positions
+    $start = Wait-PaneLayout 'both exact downloaded tab strips and titles before moving anything' {
+        param($layout, $panes, $reader)
+        $panes.Count -eq 2 -and ($reader.tab_counts -join ',') -ceq '10,10' -and $panes[1].item -eq $fixture.review_item
+    }
+    $startLayout = $start.cached_reader.pane_positions.layout
+    $leftOrder = @($startLayout.strips[0].tabs.id)
+    $rightOrder = @($startLayout.strips[1].tabs.id)
+    $archiveId = $leftOrder[1]
+    $archiveTitleDigest = $startLayout.strips[0].tabs[1].title_sha256
+    $originalOutbox = $start.cached_reader.outbox
+    Wait-For 'the exact inactive archive tab title in the native tree' {
+        $null -ne (Find-OwnedFixtureControl $Window 'reader-tab-0-1' 'Issue fixture/archive #2 Investigate relay behavior 2')
+    }
+    Click-AccountControl $Window ('reader-repository-' + $archive.archive)
+    Wait-For 'enter the exact retained archive comment search' {
+        Set-OwnedFixtureEditValue $Window 'reader-search' 'Search downloaded content' 'Orchid reading checkpoint'
+    }
+    Click-AccountControl $Window 'reader-search-submit'
+    $null = Wait-Reader 'one cached result on the archive item' {
+        param($reader) $reader.search_results -eq 1 -and $reader.first_search_item -eq $archive.item
+    }
+    Click-AccountControl $Window 'reader-beside-0'
+    $beside = Wait-PaneLayout 'open the archive beside the original tabs without replacing them' {
+        param($layout, $panes, $reader)
+        ($reader.tab_counts -join ',') -ceq '10,11' -and $reader.focused_pane -eq 1 -and
+            $panes.Count -eq 2 -and $panes[1].item -eq $archive.item -and $panes[1].tab -cne $archiveId -and
+            (Test-PaneLayoutOrder $layout.strips[0] $leftOrder) -and
+            ($layout.strips[1].tabs[0..9].id -join ',') -ceq ($rightOrder -join ',')
+    }
+    Wait-For 'the original PR title stays visible while its tab is inactive' {
+        $null -ne (Find-OwnedFixtureControl $Window 'reader-tab-1-0' 'Pull request fixture/relay #3 Improve relay workflow 3')
+    }
+    Add-Evidence 'Open the archive search result beside the original workspace and retain the inactive PR title' $beside.cached_reader.pane_positions.layout
+    Click-AccountControl $Window 'reader-close-tab'
+    $null = Wait-PaneLayout 'the original ten-tab right strip is intact after closing the temporary view' {
+        param($layout, $panes, $reader)
+        ($reader.tab_counts -join ',') -ceq '10,10' -and (Test-PaneLayoutOrder $layout.strips[1] $rightOrder)
+    }
+    Click-AccountControl $Window 'reader-tab-1-0'
+    Click-AccountControl $Window 'reader-tab-0-1'
+    $null = Wait-Reader 'the original archive tab is active before following its search anchor' {
+        param($reader) $reader.focused_pane -eq 0 -and $reader.active_item -eq $archive.item
+    }
+    Click-AccountControl $Window 'reader-result-0'
+    $null = Wait-PaneLayout 'the original archive view has its exact cached discussion anchor' {
+        param($layout, $panes)
+        $panes.Count -eq 2 -and $panes[0].tab -ceq $archiveId -and $panes[0].discussion_anchor -ceq $archive.anchor
+    }
+    Click-AccountControl $Window 'reader-maximize-pane'
+    $null = Wait-PaneLayout 'maximize only the archive while retaining both layouts' {
+        param($layout, $panes, $reader, $bounds)
+        $layout.maximized -and $reader.focused_pane -eq 0 -and $null -eq $bounds.PSObject.Properties['reader-tab-1-0'] -and
+            (Test-PaneLayoutOrder $layout.strips[0] $leftOrder) -and (Test-PaneLayoutOrder $layout.strips[1] $rightOrder)
+    }
+    Click-AccountControl $Window 'reader-draft-comment-0'
+    $draft = 'An unsent archive draft stays in its original pane.'
+    Type-WriteFixtureField $Window 'reader-draft-input-0' $draft
+    Wait-WriteFixtureDraft $archive.item $draft
+    $draftObservation = Wait-Reader 'the original archive draft is saved but unsubmitted' {
+        param($reader) $reader.active_draft_saved -and !$reader.active_draft_submitted -and $reader.outbox -eq $originalOutbox
+    }
+    $draftSha = $draftObservation.cached_reader.active_draft_sha256
+    Click-AccountControl $Window 'reader-maximize-pane'
+    $restored = Wait-PaneLayout 'both original views are visible after restoring the split' {
+        param($layout, $panes, $reader, $bounds)
+        !$layout.maximized -and $panes.Count -eq 2 -and $panes[0].saved_draft_sha256 -ceq $draftSha -and
+            $panes[1].item -eq $fixture.review_item -and $null -ne $bounds.PSObject.Properties['reader-tab-1-0']
+    }
+    $initialOffset = $restored.cached_reader.pane_positions.panes[0].discussion_offset
+    Move-FixturePaneDiscussion $Window $archive.item
+    $anchored = Wait-PaneLayout 'the saved archive discussion moves within its own viewport' {
+        param($layout, $panes)
+        $panes.Count -eq 2 -and $panes[0].discussion_offset -gt $initialOffset -and $panes[0].discussion_anchor -ceq $archive.anchor
+    }
+    $savedOffset = $anchored.cached_reader.pane_positions.panes[0].discussion_offset
+    $archiveViewMatches = {
+        param($pane)
+        $pane.tab -ceq $archiveId -and $pane.item -eq $archive.item -and $pane.repository -eq $archive.archive -and
+            $pane.discussion_anchor -ceq $archive.anchor -and $pane.discussion_offset -eq $savedOffset -and
+            $pane.saved_draft_sha256 -ceq $draftSha
+    }
+    $reordered = @($leftOrder[1], $leftOrder[0]) + @($leftOrder | Select-Object -Skip 2)
+    Click-AccountControl $Window 'reader-reorder-tab'
+    $null = Wait-PaneLayout 'the original archive tab moves one slot left in the same pane' {
+        param($layout, $panes)
+        $layout.strips[0].active -eq 0 -and (Test-PaneLayoutOrder $layout.strips[0] $reordered) -and
+            (Test-PaneLayoutOrder $layout.strips[1] $rightOrder) -and (& $archiveViewMatches $panes[0])
+    }
+    $leftAfterMove = @($reordered | Where-Object { $_ -cne $archiveId })
+    $rightAfterMove = $rightOrder + @($archiveId)
+    Click-AccountControl $Window 'reader-move-tab'
+    $moved = Wait-PaneLayout 'move the saved archive view to the right pane with the same title and draft' {
+        param($layout, $panes, $reader)
+        $reader.focused_pane -eq 1 -and $layout.strips[1].active -eq 10 -and
+            (Test-PaneLayoutOrder $layout.strips[0] $leftAfterMove) -and
+            (Test-PaneLayoutOrder $layout.strips[1] $rightAfterMove) -and
+            $layout.strips[1].tabs[10].title_sha256 -ceq $archiveTitleDigest -and (& $archiveViewMatches $panes[1])
+    }
+    Add-Evidence 'Restore both panes, reorder the archive tab and move it with the original anchor and draft' $moved.cached_reader.pane_positions
+
+    Click-AccountControl $Window 'reader-close-tab'
+    $null = Wait-PaneLayout 'the original archive tab closes without changing the other entries' {
+        param($layout) (Test-PaneLayoutOrder $layout.strips[0] $leftAfterMove) -and (Test-PaneLayoutOrder $layout.strips[1] $rightOrder)
+    }
+    Wait-For 'reopen the most recently closed original tab through its native command' {
+        Invoke-OwnedFixtureControl $Window 'reader-reopen-tab' $null 'Reopen tab'
+    }
+    $null = Wait-PaneLayout 'reopen the same archive tab at its old slot with the matching draft and position' {
+        param($layout, $panes, $reader)
+        $reader.focused_pane -eq 1 -and $layout.strips[1].active -eq 10 -and
+            (Test-PaneLayoutOrder $layout.strips[1] $rightAfterMove) -and (& $archiveViewMatches $panes[1])
+    }
+    Click-AccountControl $Window 'reader-focus-pane'
+    $null = Wait-Reader 'the other pane is focused before closing it' { param($reader) $reader.focused_pane -eq 0 }
+    Click-AccountControl $Window 'reader-close-pane'
+    $before = Wait-PaneLayout 'close the other pane and retain the archive tab strip and view' {
+        param($layout, $panes, $reader)
+        $reader.pane_count -eq 1 -and $panes.Count -eq 1 -and $reader.focused_pane -eq 0 -and $layout.strips[0].active -eq 10 -and
+            (Test-PaneLayoutOrder $layout.strips[0] $rightAfterMove) -and (& $archiveViewMatches $panes[0])
+    }
+    $originalPid = $script:app.Id
+    $restarted = Restart-Reader $Profile
+    $after = Wait-PaneLayout 'reopen the same offline pane with every inactive title and the original unsent draft' {
+        param($layout, $panes, $reader)
+        $reader.pane_count -eq 1 -and $panes.Count -eq 1 -and $reader.focused_pane -eq 0 -and $layout.strips[0].active -eq 10 -and
+            (Test-PaneLayoutOrder $layout.strips[0] $rightAfterMove) -and (& $archiveViewMatches $panes[0]) -and
+            ($layout.strips[0].tabs.title_sha256 -join ',') -ceq ($before.cached_reader.pane_positions.layout.strips[0].tabs.title_sha256 -join ',') -and
+            $reader.outbox -eq $originalOutbox -and !$reader.active_draft_submitted
+    }
+    if ($after.pid -eq $originalPid -or $restarted -eq [IntPtr]::Zero) {
+        throw 'The saved archive workspace did not start in a distinct native process.'
+    }
+    Add-Evidence 'Close and reopen the tab, close the other pane and restart offline with the exact saved order, titles and unsent draft' ([ordered]@{
+        original_pid = $originalPid; restarted_pid = $after.pid
+        before = $before.cached_reader.pane_positions; after = $after.cached_reader.pane_positions
+    })
+    Stop-ThroughUi
+    $script:report.detail = 'Native tab and pane commands preserved the original archive reading location, cached titles, and unsent draft across a separate offline app restart.'
+}

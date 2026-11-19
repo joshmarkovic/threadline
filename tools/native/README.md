@@ -124,6 +124,8 @@ Run `cargo xtask test e2e --suite full --case S12-NATIVE-LIFECYCLE --binary <opt
 
 Run `cargo xtask test e2e --suite full --case S12-OFFLINE-MIXED-OUTBOX --binary <e2e-binary>` for a separate offline cache cleanup check with the same isolated fixture. The case clears unpinned content through Storage usage, inspects the four saved payloads, and cancels their common prerequisite while keeping the three dependent entries readable. It compares the closed profile with its seeded state, verifies cleanup of the synthetic credential, and requires an empty loopback trace.
 
+Run `cargo xtask test e2e --suite full --case S12-PANE-LIFECYCLE --binary <e2e-binary>` to drive the saved two-repository fixture through Open beside, Maximize and restore, Tab left, Move tab, Close and Reopen tab, and Close pane. It restarts the same isolated profile offline and compares the saved tab order, cached titles, selected comment, and unsent draft. The loopback trace must be empty.
+
 Allow about three minutes for the normal dispatch lease to expire. The driver checks the restored workspace before an authenticated startup response and compares the closed database before and after interruption and normal sign-out. It records one uncertain request, retained dependents and draft, and the unchanged prior delivery receipt. It removes only its synthetic Credential Manager entry. The prior delivery is seed data. Review installed notification delivery and the separate disk-fault checks in the sprint reports.
 
 ## Early Linux and macOS checks

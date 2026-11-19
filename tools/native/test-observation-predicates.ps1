@@ -632,6 +632,29 @@ if ($script:positionReads -ne 3 -or $position.cached_reader.pane_positions.panes
     throw 'The pane predicate did not wait for the exact archive repository beside the original PR.'
 }
 
+$script:paneLayoutReads = 0
+function Read-Observation {
+    $script:paneLayoutReads++
+    $title = if ($script:paneLayoutReads -gt 1) { 'a' * 64 } else { $null }
+    [pscustomobject]@{
+        bounds = [pscustomobject]@{}
+        cached_reader = [pscustomobject]@{ offline = $true; signed_out = $true; pane_positions = [pscustomobject]@{
+            panes = @([pscustomobject]@{ tab = 'archive' })
+            layout = [pscustomobject]@{ settled = $true; strips = @([pscustomobject]@{
+                active = 1
+                tabs = @([pscustomobject]@{id = 'pr';title_sha256 = $title}, [pscustomobject]@{id = 'archive';title_sha256 = 'b' * 64})
+            }) }
+        } }
+    }
+}
+$paneLayout = Wait-PaneLayout 'the restarted archive tab and its inactive PR title' {
+    param($layout, $panes)
+    (Test-PaneLayoutOrder $layout.strips[0] @('pr', 'archive')) -and $layout.strips[0].active -eq 1 -and $panes[0].tab -ceq 'archive'
+}
+if ($script:paneLayoutReads -ne 3 -or (Test-PaneLayoutOrder $paneLayout.cached_reader.pane_positions.layout.strips[0] @('archive', 'pr'))) {
+    throw 'The pane lifecycle predicate accepted missing titles or a reordered strip.'
+}
+
 $script:viewportReads = 0
 function Read-Observation {
     $script:viewportReads++

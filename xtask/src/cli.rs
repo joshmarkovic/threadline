@@ -397,6 +397,7 @@ fn known_case(lane: Lane, case: &str) -> bool {
                     | "S12-NATIVE-LIFECYCLE"
                     | "S12-OFFLINE-MIXED-OUTBOX"
                     | "S12-PANE-POSITIONS"
+                    | "S12-PANE-LIFECYCLE"
             )
             | (Lane::E2e, "S05-WINDOWS-SYNC" | "S05-WINDOWS-RATE-LIMIT")
             | (Lane::E2e, "S06-SHARED-PR-PANES")
@@ -444,6 +445,17 @@ mod tests {
             .is_ok()
         );
         assert!(parse(&arguments(&["test", "integration", "--case", case])).is_err());
+    }
+
+    #[test]
+    fn pane_lifecycle_is_a_separate_native_e2e_case() {
+        let case = "S12-PANE-LIFECYCLE";
+        let options = parse(&arguments(&[
+            "test", "e2e", "--suite", "full", "--case", case,
+        ]))
+        .unwrap();
+        assert_eq!(options.case.as_deref(), Some(case));
+        assert!(parse(&arguments(&["test", "ui", "--case", case])).is_err());
     }
 
     #[test]
