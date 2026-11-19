@@ -280,7 +280,7 @@ pub fn lifecycle_checkpoint(store: &Store, stage: &str) -> Result<serde_json::Va
         Ok(db.query_row(
             "SELECT COUNT(*) FROM native_notification_groups WHERE account_id=?",
             [account],
-            |row| row.get::<_, u64>(0),
+            |row| row.get::<_, i64>(0),
         )?)
     })?;
     let original_rows = store.queue_page(account, 0, 10)?;

@@ -111,3 +111,62 @@ pub(super) fn trace(records: &[RequestEvidence]) -> bool {
             )
         })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn native_lifecycle_fixture_holds_an_authenticated_startup_and_records_one_lost_write() {
+        let dir = tempfile::tempdir().unwrap();
+        let fixture = AccessFixture::start(dir.path()).unwrap();
+        let address = fixture.address();
+        let phase = fixture.phase_file();
+        let request = |method: &str, route: &str, payload: &str| {
+            let mut socket = TcpStream::connect(address).unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(4)))
+                .unwrap();
+            write!(
+                socket,
+                "{method} {route} HTTP/1.1\r\nHost: {address}\r\nAuthorization: {FIXTURE_AUTHORIZATION}\r\nContent-Length: {}\r\n\r\n{payload}",
+                payload.len()
+            ).unwrap();
+            let mut output = String::new();
+            socket.read_to_string(&mut output).unwrap();
+            output
+        };
+        let marker = |name: &str| {
+            let path = dir.path().join(name);
+            let deadline = Instant::now() + Duration::from_secs(3);
+            while Instant::now() < deadline && !path.exists() {
+                thread::sleep(Duration::from_millis(10));
+            }
+            assert!(path.exists(), "fixture never received {name}");
+        };
+        thread::scope(|scope| {
+            fs::write(phase, "lifecycle-delay").unwrap();
+            let first = scope.spawn(|| request("GET", "/user", ""));
+            marker("lifecycle-probe-held");
+            assert!(!first.is_finished());
+            fs::write(phase, "lifecycle-ready").unwrap();
+            assert!(first.join().unwrap().starts_with("HTTP/1.1 200"));
+
+            fs::write(phase, "lifecycle-crash").unwrap();
+            let mutation =
+                scope.spawn(|| request("POST", COMMENTS, &json!({"body": COMMENT}).to_string()));
+            marker("lifecycle-comment-held");
+            assert!(!mutation.is_finished());
+            fs::write(phase, "lifecycle-recovery").unwrap();
+            assert!(mutation.join().unwrap().is_empty());
+            assert!(request("GET", "/user", "").starts_with("HTTP/1.1 200"));
+        });
+        fixture
+            .finish(dir.path(), TraceCheck::NativeLifecycle)
+            .unwrap();
+        assert_eq!(
+            post(Phase::LifecycleCrash, COMMENTS, &json!({"body":"other"})),
+            Some(Route::Unexpected)
+        );
+    }
+}

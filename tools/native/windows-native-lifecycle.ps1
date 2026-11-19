@@ -121,6 +121,15 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
     Wait-For 'the normal interrupted-send lease deadline' {
         [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -ge ($recoveryDeadline + 1500)
     } 182000 200
+    Click-AccountControl $recovery 'reader-outbox'
+    Click-AccountControl $recovery 'reader-outbox-filter-attention'
+    Wait-For 'the original unresolved comment in the process-owned Outbox' {
+        $name = 'Comment ' + [char]0x00b7 + ' Outcome unknown'
+        Invoke-OwnedFixtureControl $recovery 'reader-outbox-action-0' $null $name
+    }
+    $null = Wait-Reader 'the reopened original comment shows an unknown native outcome' {
+        param($reader) $reader.outbox_visible -and $reader.outbox_action_state -ceq 'OutcomeUnknown'
+    }
     Stop-ThroughUi
     $recovered = Read-NativeLifecycle $Profile 'inspect' 'native-lifecycle-recovered.json'
     if (!$recovered.protected_token_present -or $recovered.actions[0] -cne 'OutcomeUnknown' -or

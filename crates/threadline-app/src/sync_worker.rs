@@ -240,6 +240,7 @@ struct Local {
     status: SyncStatus,
     waiting: u64,
     profiles: Vec<AccessProfile>,
+    recovered_operations: bool,
     next_recovery: Option<i64>,
     next_read: Option<i64>,
     next_write: Option<i64>,
@@ -261,10 +262,13 @@ impl Local {
         }
         // This deadline is local. Pausing transport does not pause recovery of an expired lease.
         let mut next_recovery = store.next_operation_recovery(account)?;
-        if next_recovery.is_some_and(|due| due <= now) {
-            store.recover_expired(account, now)?;
+        let recovered_operations = if next_recovery.is_some_and(|due| due <= now) {
+            let changed = store.recover_expired(account, now)?;
             next_recovery = store.next_operation_recovery(account)?;
-        }
+            changed > 0
+        } else {
+            false
+        };
         Ok(Some(Self {
             account,
             settings,
@@ -275,6 +279,7 @@ impl Local {
                 .into_iter()
                 .filter(|profile| profile.account == account)
                 .collect(),
+            recovered_operations,
             next_recovery,
             next_read: if network {
                 store.next_sync_due(account, now)?
@@ -350,6 +355,9 @@ async fn run(
             enroll = true;
             continue;
         };
+        if local.recovered_operations {
+            digest = digest.wrapping_add(1);
+        }
         let offline = local.settings.controls.work_offline;
         bound.retain_profiles(&local.profiles);
         let account_changed = active_account.replace(local.account) != Some(local.account);
@@ -731,11 +739,13 @@ mod recovery_tests {
         let before = Local::load(&restored, deadline - 1, false, false)
             .unwrap()
             .unwrap();
+        assert!(!before.recovered_operations);
         assert_eq!(before.next_recovery, Some(deadline));
         assert_eq!(op().state, State::Sending);
         let expiry = Local::load(&restored, deadline, false, false)
             .unwrap()
             .unwrap();
+        assert!(expiry.recovered_operations);
         assert_eq!(expiry.next_recovery, None);
         assert_eq!(op().state, State::OutcomeUnknown);
         assert_eq!(
