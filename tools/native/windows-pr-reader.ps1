@@ -253,12 +253,12 @@ function Wait-SharedPrPanes([string]$Description, [long]$Item, [scriptblock]$Che
     }
 }
 
-function Move-SharedPrReadingPosition([IntPtr]$Window, [long]$Item, [bool]$FilesContext) {
+function Wait-SharedPrViewport([long]$ExpectedItem, [bool]$FilesContext) {
     $pane = if ($FilesContext) { 1 } else { 0 }
-    $id = if ($FilesContext) { 'pr-1-context-content' } else { 'reader-conversation-0' }
+    $id = if ($FilesContext) { 'pr-1-context-content' } else { 'pr-0-conversation-records' }
     $section = if ($FilesContext) { 'Files' } else { 'Conversation' }
     $field = if ($FilesContext) { 'files_context_offset' } else { 'conversation_offset' }
-    $surface = Wait-State 'the precise visible viewport for the existing PR pane' {
+    $observation = Wait-State ("the precise visible $id viewport for the existing PR pane") {
         param($state)
         $reader = $state.PSObject.Properties['cached_reader']
         if ($null -eq $reader -or $null -eq $reader.Value) { return $false }
@@ -267,9 +267,19 @@ function Move-SharedPrReadingPosition([IntPtr]$Window, [long]$Item, [bool]$Files
         if ($null -eq $positions -or @($positions.Value).Count -ne 2 -or $null -eq $bounds -or
             $bounds.Value[2] -le 0 -or $bounds.Value[3] -le 0) { return $false }
         $target = $positions.Value[$pane]
-        $target.item -eq $Item -and $target.view.section -ceq $section -and
+        $target.item -eq $ExpectedItem -and $target.view.section -ceq $section -and
             $null -ne $target.PSObject.Properties[$field].Value
     }
+    [pscustomobject]@{ observation = $observation; id = $id; pane = $pane; section = $section; field = $field }
+}
+
+function Move-SharedPrReadingPosition([IntPtr]$Window, [long]$Item, [bool]$FilesContext) {
+    $viewport = Wait-SharedPrViewport $Item $FilesContext
+    $surface = $viewport.observation
+    $id = $viewport.id
+    $pane = $viewport.pane
+    $section = $viewport.section
+    $field = $viewport.field
     $target = $surface.cached_reader.shared_pr_panes[$pane]
     $before = $target.PSObject.Properties[$field].Value
     $rect = $surface.bounds.PSObject.Properties[$id].Value
@@ -392,7 +402,7 @@ function Invoke-SharedPrPanesProof([IntPtr]$Window) {
             $anchor[0].first_line -eq 1 -and $anchor[0].last_line -eq 1 -and $anchor[0].source_oid -ceq $head -and
             $reader.pending_pr_reads -eq 0 -and $reader.outbox -eq 0
     }
-    $null = Wait-AccountControl 'reader-conversation-0'
+    $null = Wait-AccountControl 'pr-0-conversation-records'
     $null = Wait-AccountControl 'pr-1-context-content'
     Add-Evidence 'Publish one shared refresh while the two visible reading positions and unsent review remain separate' $after.cached_reader.shared_pr_panes
     Stop-ThroughUi
