@@ -67,8 +67,14 @@ function Wait-WriteFixtureDraft([long]$Item, [string]$Value) {
     }
 }
 
-function Queue-WriteFixtureDraft([IntPtr]$Window, [long]$Item, [int]$Expected) {
-    Click-AccountControl $Window 'reader-submit-0'
+function Queue-WriteFixtureDraft([IntPtr]$Window, [long]$Item, [int]$Expected, [string]$Action) {
+    if ($Action) {
+        Wait-For 'the matching enabled native draft submission action' {
+            Invoke-OwnedFixtureControl $Window 'reader-submit-0' $null $Action
+        }
+    } else {
+        Click-AccountControl $Window 'reader-submit-0'
+    }
     $null = Wait-Reader 'the explicit submission reached the durable Outbox' {
         param($reader)
         $reader.active_item -eq $Item -and $reader.active_draft_submitted -and $reader.outbox -eq $Expected
@@ -245,17 +251,23 @@ function Invoke-IssueWriteSurfaceProof([IntPtr]$Window) {
 
 function Queue-CommentDependencyPair([IntPtr]$Window, [long]$Item, [string]$Original, [string]$Revised) {
     Click-AccountControl $Window 'reader-draft-comment-0'
+    Wait-For 'the create-comment editor in the owned app' {
+        $null -ne (Find-OwnedFixtureControl $Window 'reader-submit-0' 'Queue comment' -AllowDisabled)
+    }
     Type-WriteFixtureField $Window 'reader-draft-input-0' $Original
     Wait-WriteFixtureDraft $Item $Original
-    Queue-WriteFixtureDraft $Window $Item 1
+    Queue-WriteFixtureDraft $Window $Item 1 'Queue comment'
 
     Wait-For 'the native follow-up edit control on the first queued comment' {
         Invoke-OwnedFixtureControl $Window 'reader-edit-pending-comment-0-0' $null 'Draft a follow-up edit'
     }
+    Wait-For 'the follow-up edit editor in the owned app' {
+        $null -ne (Find-OwnedFixtureControl $Window 'reader-submit-0' 'Queue comment edit' -AllowDisabled)
+    }
     Wait-WriteFixtureDraft $Item $Original
     Type-WriteFixtureField $Window 'reader-draft-input-0' $Revised
     Wait-WriteFixtureDraft $Item $Revised
-    Queue-WriteFixtureDraft $Window $Item 2
+    Queue-WriteFixtureDraft $Window $Item 2 'Queue comment edit'
 }
 
 function Invoke-CommentDependencyProof([IntPtr]$Window, [string]$Profile) {

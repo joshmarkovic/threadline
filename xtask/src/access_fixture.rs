@@ -252,6 +252,12 @@ enum Route {
     DependencyWrongCommentId,
     DependencyUnexpectedCommentQuery,
     DependencyEditBodyMismatch,
+    DependencyRepeatedOriginalCreate,
+    DependencyCreateUsedForEdit,
+    DependencyUnexpectedCreate,
+    DependencyUnexpectedGraphql,
+    DependencyUnexpectedPost,
+    DependencyUnexpectedMethod,
     Unexpected,
 }
 

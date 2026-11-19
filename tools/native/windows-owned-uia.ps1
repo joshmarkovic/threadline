@@ -6,10 +6,10 @@ function Test-OwnedFixtureWindow([IntPtr]$Window) {
         [ThreadlineWinInput]::IsWindowVisible($Window) -and ![ThreadlineWinInput]::IsIconic($Window)
 }
 
-function Test-OwnedAutomationProperties($Properties, [string]$Id, [int]$Owner, [string]$ExpectedName) {
+function Test-OwnedAutomationProperties($Properties, [string]$Id, [int]$Owner, [string]$ExpectedName, [switch]$AllowDisabled) {
     return $Properties.ProcessId -eq $Owner -and $Properties.AutomationId -ceq $Id -and
         (!$ExpectedName -or $Properties.Name -ceq $ExpectedName) -and
-        !$Properties.IsOffscreen -and $Properties.IsEnabled -and
+        !$Properties.IsOffscreen -and ($AllowDisabled -or $Properties.IsEnabled) -and
         $Properties.BoundingRectangle.Width -gt 0 -and $Properties.BoundingRectangle.Height -gt 0
 }
 
@@ -25,13 +25,13 @@ function Get-OwnedFixtureActivation($Element, [string]$Id) {
     return $null
 }
 
-function Select-UniqueOwnedFixtureControl($Controls, [string]$Id, [int]$Owner, [string]$ExpectedName, [switch]$Edit) {
+function Select-UniqueOwnedFixtureControl($Controls, [string]$Id, [int]$Owner, [string]$ExpectedName, [switch]$Edit, [switch]$AllowDisabled) {
     $match = $null
     foreach ($control in $Controls) {
-        if (!(Test-OwnedAutomationProperties $control.Current $Id $Owner $ExpectedName)) { continue }
+        if (!(Test-OwnedAutomationProperties $control.Current $Id $Owner $ExpectedName -AllowDisabled:$AllowDisabled)) { continue }
         if ($Edit -and ($control.Current.IsPassword -or
             $control.Current.ControlType.Id -ne [Windows.Automation.ControlType]::Edit.Id)) { continue }
-        if (!$Edit -and $ExpectedName -and $null -eq (Get-OwnedFixtureActivation $control $Id)) { continue }
+        if (!$Edit -and !$AllowDisabled -and $ExpectedName -and $null -eq (Get-OwnedFixtureActivation $control $Id)) { continue }
         if ($null -ne $match) {
             Stop-Blocked 'The owned accessibility tree returned multiple eligible controls for the exact identity.'
         }
@@ -40,7 +40,7 @@ function Select-UniqueOwnedFixtureControl($Controls, [string]$Id, [int]$Owner, [
     return $match
 }
 
-function Find-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [string]$ExpectedName, [switch]$Edit) {
+function Find-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [string]$ExpectedName, [switch]$Edit, [switch]$AllowDisabled) {
     if (!(Test-OwnedFixtureWindow $Window)) { Stop-Blocked 'The isolated Threadline window is no longer visible and owned.' }
     try {
         $root = [Windows.Automation.AutomationElement]::FromHandle($Window)
@@ -57,7 +57,7 @@ function Find-OwnedFixtureControl([IntPtr]$Window, [string]$Id, [string]$Expecte
         }
         $condition = [Windows.Automation.AndCondition]::new([Windows.Automation.Condition[]]$conditions)
         $controls = $root.FindAll([Windows.Automation.TreeScope]::Descendants, $condition)
-        return Select-UniqueOwnedFixtureControl $controls $Id $script:app.Id $ExpectedName -Edit:$Edit
+        return Select-UniqueOwnedFixtureControl $controls $Id $script:app.Id $ExpectedName -Edit:$Edit -AllowDisabled:$AllowDisabled
     } catch [Windows.Automation.ElementNotAvailableException] {
         return $null
     }

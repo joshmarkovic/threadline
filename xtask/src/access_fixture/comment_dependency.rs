@@ -38,6 +38,12 @@ pub(super) fn post(phase: Phase, path: &str, body: &Value) -> Option<Route> {
         Phase::CommentDependencyLost if *body == json!({"body":LOST}) => {
             Route::DependencyCommentLost
         }
+        Phase::CommentDependencyResume if *body == json!({"body":ORIGINAL}) => {
+            Route::DependencyRepeatedOriginalCreate
+        }
+        Phase::CommentDependencyResume if *body == json!({"body":EDIT}) => {
+            Route::DependencyCreateUsedForEdit
+        }
         _ => Route::Unexpected,
     })
 }
@@ -70,7 +76,10 @@ pub(super) fn classify_unexpected_request(
         }
         "GET" => Some(Route::DependencyUnexpectedRead),
         "PATCH" => Some(Route::DependencyUnexpectedEdit),
-        _ => None,
+        "POST" if path == CREATE => Some(Route::DependencyUnexpectedCreate),
+        "POST" if path == "/graphql" => Some(Route::DependencyUnexpectedGraphql),
+        "POST" => Some(Route::DependencyUnexpectedPost),
+        _ => Some(Route::DependencyUnexpectedMethod),
     }
 }
 
@@ -140,6 +149,12 @@ pub(super) fn trace(records: &[RequestEvidence]) -> bool {
                     | Route::DependencyWrongCommentId
                     | Route::DependencyUnexpectedCommentQuery
                     | Route::DependencyEditBodyMismatch
+                    | Route::DependencyRepeatedOriginalCreate
+                    | Route::DependencyCreateUsedForEdit
+                    | Route::DependencyUnexpectedCreate
+                    | Route::DependencyUnexpectedGraphql
+                    | Route::DependencyUnexpectedPost
+                    | Route::DependencyUnexpectedMethod
             )
             && !matches!(
                 entry.route,
@@ -178,6 +193,10 @@ mod tests {
     fn dependent_comment_request_diagnostics_use_checked_shapes_only() {
         let phase = Phase::CommentDependencyResume;
         let cases = [
+            ("POST", CREATE, Route::DependencyUnexpectedCreate),
+            ("POST", "/graphql", Route::DependencyUnexpectedGraphql),
+            ("POST", "/elsewhere", Route::DependencyUnexpectedPost),
+            ("DELETE", EXACT, Route::DependencyUnexpectedMethod),
             (
                 "GET",
                 "/repos/fixture-org/private/issues/comments/99",
@@ -202,6 +221,14 @@ mod tests {
                 None
             );
         }
+        assert_eq!(
+            post(phase, CREATE, &json!({"body":ORIGINAL})),
+            Some(Route::DependencyRepeatedOriginalCreate)
+        );
+        assert_eq!(
+            post(phase, CREATE, &json!({"body":EDIT})),
+            Some(Route::DependencyCreateUsedForEdit)
+        );
     }
 
     #[test]

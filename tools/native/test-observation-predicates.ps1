@@ -24,6 +24,18 @@ if (@($helpers.Name | Sort-Object -Unique).Count -ne 5 -or $helpers.Count -ne 5)
 . (Join-Path $PSScriptRoot 'windows-owned-uia.ps1')
 . (Join-Path $PSScriptRoot 'windows-review-context.ps1')
 
+$editorAction = [pscustomobject]@{
+    ProcessId = 41; AutomationId = 'reader-submit-0'; Name = 'Queue comment edit'
+    IsOffscreen = $false; IsEnabled = $false
+    BoundingRectangle = [pscustomobject]@{ Width = 120; Height = 24 }
+}
+if (!(Test-OwnedAutomationProperties $editorAction 'reader-submit-0' 41 'Queue comment edit' -AllowDisabled) -or
+    (Test-OwnedAutomationProperties $editorAction 'reader-submit-0' 41 'Queue comment edit') -or
+    (Test-OwnedAutomationProperties $editorAction 'reader-submit-0' 41 'Queue comment' -AllowDisabled) -or
+    (Test-OwnedAutomationProperties $editorAction 'reader-submit-0' 42 'Queue comment edit' -AllowDisabled)) {
+    throw 'The read-only editor readiness check did not distinguish the owned disabled edit from an enabled submit.'
+}
+
 $notLoaded = '{"connection":"Reachable","cache_generation":2,"panel_open":false,"controls":null}' | ConvertFrom-Json
 if (Test-NotificationSyncReady $notLoaded) { throw 'Reachable fixture transport did not prove saved Sync controls had loaded.' }
 $loaded = '{"connection":"Reachable","cache_generation":2,"panel_open":true,"controls":{"work_offline":false,"pause_background":false,"pause_queued_actions":false,"notification_quiet":false}}' | ConvertFrom-Json
