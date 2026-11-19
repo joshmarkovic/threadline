@@ -16,6 +16,9 @@ pub fn scenario_ids() -> impl Iterator<Item = &'static str> {
 }
 
 pub fn fixture_revision(case: &str) -> Option<&'static str> {
+    if case == "S08-REVIEW-DECISIONS" {
+        return Some("s08-native-review-decisions-v1");
+    }
     if case == "S12-NATIVE-LIFECYCLE" {
         return Some("s12-native-lifecycle-v1");
     }
@@ -181,6 +184,10 @@ pub fn associations(case: &str) -> Associations {
         "S12-READER-CONCURRENT" => (
             "CACHE-01;SEARCH-01;SYNC-06;WORKSPACE-08;TEST-08",
             "AC-35;AC-48",
+        ),
+        "S08-REVIEW-DECISIONS" => (
+            "REVIEW-01;REVIEW-02;REVIEW-03;REVIEW-04;TEST-04",
+            "AC-16;AC-18;AC-65",
         ),
         "S09-MERGE-QUEUE" => ("MERGE-01;MERGE-03;MERGE-04;OUTBOX-03;TEST-04", "AC-77"),
         "S12-NATIVE-LIFECYCLE" => (

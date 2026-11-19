@@ -20,6 +20,7 @@ mod history;
 mod lifecycle;
 mod merge;
 mod pr;
+mod review_decisions;
 mod writes;
 
 const MAX_REQUEST: u64 = 16 * 1024;
@@ -72,6 +73,7 @@ enum Phase {
     PrRelease,
     ReviewSend,
     ReviewChanged,
+    ReviewDecisions,
     MergePrepare,
     MergeSend,
     MergeWrongHead,
@@ -117,6 +119,7 @@ impl Phase {
             "pr-release" => Ok(Self::PrRelease),
             "review-send" => Ok(Self::ReviewSend),
             "review-changed" => Ok(Self::ReviewChanged),
+            "review-decisions" => Ok(Self::ReviewDecisions),
             "merge-prepare" => Ok(Self::MergePrepare),
             "merge-send" => Ok(Self::MergeSend),
             "merge-wrong-head" => Ok(Self::MergeWrongHead),
@@ -172,6 +175,7 @@ enum Route {
     ReviewRead,
     ReviewCreated,
     ReviewSubmitted,
+    ReviewDecision(review_decisions::DecisionStep),
     MergePolicyA,
     MergePolicyB,
     MergePut,
@@ -228,6 +232,7 @@ pub enum TraceCheck {
     PullRequestJourney,
     ReviewContextJourney,
     ReviewDraftJourney,
+    ReviewDecisionsJourney,
     MergeJourney,
     MergeQueueJourney,
     CredentialBoundary,
@@ -284,6 +289,7 @@ impl AccessFixture {
             TraceCheck::PullRequestJourney => pr::trace(&records),
             TraceCheck::ReviewContextJourney => pr::trace_review_context(&records),
             TraceCheck::ReviewDraftJourney => pr::trace_review_draft(&records),
+            TraceCheck::ReviewDecisionsJourney => review_decisions::trace(&records),
             TraceCheck::MergeJourney => merge::trace(&records),
             TraceCheck::MergeQueueJourney => merge::trace_queue(&records),
             TraceCheck::CredentialBoundary => complete_credential_boundary(&records),
@@ -562,6 +568,9 @@ fn answer(
             Route::ReviewSubmitted => {
                 socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:4202:08\r\n")?
             }
+            Route::ReviewDecision(step) => {
+                write!(socket, "X-GitHub-Request-Id: SYNTHETIC:08:{step:?}\r\n")?
+            }
             Route::MergePut => socket.write_all(b"X-GitHub-Request-Id: SYNTHETIC:4201:09\r\n")?,
             _ => (),
         }
@@ -641,7 +650,8 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
             Some("HTTP/1.1"),
         ) => Route::OpenPullIndex,
         (Some("POST"), Some("/graphql"), Some("HTTP/1.1")) => Route::Graphql,
-        (Some("GET"), Some(target), Some("HTTP/1.1")) => lifecycle::read_route(phase, target)
+        (Some("GET"), Some(target), Some("HTTP/1.1")) => review_decisions::get(phase, target)
+            .or_else(|| lifecycle::read_route(phase, target))
             .or_else(|| backlog::read_route(phase, target))
             .or_else(|| history::route(phase, target))
             .or_else(|| pr::route(target))
@@ -694,6 +704,7 @@ fn read_request(socket: &TcpStream, phase: Phase) -> io::Result<(Route, bool, Op
         if route != Route::Graphql {
             route = payload.as_ref().map_or(Route::Unexpected, |body| {
                 lifecycle::post(phase, &post_path, body)
+                    .or_else(|| review_decisions::post(phase, &post_path, body))
                     .or_else(|| backlog::post(phase, &post_path, body))
                     .or_else(|| pr::post(phase, &post_path, body))
                     .unwrap_or_else(|| writes::post(phase, &post_path, body))
@@ -753,6 +764,9 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
     if !authorized || phase == Phase::Revoked {
         return result(401, "Unauthorized", json!({"message":"Bad credentials"}));
     }
+    if let Some(reply) = review_decisions::response(route) {
+        return reply;
+    }
     if let Some(response) = lifecycle::response(phase, route) {
         return response;
     }
@@ -780,7 +794,7 @@ fn response(phase: Phase, route: Route, authorized: bool, merge_sent: bool) -> R
     let repository = json!({
         "id":71, "node_id":"R_71", "name":"private", "owner":{"login":"fixture-org"},
         "default_branch":"main","private":true,
-        "permissions":{"pull":true,"push":matches!(phase, Phase::ReviewSend | Phase::ReviewChanged) || merge::applies(phase),"admin":false}
+        "permissions":{"pull":true,"push":matches!(phase, Phase::ReviewSend | Phase::ReviewChanged | Phase::ReviewDecisions) || merge::applies(phase),"admin":false}
     });
     let item = || {
         json!({

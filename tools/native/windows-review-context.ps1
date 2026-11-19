@@ -1,4 +1,4 @@
-function Select-FixtureRightReviewLine([IntPtr]$Window, [string]$Head, [string]$FixturePath = 'src/first.rs') {
+function Select-FixtureRightReviewLine([IntPtr]$Window, [string]$Head, [string]$FixturePath = 'src/first.rs', [int]$Line = 1) {
     if ($FixturePath -cnotin @('src/first.rs', 'src/second.rs')) { throw 'Unknown native fixture comparison.' }
     $null = Wait-PrReader 'the exact loaded comparison before source navigation' {
         param($pr)
@@ -10,8 +10,8 @@ function Select-FixtureRightReviewLine([IntPtr]$Window, [string]$Head, [string]$
     $null = Wait-PrReader 'the exact modified source line selected by the native action' {
         param($pr)
         $anchor = $pr.source_anchor
-        $pr.head -ceq $Head -and $pr.selected_source_line -eq 1 -and $null -ne $anchor -and
-            $anchor.path -ceq $FixturePath -and $anchor.side -ceq 'Right' -and $anchor.line -eq 1
+        $pr.head -ceq $Head -and $null -ne $pr.selected_source_line -and $null -ne $anchor -and
+            $anchor.path -ceq $FixturePath -and $anchor.side -ceq 'Right' -and $anchor.line -eq $Line
     }
 }
 
@@ -225,4 +225,87 @@ function Invoke-ReviewDraftProof([IntPtr]$Window, [string]$Profile) {
     })
     Stop-ThroughUi
     $script:report.detail = 'Native review input survived an offline restart and confirmed the unchanged expected head. A second approval was held when provider preflight observed a different head, with original source and draft retained.'
+}
+
+function Wait-FixtureReviewDecision($Fixture, [string]$Draft, [bool]$Queued) {
+    return Wait-PrReader 'the exact native review decision and every durable inline anchor' {
+        param($pr, $reader)
+        $review = $pr.review_draft
+        if ($null -eq $review -or $review.id -cne $Draft -or $review.head -cne $Fixture.head -or
+            $reader.active_number -ne $Fixture.number -or $review.event -cne $Fixture.event -or
+            !$review.saved -or !$review.summary_nonempty -or !$review.owner_tab -or
+            ($Queued -and !$review.queued) -or @($review.anchors).Count -ne $Fixture.lines.Count) { return $false }
+        for ($index = 0; $index -lt $Fixture.lines.Count; $index++) {
+            $anchor = $review.anchors[$index]
+            if ($anchor.path -cne $Fixture.path -or $anchor.side -cne 'Right' -or
+                $anchor.source_oid -cne $Fixture.head -or $anchor.first_line -ne $Fixture.lines[$index] -or
+                $anchor.last_line -ne $Fixture.lines[$index] -or !$anchor.comment_nonempty) { return $false }
+        }
+        return $true
+    }
+}
+
+function Invoke-ReviewDecisionsProof([IntPtr]$Window, [string]$Profile) {
+    Wait-SeededFixtureAccount
+    Open-SyncSettings $Window
+    Click-AccountControl $Window 'sync-pause-background'
+    $null = Wait-Sync 'scheduled reads paused while previously queued reviews can submit' {
+        param($sync) $sync.controls.pause_background -and !$sync.controls.pause_queued_actions
+    }
+    Click-AccountControl $Window 'reader-repository-1'
+    Click-AccountControl $Window 'reader-fetch-repository'
+    $fixtures = @(
+        @{ index = 0; number = 42; title = 'First fixture pull request'; head = 'b' * 40; path = 'src/first.rs';
+           event = 'Approve'; action = 'pr-0-review-approve'; lines = @(1, 3); changed = 4 },
+        @{ index = 1; number = 43; title = 'Second fixture pull request'; head = 'e' * 40; path = 'src/second.rs';
+           event = 'RequestChanges'; action = 'pr-0-review-request-changes'; lines = @(1); changed = 2 }
+    )
+    foreach ($fixture in $fixtures) {
+        $null = Open-FixturePr $Window 0 $fixture.number $fixture.title $fixture.head $fixture.path $fixture.changed
+        $draft = Enter-FixtureAnchoredReview $Window $fixture.head $fixture.path
+        if ($fixture.lines.Count -eq 2) {
+            Select-FixtureRightReviewLine $Window $fixture.head $fixture.path 3
+            Click-AccountControl $Window 'pr-0-review-add-inline'
+            $null = Wait-PrReader 'the two distinct native source anchors' {
+                param($pr) $null -ne $pr.review_draft -and @($pr.review_draft.anchors).Count -eq 2
+            }
+            Wait-For 'the owned second inline note editor' {
+                Set-OwnedFixtureEditValue $Window 'pr-0-review-inline' 'Inline review comment' 'Threadline synthetic second inline review note.'
+            }
+        }
+        Click-AccountControl $Window $fixture.action
+        $null = Wait-FixtureReviewDecision $fixture $draft $false
+        Set-WriteFixtureOffline $Window $true
+        Click-AccountControl $Window 'pr-0-review-submit'
+        $queued = Wait-FixtureReviewDecision $fixture $draft $true
+        if (!$queued.cached_reader.offline -or $queued.cached_reader.outbox -ne 1) { throw 'The isolated review was not queued offline.' }
+        $previous = $script:app.Id
+        $Window = Restart-Reader $Profile
+        $restored = Wait-FixtureReviewDecision $fixture $draft $false
+        if (!$restored.cached_reader.offline -or $restored.cached_reader.outbox -ne 1 -or $script:app.Id -eq $previous) {
+            throw 'The isolated review did not survive a separate offline process.'
+        }
+        Set-WriteFixtureOffline $Window $false
+        Click-AccountControl $Window 'reader-outbox'
+        Click-AccountControl $Window 'reader-outbox-filter-history'
+        Wait-For 'the submitted review and predecessor are durably confirmed' {
+            if ($script:app.HasExited) { throw 'Threadline exited before review confirmation.' }
+            $current = Read-Observation
+            if ($null -eq $current -or $current.pid -ne $script:app.Id) { return $false }
+            $reader = $current.PSObject.Properties['cached_reader']
+            $null -ne $reader -and $reader.Value.outbox_visible -and $reader.Value.outbox -eq 0
+        } 30000 50
+        Inspect-WriteFixtureAction $Window $fixture.index 'Confirmed' 'Review'
+        Add-Evidence 'Restore and confirm the original queued native review decision' ([ordered]@{
+            number = $fixture.number; head = $fixture.head; event = $fixture.event; source_lines = $fixture.lines
+            distinct_process = $true; confirmed = $true
+        })
+        if ($fixture.index -eq 0) {
+            Click-AccountControl $Window 'reader-outbox-open'
+            Click-AccountControl $Window 'reader-maximize-pane'
+            Click-AccountControl $Window 'reader-repository-1'
+        }
+    }
+    Stop-ThroughUi
+    $script:report.detail = 'Windows restored a two-note approval and an anchored request for changes in separate offline processes. Both original reviews confirmed through the exact reviewer and revision checks.'
 }

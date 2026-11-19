@@ -44,7 +44,7 @@ function Activate-FixturePr([IntPtr]$Window, [string]$Prefix, [int]$Number, [str
     }
 }
 
-function Open-FixturePr([IntPtr]$Window, [int]$Pane, [int]$Number, [string]$Title, [string]$Head, [string]$Path) {
+function Open-FixturePr([IntPtr]$Window, [int]$Pane, [int]$Number, [string]$Title, [string]$Head, [string]$Path, [int]$ChangedLines = 2) {
     Activate-FixturePr $Window 'reader-result-' $Number $Title -Result
     $initial = Wait-PrReader 'the chosen pull request tab' {
         param($pr, $reader)
@@ -62,7 +62,7 @@ function Open-FixturePr([IntPtr]$Window, [int]$Pane, [int]$Number, [string]$Titl
     }
     Click-AccountControl $Window "pr-$Pane-file-0"
     return Wait-PrReader 'the exact changed path and parsed patch' {
-        param($pr) $pr.selected_file -ceq $Path -and $pr.patch_change_lines -eq 2
+        param($pr) $pr.selected_file -ceq $Path -and $pr.patch_change_lines -eq $ChangedLines
     }
 }
 

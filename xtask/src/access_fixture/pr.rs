@@ -38,6 +38,7 @@ pub(super) fn applies(phase: Phase) -> bool {
             | Phase::PrRelease
             | Phase::ReviewSend
             | Phase::ReviewChanged
+            | Phase::ReviewDecisions
     ) || merge::applies(phase)
 }
 
@@ -117,7 +118,17 @@ fn data(phase: Phase, route: Route) -> Option<Value> {
                 B_HEAD
             },
         )),
-        Route::CompareA => Some(compare(A_BASE, A_HEAD, A_MERGE, "src/first.rs")),
+        Route::CompareA => {
+            let mut comparison = compare(A_BASE, A_HEAD, A_MERGE, "src/first.rs");
+            if phase == Phase::ReviewDecisions {
+                comparison["files"][0]["additions"] = json!(2);
+                comparison["files"][0]["deletions"] = json!(2);
+                comparison["files"][0]["patch"] = json!(
+                    "@@ -1 +1 @@\n-original\n+changed\n@@ -3 +3 @@\n-original again\n+changed again"
+                );
+            }
+            Some(comparison)
+        }
         Route::CompareB => Some(compare(B_BASE, B_HEAD, B_MERGE, "src/second.rs")),
         Route::Item => Some(json!({
             "id":410,"node_id":"I_410","number":41,"title":"First pull request issue",
