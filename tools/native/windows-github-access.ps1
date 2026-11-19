@@ -194,7 +194,44 @@ function Enter-FixtureAccountForm([IntPtr]$Window, [switch]$LoopbackTokenAction)
     })
 }
 
-function Connect-FixtureAccount([IntPtr]$Window, [switch]$FromVisibleControl, [switch]$LoopbackTokenAction) {
+function Test-FixtureAccountRouteCorrection([IntPtr]$Window) {
+    $repository = 'account-repository'
+    $name = 'GitHub repository'
+    $message = 'Enter a repository as owner/repository, for example octocat/hello-world.'
+
+    Wait-For 'the owned repository editor to accept the synthetic owner alone' {
+        Set-OwnedFixtureEditValue $Window $repository $name 'fixture-org'
+    }
+    Wait-For 'the owner alone to appear in the repository editor' {
+        $edit = Get-OwnedFixtureEditPattern $Window $repository $name
+        $null -ne $edit -and $edit.Current.Value -ceq 'fixture-org'
+    }
+    Wait-For 'Check access on the owned account form' {
+        Invoke-OwnedFixtureControl $Window 'account-connect' -ExpectedName 'Check access'
+    }
+    Wait-For 'visible inline advice to enter both the owner and repository' {
+        $null -ne (Find-OwnedFixtureControl $Window 'account-repository-error' $message)
+    }
+    Assert-OwnedMaskedFixtureField $Window
+    $null = Wait-Account 'the synthetic token to remain in the masked editor after local validation' {
+        param($account)
+        $account.panel_open -and !$account.fixture_route_entered -and $account.fixture_token_entered -and !$account.active_user_id
+    }
+    Add-Evidence 'Check a username alone and keep the masked credential for correction' ([ordered]@{
+        route_error = $message
+        password_field = $true
+        readable_value_pattern = $false
+        synthetic_credential_retained = $true
+    })
+    Wait-For 'the same owned editor to accept a full owner/repository' {
+        Set-OwnedFixtureEditValue $Window $repository $name 'fixture-org/private'
+    }
+    $null = Wait-Account 'the corrected route and the original synthetic credential' {
+        param($account) $account.fixture_route_entered -and $account.fixture_token_entered
+    }
+}
+
+function Connect-FixtureAccount([IntPtr]$Window, [switch]$FromVisibleControl, [switch]$LoopbackTokenAction, [switch]$VerifyRouteCorrection) {
     if ($FromVisibleControl) {
         Click-AccountControl $Window 'account-open'
         $null = Wait-Account 'open the native account panel through its visible control' {
@@ -204,6 +241,7 @@ function Connect-FixtureAccount([IntPtr]$Window, [switch]$FromVisibleControl, [s
         $null = Open-AccountFixture
     }
     Enter-FixtureAccountForm $Window -LoopbackTokenAction:$LoopbackTokenAction
+    if ($VerifyRouteCorrection) { Test-FixtureAccountRouteCorrection $Window }
     Click-AccountControl $Window 'account-connect'
     $identity = Wait-Account 'verified fixture identity and repository access' {
         param($account)
@@ -227,7 +265,7 @@ function Connect-FixtureAccount([IntPtr]$Window, [switch]$FromVisibleControl, [s
 }
 
 function Invoke-GitHubAccessProof([IntPtr]$Window, [string]$Profile) {
-    Connect-FixtureAccount $Window
+    Connect-FixtureAccount $Window -VerifyRouteCorrection
     Set-AccessPhase 'partial'
     Click-AccountControl $Window 'account-refresh'
     $null = Wait-Account 'partial SSO repository discovery with retained direct access' {
