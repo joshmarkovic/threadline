@@ -14,4 +14,12 @@ The first two rows ran on Windows at `8a22b8d`. Six native test executables pass
 
 The first installed build recorded the generic operating-system fallback reason. A follow-up probe verified the exact registered command, shortcut target, AppUserModelID and activator. Windows created the scoped notifier. Reading its per-sender setting returned `0x80070490` (element not found) both before and after the probe assigned its explicit process AppUserModelID. The Windows response contained no permission decision. [Cold attempt and sender probe](evidence/sprint-11/windows-delivery.json) · [Microsoft's notification setting reference](https://learn.microsoft.com/en-us/uwp/api/windows.ui.notifications.toastnotifier.setting)
 
-The scheduling independence case and the published Windows package retain their own gates. [Windows scenario ledger](../spec/test_platform_traceability.csv) · [Sprint requirements](../spec/sprints/sprint_11_notifications.md)
+## Windows Quiet hours and synchronization controls
+
+E2E-013 passed on Windows 11 x64 build 22631.7652 at 96 DPI with clean app and runner `c93a8cf` and native driver `6b57731`. The native settings saved a UTC quiet window. A separate process restored Work Offline, background read pause and Outbox pause. The isolated fixture added one activity event and one typed queued action for the known repository. The native Activity feed displayed the event after reconnection with a Feed only decision, Quiet hours as the suppression reason, and sound off. [Native settings, restart and feed observations](evidence/sprint-11/native-schedule.json)
+
+The provider recorded 11 loopback requests. The initial issue and comment scans both returned 200. The offline restart produced no requests. With both pauses still set, Check now reached the provider and displayed HTTP 503 as a service error. Resuming just Outbox sent the original queued comment once and returned HTTP 201. [Recorded request trace and checkpoints](evidence/sprint-11/native-schedule.json)
+
+Three earlier runs returned Fail. The first read the synchronization settings before they loaded. The second did not match the native preference label's selection state. The third saved preferences and restarted successfully, then stalled in Windows UI Automation until the owned app window was closed. The passing run bounded each restarted Activity invocation and checked its feed decision after lifting Work Offline. [Earlier attempts and artifact digests](evidence/sprint-11/native-schedule.json)
+
+The published Windows package retains its separate acceptance checks. [Windows scenario ledger](../spec/test_platform_traceability.csv) · [Sprint requirements](../spec/sprints/sprint_11_notifications.md)

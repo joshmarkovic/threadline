@@ -1,0 +1,334 @@
+{
+  "windows_e2e_013": [
+    {
+      "run": "e2e-1795046024226-37356",
+      "case": "E2E-013",
+      "status": "Fail",
+      "exit_code": 1,
+      "child_exit_code": 1,
+      "test_checkout_source": "3d4fc49da5f13fdb4747e331f90e60832edaab00",
+      "source_dirty": false,
+      "app_source_revision": "c93a8cfd1240b0cd258577f0bce697dd26aad9ac",
+      "runner_binary_source": "c93a8cfd1240b0cd258577f0bce697dd26aad9ac",
+      "binary": {
+        "sha256": "304597568c644891fc92bf77449b6053d690d08a366d053d1ca2c321579398db",
+        "size_bytes": 80279040,
+        "build": "external override",
+        "evidence_class": "test-build native process"
+      },
+      "version": "0.1.0",
+      "fixture_revision": "s11-native-notification-schedule-v1",
+      "lock_sha256": "5b92e1a83782908953a4405e9c1ed8ce80e2dffaa10238f3e14ac04c0a524056",
+      "seed": 12345,
+      "started_at_unix_ms": 1795046024225,
+      "finished_at_unix_ms": 1795046035368,
+      "dpi": 96,
+      "driver_detail": "The property 'work_offline' cannot be found on this object. Verify that the property exists.",
+      "action_count": 1,
+      "request_count": 6,
+      "observations": [],
+      "offline_requests": 0,
+      "offline_profile_reopened": false,
+      "sha256": {
+        "result.json": "3acae18cab59d88cce6df65b7275afbd4f5238ba4ae657012a0e5c863b79cb70",
+        "notification-schedule-native.json": "6fb74d3573806de9db7c3bbc69810717de1aef128ed7eaf91edb0b111121bd9e",
+        "binary.json": "a87a7cdb97db7bc49de113b9e3b7327ca421fd4d62424005b57c6dd52faa8520",
+        "github-access-trace.json": "1b7f58ec4aaee8047b14e2c8521277bbcdbed0f27aab546e6e71c14fb8ab88ba"
+      }
+    },
+    {
+      "run": "e2e-1795046227088-13440",
+      "case": "E2E-013",
+      "status": "Fail",
+      "exit_code": 1,
+      "child_exit_code": 1,
+      "test_checkout_source": "1d3dcf01d1796f17e42621e79e57dd1878e43050",
+      "source_dirty": false,
+      "app_source_revision": "c93a8cfd1240b0cd258577f0bce697dd26aad9ac",
+      "runner_binary_source": "c93a8cfd1240b0cd258577f0bce697dd26aad9ac",
+      "binary": {
+        "sha256": "304597568c644891fc92bf77449b6053d690d08a366d053d1ca2c321579398db",
+        "size_bytes": 80279040,
+        "build": "external override",
+        "evidence_class": "test-build native process"
+      },
+      "version": "0.1.0",
+      "fixture_revision": "s11-native-notification-schedule-v1",
+      "lock_sha256": "5b92e1a83782908953a4405e9c1ed8ce80e2dffaa10238f3e14ac04c0a524056",
+      "seed": 12345,
+      "started_at_unix_ms": 1795046227087,
+      "finished_at_unix_ms": 1795046250926,
+      "dpi": 96,
+      "driver_detail": "Timed out waiting for the native Enable quiet hours control.",
+      "action_count": 4,
+      "request_count": 6,
+      "observations": [],
+      "offline_requests": 0,
+      "offline_profile_reopened": false,
+      "sha256": {
+        "result.json": "503b494a93b1f4a347e136517ae22138c1e9c7144b9c6df946fc5a2565d28fde",
+        "notification-schedule-native.json": "138962f6b773e16d5c8f4e0eddf5b7c8218eab15fe5f52aa2bb62cd4ee1b3857",
+        "binary.json": "a87a7cdb97db7bc49de113b9e3b7327ca421fd4d62424005b57c6dd52faa8520",
+        "github-access-trace.json": "1b7f58ec4aaee8047b14e2c8521277bbcdbed0f27aab546e6e71c14fb8ab88ba"
+      }
+    },
+    {
+      "run": "e2e-1795046450091-38620",
+      "case": "E2E-013",
+      "status": "Fail",
+      "exit_code": 1,
+      "child_exit_code": 1,
+      "test_checkout_source": "0c4afc7b68aa1cbf7b9d3f8e6480ce576988d274",
+      "source_dirty": false,
+      "app_source_revision": "c93a8cfd1240b0cd258577f0bce697dd26aad9ac",
+      "runner_binary_source": "c93a8cfd1240b0cd258577f0bce697dd26aad9ac",
+      "binary": {
+        "sha256": "304597568c644891fc92bf77449b6053d690d08a366d053d1ca2c321579398db",
+        "size_bytes": 80279040,
+        "build": "external override",
+        "evidence_class": "test-build native process"
+      },
+      "version": "0.1.0",
+      "fixture_revision": "s11-native-notification-schedule-v1",
+      "lock_sha256": "5b92e1a83782908953a4405e9c1ed8ce80e2dffaa10238f3e14ac04c0a524056",
+      "seed": 12345,
+      "started_at_unix_ms": 1795046450090,
+      "finished_at_unix_ms": 1795046816499,
+      "dpi": 96,
+      "driver_detail": "Exception calling \"Invoke\" with \"0\" argument(s): \"Unrecognized error.\"",
+      "action_count": 16,
+      "request_count": 6,
+      "observations": [
+        {
+          "action": "Save independent notification quiet hours using native fields",
+          "observed": {
+            "weekdays": 127,
+            "start_minute": 1321,
+            "end_minute": 181,
+            "timezone": "UTC"
+          }
+        }
+      ],
+      "offline_requests": 0,
+      "offline_profile_reopened": true,
+      "sha256": {
+        "result.json": "605f8ac279499513aba81e6d6aabc866dbca87bdb208c32eb31bbc86097b352a",
+        "notification-schedule-native.json": "6ede1690738e0af08feaaaa294b3bff765ede7774158caa575883cb81cbeb35a",
+        "binary.json": "a87a7cdb97db7bc49de113b9e3b7327ca421fd4d62424005b57c6dd52faa8520",
+        "github-access-trace.json": "1b7f58ec4aaee8047b14e2c8521277bbcdbed0f27aab546e6e71c14fb8ab88ba",
+        "notification-schedule-fixture.json": "831a8d8c812a6a1897bc2de25993c1d43e0a8afcf8c9fdb323b95d0b401712d9",
+        "reader-restart-observation.json": "2276e2497934bae1b676aa45d44a36c588875c1b85e0c4e88023c53e9496128e"
+      }
+    },
+    {
+      "run": "e2e-1795047546182-47316",
+      "case": "E2E-013",
+      "status": "Pass",
+      "exit_code": 0,
+      "child_exit_code": 0,
+      "test_checkout_source": "6b57731c0b9eb2499aafcdc6e3f3fbbedbd0656c",
+      "source_dirty": false,
+      "app_source_revision": "c93a8cfd1240b0cd258577f0bce697dd26aad9ac",
+      "runner_binary_source": "c93a8cfd1240b0cd258577f0bce697dd26aad9ac",
+      "binary": {
+        "sha256": "304597568c644891fc92bf77449b6053d690d08a366d053d1ca2c321579398db",
+        "size_bytes": 80279040,
+        "build": "external override",
+        "evidence_class": "test-build native process"
+      },
+      "version": "0.1.0",
+      "fixture_revision": "s11-native-notification-schedule-v1",
+      "lock_sha256": "5b92e1a83782908953a4405e9c1ed8ce80e2dffaa10238f3e14ac04c0a524056",
+      "seed": 12345,
+      "command": {
+        "program": "xtask",
+        "argv": [
+          "test",
+          "e2e",
+          "--suite",
+          "full",
+          "--case",
+          "E2E-013",
+          "--binary",
+          "<binary-path>",
+          "--seed",
+          "12345",
+          "--report-dir",
+          "<report-dir>"
+        ],
+        "redacted": true
+      },
+      "started_at_unix_ms": 1795047546181,
+      "finished_at_unix_ms": 1795047617685,
+      "host": {
+        "os": "windows",
+        "architecture": "x86_64",
+        "version": "Microsoft Windows [Version 10.0.22631.7652]",
+        "display_session": "Windows desktop availability is checked by native driver"
+      },
+      "dpi": 96,
+      "driver_detail": "Windows quiet hours kept the seeded native activity in the feed while independent native synchronization controls held network requests and the queued action. Explicit checking and queue resumption were each verified against saved preferences and loopback requests.",
+      "action_count": 34,
+      "request_count": 11,
+      "observations": [
+        {
+          "action": "Save independent notification quiet hours using native fields",
+          "observed": {
+            "weekdays": 127,
+            "start_minute": 1339,
+            "end_minute": 199,
+            "timezone": "UTC"
+          }
+        },
+        {
+          "action": "Restore Work Offline, background read pause and Outbox pause after restart",
+          "observed": {
+            "work_offline": true,
+            "pause_background": true,
+            "pause_queued_actions": true,
+            "notification_quiet": false
+          }
+        },
+        {
+          "action": "Observe the isolated event in the native feed with the exact Quiet Hours decision",
+          "observed": {
+            "delivery": "FeedOnly",
+            "popup_suppressed_by": "QuietHours",
+            "sound": false
+          }
+        },
+        {
+          "action": "Restore the same quiet hours after restart and reconnection",
+          "observed": {
+            "weekdays": 127,
+            "start_minute": 1339,
+            "end_minute": 199,
+            "timezone": "UTC"
+          }
+        },
+        {
+          "action": "Resume one queued action independently of paused background polling",
+          "observed": "Confirmed"
+        }
+      ],
+      "offline_requests": 0,
+      "offline_profile_reopened": true,
+      "http": [
+        {
+          "phase": "sync_live",
+          "route": "repository",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "sync_live",
+          "route": "updated_comments",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "sync_live",
+          "route": "updated_items",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "sync_live",
+          "route": "user",
+          "status": 200,
+          "count": 2
+        },
+        {
+          "phase": "sync_notification_send",
+          "route": "comment_created",
+          "status": 201,
+          "count": 1
+        },
+        {
+          "phase": "sync_notification_send",
+          "route": "item",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "sync_notification_send",
+          "route": "repository",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "sync_notification_send",
+          "route": "user",
+          "status": 200,
+          "count": 1
+        },
+        {
+          "phase": "sync_service",
+          "route": "user",
+          "status": 503,
+          "count": 1
+        }
+      ],
+      "sha256": {
+        "result.json": "de9bf06fee28f00fe9bf16c860cf5936d25482e4c3a32c49f1c1dde54464caf2",
+        "notification-schedule-native.json": "feeb3677a3b732841d58f5948b4c20ed005c48d451f410977a50c6a3dd1dcf37",
+        "binary.json": "a87a7cdb97db7bc49de113b9e3b7327ca421fd4d62424005b57c6dd52faa8520",
+        "github-access-trace.json": "5498aee937470e64e0def6b32a557d34b48c2eb1cd340791ce73315555b76d86",
+        "notification-schedule-fixture.json": "831a8d8c812a6a1897bc2de25993c1d43e0a8afcf8c9fdb323b95d0b401712d9",
+        "notification-schedule-checkpoints.jsonl": "0f2f9e748480c295c47b18eac770e7f441bb3bfb266b092cd50a5608d01cbd9f",
+        "reader-restart-observation.json": "c5d17d88034e1d6899873303d938ae3dbc581b5f8f168b282c0d8a6ae045259c"
+      },
+      "checkpoints": [
+        {
+          "step": "quiet_hours_saved",
+          "at_unix_ms": 1795047570962
+        },
+        {
+          "step": "offline_and_paused_before_quit",
+          "at_unix_ms": 1795047581623
+        },
+        {
+          "step": "offline_restart_and_fixture_verified",
+          "at_unix_ms": 1795047583438
+        },
+        {
+          "step": "online_with_separate_pauses",
+          "at_unix_ms": 1795047588111
+        },
+        {
+          "step": "request_restarted_activity",
+          "at_unix_ms": 1795047588116
+        },
+        {
+          "step": "restarted_activity_invoked",
+          "at_unix_ms": 1795047591283
+        },
+        {
+          "step": "quiet_hours_feed_only_verified",
+          "at_unix_ms": 1795047591317
+        },
+        {
+          "step": "settings_restored",
+          "at_unix_ms": 1795047593477
+        },
+        {
+          "step": "request_restarted_activity",
+          "at_unix_ms": 1795047597745
+        },
+        {
+          "step": "restarted_activity_invoked",
+          "at_unix_ms": 1795047600592
+        },
+        {
+          "step": "queued_action_confirmed",
+          "at_unix_ms": 1795047617563
+        }
+      ],
+      "seeded_fixture": {
+        "fixture_revision": "s11-native-notification-schedule-v1",
+        "queued": 1,
+        "events": 1
+      }
+    }
+  ]
+}
