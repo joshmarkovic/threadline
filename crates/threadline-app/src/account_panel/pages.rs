@@ -1,17 +1,21 @@
 use gpui_kit::component::{
-    Disableable, Selectable, Sizable,
+    Disableable, IconName, Selectable, Sizable,
     button::{Button, ButtonVariants},
     input::Input,
 };
 use gpui_kit::{
-    AnyElement, Context, Focusable, InteractiveElement, IntoElement, ParentElement, Role,
-    StatefulInteractiveElement, Styled, TestSupportExt, div, prelude::FluentBuilder, px,
+    AnyElement, Context, Focusable, FontWeight, InteractiveElement, IntoElement, ParentElement,
+    Role, StatefulInteractiveElement, Styled, TestSupportExt, div, prelude::FluentBuilder, px,
 };
 use threadline_core::github::AccessError;
 use threadline_storage::access::DiscoveryState;
 
 use super::{AccountPanel, AccountPanelEvent, OnboardingStep, sign_in_label};
-use crate::{accounts::AccessIssueScope, palette::Palette};
+use crate::{
+    accounts::AccessIssueScope,
+    palette::Palette,
+    ui::{CONTENT_WIDTH, card, nav, nav_heading},
+};
 
 impl AccountPanel {
     pub(super) fn onboarding_page(
@@ -45,7 +49,7 @@ impl AccountPanel {
                     .flex()
                     .flex_col()
                     .gap_4()
-                    .child(self.identity())
+                    .child(self.identity(palette))
                     .child(self.repositories(palette, cx))
                     .child(
                         div().flex().child(
@@ -78,112 +82,256 @@ impl AccountPanel {
                     .into_any_element(),
             ),
         };
+        let steps = [
+            OnboardingStep::TimeZone,
+            OnboardingStep::GitHub,
+            OnboardingStep::Repository,
+        ];
+        let reached = steps.iter().position(|each| *each == step).unwrap_or(0);
+        let progress = div()
+            .flex()
+            .items_center()
+            .gap_1p5()
+            .children((0..steps.len()).map(|index| {
+                div()
+                    .h(px(4.))
+                    .w(px(32.))
+                    .rounded_full()
+                    .bg(if index <= reached {
+                        palette.accent
+                    } else {
+                        palette.border
+                    })
+            }));
         div()
+            .w_full()
+            .max_w(px(CONTENT_WIDTH))
             .flex()
             .flex_col()
             .gap_4()
-            .w_full()
-            .max_w(px(760.))
-            .mx_auto()
-            .p_4()
-            .child(div().text_xl().child(title))
-            .child(div().text_sm().text_color(palette.muted).child(detail))
+            .p_6()
+            .rounded_lg()
+            .border_1()
+            .border_color(palette.border)
+            .bg(palette.panel)
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .child(crate::brand::mark(px(36.)))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_3()
+                            .child(div().text_xs().text_color(palette.muted).child(format!(
+                                "Step {} of {}",
+                                reached + 1,
+                                steps.len()
+                            )))
+                            .child(progress),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .child(
+                        div()
+                            .text_xl()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(title),
+                    )
+                    .child(div().text_sm().text_color(palette.muted).child(detail)),
+            )
             .child(content)
             .into_any_element()
     }
 
-    pub(super) fn settings_page(&self, palette: Palette, cx: &mut Context<Self>) -> AnyElement {
+    /// The section list beside Settings. Every section stays on one page, so a
+    /// row scrolls to its section. Synchronization opens its own page.
+    pub(super) fn settings_nav(
+        &self,
+        palette: Palette,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        fn jump(
+            id: &'static str,
+            label: &'static str,
+            section: usize,
+            cx: &mut Context<AccountPanel>,
+        ) -> Button {
+            nav(id, label).on_click(cx.listener(move |panel, _, window, cx| {
+                if panel.synchronization.is_some() {
+                    panel.set_page(super::AccountPanelPage::Settings, window, cx);
+                }
+                panel.scroll.scroll_to_top_of_item(section);
+                cx.notify();
+            }))
+        }
+        div()
+            .w(px(200.))
+            .h_full()
+            .flex_shrink_0()
+            .flex()
+            .flex_col()
+            .gap_0p5()
+            .px_2()
+            .py_3()
+            .border_r_1()
+            .border_color(palette.border)
+            .bg(palette.surface)
+            .child(nav_heading("Settings", palette))
+            .child(jump("settings-nav-account", "Account", 0, cx))
+            .child(jump("settings-nav-repositories", "Repositories", 1, cx))
+            .when(self.view.active.is_some(), |list| {
+                list.child(
+                    self.control(
+                        "settings-synchronization",
+                        nav("settings-synchronization", "Synchronization")
+                            .selected(self.synchronization.is_some())
+                            .on_click(cx.listener(|_, _, _, cx| {
+                                cx.emit(AccountPanelEvent::OpenSynchronization)
+                            })),
+                    ),
+                )
+            })
+            .child(jump("settings-nav-display", "Display", 2, cx))
+            .when(self.updates.is_some(), |list| {
+                list.child(jump("settings-nav-updates", "Updates", 3, cx))
+            })
+    }
+
+    /// The Settings sections in the order the section list addresses them.
+    pub(super) fn settings_sections(
+        &self,
+        palette: Palette,
+        cx: &mut Context<Self>,
+    ) -> Vec<AnyElement> {
         if let Some(sync) = &self.synchronization {
-            return div()
-                .flex()
-                .flex_col()
-                .size_full()
-                .max_w(px(920.))
-                .mx_auto()
-                .child(
-                    div().flex().child(
+            return vec![
+                div()
+                    .w_full()
+                    .max_w(px(CONTENT_WIDTH))
+                    .flex()
+                    .child(
                         self.control(
                             "settings-sync-back",
                             Button::new("settings-sync-back")
                                 .accessibility_id("settings-sync-back")
+                                .icon(IconName::ArrowLeft)
                                 .label("Back to Settings")
+                                .ghost()
                                 .small()
                                 .on_click(cx.listener(|panel, _, window, cx| {
                                     panel.set_page(super::AccountPanelPage::Settings, window, cx);
                                 })),
                         ),
-                    ),
-                )
-                .child(sync.clone())
-                .into_any_element();
+                    )
+                    .into_any_element(),
+                div()
+                    .w_full()
+                    .max_w(px(CONTENT_WIDTH))
+                    .child(sync.clone())
+                    .into_any_element(),
+            ];
         }
         let form_title = if self.renew.is_some() {
             "Reconnect this GitHub account"
         } else {
             "Add a GitHub account"
         };
-        div()
-            .flex()
-            .flex_col()
-            .gap_5()
-            .max_w(px(920.))
-            .w_full()
-            .mx_auto()
-            .child(div().text_xl().child("Settings"))
-            .when(self.view.active.is_some(), |settings| {
-                settings.child(
-                    div().flex().child(
-                        self.control(
-                            "settings-synchronization",
-                            Button::new("settings-synchronization")
-                                .accessibility_id("settings-synchronization")
-                                .label("Synchronization")
-                                .small()
-                                .on_click(cx.listener(|_, _, _, cx| {
-                                    cx.emit(AccountPanelEvent::OpenSynchronization)
-                                })),
-                        ),
-                    ),
+        let account = card(
+            "GitHub account",
+            "The account Threadline uses to read and update your repositories.",
+            palette,
+        )
+        .child(self.identity(palette))
+        .child(self.profile_controls(palette, cx))
+        .child(
+            div().flex().child(
+                self.control(
+                    "account-add",
+                    Button::new("account-add")
+                        .accessibility_id("account-add")
+                        .icon(IconName::Plus)
+                        .label("Add account")
+                        .small()
+                        .disabled(self.busy)
+                        .on_click(cx.listener(|panel, _, window, cx| {
+                            panel.start_credential_form(None, window, cx);
+                        })),
+                ),
+            ),
+        )
+        .when(self.credential_form_open, |group| {
+            group
+                .child(
+                    div()
+                        .pt_3()
+                        .border_t_1()
+                        .border_color(palette.border)
+                        .text_sm()
+                        .font_weight(FontWeight::MEDIUM)
+                        .child(form_title),
                 )
-            })
-            .child(
-                section("GitHub account", palette)
-                    .child(self.identity())
-                    .child(self.profile_controls(cx))
-                    .child(
-                        div().flex().child(
-                            self.control(
-                                "account-add",
-                                Button::new("account-add")
-                                    .accessibility_id("account-add")
-                                    .label("Add account")
-                                    .small()
-                                    .disabled(self.busy)
-                                    .on_click(cx.listener(|panel, _, window, cx| {
-                                        panel.start_credential_form(None, window, cx);
-                                    })),
-                            ),
-                        ),
-                    )
-                    .when(self.credential_form_open, |group| {
-                        group
-                            .child(div().text_sm().child(form_title))
-                            .child(self.credential_form(palette, cx))
-                            .child(self.reply(cx))
-                    }),
-            )
-            .child(section("Display", palette).child(self.time_zone_settings(false, palette, cx)))
-            .children(self.updates.clone())
-            .child(section("Repositories", palette).child(self.repositories(palette, cx)))
-            .into_any_element()
+                .child(self.credential_form(palette, cx))
+                .child(self.reply(cx))
+        });
+        let repositories = card(
+            "Repositories",
+            "Choose the repositories Threadline monitors and keeps available offline.",
+            palette,
+        )
+        .child(self.repositories(palette, cx));
+        let display = card("Display", "Choose how dates and times appear.", palette)
+            .child(self.time_zone_settings(false, palette, cx));
+        let mut sections = vec![
+            account.into_any_element(),
+            repositories.into_any_element(),
+            display.into_any_element(),
+        ];
+        if let Some(updates) = &self.updates {
+            sections.push(
+                div()
+                    .w_full()
+                    .max_w(px(CONTENT_WIDTH))
+                    .child(updates.clone())
+                    .into_any_element(),
+            );
+        }
+        sections
     }
 
-    fn identity(&self) -> impl IntoElement {
-        let text = self.current_profile().map_or_else(
+    fn identity(&self, palette: Palette) -> impl IntoElement {
+        let profile = self.current_profile();
+        let text = profile.map_or_else(
             || "No GitHub account connected".to_owned(),
             |profile| format!("{} · {}", profile.login, sign_in_label(profile.access)),
         );
-        status("account-identity", text)
+        let initial = profile
+            .and_then(|profile| profile.login.chars().next())
+            .map_or_else(|| "?".to_owned(), |first| first.to_uppercase().to_string());
+        div()
+            .flex()
+            .items_center()
+            .gap_3()
+            .child(
+                div()
+                    .size(px(36.))
+                    .flex_shrink_0()
+                    .rounded_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .bg(palette.accent_bg)
+                    .text_color(palette.accent)
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(initial),
+            )
+            .child(status("account-identity", text))
     }
 
     fn repositories(&self, palette: Palette, cx: &mut Context<Self>) -> impl IntoElement {
@@ -410,18 +558,6 @@ impl AccountPanel {
                     .map(|message| status("display-timezone-message", message)),
             )
     }
-}
-
-fn section(title: &'static str, palette: Palette) -> gpui_kit::Div {
-    div()
-        .flex()
-        .flex_col()
-        .gap_3()
-        .p_3()
-        .border_1()
-        .border_color(palette.border)
-        .rounded_md()
-        .child(div().text_lg().child(title))
 }
 
 pub(super) fn status(

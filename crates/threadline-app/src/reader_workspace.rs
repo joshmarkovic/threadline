@@ -244,6 +244,7 @@ pub(crate) struct ReaderWorkspace {
     history: history_view::HistoryState,
     activity: activity_view::ActivityState,
     sync_panel: Option<Entity<crate::sync_panel::SyncPanel>>,
+    home_summary: Option<(String, Option<String>)>,
     sync_watch: Option<Subscription>,
     #[cfg(feature = "e2e")]
     sync_render_watch: Option<Subscription>,
@@ -712,6 +713,7 @@ impl ReaderWorkspace {
             history: history_view::HistoryState::default(),
             activity: activity_view::ActivityState::default(),
             sync_panel: None,
+            home_summary: None,
             sync_watch: None,
             #[cfg(feature = "e2e")]
             sync_render_watch: None,
@@ -792,6 +794,11 @@ impl ReaderWorkspace {
 
     pub(crate) fn has_account(&self) -> bool {
         self.account.is_some()
+    }
+
+    /// The monitoring summary and latest refresh result shown in the status bar.
+    pub(crate) fn set_home_summary(&mut self, summary: Option<(String, Option<String>)>) {
+        self.home_summary = summary;
     }
 
     pub(crate) fn refresh_home(

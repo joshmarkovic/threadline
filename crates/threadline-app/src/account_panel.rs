@@ -77,6 +77,7 @@ pub(crate) struct AccountPanel {
     service: AccountService,
     runtime: tokio::runtime::Handle,
     focus: gpui_kit::FocusHandle,
+    scroll: gpui_kit::ScrollHandle,
     page: AccountPanelPage,
     onboarding: Option<OnboardingStep>,
     focus_sign_in: bool,
@@ -140,6 +141,7 @@ impl AccountPanel {
             service,
             runtime,
             focus: cx.focus_handle(),
+            scroll: gpui_kit::ScrollHandle::new(),
             page: AccountPanelPage::Settings,
             onboarding: None,
             focus_sign_in: false,
@@ -947,7 +949,7 @@ impl AccountPanel {
         cx.notify();
     }
 
-    fn profile_controls(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn profile_controls(&self, palette: Palette, cx: &mut Context<Self>) -> impl IntoElement {
         let mut shown = HashSet::new();
         let rows: Vec<_> = self
             .view
@@ -1063,7 +1065,11 @@ impl AccountPanel {
                         div()
                             .flex()
                             .items_center()
+                            .justify_between()
                             .gap_2()
+                            .pt_2()
+                            .border_t_1()
+                            .border_color(palette.border)
                             .child(div().text_sm().child(format!(
                                 "{} · {}",
                                 profile.owner_scope,
@@ -1132,18 +1138,26 @@ impl AccountPanel {
             .justify_between()
             .gap_3()
             .items_center()
-            .p_2()
-            .border_b_1()
+            .py_2()
+            .border_t_1()
             .border_color(palette.border)
             .child(
                 div()
+                    .min_w_0()
                     .flex()
                     .flex_col()
-                    .gap_1()
+                    .gap_0p5()
                     .child(
                         div()
+                            .flex()
+                            .items_center()
+                            .gap_2()
                             .text_sm()
-                            .child(format!("{}/{}", repo.owner, repo.name)),
+                            .font_weight(gpui_kit::FontWeight::MEDIUM)
+                            .child(format!("{}/{}", repo.owner, repo.name))
+                            .when(repo.selected, |name| {
+                                name.child(crate::ui::tag("Monitored", palette.good))
+                            }),
                     )
                     .child(
                         div()
@@ -1213,26 +1227,42 @@ impl Render for AccountPanel {
             self.focus_form(window, cx);
         }
         let palette = Palette::current(cx);
-        let content = match (self.page, self.onboarding) {
-            (AccountPanelPage::Onboarding, Some(step)) => self.onboarding_page(step, palette, cx),
-            _ => self.settings_page(palette, cx),
+        let onboarding = match (self.page, self.onboarding) {
+            (AccountPanelPage::Onboarding, Some(step)) => Some(step),
+            _ => None,
         };
+        let sections = match onboarding {
+            Some(step) => vec![self.onboarding_page(step, palette, cx)],
+            None => self.settings_sections(palette, cx),
+        };
+        let navigation = onboarding
+            .is_none()
+            .then(|| self.settings_nav(palette, cx).into_any_element());
         div()
-            .id("account-panel")
-            .track_focus(&self.focus)
-            .tab_stop(true)
-            .role(Role::Group)
-            .aria_label("GitHub settings and setup")
-            .w_full()
-            .h_full()
-            .overflow_y_scroll()
-            .p_4()
+            .size_full()
             .flex()
-            .flex_col()
-            .gap_4()
-            .bg(palette.panel)
+            .bg(palette.canvas)
             .text_color(palette.ink)
-            .child(content)
+            .children(navigation)
+            .child(
+                div()
+                    .id("account-panel")
+                    .track_focus(&self.focus)
+                    .tab_stop(true)
+                    .role(Role::Group)
+                    .aria_label("GitHub settings and setup")
+                    .flex_1()
+                    .min_w_0()
+                    .h_full()
+                    .overflow_y_scroll()
+                    .track_scroll(&self.scroll)
+                    .p_6()
+                    .flex()
+                    .flex_col()
+                    .items_center()
+                    .gap_4()
+                    .children(sections),
+            )
     }
 }
 
