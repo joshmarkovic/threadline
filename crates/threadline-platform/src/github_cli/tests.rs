@@ -221,6 +221,7 @@ async fn installed_cli_version() {
 #[cfg(windows)]
 #[tokio::test]
 async fn native_console_has_interactive_handles() {
+    fn assert_send(_: impl Send) {}
     // Start only this test binary. The child's console must work even when the parent has redirected input/output.
     let executable = std::env::current_exe().unwrap();
     let cli = GitHubCli {
@@ -228,6 +229,8 @@ async fn native_console_has_interactive_handles() {
         executable,
         environment: native::environment().unwrap(),
     };
+    // The desktop runs this future on its multithreaded account worker.
+    assert_send(cli.login(&CancellationToken::new()));
     timeout(
         Duration::from_secs(15),
         native::console(

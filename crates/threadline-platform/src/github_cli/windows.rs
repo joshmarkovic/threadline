@@ -83,7 +83,7 @@ pub(super) async fn login(cli: &GitHubCli) -> Result<(), CliError> {
 }
 
 /// Use a fresh console with OS-created standard handles, even when Threadline itself runs without a console.
-pub(super) async fn console(cli: &GitHubCli, args: &[&str]) -> Result<(), CliError> {
+fn spawn_console(cli: &GitHubCli, args: &[&str]) -> Result<ConsoleProcess, CliError> {
     // The only arguments are internal literals. No shell, path quoting, or user-provided arguments are interpreted.
     debug_assert!(args.iter().all(|a| !a.contains([' ', '"', '\0'])));
     let mut line = format!("gh.exe {}", args.join(" "))
@@ -131,7 +131,13 @@ pub(super) async fn console(cli: &GitHubCli, args: &[&str]) -> Result<(), CliErr
     }
     // These handles belong to the caller on success. Drop the thread handle immediately.
     drop(unsafe { OwnedHandle::from_raw_handle(info.hThread) });
-    let child = ConsoleProcess(unsafe { OwnedHandle::from_raw_handle(info.hProcess) });
+    Ok(ConsoleProcess(unsafe {
+        OwnedHandle::from_raw_handle(info.hProcess)
+    }))
+}
+
+pub(super) async fn console(cli: &GitHubCli, args: &[&str]) -> Result<(), CliError> {
+    let child = spawn_console(cli, args)?;
     loop {
         match unsafe { WaitForSingleObject(child.0.as_raw_handle(), 0) } {
             WAIT_OBJECT_0 => {
