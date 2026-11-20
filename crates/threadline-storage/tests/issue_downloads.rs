@@ -43,6 +43,8 @@ fn issue_pin_schema_17_active_job_keeps_its_identity_and_partial_page_on_upgrade
         .unwrap();
     drop(store);
     let db = rusqlite::Connection::open(directory.path().join(DATABASE_FILENAME)).unwrap();
+    db.execute_batch(include_str!("support/schema_18.sql"))
+        .unwrap();
     db.execute_batch(
         "BEGIN;
         UPDATE issue_downloads SET state='active';

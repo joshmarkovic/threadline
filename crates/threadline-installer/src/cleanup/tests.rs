@@ -62,7 +62,9 @@ fn cleanup_skips_the_cli_binding_and_retains_pat_backups_in_its_inventory() {
     fs::copy(&current, &backup).unwrap();
     Connection::open(&backup)
         .unwrap()
-        .pragma_update(None, "user_version", 18)
+        .execute_batch(include_str!(
+            "../../../threadline-storage/tests/support/schema_18.sql"
+        ))
         .unwrap();
     Connection::open(&current).unwrap().execute(
         "UPDATE github_access_profiles SET credential_kind=2, credential_ref=lower(hex(randomblob(16)))", []

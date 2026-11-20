@@ -58,14 +58,8 @@ fn schema_18_upgrade_preserves_pat_bindings_and_backs_up_the_original() {
     store.activate_local_profile(account).unwrap();
     drop(store);
     let db = rusqlite::Connection::open(&path).unwrap();
-    // Reproduce the original schema 18 constraint on an otherwise complete profile.
-    db.execute_batch("ALTER TABLE github_access_profiles ADD COLUMN original_kind INTEGER NOT NULL
-                      DEFAULT 0 CHECK(original_kind IN (0,1));
-                      UPDATE github_access_profiles SET original_kind=credential_kind;
-                      ALTER TABLE github_access_profiles DROP COLUMN credential_kind;
-                      ALTER TABLE github_access_profiles RENAME COLUMN original_kind TO credential_kind;
-                      DROP TABLE retired_github_pat_refs;
-                      PRAGMA user_version=18;").unwrap();
+    db.execute_batch(include_str!("support/schema_18.sql"))
+        .unwrap();
     drop(db);
 
     let store = Store::open(&path).unwrap();
