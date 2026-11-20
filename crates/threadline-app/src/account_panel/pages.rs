@@ -93,6 +93,30 @@ impl AccountPanel {
     }
 
     pub(super) fn settings_page(&self, palette: Palette, cx: &mut Context<Self>) -> AnyElement {
+        if let Some(sync) = &self.synchronization {
+            return div()
+                .flex()
+                .flex_col()
+                .size_full()
+                .max_w(px(920.))
+                .mx_auto()
+                .child(
+                    div().flex().child(
+                        self.control(
+                            "settings-sync-back",
+                            Button::new("settings-sync-back")
+                                .accessibility_id("settings-sync-back")
+                                .label("Back to Settings")
+                                .small()
+                                .on_click(cx.listener(|panel, _, window, cx| {
+                                    panel.set_page(super::AccountPanelPage::Settings, window, cx);
+                                })),
+                        ),
+                    ),
+                )
+                .child(sync.clone())
+                .into_any_element();
+        }
         let form_title = if self.renew.is_some() {
             "Replace a personal access token"
         } else {
@@ -106,6 +130,22 @@ impl AccountPanel {
             .w_full()
             .mx_auto()
             .child(div().text_xl().child("Settings"))
+            .when(self.view.active.is_some(), |settings| {
+                settings.child(
+                    div().flex().child(
+                        self.control(
+                            "settings-synchronization",
+                            Button::new("settings-synchronization")
+                                .accessibility_id("settings-synchronization")
+                                .label("Synchronization")
+                                .small()
+                                .on_click(cx.listener(|_, _, _, cx| {
+                                    cx.emit(AccountPanelEvent::OpenSynchronization)
+                                })),
+                        ),
+                    ),
+                )
+            })
             .child(
                 section("GitHub account", palette)
                     .child(self.identity())

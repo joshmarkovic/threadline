@@ -68,14 +68,14 @@ function Invoke-InstalledDraftSignOut([long]$Account, [long]$PreviousGeneration)
                     if ($panes.left -cne $before.left -or $panes.right -cne $before.right) {
                         throw 'The offline restart changed the active cached items.'
                     }
-                    Wait-InstalledDraft $child 'the restarted Synchronization settings' { Invoke-OwnedId $child 'reader-sync-settings' }
+                    Open-InstalledSyncSettings $child
                     Wait-InstalledDraft $child 'the saved offline and two pause controls' {
                         (Test-InstalledDraftDial $child 'sync-work-offline' 'Work offline' $true) -and
                             (Test-InstalledDraftDial $child 'sync-pause-background' 'Pause background refresh' $true) -and
                             (Test-InstalledDraftDial $child 'sync-pause-outbox' 'Pause queued actions' $true)
                     }
                     $result.paused_and_offline_after_restart = $true
-                    Wait-InstalledDraft $child 'the owned return to the cached workspace' { Invoke-OwnedId $child 'reader-browse' }
+                    Wait-InstalledDraft $child 'the owned return to the cached workspace' { Invoke-OwnedId $child 'account-close' 'Home' }
                 }
                 Wait-InstalledDraft $child 'the same locally available issue and review' {
                     $after = Read-InstalledDraftPanes $child

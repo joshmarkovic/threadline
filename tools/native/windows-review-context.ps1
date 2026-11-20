@@ -251,6 +251,7 @@ function Invoke-ReviewDraftProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Sync 'unrelated reads paused while the review Outbox remains enabled' {
         param($sync) $sync.controls.pause_background -and !$sync.controls.pause_queued_actions
     }
+    Open-FixtureHome $Window
     Click-AccountControl $Window 'reader-repository-1'
     Click-AccountControl $Window 'reader-fetch-repository'
     $first = Open-FixturePr $Window 0 42 'First fixture pull request' $headA 'src/first.rs'
@@ -342,6 +343,7 @@ function Invoke-ReviewDecisionsProof([IntPtr]$Window, [string]$Profile, [switch]
     $null = Wait-Sync 'scheduled reads paused while previously queued reviews can submit' {
         param($sync) $sync.controls.pause_background -and !$sync.controls.pause_queued_actions
     }
+    Open-FixtureHome $Window
     Click-AccountControl $Window 'reader-repository-1'
     Click-AccountControl $Window 'reader-fetch-repository'
     $fixtures = @(
@@ -493,6 +495,7 @@ function Invoke-ThreadQueueProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Sync 'the fixture write worker remains enabled while background reads are paused' {
         param($sync) $sync.controls.pause_background -and !$sync.controls.pause_queued_actions
     }
+    Open-FixtureHome $Window
     Click-AccountControl $Window 'reader-repository-1'
     Click-AccountControl $Window 'reader-fetch-repository'
     $first = Open-FixturePr $Window 0 42 'First fixture pull request' $head 'src/first.rs'

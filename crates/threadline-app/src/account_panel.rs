@@ -36,6 +36,7 @@ pub(crate) enum AccountPanelPage {
 
 pub(crate) enum AccountPanelEvent {
     OnboardingFinished,
+    OpenSynchronization,
     RefreshFinished { account: AccountId },
 }
 
@@ -86,6 +87,7 @@ pub(crate) struct AccountPanel {
     saving_display_zone: bool,
     token: Entity<InputState>,
     updates: Option<Entity<crate::updates::Updates>>,
+    synchronization: Option<Entity<crate::sync_panel::SyncPanel>>,
     renew: Option<AccessProfile>,
     view: AccountView,
     busy: bool,
@@ -145,6 +147,7 @@ impl AccountPanel {
             saving_display_zone: false,
             token,
             updates: None,
+            synchronization: None,
             renew: None,
             view: AccountView::default(),
             busy: false,
@@ -184,6 +187,7 @@ impl AccountPanel {
             self.clear_token(window, cx);
         }
         self.page = page;
+        self.synchronization = None;
         match (page, self.onboarding) {
             (AccountPanelPage::Onboarding, Some(OnboardingStep::GitHub)) => {
                 self.focus_form(window, cx);
@@ -195,6 +199,23 @@ impl AccountPanel {
 
     pub(crate) fn loaded(&self) -> bool {
         self.loaded
+    }
+
+    pub(crate) fn open_synchronization(
+        &mut self,
+        panel: Entity<crate::sync_panel::SyncPanel>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.clear_token(window, cx);
+        self.synchronization = Some(panel);
+        self.focus.focus(window, cx);
+        cx.notify();
+    }
+
+    #[cfg(feature = "e2e")]
+    pub(crate) fn synchronization_open(&self) -> bool {
+        self.synchronization.is_some()
     }
 
     pub(crate) fn set_updates(
@@ -414,6 +435,9 @@ impl AccountPanel {
                         #[cfg(feature = "e2e")]
                         input_issue,
                     }) => {
+                        if panel.view.active != view.active {
+                            panel.synchronization = None;
+                        }
                         panel.view = view;
                         if initial_load && succeeded && panel.view.active.is_none() {
                             panel.onboarding = Some(OnboardingStep::TimeZone);

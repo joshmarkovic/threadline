@@ -119,11 +119,14 @@ impl SyncPanel {
             #[cfg(feature = "e2e")]
             observer: None,
         };
-        panel.load(window, cx, true);
+        panel.refresh(window, cx);
         panel
     }
 
-    fn load(&mut self, window: &mut Window, cx: &mut Context<Self>, load_form: bool) {
+    pub(crate) fn refresh(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.busy {
+            return;
+        }
         let account = self.account;
         let store = Arc::clone(&self.store);
         self.busy = true;
@@ -139,7 +142,7 @@ impl SyncPanel {
                 panel.busy = false;
                 match result {
                     Ok(Ok((settings, status))) => {
-                        if load_form || panel.saved.is_none() {
+                        if panel.saved.is_none() {
                             panel.set_inputs(&settings.schedule, window, cx);
                         }
                         panel.saved = Some(settings);
@@ -444,7 +447,7 @@ impl Render for SyncPanel {
                         button("sync-refresh-status", "Refresh status")
                             .disabled(self.busy)
                             .on_click(
-                                cx.listener(|panel, _, window, cx| panel.load(window, cx, false)),
+                                cx.listener(|panel, _, window, cx| panel.refresh(window, cx)),
                             ),
                     ),
             )

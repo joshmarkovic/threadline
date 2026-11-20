@@ -119,7 +119,7 @@ function Invoke-InstalledDraftDelay {
                     }
                 }
                 $before = Wait-InstalledDraft $child 'the original issue and review panes' { Read-InstalledDraftPanes $child } -ReturnValue
-                Wait-InstalledDraft $child 'the owned Synchronization settings' { Invoke-OwnedId $child 'reader-sync-settings' }
+                Open-InstalledSyncSettings $child
                 Wait-InstalledDraft $child 'the three original offline settings' {
                     (Test-InstalledDraftDial $child 'sync-work-offline' 'Work offline' $true) -and
                     (Test-InstalledDraftDial $child 'sync-pause-background' 'Pause background refresh' $true) -and
@@ -150,14 +150,14 @@ function Invoke-InstalledDraftDelay {
                 $result.matching_cached_panes_while_held = $null -ne $after -and $after.left -ceq $before.left -and
                     $after.right -ceq $before.right -and (Test-InstalledDraftSocket $child $held)
                 if (!$result.matching_cached_panes_while_held) { throw 'Both original cached panes did not return while the exact tunnel was held open.' }
-                Wait-InstalledDraft $child 'the restarted Synchronization settings' { Invoke-OwnedId $child 'reader-sync-settings' }
+                Open-InstalledSyncSettings $child
                 Wait-InstalledDraft $child 'both saved pauses and online mode in the restarted process' {
                     $result.online_pause_background = Test-InstalledDraftDial $child 'sync-pause-background' 'Pause background refresh' $true
                     $result.online_pause_outbox = Test-InstalledDraftDial $child 'sync-pause-outbox' 'Pause queued actions' $true
                     $result.online_work_offline_off = Test-InstalledDraftDial $child 'sync-work-offline' 'Work offline' $false
                     return $result.online_pause_background -and $result.online_pause_outbox -and $result.online_work_offline_off
                 }
-                Wait-InstalledDraft $child 'the owned return to the cached workspace' { Invoke-OwnedId $child 'reader-browse' }
+                Wait-InstalledDraft $child 'the owned return to the cached workspace' { Invoke-OwnedId $child 'account-close' 'Home' }
                 Wait-InstalledDraft $child 'the same pane selections after opening settings' {
                     $reopened = Read-InstalledDraftPanes $child
                     return $null -ne $reopened -and $reopened.left -ceq $before.left -and $reopened.right -ceq $before.right

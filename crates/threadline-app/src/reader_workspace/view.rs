@@ -600,14 +600,6 @@ impl ReaderWorkspace {
                 control("reader-storage", "Storage usage")
                     .on_click(cx.listener(|this, _, window, cx| this.show_cache(window, cx))),
             )
-            .child(
-                self.observed_control(
-                    "reader-sync-settings",
-                    control("reader-sync-settings", "Synchronization")
-                        .on_click(cx.listener(|this, _, window, cx| this.show_sync(window, cx))),
-                    false,
-                ),
-            )
     }
 
     fn browse_view(&self, palette: Palette, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1707,7 +1699,6 @@ impl ReaderWorkspace {
 
     fn workspace_upper_surface(&self, palette: Palette, cx: &mut Context<Self>) -> AnyElement {
         match self.surface {
-            Surface::Sync=>div().flex_1().min_h_0().children(self.sync_panel.clone()).into_any_element(),
             Surface::Browse=>self.browse_view(palette,cx).into_any_element(),
             Surface::Outbox=>self.outbox_view(palette,cx),
             Surface::History=>self.history_surface(palette,cx),

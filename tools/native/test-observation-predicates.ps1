@@ -662,6 +662,7 @@ try {
 $script:report = [ordered]@{ actions = @() }
 function Wait-Account { param($Description, $Check) }
 function Open-SyncSettings { param($Window) }
+function Open-FixtureHome { param($Window) }
 function Wait-Sync { param($Description, $Check) }
 function Set-AccessPhase { param($Phase) }
 function Click-AccountControl { param($Window, $Id) }

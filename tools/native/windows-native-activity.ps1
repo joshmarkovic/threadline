@@ -58,6 +58,7 @@ function Start-NativeActivitySync([IntPtr]$Window, [string]$Phase) {
     $null = Wait-Sync 'verified connectivity from the selected repository profile' {
         param($sync) $sync.connection -ceq 'Reachable'
     }
+    Open-FixtureHome $Window
 }
 
 function Wait-NativeActivityDelivery([string]$Profile, [string]$Stage, [string]$Description, [int]$Timeout) {

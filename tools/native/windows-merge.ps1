@@ -22,6 +22,7 @@ function Invoke-MergeQueueProof([IntPtr]$Window) {
     $null = Wait-Sync 'unrelated reads paused with queue dispatch enabled' {
         param($sync) $sync.controls.pause_background -and !$sync.controls.pause_queued_actions
     }
+    Open-FixtureHome $Window
     Click-AccountControl $Window 'reader-repository-1'
     Click-AccountControl $Window 'reader-fetch-repository'
     $fixtures = @(
@@ -65,6 +66,7 @@ function Invoke-MergeCancellationProof([IntPtr]$Window) {
     $null = Wait-Sync 'scheduled reads paused and writes enabled' {
         param($sync) $sync.controls.pause_background -and !$sync.controls.pause_queued_actions
     }
+    Open-FixtureHome $Window
     Click-AccountControl $Window 'reader-repository-1'
     Click-AccountControl $Window 'reader-fetch-repository'
     $null = Open-FixturePr $Window 0 42 'First fixture pull request' $head 'src/first.rs'
@@ -120,6 +122,7 @@ function Invoke-MergeProof([IntPtr]$Window) {
     $null = Wait-Sync 'only unrelated scheduled reads are paused' {
         param($sync) $sync.controls.pause_background -and !$sync.controls.pause_queued_actions
     }
+    Open-FixtureHome $Window
     Click-AccountControl $Window 'reader-repository-1'
     Click-AccountControl $Window 'reader-fetch-repository'
     $first = Open-FixturePr $Window 0 42 'First fixture pull request' $firstHead 'src/first.rs'

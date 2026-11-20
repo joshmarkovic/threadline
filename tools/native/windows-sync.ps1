@@ -7,7 +7,8 @@ function Wait-Sync([string]$Description, [scriptblock]$SyncCheck) {
 }
 
 function Open-SyncSettings([IntPtr]$Window) {
-    Click-AccountControl $Window 'reader-sync-settings'
+    Open-FixtureSettings $Window
+    Click-AccountControl $Window 'settings-synchronization' -ExpectedName 'Synchronization'
     $null = Wait-Sync 'the native synchronization settings with persisted values' {
         param($sync) $sync.panel_open -and $null -ne $sync.controls -and $null -ne $sync.schedule
     }
@@ -104,6 +105,7 @@ function Invoke-RateLimitedCacheProof([IntPtr]$Window) {
     }
     Set-AccessPhase 'sync-rate-floor'
     Click-AccountControl $Window 'sync-check-now'
+    Open-FixtureHome $Window
     Click-AccountControl $Window 'reader-browse'
     Click-AccountControl $Window 'reader-close-tab'
     $null = Wait-Reader 'the original issue tab is closed before searching the local cache' {
@@ -228,6 +230,7 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Sync 'the normal authenticated issue and comment polling before pauses' {
         param($sync) Test-NotificationSyncReady $sync
     }
+    Open-FixtureHome $Window
     Open-NotificationSchedule $Window
     Wait-For 'the native Enable quiet hours control' {
         Invoke-OwnedFixtureControl $Window 'notifications-quiet' $null (Get-NotificationChoiceName 'Enable quiet hours' $false)
@@ -305,6 +308,7 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
     }
     Add-NotificationCheckpoint 'online_with_separate_pauses'
 
+    Open-FixtureHome $restarted
     Open-RestartedFixtureActivity $restarted
     $null = Wait-Reader 'the exact seeded event is in the real Activity feed because quiet hours suppress popup and sound' {
         param($reader) $reader.notification.isolated_quiet_event_feed_only
@@ -325,6 +329,7 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
         param($sync) $sync.connection -ceq 'Reachable' -and $sync.reason -ceq 'ServiceFailure' -and
             $sync.controls.pause_background -and $sync.controls.pause_queued_actions -and !$sync.controls.work_offline
     }
+    Open-FixtureHome $restarted
     Open-RestartedFixtureActivity $restarted
     Open-NotificationSchedule $restarted -FromActivity
     $null = Wait-FixtureQuietSchedule $startMinute $endMinute
@@ -349,6 +354,7 @@ function Invoke-NotificationScheduleProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Sync 'only queued actions resumed while background reads stay paused' {
         param($sync) !$sync.controls.work_offline -and !$sync.controls.pause_queued_actions -and $sync.controls.pause_background
     }
+    Open-FixtureHome $restarted
     Click-AccountControl $restarted 'reader-outbox'
     Click-AccountControl $restarted 'reader-outbox-filter-history'
     Inspect-WriteFixtureAction $restarted 0 'Confirmed' 'Comment'

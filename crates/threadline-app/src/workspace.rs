@@ -333,16 +333,32 @@ impl Workspace {
             subscriptions.push(cx.subscribe_in(
                 panel,
                 window,
-                |this, _, event: &crate::account_panel::AccountPanelEvent, window, cx| match event {
-                    crate::account_panel::AccountPanelEvent::OnboardingFinished => {
-                        this.navigate(WorkspaceRoute::Home, window, cx)
-                    }
-                    crate::account_panel::AccountPanelEvent::RefreshFinished { account } => {
-                        if let Some(reader) = &this.reader {
-                            reader
-                                .update(cx, |reader, cx| reader.refresh_home(*account, window, cx));
+                |this, panel, event: &crate::account_panel::AccountPanelEvent, window, cx| {
+                    match event {
+                        crate::account_panel::AccountPanelEvent::OnboardingFinished => {
+                            this.navigate(WorkspaceRoute::Home, window, cx)
                         }
-                        cx.notify();
+                        crate::account_panel::AccountPanelEvent::OpenSynchronization => {
+                            if this.route == WorkspaceRoute::Settings
+                                && let Some(sync) = this.reader.as_ref().and_then(|reader| {
+                                    reader.update(cx, |reader, cx| {
+                                        reader.sync_settings_panel(window, cx)
+                                    })
+                                })
+                            {
+                                panel.update(cx, |panel, cx| {
+                                    panel.open_synchronization(sync, window, cx)
+                                });
+                            }
+                        }
+                        crate::account_panel::AccountPanelEvent::RefreshFinished { account } => {
+                            if let Some(reader) = &this.reader {
+                                reader.update(cx, |reader, cx| {
+                                    reader.refresh_home(*account, window, cx)
+                                });
+                            }
+                            cx.notify();
+                        }
                     }
                 },
             ));
@@ -1914,15 +1930,13 @@ impl Workspace {
             cached_reader: self
                 .accounts
                 .as_ref()
+                .filter(|panel| panel.read(cx).uses_isolated_fixture())
                 .and_then(|panel| {
-                    panel
-                        .read(cx)
-                        .observation(self.route != WorkspaceRoute::Home, window, cx)
-                })
-                .and_then(|_| {
+                    let sync_open = self.route == WorkspaceRoute::Settings
+                        && panel.read(cx).synchronization_open();
                     self.reader
                         .as_ref()
-                        .map(|reader| reader.read(cx).observation(window, cx))
+                        .map(|reader| reader.read(cx).observation(sync_open, window, cx))
                 }),
         }
     }

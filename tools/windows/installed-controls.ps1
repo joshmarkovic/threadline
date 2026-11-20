@@ -24,6 +24,11 @@ function Find-OwnedId($Root, [int]$ChildId, [string]$Id, [switch]$AllowDisabled)
     return $null
 }
 
+function Open-InstalledSyncSettings([Diagnostics.Process]$Process) {
+    Wait-InstalledDraft $Process 'the installed Settings screen' { Invoke-OwnedId $Process 'account-open' 'Settings' }
+    Wait-InstalledDraft $Process 'the Synchronization settings' { Invoke-OwnedId $Process 'settings-synchronization' 'Synchronization' }
+}
+
 function Invoke-OwnedId([Diagnostics.Process]$Process, [string]$Id, [string]$Name) {
     $root = Get-OwnedWindow $Process
     $control = Find-OwnedId $root $Process.Id $Id

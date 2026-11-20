@@ -52,9 +52,7 @@ fn ui_008_first_launch_opens_time_zone_onboarding_and_keeps_home_controls_hidden
 }
 
 #[gpui_kit::test]
-fn ui_008_native_account_shortcut_works_from_synchronization_after_focus_restores(
-    cx: &mut TestAppContext,
-) {
+fn ui_008_synchronization_opens_from_settings_and_returns_to_home(cx: &mut TestAppContext) {
     use std::time::{Duration, Instant};
     use threadline_storage::fixtures::{Scale, populate_reader};
 
@@ -62,6 +60,11 @@ fn ui_008_native_account_shortcut_works_from_synchronization_after_focus_restore
     let directory = tempfile::tempdir().unwrap();
     let store = Arc::new(Store::open_profile(directory.path()).unwrap());
     let fixture = populate_reader(&store, 42, Scale::Small).unwrap();
+    let initially_offline = store
+        .sync_settings(fixture.account)
+        .unwrap()
+        .controls
+        .work_offline;
     let profile = store.github_access_profiles().unwrap().pop().unwrap();
     let retired = store
         .observe_github_repository(
@@ -126,7 +129,7 @@ fn ui_008_native_account_shortcut_works_from_synchronization_after_focus_restore
             window.simulate_next_frame(cx);
             window.render_frame(cx);
             window
-                .try_find("reader-sync-settings")
+                .try_find("home-repository-summary")
                 .is_some_and(|control| control.visible())
         })
         .unwrap()
@@ -145,8 +148,10 @@ fn ui_008_native_account_shortcut_works_from_synchronization_after_focus_restore
         assert!(window.find("account-open").visible());
         assert!(window.find("account-close").visible());
         assert!(window.try_find("account-token").is_none());
-        window.click("reader-sync-settings", cx);
-        window.press("secondary-shift-a", cx);
+        assert!(window.try_find("reader-sync-settings").is_none());
+        assert!(window.try_find("settings-synchronization").is_none());
+        assert!(window.try_find("sync-work-offline").is_none());
+        window.click("account-open", cx);
     })
     .unwrap();
     step(cx, &mut |cx| {
@@ -154,11 +159,64 @@ fn ui_008_native_account_shortcut_works_from_synchronization_after_focus_restore
     });
     cx.update_window(window, |_, window, cx| {
         window.render_frame(cx);
-        assert!(window.find("account-close").visible());
+        assert!(window.try_find("home-refresh-all").is_none());
+        window.click("settings-synchronization", cx);
+    })
+    .unwrap();
+    step(cx, &mut |cx| {
+        cx.update_window(window, |_, window, cx| {
+            window.simulate_next_frame(cx);
+            window.render_frame(cx);
+            window
+                .try_find("sync-work-offline")
+                .is_some_and(|control| control.visible())
+        })
+        .unwrap()
+    });
+    cx.update_window(window, |_, window, cx| {
+        assert!(window.find("sync-pause-background").visible());
+        window.click("settings-sync-back", cx);
+        window.render_frame(cx);
+        assert!(window.find("settings-synchronization").visible());
+        assert!(window.try_find("sync-work-offline").is_none());
+        window.click("account-offline", cx);
+    })
+    .unwrap();
+    step(cx, &mut |cx| {
+        cx.read(|cx| {
+            workspace
+                .read(cx)
+                .accounts
+                .as_ref()
+                .unwrap()
+                .read(cx)
+                .local_reader_state()
+                .0
+                .offline
+                != initially_offline
+        })
+    });
+    cx.update_window(window, |_, window, cx| {
+        window.click("settings-synchronization", cx);
+    })
+    .unwrap();
+    step(cx, &mut |cx| {
+        cx.update_window(window, |_, window, cx| {
+            window.simulate_next_frame(cx);
+            window.render_frame(cx);
+            window
+                .try_find("sync-work-offline")
+                .is_some_and(|control| !control.disabled().unwrap_or(false))
+                && window.find("sync-check-now").disabled().unwrap_or(false) != initially_offline
+        })
+        .unwrap()
+    });
+    cx.update_window(window, |_, window, cx| {
         window.press("secondary-shift-a", cx);
         window.simulate_next_frame(cx);
         window.render_frame(cx);
         assert_eq!(workspace.read(cx).route, WorkspaceRoute::Home);
+        assert!(window.find("home-refresh-all").visible());
         window.click("account-open", cx);
     })
     .unwrap();

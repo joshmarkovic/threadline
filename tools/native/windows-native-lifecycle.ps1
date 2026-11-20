@@ -391,7 +391,7 @@ function Invoke-RepositoryScopeHoldProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Sync 'verify authenticated connectivity with dispatch enabled and no eligible scope work' {
         param($sync) (Test-LifecycleSync $sync $false $false -Reachable) -and $sync.eligible_outbox -eq 0
     }
-    Open-FixtureSettings $restarted
+    Click-AccountControl $restarted 'settings-sync-back' -ExpectedName 'Back to Settings'
     Click-AccountControl $restarted 'account-refresh'
     $null = Wait-Account 'verify the still-selected archive on the original account' {
         param($account)
@@ -508,6 +508,7 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
     Wait-For 'the normal interrupted-send lease deadline' {
         [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -ge ($recoveryDeadline + 1500)
     } 182000 200
+    Open-FixtureHome $recovery
     Click-AccountControl $recovery 'reader-outbox'
     Click-AccountControl $recovery 'reader-outbox-filter-attention'
     Wait-For 'the original unresolved comment in the process-owned Outbox' {
@@ -590,6 +591,7 @@ function Invoke-NativeLifecycleProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Sync 'the renewed credential serves a new verified online connection' {
         param($sync) Test-LifecycleSync $sync $false $false -Reachable
     }
+    Open-FixtureHome $repair
     Click-AccountControl $repair 'reader-outbox'
     Click-AccountControl $repair 'reader-outbox-filter-attention'
     Wait-For 'the same owned Outbox row remains uncertain after same-user repair' {

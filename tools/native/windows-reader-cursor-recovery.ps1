@@ -58,6 +58,7 @@ function Invoke-ReaderCursorRecoveryProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Sync 'background refresh and queued actions paused' {
         param($sync) $sync.controls.pause_background -and $sync.controls.pause_queued_actions
     }
+    Open-FixtureHome $Window
     Click-AccountControl $Window 'reader-browse'
     $item = Open-WriteFixtureIssue $Window -UserConnected
     Click-AccountControl $Window 'reader-fetch-metadata-0'

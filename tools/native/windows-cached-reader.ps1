@@ -236,6 +236,7 @@ function Invoke-ReaderResumeProof([IntPtr]$Window, [string]$Profile) {
     $null = Wait-Sync 'background refresh paused before the explicit offline download' {
         param($sync) $sync.controls.pause_background -and !$sync.controls.work_offline
     }
+    Open-FixtureHome $Window
     Click-AccountControl $Window 'reader-browse'
     Click-AccountControl $Window 'reader-repository-1'
     Click-AccountControl $Window 'reader-fetch-repository'
@@ -284,6 +285,7 @@ function Invoke-ReaderResumeProof([IntPtr]$Window, [string]$Profile) {
         param($sync) !$sync.controls.work_offline -and $sync.controls.pause_background
     }
     Wait-SeededFixtureAccount
+    Open-FixtureHome $restarted
     $null = Wait-Reader 'the worker resumes the original download with two unique comments' {
         param($reader)
         $reader.active_item -eq $item -and $reader.comments_coverage -ceq 'Complete' -and
@@ -599,6 +601,7 @@ function Invoke-ConcurrentReaderPerformance([IntPtr]$Window) {
     $null = Wait-Sync 'the read worker is enabled with writes paused' {
         param($sync) !$sync.controls.work_offline -and $sync.controls.pause_queued_actions -and !$sync.controls.pause_background
     }
+    Open-FixtureHome $Window
     Click-AccountControl $Window 'reader-browse'
     Invoke-ReaderPerformance $Window -Concurrent
 }

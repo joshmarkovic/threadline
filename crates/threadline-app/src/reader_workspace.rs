@@ -270,7 +270,6 @@ enum Surface {
     NotificationSettings,
     Outbox,
     Storage,
-    Sync,
     History,
 }
 
@@ -512,7 +511,12 @@ impl ReaderWorkspace {
     }
 
     #[cfg(feature = "e2e")]
-    pub(crate) fn observation(&self, window: &Window, cx: &gpui_kit::App) -> ReaderObservation {
+    pub(crate) fn observation(
+        &self,
+        synchronization_open: bool,
+        window: &Window,
+        cx: &gpui_kit::App,
+    ) -> ReaderObservation {
         use sha2::{Digest, Sha256};
         let active = self
             .layout
@@ -583,7 +587,7 @@ impl ReaderWorkspace {
                     .as_ref()
                     .and_then(|panel| panel.read(cx).saved_settings());
                 SyncObservation {
-                    panel_open: self.surface == Surface::Sync,
+                    panel_open: synchronization_open,
                     schedule: settings.map(|settings| settings.schedule.clone()),
                     controls: settings.map(|settings| settings.controls),
                     cache_generation: update.cache_generation,
@@ -1320,9 +1324,15 @@ impl ReaderWorkspace {
         cx.notify();
     }
 
-    fn show_sync(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(account) = self.account else { return };
-        if self.sync_panel.is_none() {
+    pub(crate) fn sync_settings_panel(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<Entity<crate::sync_panel::SyncPanel>> {
+        let account = self.account?;
+        if let Some(panel) = &self.sync_panel {
+            panel.update(cx, |panel, cx| panel.refresh(window, cx));
+        } else {
             let store = Arc::clone(&self.store);
             let runtime = self.runtime.clone();
             let panel =
@@ -1365,9 +1375,7 @@ impl ReaderWorkspace {
             ));
             self.sync_panel = Some(panel);
         }
-        self.surface = Surface::Sync;
-        self.surface_focus.focus(window, cx);
-        cx.notify();
+        self.sync_panel.clone()
     }
 
     fn refresh_tab_summaries(&mut self, window: &mut Window, cx: &mut Context<Self>) {
