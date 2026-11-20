@@ -7247,10 +7247,15 @@ dependencies = [
 name = "threadline-platform"
 version = "0.1.0"
 dependencies = [
+ "libc",
+ "serde_json",
+ "tempfile",
+ "threadline-core",
  "tokio",
  "windows 0.62.2",
  "windows-core 0.62.2",
  "windows-sys 0.61.2",
+ "zeroize",
 ]
 
 [[package]]
@@ -7371,6 +7376,7 @@ dependencies = [
  "libc",
  "mio",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "windows-sys 0.61.2",

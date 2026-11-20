@@ -11,6 +11,7 @@ pub use activity::{
     ActivityAction, ActivityActivation, ActivityId, ActivityNotification, ActivityPermission,
 };
 mod credentials;
+pub mod github_cli;
 mod paths;
 #[cfg(windows)]
 mod platform_windows;

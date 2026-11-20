@@ -1,10 +1,57 @@
 #[cfg(windows)]
 /// Verifies the Windows trust chain and the SHA-256 digest of its actual signer leaf.
 pub fn verify(path: &std::path::Path, pin: [u8; 32]) -> Result<(), u8> {
+    let file = open_for_verification(path)?;
+    verify_signer(path, &file, |cert| unsafe {
+        publisher_sha256(cert) == Some(pin)
+    })
+}
+
+/// Keep the verified executable open without write/delete sharing until the broker releases it.
+pub(super) fn github_cli(path: &std::path::Path) -> Option<std::fs::File> {
+    use windows_sys::Win32::Security::Cryptography::{CERT_NAME_ATTR_TYPE, CertGetNameStringW};
+    let file = open_for_verification(path).ok()?;
+    verify_signer(path, &file, |certificate| {
+        let mut name = [0u16; 128];
+        // Read the organization from the verified leaf's subject, using its X.500 attribute OID.
+        let len = unsafe {
+            CertGetNameStringW(
+                certificate,
+                CERT_NAME_ATTR_TYPE,
+                0,
+                c"2.5.4.10".as_ptr().cast(),
+                name.as_mut_ptr(),
+                name.len() as u32,
+            )
+        } as usize;
+        (1..=name.len()).contains(&len)
+            && name[..len - 1]
+                .iter()
+                .copied()
+                .eq("GitHub, Inc.".encode_utf16())
+    })
+    .ok()?;
+    Some(file)
+}
+
+fn open_for_verification(path: &std::path::Path) -> Result<std::fs::File, u8> {
+    use std::os::windows::fs::OpenOptionsExt;
+    use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
+    std::fs::OpenOptions::new()
+        .share_mode(FILE_SHARE_READ)
+        .read(true)
+        .open(path)
+        .map_err(|_| 3)
+}
+
+fn verify_signer(
+    path: &std::path::Path,
+    file_handle: &std::fs::File,
+    accepts: impl FnOnce(&windows_sys::Win32::Security::Cryptography::CERT_CONTEXT) -> bool,
+) -> Result<(), u8> {
     use std::{
-        fs::OpenOptions,
         mem::size_of,
-        os::windows::{ffi::OsStrExt, fs::OpenOptionsExt, io::AsRawHandle},
+        os::windows::{ffi::OsStrExt, io::AsRawHandle},
     };
     use windows_sys::Win32::{
         Foundation::INVALID_HANDLE_VALUE,
@@ -14,14 +61,8 @@ pub fn verify(path: &std::path::Path, pin: [u8; 32]) -> Result<(), u8> {
             WTD_REVOCATION_CHECK_CHAIN_EXCLUDE_ROOT, WTD_REVOKE_WHOLECHAIN, WTD_STATEACTION_CLOSE,
             WTD_STATEACTION_VERIFY, WTD_UI_NONE, WinVerifyTrust,
         },
-        Storage::FileSystem::FILE_SHARE_READ,
     };
 
-    let file_handle = OpenOptions::new()
-        .share_mode(FILE_SHARE_READ)
-        .read(true)
-        .open(path)
-        .map_err(|_| 3u8)?;
     let name = path
         .as_os_str()
         .encode_wide()
@@ -52,7 +93,10 @@ pub fn verify(path: &std::path::Path, pin: [u8; 32]) -> Result<(), u8> {
         let status = WinVerifyTrust(INVALID_HANDLE_VALUE, &mut policy, (&raw mut trust).cast());
         let result = if status != 0 {
             Err(1)
-        } else if publisher_sha256(trust.hWVTStateData) == Some(pin) {
+        } else if signer_leaf(trust.hWVTStateData)
+            .as_ref()
+            .is_some_and(accepts)
+        {
             Ok(())
         } else {
             Err(2)
@@ -64,16 +108,11 @@ pub fn verify(path: &std::path::Path, pin: [u8; 32]) -> Result<(), u8> {
 }
 
 #[cfg(windows)]
-unsafe fn publisher_sha256(state: windows_sys::Win32::Foundation::HANDLE) -> Option<[u8; 32]> {
-    use windows_sys::{
-        Win32::Security::{
-            Cryptography::CryptHashCertificate2,
-            WinTrust::{
-                WTHelperGetProvCertFromChain, WTHelperGetProvSignerFromChain,
-                WTHelperProvDataFromStateData,
-            },
-        },
-        core::w,
+unsafe fn signer_leaf(
+    state: windows_sys::Win32::Foundation::HANDLE,
+) -> *const windows_sys::Win32::Security::Cryptography::CERT_CONTEXT {
+    use windows_sys::Win32::Security::WinTrust::{
+        WTHelperGetProvCertFromChain, WTHelperGetProvSignerFromChain, WTHelperProvDataFromStateData,
     };
 
     // Index zero is the actual verified signer and its leaf. Do not use a
@@ -81,14 +120,23 @@ unsafe fn publisher_sha256(state: windows_sys::Win32::Foundation::HANDLE) -> Opt
     unsafe {
         let provider = WTHelperProvDataFromStateData(state);
         if provider.is_null() {
-            return None;
+            return std::ptr::null();
         }
         let signer = WTHelperGetProvSignerFromChain(provider, 0, 0, 0);
         if signer.is_null() {
-            return None;
+            return std::ptr::null();
         }
-        let leaf = WTHelperGetProvCertFromChain(signer, 0).as_ref()?;
-        let certificate = leaf.pCert.as_ref()?;
+        WTHelperGetProvCertFromChain(signer, 0)
+            .as_ref()
+            .map_or(std::ptr::null(), |leaf| leaf.pCert)
+    }
+}
+
+unsafe fn publisher_sha256(
+    certificate: &windows_sys::Win32::Security::Cryptography::CERT_CONTEXT,
+) -> Option<[u8; 32]> {
+    use windows_sys::{Win32::Security::Cryptography::CryptHashCertificate2, core::w};
+    unsafe {
         let mut bytes = [0u8; 32];
         let mut length = bytes.len() as u32;
         let status = CryptHashCertificate2(
