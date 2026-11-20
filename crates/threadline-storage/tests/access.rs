@@ -113,6 +113,31 @@ fn schema_18_upgrade_preserves_pat_bindings_and_backs_up_the_original() {
     );
     assert!(store.with_installed_credential(&linked, || ()).is_ok());
     assert!(store.with_installed_credential(&fine, || ()).is_ok());
+    let mut forged = fine.clone();
+    forged.kind = CredentialKind::GitHubCli;
+    assert!(
+        store
+            .with_installed_credential(&forged, || panic!("unlinked CLI"))
+            .is_err()
+    );
+    assert!(
+        !store
+            .record_access_result(
+                &fine,
+                CredentialKind::GitHubCli,
+                AccessState::Readable,
+                DiscoveryState::Complete,
+                15
+            )
+            .unwrap()
+    );
+    let mut wrong_login = linked;
+    wrong_login.login = "bob".into();
+    assert!(
+        store
+            .with_installed_credential(&wrong_login, || panic!("wrong CLI login"))
+            .is_err()
+    );
 }
 
 #[test]

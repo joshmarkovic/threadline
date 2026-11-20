@@ -367,10 +367,12 @@ impl Store {
     ) -> Result<T> {
         self.write(|tx| {
             let current: bool = tx.query_row(
-                "SELECT EXISTS(SELECT 1 FROM github_access_profiles
-                 WHERE account_id=?1 AND owner_scope=?2 AND credential_ref=?3
-                 AND credential_generation=?4 AND installed_generation=credential_generation AND access<>2)",
-                params![profile.account, profile.owner_scope, profile.credential_ref, profile.credential_generation],
+                "SELECT EXISTS(SELECT 1 FROM github_access_profiles p JOIN accounts a ON a.id=p.account_id
+                 WHERE p.account_id=?1 AND p.owner_scope=?2 AND p.credential_ref=?3
+                 AND p.credential_generation=?4 AND p.installed_generation=p.credential_generation AND p.access<>2
+                 AND p.credential_kind=?5 AND p.login=?6 COLLATE NOCASE AND a.host='github.com' AND a.provider_user_id=?7)",
+                params![profile.account, profile.owner_scope, profile.credential_ref, profile.credential_generation,
+                        profile.kind as i64, profile.login, profile.user_id.to_string()],
                 |row| row.get(0),
             )?;
             if !current { return Err(Error::Conflict("installed credential changed")); }
@@ -411,8 +413,8 @@ impl Store {
     ) -> Result<bool> {
         self.write(|tx| {
             let changed = tx.execute(
-                "UPDATE github_access_profiles SET credential_kind=?4,access=?5,discovery=?6,checked_at_ms=?7
-                 WHERE account_id=?1 AND owner_scope=?2 AND credential_ref=?3 AND (checked_at_ms IS NULL OR checked_at_ms<=?7)
+                "UPDATE github_access_profiles SET access=?5,discovery=?6,checked_at_ms=?7
+                 WHERE account_id=?1 AND owner_scope=?2 AND credential_ref=?3 AND credential_kind=?4 AND (checked_at_ms IS NULL OR checked_at_ms<=?7)
                        AND generation=?8 AND (?5<>1 OR installed_generation=credential_generation)",
                 params![profile.account,profile.owner_scope,profile.credential_ref,kind as i64,access as i64,discovery as i64,at_ms,profile.generation],
             )?;
