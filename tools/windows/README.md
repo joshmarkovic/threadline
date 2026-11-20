@@ -4,6 +4,8 @@ The local fixture installs a prebuilt x64 Threadline executable for the current 
 
 Build on Linux with the pinned NSIS 3.11 compiler and its matching `NSISDIR` data tree. Supply the application executable, setup output, local package version, monotonically increasing build ordinal, and the verified application schema version. Use `unknown` for a packaging-only executable whose schema cannot be proved.
 
+The application, setup and uninstaller share one icon, `crates/threadline-app/assets/threadline.ico`. The app's build script embeds it in `threadline.exe` on Windows, where it appears on the window, the taskbar and the Start shortcut. The package builder reads the same file from the source tree. To change the artwork, edit `threadline.svg` beside it and regenerate the `.ico` (16 to 64 pixel bitmap images plus a 256 pixel PNG image) and `threadline-mark.png` (96 pixels) with any SVG renderer.
+
 ```sh
 export MAKENSIS=/path/to/pinned/nsis/usr/bin/makensis
 export NSISDIR=/path/to/pinned/nsis/usr/share/nsis
