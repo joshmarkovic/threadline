@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use gpui_kit::base::text::TextViewState;
 use gpui_kit::component::button::{Button, ButtonVariants};
@@ -36,6 +36,12 @@ use crate::{
 const GUTTER: f32 = 8.;
 const WORKSPACE_INSET: f32 = 12.;
 const COMPACT_REVIEW_WIDTH: f32 = 960.;
+/// How often a downloaded update looks for a quiet moment to install.
+pub(crate) const IDLE_POLL: Duration = Duration::from_secs(30);
+/// Quiet time before an update installs while the window is in the background.
+const IDLE_IN_BACKGROUND: Duration = Duration::from_secs(60);
+/// Quiet time before an update installs while the window is in front.
+pub(crate) const IDLE_WHILE_ACTIVE: Duration = Duration::from_secs(10 * 60);
 
 actions!(
     threadline,
@@ -179,6 +185,8 @@ pub struct Workspace {
     reader: Option<Entity<ReaderWorkspace>>,
     route: WorkspaceRoute,
     user_interacted: bool,
+    last_interaction: Instant,
+    idle_install_pending: bool,
     restarting: bool,
     initial_route_chosen: bool,
     feasibility_fixture: bool,
@@ -423,6 +431,8 @@ impl Workspace {
             reader,
             route: WorkspaceRoute::Home,
             user_interacted: false,
+            last_interaction: Instant::now(),
+            idle_install_pending: false,
             restarting: false,
             initial_route_chosen: false,
             feasibility_fixture,
@@ -461,7 +471,7 @@ impl Workspace {
     }
 
     fn toggle_accounts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.user_interacted = true;
+        self.note_interaction();
         if self.route == WorkspaceRoute::Onboarding {
             return;
         }
@@ -548,6 +558,103 @@ impl Workspace {
         self.attach_updates(updates, window, cx);
     }
 
+    fn note_interaction(&mut self) {
+        self.user_interacted = true;
+        self.last_interaction = Instant::now();
+    }
+
+    /// Saves the workspace, then hands over to the verified installer.
+    fn begin_update(
+        &mut self,
+        updates: &Entity<crate::updates::Updates>,
+        request: crate::updates::RestartRequested,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self
+            .reader
+            .as_ref()
+            .is_some_and(|reader| reader.read(cx).departing())
+        {
+            updates.update(cx, |model, cx| {
+                model.restart_problem(
+                    "Finish the workspace change, then choose Restart to update.",
+                    cx,
+                )
+            });
+            return;
+        }
+        self.restarting = true;
+        self.shell_focus.focus(window, cx);
+        cx.notify();
+        let updates = updates.clone();
+        if let Some(reader) = self
+            .reader
+            .as_ref()
+            .filter(|reader| reader.read(cx).has_account())
+        {
+            reader.update(cx, |reader, cx| {
+                reader.request_departure(
+                    false,
+                    move |_, cx| updates.update(cx, |model, cx| model.launch(request, cx)),
+                    window,
+                    cx,
+                );
+            });
+        } else {
+            updates.update(cx, |model, cx| model.launch(request, cx));
+        }
+    }
+
+    /// Installs a downloaded update once the person has stepped away. A session
+    /// makes one automatic attempt; Restart to update stays available after it.
+    fn install_when_idle(
+        &mut self,
+        updates: Entity<crate::updates::Updates>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if std::mem::replace(&mut self.idle_install_pending, true) {
+            return;
+        }
+        cx.spawn_in(window, async move |view, cx| {
+            loop {
+                cx.background_executor().timer(IDLE_POLL).await;
+                let attempted = view.update_in(cx, |this, window, cx| {
+                    if this.restarting || !updates.read(cx).ready_to_install() {
+                        return false;
+                    }
+                    let quiet = if window.is_window_active() {
+                        IDLE_WHILE_ACTIVE
+                    } else {
+                        IDLE_IN_BACKGROUND
+                    };
+                    if this.last_interaction.elapsed() < quiet {
+                        return false;
+                    }
+                    this.begin_update(
+                        &updates,
+                        crate::updates::RestartRequested::Startup,
+                        window,
+                        cx,
+                    );
+                    true
+                });
+                if !matches!(attempted, Ok(false)) {
+                    break;
+                }
+            }
+        })
+        .detach();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn rewind_last_interaction(&mut self, by: Duration) {
+        if let Some(earlier) = self.last_interaction.checked_sub(by) {
+            self.last_interaction = earlier;
+        }
+    }
+
     pub(crate) fn attach_updates(
         &mut self,
         updates: Entity<crate::updates::Updates>,
@@ -559,45 +666,16 @@ impl Workspace {
             window,
             |this, updates, request: &crate::updates::RestartRequested, window, cx| {
                 let request = *request;
-                if this.restarting
-                    || (matches!(request, crate::updates::RestartRequested::Startup)
-                        && this.user_interacted)
-                {
+                if this.restarting {
                     return;
                 }
-                if this
-                    .reader
-                    .as_ref()
-                    .is_some_and(|reader| reader.read(cx).departing())
+                if matches!(request, crate::updates::RestartRequested::Startup)
+                    && this.user_interacted
                 {
-                    updates.update(cx, |model, cx| {
-                        model.restart_problem(
-                            "Finish the workspace change, then choose Restart to update.",
-                            cx,
-                        )
-                    });
+                    this.install_when_idle(updates.clone(), window, cx);
                     return;
                 }
-                this.restarting = true;
-                this.shell_focus.focus(window, cx);
-                cx.notify();
-                let updates = updates.clone();
-                if let Some(reader) = this
-                    .reader
-                    .as_ref()
-                    .filter(|reader| reader.read(cx).has_account())
-                {
-                    reader.update(cx, |reader, cx| {
-                        reader.request_departure(
-                            false,
-                            move |_, cx| updates.update(cx, |model, cx| model.launch(request, cx)),
-                            window,
-                            cx,
-                        );
-                    });
-                } else {
-                    updates.update(cx, |model, cx| model.launch(request, cx));
-                }
+                this.begin_update(updates, request, window, cx);
             },
         ));
         self._subscriptions.push(cx.subscribe_in(
@@ -1684,9 +1762,9 @@ impl gpui_kit::Render for Workspace {
         }
         let window_content = div()
             .id("threadline")
-            .capture_any_mouse_down(cx.listener(|this, _, _, _| this.user_interacted = true))
-            .capture_key_down(cx.listener(|this, _, _, _| this.user_interacted = true))
-            .on_scroll(cx.listener(|this, _, _, _| this.user_interacted = true))
+            .capture_any_mouse_down(cx.listener(|this, _, _, _| this.note_interaction()))
+            .capture_key_down(cx.listener(|this, _, _, _| this.note_interaction()))
+            .on_scroll(cx.listener(|this, _, _, _| this.note_interaction()))
             .track_focus(&self.shell_focus)
             .tab_stop(!self.feasibility_fixture)
             .key_context(if self.feasibility_fixture {

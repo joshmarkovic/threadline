@@ -11,14 +11,18 @@ struct Fixture {
     checks: AtomicUsize,
     handoffs: AtomicUsize,
     acknowledge_handoff: AtomicBool,
+    nothing_newer: AtomicBool,
     release_gate: tokio::sync::Notify,
     next_error: Mutex<Option<&'static str>>,
 }
 
 struct TestSource(Arc<Fixture>);
 impl Source for TestSource {
-    fn configured(&self) -> bool {
-        self.0.configured.load(Ordering::SeqCst)
+    fn installed(&self) -> Option<String> {
+        self.0
+            .configured
+            .load(Ordering::SeqCst)
+            .then(|| "1.2.2".to_owned())
     }
     fn check(&self) -> CheckFuture<'_> {
         Box::pin(async move {
@@ -26,6 +30,9 @@ impl Source for TestSource {
             self.0.release_gate.notified().await;
             if let Some(error) = self.0.next_error.lock().unwrap().take() {
                 return Err(error);
+            }
+            if self.0.nothing_newer.load(Ordering::SeqCst) {
+                return Ok(None);
             }
             Ok(Some(
                 Box::new(TestSetup(self.0.clone())) as Box<dyn VerifiedSetup>
@@ -202,22 +209,83 @@ fn public_updates_offer_retry_without_a_token_prompt(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn an_open_app_checks_again_later_and_on_request(cx: &mut TestAppContext) {
+    cx.executor().allow_parking();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let fixture = Arc::new(Fixture::default());
+    fixture.configured.store(true, Ordering::SeqCst);
+    fixture.nothing_newer.store(true, Ordering::SeqCst);
+    let (window, panel) = cx.update(|cx| {
+        gpui_kit::init(cx);
+        gpui_kit::open_window(WindowOptions::default(), cx, |_, cx| {
+            cx.new(|cx| {
+                Updates::with_source(
+                    runtime.handle().clone(),
+                    Arc::new(TestSource(fixture.clone())),
+                    cx,
+                )
+            })
+        })
+        .unwrap()
+    });
+    let current = |cx: &mut TestAppContext| {
+        fixture.release_gate.notify_one();
+        await_model(cx, |cx| {
+            cx.read(|cx| matches!(panel.read(cx).state, State::Current))
+        });
+    };
+    cx.update(|cx| panel.update(cx, |model, cx| model.set_policy(Some(true), cx)));
+    await_model(cx, |_| fixture.checks.load(Ordering::SeqCst) == 1);
+    current(cx);
+    cx.executor()
+        .advance_clock(RECHECK_AFTER_CURRENT - Duration::from_secs(1));
+    cx.run_until_parked();
+    assert_eq!(fixture.checks.load(Ordering::SeqCst), 1);
+    cx.executor().advance_clock(Duration::from_secs(1));
+    await_model(cx, |_| fixture.checks.load(Ordering::SeqCst) == 2);
+    current(cx);
+    cx.update_window(window, |_, window, cx| {
+        panel.update(cx, |model, cx| model.show_settings(true, cx));
+        window.render_frame(cx);
+        assert!(window.find("update-version").visible());
+        window.click("updates-check-again", cx);
+    })
+    .unwrap();
+    await_model(cx, |_| fixture.checks.load(Ordering::SeqCst) == 3);
+}
+
+#[gpui_kit::test]
 fn startup_installs_the_verified_update_automatically(cx: &mut TestAppContext) {
-    check_workspace_startup(cx, false);
+    check_workspace_startup(cx, Start::Untouched);
 }
 
 #[gpui_kit::test]
 fn starting_work_during_the_check_defers_installation(cx: &mut TestAppContext) {
-    check_workspace_startup(cx, true);
+    check_workspace_startup(cx, Start::Working);
 }
 
-fn check_workspace_startup(cx: &mut TestAppContext, interact: bool) {
+#[gpui_kit::test]
+fn a_deferred_update_installs_once_the_app_is_idle(cx: &mut TestAppContext) {
+    check_workspace_startup(cx, Start::WorkingThenIdle);
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum Start {
+    Untouched,
+    Working,
+    WorkingThenIdle,
+}
+
+fn check_workspace_startup(cx: &mut TestAppContext, start: Start) {
+    use crate::workspace::{IDLE_POLL, IDLE_WHILE_ACTIVE};
+
+    let interact = start != Start::Untouched;
     cx.executor().allow_parking();
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let fixture = Arc::new(Fixture::default());
     fixture.configured.store(true, Ordering::SeqCst);
     fixture.acknowledge_handoff.store(true, Ordering::SeqCst);
-    let ((window, _workspace), panel) = cx.update(|cx| {
+    let ((window, workspace), panel) = cx.update(|cx| {
         gpui_kit::init(cx);
         let mut panel = None;
         let window = gpui_kit::open_window(WindowOptions::default(), cx, |window, cx| {
@@ -256,11 +324,27 @@ fn check_workspace_startup(cx: &mut TestAppContext, interact: bool) {
             cx.read(|cx| matches!(panel.read(cx).state, State::Ready(_)))
         });
         assert_eq!(fixture.handoffs.load(Ordering::SeqCst), 0);
-        cx.update_window(window, |_, window, cx| {
-            window.render_frame(cx);
-            window.click("updates-restart", cx);
-        })
-        .unwrap();
+    }
+    match start {
+        Start::Untouched => {}
+        Start::Working => {
+            cx.update_window(window, |_, window, cx| {
+                window.render_frame(cx);
+                window.click("updates-restart", cx);
+            })
+            .unwrap();
+        }
+        Start::WorkingThenIdle => {
+            cx.executor().advance_clock(IDLE_POLL);
+            cx.run_until_parked();
+            assert_eq!(fixture.handoffs.load(Ordering::SeqCst), 0);
+            cx.update(|cx| {
+                workspace.update(cx, |workspace, _| {
+                    workspace.rewind_last_interaction(IDLE_WHILE_ACTIVE)
+                })
+            });
+            cx.executor().advance_clock(IDLE_POLL);
+        }
     }
     await_model(cx, |_| fixture.handoffs.load(Ordering::SeqCst) == 1);
 }

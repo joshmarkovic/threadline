@@ -10,14 +10,18 @@ mod windows;
 #[cfg(windows)]
 pub(crate) use windows::Restart;
 
-/// Whether the running program is installed and configured for verified updates.
-pub fn configured() -> bool {
+/// The installed version, when the running program is installed and configured
+/// for verified updates.
+pub fn installed_version() -> Option<String> {
     #[cfg(windows)]
     {
-        matches!(windows::verified_install(), Ok(Some(_)))
+        windows::verified_install()
+            .ok()
+            .flatten()
+            .map(|(installed, _)| installed.version.to_string())
     }
     #[cfg(not(windows))]
-    false
+    None
 }
 
 /// Check the public release feed and stage a verified newer installer.

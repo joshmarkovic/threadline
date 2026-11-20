@@ -1,12 +1,22 @@
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use gpui_kit::{
     Context, EventEmitter, InteractiveElement, IntoElement, ParentElement, Render, Role,
-    StatefulInteractiveElement, Styled, Window,
-    component::{Disableable, button::Button},
+    SharedString, StatefulInteractiveElement, Styled, TestSupportExt, Window,
+    component::{
+        Disableable, Sizable,
+        button::{Button, ButtonVariants},
+    },
     div,
 };
 use tokio::{runtime::Handle, task::AbortHandle};
+
+use crate::palette::Palette;
+
+/// How long to wait before looking again after finding nothing newer.
+const RECHECK_AFTER_CURRENT: Duration = Duration::from_secs(4 * 60 * 60);
+/// How long to wait before repeating a check that failed.
+const RECHECK_AFTER_FAILURE: Duration = Duration::from_secs(30 * 60);
 
 #[derive(Clone, Copy)]
 pub(crate) enum RestartRequested {
@@ -27,7 +37,8 @@ trait VerifiedSetup: Send + Sync {
 type CheckResult = Result<Option<Box<dyn VerifiedSetup>>, &'static str>;
 type CheckFuture<'a> = Pin<Box<dyn Future<Output = CheckResult> + Send + 'a>>;
 trait Source: Send + Sync {
-    fn configured(&self) -> bool;
+    /// The installed version, when this copy can update itself.
+    fn installed(&self) -> Option<String>;
     fn check(&self) -> CheckFuture<'_>;
 }
 
@@ -43,14 +54,14 @@ impl VerifiedSetup for threadline_installer::Staged {
     }
 }
 impl Source for Releases {
-    fn configured(&self) -> bool {
+    fn installed(&self) -> Option<String> {
         #[cfg(windows)]
         {
-            threadline_installer::github_update::configured()
+            threadline_installer::github_update::installed_version()
         }
         #[cfg(not(windows))]
         {
-            false
+            None
         }
     }
     fn check(&self) -> CheckFuture<'_> {
@@ -83,6 +94,7 @@ pub(crate) struct Updates {
     runtime: Handle,
     source: Arc<dyn Source>,
     state: State,
+    installed: Option<String>,
     permitted: Option<bool>,
     generation: u64,
     check_task: Option<AbortHandle>,
@@ -98,15 +110,16 @@ impl Updates {
 
     fn with_source(runtime: Handle, source: Arc<dyn Source>, cx: &mut Context<Self>) -> Self {
         let probe = source.clone();
-        let work = runtime.spawn_blocking(move || probe.configured());
+        let work = runtime.spawn_blocking(move || probe.installed());
         cx.spawn(async move |view, cx| {
-            let configured = work.await.unwrap_or_default();
+            let installed = work.await.unwrap_or_default();
             let _ = view.update(cx, |model, cx| {
-                model.state = if configured {
+                model.state = if installed.is_some() {
                     State::Waiting
                 } else {
                     State::Unconfigured
                 };
+                model.installed = installed;
                 model.start(cx);
                 cx.notify();
             });
@@ -116,6 +129,7 @@ impl Updates {
             runtime,
             source,
             state: State::Inspecting,
+            installed: None,
             permitted: None,
             generation: 0,
             check_task: None,
@@ -138,6 +152,11 @@ impl Updates {
         }
         self.start(cx);
         cx.notify();
+    }
+
+    /// Whether a verified update is downloaded and may be installed without asking.
+    pub(crate) fn ready_to_install(&self) -> bool {
+        matches!(self.state, State::Ready(_)) && !self.launching && self.permitted == Some(true)
     }
 
     fn cancel_check(&mut self) {
@@ -171,11 +190,41 @@ impl Updates {
                 };
                 if matches!(model.state, State::Ready(_)) {
                     cx.emit(RestartRequested::Startup);
+                } else {
+                    model.check_again_later(cx);
                 }
                 cx.notify();
             });
         })
         .detach();
+    }
+
+    /// Looks for a newer release again while the app stays open.
+    fn check_again_later(&mut self, cx: &mut Context<Self>) {
+        let delay = match self.state {
+            State::Current => RECHECK_AFTER_CURRENT,
+            State::Failed(_) => RECHECK_AFTER_FAILURE,
+            _ => return,
+        };
+        let generation = self.generation;
+        let timer = cx.background_executor().timer(delay);
+        cx.spawn(async move |view, cx| {
+            timer.await;
+            let _ = view.update(cx, |model, cx| {
+                if model.generation == generation {
+                    model.check_now(cx);
+                }
+            });
+        })
+        .detach();
+    }
+
+    fn check_now(&mut self, cx: &mut Context<Self>) {
+        if matches!(self.state, State::Current | State::Failed(_)) {
+            self.state = State::Waiting;
+            self.start(cx);
+            cx.notify();
+        }
     }
 
     pub(crate) fn launch(&mut self, request: RestartRequested, cx: &mut Context<Self>) {
@@ -233,68 +282,121 @@ impl Drop for Updates {
 
 impl Render for Updates {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let palette = Palette::current(cx);
         let ready = matches!(self.state, State::Ready(_));
-        let status = match &self.state {
+        let paused = matches!(self.state, State::Waiting) && self.permitted == Some(false);
+        let status: SharedString = match &self.state {
             State::Inspecting => "Checking this installation…".into(),
             State::Unconfigured => "This installation does not receive automatic updates.".into(),
-            State::Waiting if self.permitted == Some(false) => {
-                "Update checks are paused by your sync settings.".into()
-            }
+            State::Waiting if paused => "Update checks are paused by your sync settings.".into(),
             State::Waiting => "Waiting for the workspace settings.".into(),
             State::Checking => "Checking for updates…".into(),
-            State::Current => "No newer update is available.".into(),
-            State::Failed(error) => error.to_string(),
+            State::Current => "Threadline is up to date.".into(),
+            State::Failed(error) => (*error).into(),
             State::Ready(_) if self.launching => "Starting the verified installer…".into(),
-            State::Ready(setup) => format!("Threadline {} is ready to install.", setup.version()),
+            State::Ready(setup) => {
+                format!("Threadline {} is ready to install.", setup.version()).into()
+            }
         };
         if !self.open && !ready {
             return div();
         }
-        let mut panel = div().flex().flex_col().gap_2().p_3();
-        if self.open {
-            panel = panel.child("App updates");
-        }
-        let mut summary = div().flex().items_center().gap_2().child(
+        let status_color = match self.state {
+            State::Failed(_) => palette.bad,
+            State::Waiting if paused => palette.warn,
+            _ => palette.ink,
+        };
+        let status = div()
+            .id("update-status")
+            .accessibility_id("update-status")
+            .role(Role::Status)
+            .aria_label(status.clone())
+            .text_color(status_color)
+            .child(status);
+        let restart = ready.then(|| {
+            Button::new("updates-restart")
+                .label("Restart to update")
+                .primary()
+                .small()
+                .accessibility_id("updates-restart")
+                .disabled(self.launching)
+                .on_click(cx.listener(|_, _, _, cx| cx.emit(RestartRequested::User)))
+        });
+        let note = self.note.map(|note| {
             div()
-                .id("update-status")
-                .accessibility_id("update-status")
+                .id("update-note")
+                .accessibility_id("update-note")
                 .role(Role::Status)
-                .aria_label(status.clone())
-                .child(status),
-        );
-        if ready {
-            summary = summary.child(
-                Button::new("updates-restart")
-                    .label("Restart to update")
-                    .accessibility_id("updates-restart")
-                    .disabled(self.launching)
-                    .on_click(cx.listener(|_, _, _, cx| cx.emit(RestartRequested::User))),
-            );
+                .aria_label(note)
+                .text_color(palette.bad)
+                .child(note)
+        });
+        if !self.open {
+            return div()
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .gap_3()
+                .px_3()
+                .py_1p5()
+                .border_b_1()
+                .border_color(palette.border)
+                .bg(palette.accent_bg)
+                .text_sm()
+                .child(status)
+                .child(
+                    div()
+                        .text_color(palette.muted)
+                        .child("It installs when you step away."),
+                )
+                .children(restart)
+                .children(note);
         }
-        if self.open && matches!(self.state, State::Failed(_)) {
-            summary = summary.child(
-                Button::new("updates-check-again")
-                    .label("Check again")
-                    .disabled(self.permitted != Some(true))
-                    .on_click(cx.listener(|model, _, _, cx| {
-                        model.state = State::Waiting;
-                        model.start(cx);
-                        cx.notify();
-                    })),
-            );
-        }
-        panel = panel.child(summary);
-        if let Some(note) = self.note {
-            panel = panel.child(
-                div()
-                    .id("update-note")
-                    .accessibility_id("update-note")
-                    .role(Role::Status)
-                    .aria_label(note)
-                    .child(note),
-            );
-        }
-        panel
+        let version = match &self.installed {
+            Some(version) => format!("Version {version}"),
+            None => format!(
+                "Version {} · not installed by setup",
+                env!("CARGO_PKG_VERSION")
+            ),
+        };
+        let check = matches!(self.state, State::Current | State::Failed(_)).then(|| {
+            Button::new("updates-check-again")
+                .label(if matches!(self.state, State::Failed(_)) {
+                    "Check again"
+                } else {
+                    "Check for updates"
+                })
+                .small()
+                .accessibility_id("updates-check-again")
+                .disabled(self.permitted != Some(true))
+                .on_click(cx.listener(|model, _, _, cx| model.check_now(cx)))
+        });
+        crate::ui::card(
+            "Updates",
+            "Threadline checks for updates when it starts and every few hours. \
+             It installs an update when you step away, then reopens.",
+            palette,
+        )
+        .child(
+            div()
+                .id("update-version")
+                .test_support()
+                .text_sm()
+                .text_color(palette.muted)
+                .child(version),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .gap_3()
+                .text_sm()
+                .child(status)
+                .children(restart)
+                .children(check),
+        )
+        .children(note.map(|note| note.text_sm()))
     }
 }
 
