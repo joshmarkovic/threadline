@@ -19,7 +19,7 @@ $uninstaller = Join-Path $installed 'Uninstall.exe'
 $record = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Threadline.InstallTest'
 $server = 'HKCU:\Software\Classes\CLSID\{df3bb9a2-0794-44a6-b130-a35197093afe}\LocalServer32'
 $sender = 'HKCU:\Software\Classes\AppUserModelId\Threadline.InstallTest'
-$shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'Threadline Installer Test.lnk'
+$shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'Threadline Preview.lnk'
 
 function Assert-Ordinary([string]$Path) {
     $item = Get-Item -LiteralPath $Path -Force

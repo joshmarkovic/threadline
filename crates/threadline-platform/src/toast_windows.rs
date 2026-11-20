@@ -57,7 +57,7 @@ impl Identity {
             (
                 "Threadline.InstallTest",
                 local_class,
-                "Threadline Installer Test.lnk",
+                "Threadline Preview.lnk",
                 r"CLSID\{df3bb9a2-0794-44a6-b130-a35197093afe}\LocalServer32",
             ),
         ];

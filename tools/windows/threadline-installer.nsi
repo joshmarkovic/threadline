@@ -11,7 +11,10 @@ ShowUninstDetails hide
 !include FileFunc.nsh
 
 !ifdef LOCAL_FIXTURE
-  !define Product "Threadline Installer Test"
+  # The preview keeps the folder it was first installed in. Only the name people see changed.
+  !define Product "Threadline Preview"
+  !define InstallFolder "Threadline Installer Test"
+  !define FormerShortcut "Threadline Installer Test"
   !define NotificationChannel Local
   !define Registration "Software\Microsoft\Windows\CurrentVersion\Uninstall\Threadline.InstallTest"
   !define History "Software\Threadline.InstallTest"
@@ -26,6 +29,7 @@ ShowUninstDetails hide
     !error "Staging fault injection is available only for the local fixture."
   !endif
   !define Product "Threadline"
+  !define InstallFolder "Threadline"
   !define NotificationChannel Release
   !define Registration "Software\Microsoft\Windows\CurrentVersion\Uninstall\Threadline"
   !define History "Software\Threadline"
@@ -77,7 +81,7 @@ ShowUninstDetails hide
 
 Name "${Product} ${PACKAGE_VERSION}"
 OutFile "${INSTALLER_OUTPUT}"
-InstallDir "$LOCALAPPDATA\Programs\${Product}"
+InstallDir "$LOCALAPPDATA\Programs\${InstallFolder}"
 !ifndef APP_ICON
   !error "Supply the application icon."
 !endif
@@ -171,6 +175,9 @@ Var RollbackFailed
   !insertmacro RefuseReparse "$INSTDIR\${Stage}\previous-uninstaller.exe"
   !insertmacro RefuseReparse "$INSTDIR\${Stage}\removing.exe"
   !insertmacro RefuseReparse "$SMPROGRAMS\${Product}.lnk"
+  !ifdef FormerShortcut
+    !insertmacro RefuseReparse "$SMPROGRAMS\${FormerShortcut}.lnk"
+  !endif
   ReadINIStr $1 "$INSTDIR\${Stage}\owner.ini" "Stage" "Identity"
   ${If} $1 != "${StageId}"
     IfFileExists "$INSTDIR\${Stage}\candidate.exe" foreign_stage 0
@@ -252,7 +259,7 @@ Function .onInit
   !endif
   SetShellVarContext current
   SetRegView 64
-  StrCpy $INSTDIR "$LOCALAPPDATA\Programs\${Product}"
+  StrCpy $INSTDIR "$LOCALAPPDATA\Programs\${InstallFolder}"
   !insertmacro LockInstaller
   !insertmacro CheckPaths
   ReadRegStr $PriorLocation HKCU "${Registration}" "InstallLocation"
@@ -270,6 +277,11 @@ Function .onInit
     IfFileExists "$SMPROGRAMS\${Product}.lnk" 0 no_unregistered_shortcut
       !insertmacro MessageAndStop 17 "A Start menu entry with this name already exists. Its files were preserved."
     no_unregistered_shortcut:
+    !ifdef FormerShortcut
+      IfFileExists "$SMPROGRAMS\${FormerShortcut}.lnk" 0 no_unregistered_former_shortcut
+        !insertmacro MessageAndStop 17 "A Start menu entry with this application's former name already exists. Its files were preserved."
+      no_unregistered_former_shortcut:
+    !endif
   ${EndIf}
   StrCpy $PriorBuild 0
   StrCpy $PendingBuild 0
@@ -365,6 +377,10 @@ Section "Install Threadline" SEC_INSTALL
   !ifndef REGISTER_ACTIVITY
     CreateShortCut "$SMPROGRAMS\${Product}.lnk" "$INSTDIR\threadline.exe"
     IfErrors commit_failure
+    !ifdef FormerShortcut
+      Delete "$SMPROGRAMS\${FormerShortcut}.lnk"
+      ClearErrors
+    !endif
   !endif
   System::Call 'kernel32::MoveFileExW(w "$INSTDIR\${Stage}\uninstaller.exe", w "$INSTDIR\Uninstall.exe", i 9) i.r0'
   StrCmp $0 0 commit_failure
@@ -486,7 +502,7 @@ Function un.onInit
   SetShellVarContext current
   SetRegView 64
   ReadRegStr $0 HKCU "${Registration}" "InstallLocation"
-  ${If} $INSTDIR != "$LOCALAPPDATA\Programs\${Product}"
+  ${If} $INSTDIR != "$LOCALAPPDATA\Programs\${InstallFolder}"
   ${OrIf} $0 != $INSTDIR
     !insertmacro MessageAndStop 17 "The uninstaller does not match the registered per-user installation. No files were removed."
   ${EndIf}
@@ -516,6 +532,10 @@ Section "Uninstall"
   ClearErrors
   Delete "$SMPROGRAMS\${Product}.lnk"
   IfErrors uninstall_restore
+  !ifdef FormerShortcut
+    Delete "$SMPROGRAMS\${FormerShortcut}.lnk"
+    ClearErrors
+  !endif
   !endif
   ClearErrors
   DeleteRegKey HKCU "${Registration}"

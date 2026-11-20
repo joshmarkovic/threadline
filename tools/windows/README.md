@@ -1,6 +1,6 @@
 # Windows installer development
 
-The local fixture installs a prebuilt x64 Threadline executable for the current Windows 11 user. It uses `%LOCALAPPDATA%\Programs\Threadline Installer Test`, a single current-user Start menu shortcut, and the `Threadline.InstallTest` entry under `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall`. After a successful interactive installation, setup closes and opens the installed app. Install and uninstall preserve `%LOCALAPPDATA%\Threadline` and credentials in Windows Credential Manager.
+The local fixture installs a prebuilt x64 Threadline executable for the current Windows 11 user. It uses `%LOCALAPPDATA%\Programs\Threadline Installer Test`, a single current-user Start menu shortcut named **Threadline Preview**, and the `Threadline.InstallTest` entry under `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall`. After a successful interactive installation, setup closes and opens the installed app. The folder and registry names predate the Threadline Preview name and stay as they are, so existing installations upgrade in place. Setup replaces a shortcut that still has the former name, Threadline Installer Test. Install and uninstall preserve `%LOCALAPPDATA%\Threadline` and credentials in Windows Credential Manager.
 
 Build on Linux with the pinned NSIS 3.11 compiler and its matching `NSISDIR` data tree. Supply the application executable, setup output, local package version, monotonically increasing build ordinal, and the verified application schema version. Use `unknown` for a packaging-only executable whose schema cannot be proved.
 
@@ -18,7 +18,7 @@ The example uses local build ordinal 2 and schema 10. For schema 14 and later, b
 .\tools\windows\build-notification-helper.ps1 -Output .\Threadline.NotificationRegistration.exe
 ```
 
-Use the actual version and schema from the chosen source revision. The sibling `.exe.json` records the setup and exact installed executable digests. Verify the former against the separately recorded digest from the build before running the local fixture. For unattended testing, run setup with `/S` to install silently and leave the app closed. The app's own silent update handoff reopens it once. On later visits, open **Threadline Installer Test** from Start. Use the Windows installed-apps entry or `Uninstall.exe` in the fixture directory to uninstall. The fixture retains `HKCU\Software\Threadline.InstallTest` build history to reject older test packages after uninstall.
+Use the actual version and schema from the chosen source revision. The sibling `.exe.json` records the setup and exact installed executable digests. Verify the former against the separately recorded digest from the build before running the local fixture. For unattended testing, run setup with `/S` to install silently and leave the app closed. The app's own silent update handoff reopens it once. On later visits, open **Threadline Preview** from Start. Use the Windows installed-apps entry or `Uninstall.exe` in the fixture directory to uninstall. The fixture retains `HKCU\Software\Threadline.InstallTest` build history to reject older test packages after uninstall.
 
 ### Remove a retained local workspace
 
@@ -108,7 +108,7 @@ Use Windows PowerShell on the release machine to provision the per-user preview 
 .\tools\windows\private-release.ps1 -Action Provision
 ```
 
-Build the app with the printed public key in `THREADLINE_PRIVATE_UPDATE_PUBLIC_KEY`, then run the installer recipe with the same environment. The recipe checks that the app contains the public key. Preview builds use the existing **Threadline Installer Test** installation, shortcut and build history. The example uses build 22, schema 18 and a Windows PowerShell session launched from WSL for reading the public key.
+Build the app with the printed public key in `THREADLINE_PRIVATE_UPDATE_PUBLIC_KEY`, then run the installer recipe with the same environment. The recipe checks that the app contains the public key. Preview builds use the existing `Threadline Installer Test` installation folder and build history, and appear as **Threadline Preview** in Start. The example uses build 22, schema 18 and a Windows PowerShell session launched from WSL for reading the public key.
 
 ```sh
 export THREADLINE_PRIVATE_UPDATE_PUBLIC_KEY="$(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$(wslpath -w "$PWD/tools/windows/private-release.ps1")" -Action PublicKey | tr -d '\r')"
