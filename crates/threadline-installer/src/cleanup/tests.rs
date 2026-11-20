@@ -54,6 +54,25 @@ impl CredentialStore for TestVault {
 }
 
 #[test]
+fn cleanup_skips_the_cli_binding_and_retains_pat_backups_in_its_inventory() {
+    let dir = synthetic_profile();
+    let data = dir.path();
+    let current = data.join(DATABASE);
+    let backup = data.join("threadline-schema-18-Prior1.sqlite3");
+    fs::copy(&current, &backup).unwrap();
+    Connection::open(&backup)
+        .unwrap()
+        .pragma_update(None, "user_version", 18)
+        .unwrap();
+    Connection::open(&current).unwrap().execute(
+        "UPDATE github_access_profiles SET credential_kind=2, credential_ref=lower(hex(randomblob(16)))", []
+    ).unwrap();
+    assert_eq!(Preview::inspect(data).unwrap().credentials.len(), 1);
+    fs::remove_file(backup).unwrap();
+    assert!(Preview::inspect(data).unwrap().credentials.is_empty());
+}
+
+#[test]
 fn it_019_preview_counts_active_workspace_and_confirmation_removes_only_managed_files() {
     let dir = synthetic_profile();
     let data = dir.path();

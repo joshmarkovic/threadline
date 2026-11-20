@@ -48,6 +48,7 @@ pub(crate) enum ReaderError {
     ServerBackoff,
     ScopeChanged,
     CredentialUnavailable,
+    GitHubCli(threadline_platform::github_cli::CliError),
     Cancelled,
     InvalidIdentity,
     IncompleteAccess,
@@ -74,6 +75,7 @@ impl fmt::Display for ReaderError {
             Self::CredentialUnavailable | Self::ProtectedStore(_) => f.write_str(
                 "The saved credential is unavailable. Downloaded content remains available.",
             ),
+            Self::GitHubCli(error) => f.write_str(error.message()),
             Self::Cancelled => f.write_str("The download was cancelled."),
             Self::InvalidIdentity => {
                 f.write_str("The item does not match the selected repository.")
@@ -154,7 +156,7 @@ impl ReaderError {
                 PlatformError::Denied => ResourceError::Forbidden,
                 _ => ResourceError::Unauthorized,
             },
-            Self::CredentialUnavailable => ResourceError::Unauthorized,
+            Self::CredentialUnavailable | Self::GitHubCli(_) => ResourceError::Unauthorized,
             Self::ScopeChanged | Self::IncompleteAccess => ResourceError::Forbidden,
             Self::Remote(error) => match error.kind {
                 AccessKind::Unauthorized | AccessKind::InvalidCredential => {

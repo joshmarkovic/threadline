@@ -26,7 +26,7 @@ macro_rules! stored_enum {
     };
 }
 
-stored_enum!(CredentialKind { FineGrained = 0, Classic = 1 });
+stored_enum!(CredentialKind { FineGrained = 0, Classic = 1, GitHubCli = 2 });
 stored_enum!(AccessState {
     Unchecked = 0,
     Readable = 1,
@@ -172,6 +172,15 @@ fn refresh_account_authorization(db: &Connection, account: AccountId) -> Result<
     Ok(())
 }
 
+struct CredentialBinding<'a> {
+    account: AccountId,
+    user_id: NonZeroU64,
+    login: &'a str,
+    owner: &'a str,
+    kind: CredentialKind,
+    previous: Option<&'a AccessProfile>,
+}
+
 impl Store {
     /// Reserve or reuse the stable protected-store reference after verifying the GitHub user's identity.
     pub fn reserve_access_profile_credential(
@@ -183,6 +192,62 @@ impl Store {
         kind: CredentialKind,
         previous: Option<&AccessProfile>,
     ) -> Result<AccessProfile> {
+        if kind == CredentialKind::GitHubCli {
+            return Err(Error::InvalidInput(
+                "GitHub CLI requires a verified account binding",
+            ));
+        }
+        let binding = CredentialBinding {
+            account,
+            user_id,
+            login,
+            owner,
+            kind,
+            previous,
+        };
+        match self.bind_credential(binding, |_| Ok::<_, std::convert::Infallible>(()))? {
+            Ok(profile) => Ok(profile),
+            Err(impossible) => match impossible {},
+        }
+    }
+
+    /// Connect a verified CLI identity. Retire any previous PAT from its vault slot
+    /// under the same writer fence. The CLI's credential never enters the vault.
+    pub fn link_github_cli<E>(
+        &self,
+        account: AccountId,
+        user_id: NonZeroU64,
+        login: &str,
+        owner: &str,
+        previous: Option<&AccessProfile>,
+        retire_pat: impl FnOnce(&AccessProfile) -> std::result::Result<(), E>,
+    ) -> Result<std::result::Result<AccessProfile, E>> {
+        self.bind_credential(
+            CredentialBinding {
+                account,
+                user_id,
+                login,
+                owner,
+                kind: CredentialKind::GitHubCli,
+                previous,
+            },
+            retire_pat,
+        )
+    }
+
+    fn bind_credential<E>(
+        &self,
+        binding: CredentialBinding<'_>,
+        retire_pat: impl FnOnce(&AccessProfile) -> std::result::Result<(), E>,
+    ) -> Result<std::result::Result<AccessProfile, E>> {
+        let CredentialBinding {
+            account,
+            user_id,
+            login,
+            owner,
+            kind,
+            previous,
+        } = binding;
         verify_name(login)?;
         verify_name(owner)?;
         self.write(|tx| {
@@ -198,6 +263,13 @@ impl Store {
                 |row| row.get(0),
             )?;
             if !verified { return Err(Error::Conflict("GitHub identity does not match the local account")); }
+            if kind == CredentialKind::GitHubCli
+                && let Some(old) = profile(tx, account, owner)?
+                && old.kind != CredentialKind::GitHubCli
+                && let Err(error) = retire_pat(&old)
+            {
+                return Ok(Err(error));
+            }
             tx.execute(
                 "INSERT INTO github_access_profiles(account_id,owner_scope,login,credential_ref,credential_kind)
                  VALUES (?1,?2,?3,lower(hex(randomblob(16))),?4)
@@ -208,8 +280,14 @@ impl Store {
                    access=0,discovery=0,checked_at_ms=NULL",
                 params![account,owner,login,kind as i64],
             )?;
+            if kind == CredentialKind::GitHubCli {
+                tx.execute(
+                    "UPDATE github_access_profiles SET installed_generation=credential_generation
+                     WHERE account_id=?1 AND owner_scope=?2", params![account, owner],
+                )?;
+            }
             refresh_account_authorization(tx,account)?;
-            profile(tx,account,owner)?.ok_or(Error::NotFound)
+            Ok(Ok(profile(tx,account,owner)?.ok_or(Error::NotFound)?))
         })
     }
 
@@ -278,6 +356,26 @@ impl Store {
         owner: &str,
     ) -> Result<Option<AccessProfile>> {
         self.read(|db| profile(db, account, owner))
+    }
+
+    /// Fence use of an installed identity against replacement and sign-out. Independent
+    /// repository checks may advance the access-check generation for the same identity.
+    pub fn with_installed_credential<T>(
+        &self,
+        profile: &AccessProfile,
+        run: impl FnOnce() -> T,
+    ) -> Result<T> {
+        self.write(|tx| {
+            let current: bool = tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM github_access_profiles
+                 WHERE account_id=?1 AND owner_scope=?2 AND credential_ref=?3
+                 AND credential_generation=?4 AND installed_generation=credential_generation AND access<>2)",
+                params![profile.account, profile.owner_scope, profile.credential_ref, profile.credential_generation],
+                |row| row.get(0),
+            )?;
+            if !current { return Err(Error::Conflict("installed credential changed")); }
+            Ok(run())
+        })
     }
 
     pub fn github_access_profiles(&self) -> Result<Vec<AccessProfile>> {

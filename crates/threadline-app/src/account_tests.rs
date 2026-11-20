@@ -1927,6 +1927,176 @@ async fn entered_private_route_cannot_replace_the_bound_repository_identity() {
 }
 
 #[tokio::test]
+async fn cli_connection_checks_identity_and_reopens_without_storing_a_token() {
+    struct NoVault;
+    impl CredentialStore for NoVault {
+        fn read(&self, _: &CredentialRef) -> Result<Option<Credential>, PlatformError> {
+            panic!("CLI profiles must not read the Threadline vault")
+        }
+        fn save(&self, _: &CredentialRef, _: &Credential) -> Result<(), PlatformError> {
+            panic!("CLI profiles must not save GitHub CLI tokens")
+        }
+        fn remove(&self, _: &CredentialRef) -> Result<(), PlatformError> {
+            panic!("unlinking the CLI must not remove credentials")
+        }
+    }
+    let fixture = Simulator::start();
+    let dir = tempfile::tempdir().unwrap();
+    let open = || AccountService {
+        store: Arc::new(Store::open_profile(dir.path()).unwrap()),
+        credentials: Arc::new(NoVault),
+        github: GitHubClient::loopback(fixture.address).unwrap(),
+        fixture: true,
+    };
+    let connect = |login: &str, id, renew| AccountCommand::ConnectGitHubCli {
+        repository: "fixture-org/private".into(),
+        login: login.into(),
+        user_id: std::num::NonZeroU64::new(id).unwrap(),
+        renew,
+    };
+    let service = open();
+    let cancel = Cancellation::new();
+    let wrong = service
+        .execute(connect("fixture-user", 202, None), &cancel)
+        .await;
+    assert_eq!(
+        wrong.github_error.unwrap().kind,
+        AccessKind::IdentityMismatch
+    );
+    assert!(wrong.view.profiles.is_empty());
+    let missing = service
+        .execute(connect("absent-user", 101, None), &cancel)
+        .await;
+    assert_eq!(missing.message, Some(CliError::SignedOut.message()));
+    assert!(missing.view.profiles.is_empty());
+
+    let reply = service
+        .execute(connect("Fixture-User", 101, None), &cancel)
+        .await;
+    assert!(reply.succeeded);
+    let profile = reply.view.profiles[0].clone();
+    assert_eq!(profile.kind, CredentialKind::GitHubCli);
+    assert_eq!(profile.login, "fixture-user");
+    let calls = fixture.user_requests.load(Ordering::Acquire);
+    let wrong = service
+        .execute(connect("fixture-user", 202, Some(profile.clone())), &cancel)
+        .await;
+    assert!(!wrong.succeeded);
+    assert_eq!(wrong.view.profiles, vec![profile.clone()]);
+    assert_eq!(calls, fixture.user_requests.load(Ordering::Acquire));
+    drop(service);
+
+    let reopened = open();
+    let (session, _) = reopened
+        .reader_session_with_guidance(&profile, &cancel)
+        .await
+        .unwrap();
+    assert_eq!(session.user().id, profile.user_id);
+    assert!(fixture.user_requests.load(Ordering::Acquire) > calls);
+    let refresh = reopened
+        .execute(AccountCommand::RefreshAll(profile.account), &cancel)
+        .await;
+    assert!(refresh.succeeded);
+    let profile = refresh.view.profiles[0].clone();
+    reopened
+        .execute(
+            AccountCommand::SetOffline {
+                account: profile.account,
+                offline: true,
+            },
+            &cancel,
+        )
+        .await;
+    let calls = fixture.user_requests.load(Ordering::Acquire);
+    assert!(matches!(
+        reopened
+            .reader_session_with_guidance(&profile, &cancel)
+            .await,
+        Err(crate::reader::ReaderError::Offline)
+    ));
+    reopened
+        .execute(
+            AccountCommand::SetOffline {
+                account: profile.account,
+                offline: false,
+            },
+            &cancel,
+        )
+        .await;
+    let signed_out = reopened
+        .execute(AccountCommand::SignOut(profile.account), &cancel)
+        .await;
+    assert!(signed_out.succeeded);
+    assert!(
+        reopened
+            .reader_session_with_guidance(&profile, &cancel)
+            .await
+            .is_err()
+    );
+    assert_eq!(calls, fixture.user_requests.load(Ordering::Acquire));
+}
+
+#[tokio::test]
+async fn replacing_a_pat_with_the_cli_retires_only_that_owners_secret() {
+    let fixture = Simulator::start();
+    let dir = tempfile::tempdir().unwrap();
+    let vault = Arc::new(FixtureVault::default());
+    let service = AccountService {
+        store: Arc::new(Store::open_profile(dir.path()).unwrap()),
+        credentials: vault.clone(),
+        github: GitHubClient::loopback(fixture.address).unwrap(),
+        fixture: true,
+    };
+    let cancel = Cancellation::new();
+    let reply = service
+        .execute(
+            AccountCommand::Connect {
+                repository: "fixture-org/private".into(),
+                pat: Pat::from_input(FIXTURE_PAT.into()),
+                renew: None,
+            },
+            &cancel,
+        )
+        .await;
+    assert!(reply.succeeded);
+    let profile = &reply.view.profiles[0];
+    let key = credential_ref(profile).ok().unwrap();
+    assert!(vault.read(&key).unwrap().is_some());
+    let other = service
+        .store
+        .reserve_access_profile_credential(
+            profile.account,
+            profile.user_id,
+            &profile.login,
+            "other-owner",
+            CredentialKind::Classic,
+            None,
+        )
+        .unwrap();
+    let other_key = credential_ref(&other).ok().unwrap();
+    service
+        .store
+        .install_current_credential(&other, || {
+            vault.save(&other_key, &Credential(FIXTURE_PAT.as_bytes().to_vec()))
+        })
+        .unwrap()
+        .unwrap();
+    let command = || AccountCommand::ConnectGitHubCli {
+        repository: "fixture-org/private".into(),
+        login: profile.login.clone(),
+        user_id: profile.user_id,
+        renew: Some(profile.clone()),
+    };
+    let stopped = Cancellation::new();
+    stopped.cancel();
+    assert!(!service.execute(command(), &stopped).await.succeeded);
+    assert!(vault.read(&key).unwrap().is_some());
+    assert!(service.execute(command(), &cancel).await.succeeded);
+    assert!(vault.read(&key).unwrap().is_none());
+    assert!(vault.read(&other_key).unwrap().is_some());
+}
+
+#[tokio::test]
 async fn account_journey_persists_private_access_partial_sso_and_signout() {
     let fixture = Simulator::start();
     let dir = tempfile::tempdir().unwrap();

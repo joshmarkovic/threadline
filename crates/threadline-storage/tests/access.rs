@@ -34,6 +34,88 @@ fn install(
 }
 
 #[test]
+fn schema_18_upgrade_preserves_pat_bindings_and_backs_up_the_original() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("threadline.sqlite3");
+    let store = Store::open(&path).unwrap();
+    let account = store.ensure_account("github.com", 101).unwrap();
+    let classic = install(
+        &store,
+        account,
+        101,
+        "alice",
+        "first",
+        CredentialKind::Classic,
+    );
+    let fine = install(
+        &store,
+        account,
+        101,
+        "alice",
+        "second",
+        CredentialKind::FineGrained,
+    );
+    store.activate_local_profile(account).unwrap();
+    drop(store);
+    let db = rusqlite::Connection::open(&path).unwrap();
+    // Reproduce the original schema 18 constraint on an otherwise complete profile.
+    db.execute_batch("ALTER TABLE github_access_profiles ADD COLUMN original_kind INTEGER NOT NULL
+                      DEFAULT 0 CHECK(original_kind IN (0,1));
+                      UPDATE github_access_profiles SET original_kind=credential_kind;
+                      ALTER TABLE github_access_profiles DROP COLUMN credential_kind;
+                      ALTER TABLE github_access_profiles RENAME COLUMN original_kind TO credential_kind;
+                      PRAGMA user_version=18;").unwrap();
+    drop(db);
+
+    let store = Store::open(&path).unwrap();
+    assert_eq!(store.active_github_account().unwrap(), Some(account));
+    assert_eq!(
+        store.github_access_profiles().unwrap(),
+        vec![classic.clone(), fine.clone()]
+    );
+    let backup = rusqlite::Connection::open(store.migration_backup().unwrap()).unwrap();
+    assert_eq!(
+        backup
+            .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
+            .unwrap(),
+        18
+    );
+    assert!(
+        backup
+            .execute("UPDATE github_access_profiles SET credential_kind=2", [])
+            .is_err()
+    );
+    let failed = store
+        .link_github_cli(account, id(101), "alice", "first", Some(&classic), |_| {
+            Err("vault locked")
+        })
+        .unwrap();
+    assert_eq!(failed.unwrap_err(), "vault locked");
+    assert_eq!(
+        store
+            .github_access_profile(account, "first")
+            .unwrap()
+            .unwrap(),
+        classic
+    );
+    let linked = store
+        .link_github_cli(account, id(101), "alice", "first", Some(&classic), |old| {
+            assert_eq!(old, &classic);
+            Ok::<_, ()>(())
+        })
+        .unwrap()
+        .unwrap();
+    assert_eq!(linked.kind, CredentialKind::GitHubCli);
+    assert!(
+        store
+            .with_installed_credential(&classic, || panic!("stale PAT"))
+            .is_err()
+    );
+    assert!(store.with_installed_credential(&linked, || ()).is_ok());
+    assert!(store.with_installed_credential(&fine, || ()).is_ok());
+}
+
+#[test]
 fn account_scope_renewal_deselection_and_signout_hold_the_original_outbox() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("access-例.sqlite");

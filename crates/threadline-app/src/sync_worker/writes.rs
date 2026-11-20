@@ -662,9 +662,9 @@ fn preflight_failure(error: &ReaderError, now: i64, server: Option<i64>) -> Writ
             | AccessKind::ResponseTooLarge => Failure::InvalidResponse,
             _ => Failure::Transient,
         },
-        ReaderError::CredentialUnavailable | ReaderError::ProtectedStore(_) => {
-            Failure::Unauthorized
-        }
+        ReaderError::CredentialUnavailable
+        | ReaderError::GitHubCli(_)
+        | ReaderError::ProtectedStore(_) => Failure::Unauthorized,
         ReaderError::InvalidIdentity | ReaderError::ScopeChanged => Failure::Missing,
         ReaderError::ServerBackoff => Failure::Throttled {
             not_before_ms: server.unwrap_or_else(|| now.saturating_add(60_000)),

@@ -14,6 +14,7 @@ use threadline_core::{
 };
 use threadline_platform::{
     Credential, CredentialRef, CredentialStore, NativeCredentialStore, PlatformError,
+    github_cli::{CliError, GitHubCli},
 };
 use threadline_storage::{
     AccountId, RepositoryId, Store,
@@ -90,6 +91,12 @@ pub(crate) enum AccountCommand {
         pat: Pat,
         renew: Option<AccessProfile>,
     },
+    ConnectGitHubCli {
+        repository: String,
+        login: String,
+        user_id: std::num::NonZeroU64,
+        renew: Option<AccessProfile>,
+    },
     Refresh {
         profile: AccessProfile,
         repository: Option<RepositoryView>,
@@ -156,6 +163,8 @@ pub(crate) enum AccountInputIssue {
 }
 
 enum Problem {
+    Cli(CliError),
+    CliAccountChanged,
     GitHub(AccessError),
     GitHubCheck(AccessError, Reachability, AccessIssueScope),
     Storage(threadline_storage::Error),
@@ -167,6 +176,14 @@ enum Problem {
     InactiveProfile,
     Cancelled,
     ServerCooldown(i64),
+}
+
+enum Connection {
+    Pat(Pat),
+    GitHubCli {
+        login: String,
+        user_id: std::num::NonZeroU64,
+    },
 }
 
 struct RepositoryCheck<'a> {
@@ -269,19 +286,87 @@ impl AccountService {
     {
         use crate::reader::ReaderError;
 
-        let reference = credential_ref(profile).map_err(|_| ReaderError::CredentialUnavailable)?;
-        let pat = Pat(self
-            .credentials
-            .read(&reference)?
-            .ok_or(ReaderError::CredentialUnavailable)?);
-        let token = pat
-            .token()
-            .map_err(|_| ReaderError::CredentialUnavailable)?;
+        self.saved_session(profile, cancel)
+            .await
+            .map_err(|problem| match problem {
+                Problem::Cli(error) => ReaderError::GitHubCli(error),
+                Problem::CliAccountChanged | Problem::InactiveProfile => ReaderError::ScopeChanged,
+                Problem::GitHub(error) => ReaderError::Remote(error),
+                Problem::Storage(error) => error.into(),
+                Problem::Credential(error) => error.into(),
+                Problem::Offline => ReaderError::Offline,
+                Problem::Cancelled => ReaderError::Cancelled,
+                _ => ReaderError::CredentialUnavailable,
+            })
+    }
+
+    async fn cli_token(&self, login: &str, cancel: &Cancellation) -> Result<SecretToken, Problem> {
+        check_cancel(cancel)?;
+        if self.fixture {
+            #[cfg(test)]
+            if login.eq_ignore_ascii_case("fixture-user") {
+                return Ok(SecretToken::fixture());
+            }
+            return Err(Problem::Cli(CliError::SignedOut));
+        }
+        let cli = GitHubCli::discover().map_err(Problem::Cli)?;
+        cli.token_for(login, cancel)
+            .await
+            .map_err(|error| match error {
+                CliError::Cancelled => Problem::Cancelled,
+                error => Problem::Cli(error),
+            })
+    }
+
+    fn require_online(&self, account: AccountId) -> Result<(), Problem> {
+        let state = self.store.dispatch_profile(account)?;
+        if !state.active {
+            return Err(Problem::InactiveProfile);
+        }
+        if state.offline {
+            return Err(Problem::Offline);
+        }
+        Ok(())
+    }
+
+    async fn saved_session(
+        &self,
+        profile: &AccessProfile,
+        cancel: &Cancellation,
+    ) -> Result<(GitHubSession, RateLimit), Problem> {
+        check_cancel(cancel)?;
+        self.require_online(profile.account)?;
+        let cli = profile.kind == CredentialKind::GitHubCli;
+        let token = if cli {
+            self.store.with_installed_credential(profile, || ())?;
+            let token = self.cli_token(&profile.login, cancel).await?;
+            self.store.with_installed_credential(profile, || ())?;
+            self.require_online(profile.account)?;
+            token
+        } else {
+            let reference = credential_ref(profile)?;
+            let saved = self
+                .store
+                .with_installed_credential(profile, || self.credentials.read(&reference))??
+                .ok_or(Problem::NoSavedCredential)?;
+            let pat = Pat(saved);
+            pat.validated_kind(self.fixture)?;
+            pat.token()?
+        };
         let owner = OwnerScope::new(&profile.owner_scope)?;
-        Ok(self
+        let result = self
             .github
             .authenticate_with_guidance(token, owner, Some(profile.user_id), cancel)
-            .await?)
+            .await?;
+        if cli {
+            if !result.0.user().login.eq_ignore_ascii_case(&profile.login) {
+                return Err(Problem::CliAccountChanged);
+            }
+            check_cancel(cancel)?;
+            self.store.with_installed_credential(profile, || ())?;
+            self.require_online(profile.account)?;
+        }
+        Ok(result)
     }
 
     pub(crate) async fn execute(
@@ -342,7 +427,24 @@ impl AccountService {
                 repository,
                 pat,
                 renew,
-            } => self.connect(&repository, pat, renew.as_ref(), cancel).await,
+            } => {
+                self.connect(&repository, Connection::Pat(pat), renew.as_ref(), cancel)
+                    .await
+            }
+            AccountCommand::ConnectGitHubCli {
+                repository,
+                login,
+                user_id,
+                renew,
+            } => {
+                self.connect(
+                    &repository,
+                    Connection::GitHubCli { login, user_id },
+                    renew.as_ref(),
+                    cancel,
+                )
+                .await
+            }
             AccountCommand::Refresh {
                 profile,
                 repository,
@@ -421,16 +523,15 @@ impl AccountService {
     async fn connect(
         &self,
         repository: &str,
-        pat: Pat,
+        connection: Connection,
         renew: Option<&AccessProfile>,
         cancel: &Cancellation,
     ) -> Result<(Option<&'static str>, Reachability), Problem> {
         let route = parse_repository(repository).ok_or(Problem::InvalidRepository)?;
-        let kind = pat.validated_kind(self.fixture)?;
-        if let Some(account) = self.store.active_github_account()?
-            && self.store.dispatch_profile(account)?.offline
-        {
-            return Err(Problem::Offline);
+        check_cancel(cancel)?;
+        let active = self.store.active_github_account()?;
+        if let Some(account) = active {
+            self.require_online(account)?;
         }
         if let Some(profile) = renew {
             self.require_active(profile.account)?;
@@ -439,43 +540,82 @@ impl AccountService {
             }
         }
         let owner = OwnerScope::new(route.owner())?;
+        let (kind, token, expected) = match &connection {
+            Connection::Pat(pat) => (
+                pat.validated_kind(self.fixture)?,
+                pat.token()?,
+                renew.map(|profile| profile.user_id),
+            ),
+            Connection::GitHubCli { login, user_id } => {
+                if renew.is_some_and(|profile| profile.user_id != *user_id) {
+                    return Err(Problem::CliAccountChanged);
+                }
+                let token = self.cli_token(login, cancel).await?;
+                if let Some(account) = active {
+                    self.require_online(account)?;
+                }
+                (CredentialKind::GitHubCli, token, Some(*user_id))
+            }
+        };
         let session = self
             .github
-            .authenticate(
-                pat.token()?,
-                owner,
-                renew.map(|profile| profile.user_id),
-                cancel,
-            )
+            .authenticate(token, owner, expected, cancel)
             .await?;
         check_cancel(cancel)?;
+        if self.store.active_github_account()? != active {
+            return Err(Problem::InactiveProfile);
+        }
+        if let Some(account) = active {
+            self.require_online(account)?;
+        }
         let user = session.user();
+        if let Connection::GitHubCli { login, .. } = &connection
+            && !user.login.eq_ignore_ascii_case(login)
+        {
+            return Err(Problem::CliAccountChanged);
+        }
         let account = self.store.ensure_account("github.com", user.id.get())?;
         let known = self.known_repository(account, &route)?;
-        let profile = self.store.reserve_access_profile_credential(
-            account,
-            user.id,
-            &user.login,
-            session.owner().as_str(),
-            kind,
-            renew,
-        )?;
-        let reference = credential_ref(&profile)?;
-        if let Err(error) = self
-            .store
-            .install_current_credential(&profile, || self.credentials.save(&reference, &pat.0))?
-        {
-            self.store.record_access_result(
-                &profile,
-                kind,
-                AccessState::CredentialUnavailable,
-                DiscoveryState::Unchecked,
-                now_ms(),
-            )?;
-            return Err(error.into());
-        }
+        check_cancel(cancel)?;
+        let profile = match connection {
+            Connection::GitHubCli { .. } => self.store.link_github_cli(
+                account,
+                user.id,
+                &user.login,
+                session.owner().as_str(),
+                renew,
+                |old| {
+                    self.credentials
+                        .remove(&credential_ref(old)?)
+                        .map_err(Problem::Credential)
+                },
+            )??,
+            Connection::Pat(pat) => {
+                let profile = self.store.reserve_access_profile_credential(
+                    account,
+                    user.id,
+                    &user.login,
+                    session.owner().as_str(),
+                    kind,
+                    renew,
+                )?;
+                let reference = credential_ref(&profile)?;
+                if let Err(error) = self.store.install_current_credential(&profile, || {
+                    self.credentials.save(&reference, &pat.0)
+                })? {
+                    self.store.record_access_result(
+                        &profile,
+                        kind,
+                        AccessState::CredentialUnavailable,
+                        DiscoveryState::Unchecked,
+                        now_ms(),
+                    )?;
+                    return Err(error.into());
+                }
+                profile
+            }
+        };
         self.store.activate_local_profile(account)?;
-        drop(pat);
         self.check_session(
             &profile,
             kind,
@@ -512,45 +652,13 @@ impl AccountService {
             return Err(Problem::NoSavedCredential);
         }
         let profile = self.store.begin_access_check(&current)?;
-        let reference = credential_ref(&profile)?;
-        let pat = match self
-            .store
-            .with_current_credential(&profile, || self.credentials.read(&reference))?
-        {
-            Ok(Some(value)) => Pat(value),
-            Ok(None) => {
-                self.store.record_access_result(
-                    &profile,
-                    profile.kind,
-                    AccessState::CredentialUnavailable,
-                    DiscoveryState::Unchecked,
-                    now_ms(),
-                )?;
-                return Err(Problem::NoSavedCredential);
-            }
-            Err(error) => {
-                self.store.record_access_result(
-                    &profile,
-                    profile.kind,
-                    AccessState::CredentialUnavailable,
-                    DiscoveryState::Unchecked,
-                    now_ms(),
-                )?;
-                return Err(error.into());
-            }
-        };
-        let kind = pat.validated_kind(self.fixture)?;
-        let owner = OwnerScope::new(&profile.owner_scope)?;
-        let session = match self
-            .github
-            .authenticate_with_guidance(pat.token()?, owner, Some(profile.user_id), cancel)
-            .await
-        {
+        let kind = profile.kind;
+        let session = match self.saved_session(&profile, cancel).await {
             Ok((session, rate)) => {
                 self.note_sweep_rate(sweep_account, Some(rate), None)?;
                 session
             }
-            Err(error) => {
+            Err(Problem::GitHub(error)) => {
                 self.note_sweep_rate(sweep_account, error.rate, Some(error.kind))?;
                 if error.kind != AccessKind::Cancelled {
                     self.store.record_access_result(
@@ -567,8 +675,23 @@ impl AccountService {
                 }
                 return Err(error.into());
             }
+            Err(
+                error @ (Problem::Cli(_)
+                | Problem::NoSavedCredential
+                | Problem::Credential(_)
+                | Problem::CliAccountChanged),
+            ) => {
+                self.store.record_access_result(
+                    &profile,
+                    kind,
+                    AccessState::CredentialUnavailable,
+                    DiscoveryState::Unchecked,
+                    now_ms(),
+                )?;
+                return Err(error);
+            }
+            Err(error) => return Err(error),
         };
-        drop(pat);
         let RefreshTargets::One {
             repository,
             requested,
@@ -950,6 +1073,9 @@ impl AccountService {
     }
 
     fn remove_saved_credential(&self, profile: &AccessProfile) -> Result<(), Problem> {
+        if profile.kind == CredentialKind::GitHubCli {
+            return Ok(());
+        }
         let reference = credential_ref(profile)?;
         self.store
             .with_current_credential(profile, || self.credentials.remove(&reference))??;
@@ -1048,6 +1174,10 @@ fn problem_reply(view: AccountView, error: Problem) -> AccountReply {
         None
     };
     let message = match error {
+        Problem::Cli(error) => error.message(),
+        Problem::CliAccountChanged => {
+            "The GitHub CLI account changed. Choose the account again in Settings."
+        }
         Problem::Storage(error) => {
             let _ = error;
             "The account change could not be saved."

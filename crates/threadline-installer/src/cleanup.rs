@@ -24,7 +24,7 @@ type Result<T> = std::result::Result<T, &'static str>;
 const DATABASE: &str = "threadline.sqlite3";
 const APPLICATION_ID: u32 = 0x5448_5244;
 // Review credential references and backup discovery before raising this ceiling.
-const LAST_REVIEWED_SCHEMA: u32 = 18;
+const LAST_REVIEWED_SCHEMA: u32 = 19;
 const BUSY: &str =
     "Close Threadline and other programs using its database, then preview removal again.";
 const UNRECOGNIZED: &str =
@@ -180,7 +180,8 @@ impl Preview {
                 let mut query = db
                     .prepare(
                         "SELECT a.host, a.provider_user_id, p.owner_scope, p.credential_ref
-                           FROM github_access_profiles p JOIN accounts a ON a.id=p.account_id",
+                           FROM github_access_profiles p JOIN accounts a ON a.id=p.account_id
+                           WHERE p.credential_kind IN (0,1)",
                     )
                     .map_err(|_| UNRECOGNIZED)?;
                 let rows = query

@@ -15,7 +15,7 @@ use tempfile::{Builder, NamedTempFile};
 use crate::{Error, Result, queue::hold_restored_dispatch};
 
 pub const DATABASE_FILENAME: &str = "threadline.sqlite3";
-pub const SCHEMA_VERSION: u32 = 18;
+pub const SCHEMA_VERSION: u32 = 19;
 const APPLICATION_ID: u32 = 0x5448_5244;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(3);
 const BACKUP_TIMEOUT: Duration = Duration::from_secs(30);
@@ -320,6 +320,16 @@ fn migrate(connection: &mut Connection, path: &Path) -> Result<Option<PathBuf>> 
                  ALTER TABLE issue_downloads ADD COLUMN last_error INTEGER;",
             )?;
             tx.pragma_update(None, "user_version", 18)?;
+        }
+        if version < 19 {
+            tx.execute_batch(
+                "ALTER TABLE github_access_profiles ADD COLUMN new_kind INTEGER NOT NULL
+                   DEFAULT 0 CHECK(new_kind IN (0,1,2));
+                 UPDATE github_access_profiles SET new_kind=credential_kind;
+                 ALTER TABLE github_access_profiles DROP COLUMN credential_kind;
+                 ALTER TABLE github_access_profiles RENAME COLUMN new_kind TO credential_kind;",
+            )?;
+            tx.pragma_update(None, "user_version", 19)?;
         }
         check_foreign_keys(tx)?;
         Ok(backup)

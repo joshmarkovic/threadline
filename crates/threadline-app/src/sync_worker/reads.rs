@@ -438,6 +438,7 @@ fn failure(error: &ReaderError, claim: &ReadClaim) -> ReadFailure {
         ReaderError::Cancelled => ReadFailure::Cancelled,
         ReaderError::ScopeChanged
         | ReaderError::CredentialUnavailable
+        | ReaderError::GitHubCli(_)
         | ReaderError::ProtectedStore(_) => ReadFailure::Authorization,
         ReaderError::Remote(error) => match error.kind {
             AccessKind::Cancelled => ReadFailure::Cancelled,
