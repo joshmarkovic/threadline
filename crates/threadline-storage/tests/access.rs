@@ -64,6 +64,7 @@ fn schema_18_upgrade_preserves_pat_bindings_and_backs_up_the_original() {
                       UPDATE github_access_profiles SET original_kind=credential_kind;
                       ALTER TABLE github_access_profiles DROP COLUMN credential_kind;
                       ALTER TABLE github_access_profiles RENAME COLUMN original_kind TO credential_kind;
+                      DROP TABLE retired_github_pat_refs;
                       PRAGMA user_version=18;").unwrap();
     drop(db);
 
@@ -85,12 +86,14 @@ fn schema_18_upgrade_preserves_pat_bindings_and_backs_up_the_original() {
             .execute("UPDATE github_access_profiles SET credential_kind=2", [])
             .is_err()
     );
-    let failed = store
-        .link_github_cli(account, id(101), "alice", "first", Some(&classic), |_| {
-            Err("vault locked")
-        })
-        .unwrap();
-    assert_eq!(failed.unwrap_err(), "vault locked");
+    let fault = rusqlite::Connection::open(&path).unwrap();
+    fault.execute_batch("CREATE TRIGGER fail_conversion BEFORE UPDATE OF credential_kind ON github_access_profiles
+        WHEN NEW.credential_kind=2 BEGIN SELECT RAISE(ABORT,'injected failure'); END;").unwrap();
+    assert!(
+        store
+            .link_github_cli(account, id(101), "alice", "first", Some(&classic))
+            .is_err()
+    );
     assert_eq!(
         store
             .github_access_profile(account, "first")
@@ -98,14 +101,32 @@ fn schema_18_upgrade_preserves_pat_bindings_and_backs_up_the_original() {
             .unwrap(),
         classic
     );
+    assert!(
+        store
+            .clean_retired_github_pats(None, |_, _, _| -> Result<(), ()> {
+                panic!("precommit failure must preserve the PAT")
+            })
+            .unwrap()
+            .is_ok()
+    );
+    fault
+        .execute_batch("DROP TRIGGER fail_conversion;")
+        .unwrap();
+    drop(fault);
     let linked = store
-        .link_github_cli(account, id(101), "alice", "first", Some(&classic), |old| {
-            assert_eq!(old, &classic);
-            Ok::<_, ()>(())
-        })
-        .unwrap()
+        .link_github_cli(account, id(101), "alice", "first", Some(&classic))
         .unwrap();
     assert_eq!(linked.kind, CredentialKind::GitHubCli);
+    assert_ne!(classic.credential_ref, linked.credential_ref);
+    drop(store);
+    let store = Store::open(&path).unwrap();
+    let failed = store
+        .clean_retired_github_pats(Some(account), |_, _, key| {
+            assert_eq!(key, classic.credential_ref);
+            Err("vault locked")
+        })
+        .unwrap();
+    assert_eq!(failed, Err("vault locked"));
     assert!(
         store
             .with_installed_credential(&classic, || panic!("stale PAT"))
@@ -131,13 +152,43 @@ fn schema_18_upgrade_preserves_pat_bindings_and_backs_up_the_original() {
             )
             .unwrap()
     );
-    let mut wrong_login = linked;
+    let mut wrong_login = linked.clone();
     wrong_login.login = "bob".into();
     assert!(
         store
             .with_installed_credential(&wrong_login, || panic!("wrong CLI login"))
             .is_err()
     );
+
+    // A new PAT may be installed before cleanup is retried.
+    let fresh = install(
+        &store,
+        account,
+        101,
+        "alice",
+        "first",
+        CredentialKind::Classic,
+    );
+    assert_ne!(fresh.credential_ref, classic.credential_ref);
+    drop(store);
+    let store = Store::open(&path).unwrap();
+    let mut cleaned = Vec::new();
+    store
+        .clean_retired_github_pats(None, |user, owner, key| {
+            assert_eq!((user.get(), owner), (101, "first"));
+            cleaned.push(key.to_owned());
+            Ok::<_, ()>(())
+        })
+        .unwrap()
+        .unwrap();
+    assert_eq!(cleaned, vec![classic.credential_ref.clone()]);
+    assert!(store.with_installed_credential(&fresh, || ()).is_ok());
+    store
+        .clean_retired_github_pats(None, |_, _, _| -> Result<(), ()> {
+            panic!("retired slot already cleaned")
+        })
+        .unwrap()
+        .unwrap();
 }
 
 #[test]

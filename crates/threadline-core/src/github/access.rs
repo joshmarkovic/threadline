@@ -62,6 +62,18 @@ pub struct GitHubUser {
     pub id: NonZeroU64,
     pub login: String,
 }
+impl GitHubUser {
+    pub fn valid_login(value: &str) -> bool {
+        let bytes = value.as_bytes();
+        // Enterprise managed user names can contain an enterprise shortcode after an underscore.
+        (1..=100).contains(&bytes.len())
+            && bytes[0].is_ascii_alphanumeric()
+            && bytes[bytes.len() - 1].is_ascii_alphanumeric()
+            && bytes
+                .iter()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
+    }
+}
 #[derive(Clone, Eq, PartialEq)]
 pub struct RepositoryAccess {
     pub id: RepositoryApiId,
@@ -255,7 +267,7 @@ impl GitHubClient {
         if expected_user.is_some_and(|id| id != user.id) {
             return Err(AccessError::received(AccessKind::IdentityMismatch, 200));
         }
-        if user.login.is_empty() || user.login.len() > 255 {
+        if !GitHubUser::valid_login(&user.login) {
             return Err(AccessError::received(AccessKind::MalformedResponse, 200));
         }
         let session = GitHubSession {

@@ -156,6 +156,9 @@ impl ReaderError {
                 PlatformError::Denied => ResourceError::Forbidden,
                 _ => ResourceError::Unauthorized,
             },
+            Self::GitHubCli(error) if crate::accounts::cli_temporarily_unavailable(*error) => {
+                ResourceError::Transport
+            }
             Self::CredentialUnavailable | Self::GitHubCli(_) => ResourceError::Unauthorized,
             Self::ScopeChanged | Self::IncompleteAccess => ResourceError::Forbidden,
             Self::Remote(error) => match error.kind {

@@ -205,41 +205,29 @@ impl Store {
             kind,
             previous,
         };
-        match self.bind_credential(binding, |_| Ok::<_, std::convert::Infallible>(()))? {
-            Ok(profile) => Ok(profile),
-            Err(impossible) => match impossible {},
-        }
+        self.bind_credential(binding)
     }
 
-    /// Connect a verified CLI identity. Retire any previous PAT from its vault slot
-    /// under the same writer fence. The CLI's credential never enters the vault.
-    pub fn link_github_cli<E>(
+    /// Connect a verified CLI identity and journal any previous vault slot for cleanup.
+    pub fn link_github_cli(
         &self,
         account: AccountId,
         user_id: NonZeroU64,
         login: &str,
         owner: &str,
         previous: Option<&AccessProfile>,
-        retire_pat: impl FnOnce(&AccessProfile) -> std::result::Result<(), E>,
-    ) -> Result<std::result::Result<AccessProfile, E>> {
-        self.bind_credential(
-            CredentialBinding {
-                account,
-                user_id,
-                login,
-                owner,
-                kind: CredentialKind::GitHubCli,
-                previous,
-            },
-            retire_pat,
-        )
+    ) -> Result<AccessProfile> {
+        self.bind_credential(CredentialBinding {
+            account,
+            user_id,
+            login,
+            owner,
+            kind: CredentialKind::GitHubCli,
+            previous,
+        })
     }
 
-    fn bind_credential<E>(
-        &self,
-        binding: CredentialBinding<'_>,
-        retire_pat: impl FnOnce(&AccessProfile) -> std::result::Result<(), E>,
-    ) -> Result<std::result::Result<AccessProfile, E>> {
+    fn bind_credential(&self, binding: CredentialBinding<'_>) -> Result<AccessProfile> {
         let CredentialBinding {
             account,
             user_id,
@@ -248,7 +236,9 @@ impl Store {
             kind,
             previous,
         } = binding;
-        verify_name(login)?;
+        if !threadline_core::github::GitHubUser::valid_login(login) {
+            return Err(Error::InvalidInput("invalid GitHub login"));
+        }
         verify_name(owner)?;
         self.write(|tx| {
             if let Some(previous) = previous {
@@ -263,17 +253,20 @@ impl Store {
                 |row| row.get(0),
             )?;
             if !verified { return Err(Error::Conflict("GitHub identity does not match the local account")); }
-            if kind == CredentialKind::GitHubCli
-                && let Some(old) = profile(tx, account, owner)?
-                && old.kind != CredentialKind::GitHubCli
-                && let Err(error) = retire_pat(&old)
-            {
-                return Ok(Err(error));
+            if kind == CredentialKind::GitHubCli {
+                tx.execute(
+                    "INSERT INTO retired_github_pat_refs(credential_ref,account_id,owner_scope)
+                     SELECT credential_ref,account_id,owner_scope FROM github_access_profiles
+                     WHERE account_id=?1 AND owner_scope=?2 AND credential_kind IN (0,1)",
+                    params![account, owner],
+                )?;
             }
             tx.execute(
                 "INSERT INTO github_access_profiles(account_id,owner_scope,login,credential_ref,credential_kind)
                  VALUES (?1,?2,?3,lower(hex(randomblob(16))),?4)
                  ON CONFLICT(account_id,owner_scope) DO UPDATE SET login=excluded.login,
+                   credential_ref=CASE WHEN excluded.credential_kind=2 AND github_access_profiles.credential_kind<>2
+                     THEN excluded.credential_ref ELSE github_access_profiles.credential_ref END,
                    credential_kind=excluded.credential_kind,
                    generation=github_access_profiles.generation+1,
                    credential_generation=github_access_profiles.credential_generation+1,
@@ -287,7 +280,34 @@ impl Store {
                 )?;
             }
             refresh_account_authorization(tx,account)?;
-            Ok(Ok(profile(tx,account,owner)?.ok_or(Error::NotFound)?))
+            profile(tx,account,owner)?.ok_or(Error::NotFound)
+        })
+    }
+
+    /// Remove only previously committed, superseded Threadline PAT slots. A failed
+    /// removal or interrupted commit leaves a durable marker for the next retry.
+    pub fn clean_retired_github_pats<E>(
+        &self,
+        account: Option<AccountId>,
+        mut remove: impl FnMut(NonZeroU64, &str, &str) -> std::result::Result<(), E>,
+    ) -> Result<std::result::Result<(), E>> {
+        self.write(|tx| {
+            let mut query = tx.prepare(
+                "SELECT a.provider_user_id,r.owner_scope,r.credential_ref FROM retired_github_pat_refs r
+                 JOIN accounts a ON a.id=r.account_id WHERE a.host='github.com' AND (?1 IS NULL OR r.account_id=?1)
+                 AND NOT EXISTS(SELECT 1 FROM github_access_profiles p WHERE p.credential_ref=r.credential_ref)"
+            )?;
+            let retired = query.query_map([account], |row| Ok((decode_id(row,0)?, row.get::<_,String>(1)?, row.get::<_,String>(2)?)))?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            drop(query);
+            let mut result = Ok(());
+            for (user_id, owner, key) in retired {
+                match remove(user_id, &owner, &key) {
+                    Ok(()) => { tx.execute("DELETE FROM retired_github_pat_refs WHERE credential_ref=?1", [key])?; }
+                    Err(error) => result = Err(error),
+                }
+            }
+            Ok(result)
         })
     }
 

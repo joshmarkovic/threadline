@@ -177,13 +177,18 @@ impl Preview {
                 preview.unresolved = unresolved;
             }
             if version >= 3 {
-                let mut query = db
-                    .prepare(
-                        "SELECT a.host, a.provider_user_id, p.owner_scope, p.credential_ref
-                           FROM github_access_profiles p JOIN accounts a ON a.id=p.account_id
-                           WHERE p.credential_kind IN (0,1)",
-                    )
-                    .map_err(|_| UNRECOGNIZED)?;
+                let mut references = String::from(
+                    "SELECT a.host,a.provider_user_id,p.owner_scope,p.credential_ref
+                     FROM github_access_profiles p JOIN accounts a ON a.id=p.account_id
+                     WHERE p.credential_kind IN (0,1)",
+                );
+                if version >= 19 {
+                    references.push_str(
+                        " UNION ALL SELECT a.host,a.provider_user_id,r.owner_scope,r.credential_ref
+                        FROM retired_github_pat_refs r JOIN accounts a ON a.id=r.account_id",
+                    );
+                }
+                let mut query = db.prepare(&references).map_err(|_| UNRECOGNIZED)?;
                 let rows = query
                     .query_map([], |r| {
                         Ok((

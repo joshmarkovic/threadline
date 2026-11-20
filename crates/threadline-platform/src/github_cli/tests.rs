@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn login_is_a_single_github_account_argument() {
     for candidate in ["cloud-engineer", "developer_learner", "A1"] {
-        assert!(valid_login(candidate));
+        assert!(GitHubUser::valid_login(candidate));
     }
     for candidate in [
         "",
@@ -16,7 +16,7 @@ fn login_is_a_single_github_account_argument() {
         "a@",
         "ß",
     ] {
-        assert!(!valid_login(candidate));
+        assert!(!GitHubUser::valid_login(candidate));
     }
 }
 

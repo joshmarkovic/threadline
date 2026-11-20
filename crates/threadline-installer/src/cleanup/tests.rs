@@ -70,6 +70,15 @@ fn cleanup_skips_the_cli_binding_and_retains_pat_backups_in_its_inventory() {
     assert_eq!(Preview::inspect(data).unwrap().credentials.len(), 1);
     fs::remove_file(backup).unwrap();
     assert!(Preview::inspect(data).unwrap().credentials.is_empty());
+    Connection::open(&current)
+        .unwrap()
+        .execute(
+            "INSERT INTO retired_github_pat_refs(credential_ref,account_id,owner_scope)
+         SELECT lower(hex(randomblob(16))),account_id,owner_scope FROM github_access_profiles",
+            [],
+        )
+        .unwrap();
+    assert_eq!(Preview::inspect(data).unwrap().credentials.len(), 1);
 }
 
 #[test]

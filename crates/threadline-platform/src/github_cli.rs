@@ -120,7 +120,7 @@ impl GitHubCli {
             .await?;
         let user: GitHubUser =
             serde_json::from_slice(&response).map_err(|_| CliError::InvalidResponse)?;
-        if !valid_login(&user.login) {
+        if !GitHubUser::valid_login(&user.login) {
             return Err(CliError::InvalidResponse);
         }
         Ok(user)
@@ -132,7 +132,7 @@ impl GitHubCli {
         login: &str,
         cancel: &CancellationToken,
     ) -> Result<SecretToken, CliError> {
-        if !valid_login(login) {
+        if !GitHubUser::valid_login(login) {
             return Err(CliError::InvalidLogin);
         }
         let response = self
@@ -228,17 +228,6 @@ impl GitHubCli {
             result = timeout(COMMAND_TIMEOUT, run) => result.map_err(|_| CliError::Timeout)?,
         }
     }
-}
-
-fn valid_login(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    // Enterprise managed users can contain an underscore before the enterprise shortcode.
-    (1..=100).contains(&bytes.len())
-        && bytes[0].is_ascii_alphanumeric()
-        && bytes[bytes.len() - 1].is_ascii_alphanumeric()
-        && bytes
-            .iter()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
 }
 
 #[cfg(test)]

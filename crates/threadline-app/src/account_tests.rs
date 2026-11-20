@@ -36,6 +36,7 @@ struct Simulator {
 
 #[derive(Default)]
 struct ProbeHold {
+    managed_user: AtomicBool,
     hold: AtomicBool,
     arrived: AtomicBool,
     rejected: AtomicBool,
@@ -274,6 +275,7 @@ fn respond(
         match target.as_str() {
         "/user" if probe.rejected.load(Ordering::Acquire) =>
             ("401 Unauthorized", String::new(), r#"{"message":"Bad fixture credentials"}"#.into()),
+        "/user" if probe.managed_user.load(Ordering::Acquire) => ("200 OK", String::new(), r#"{"id":101,"login":"alice_corp"}"#.into()),
         "/user" => ("200 OK",String::new(),r#"{"id":101,"login":"fixture-user"}"#.to_owned()),
         "/repos/fixture-org/private" if sso => ("403 Forbidden",
             "X-GitHub-SSO: required; url=https://github.com/orgs/fixture-org/sso?authorization_request=synthetic-request\r\n".into(),
@@ -1973,13 +1975,14 @@ async fn cli_connection_checks_identity_and_reopens_without_storing_a_token() {
     assert_eq!(missing.message, Some(CliError::SignedOut.message()));
     assert!(missing.view.profiles.is_empty());
 
+    fixture.probe.managed_user.store(true, Ordering::Release);
     let reply = service
-        .execute(connect("Fixture-User", 101, None), &cancel)
+        .execute(connect("Alice_Corp", 101, None), &cancel)
         .await;
     assert!(reply.succeeded);
     let profile = reply.view.profiles[0].clone();
     assert_eq!(profile.kind, CredentialKind::GitHubCli);
-    assert_eq!(profile.login, "fixture-user");
+    assert_eq!(profile.login, "alice_corp");
     let calls = fixture.user_requests.load(Ordering::Acquire);
     let wrong = service
         .execute(connect("fixture-user", 202, Some(profile.clone())), &cancel)
@@ -2041,9 +2044,29 @@ async fn cli_connection_checks_identity_and_reopens_without_storing_a_token() {
 
 #[tokio::test]
 async fn replacing_a_pat_with_the_cli_retires_only_that_owners_secret() {
+    #[derive(Default)]
+    struct Vault {
+        entries: FixtureVault,
+        deny_removal: AtomicBool,
+    }
+    impl CredentialStore for Vault {
+        fn read(&self, key: &CredentialRef) -> Result<Option<Credential>, PlatformError> {
+            self.entries.read(key)
+        }
+        fn save(&self, key: &CredentialRef, value: &Credential) -> Result<(), PlatformError> {
+            self.entries.save(key, value)
+        }
+        fn remove(&self, key: &CredentialRef) -> Result<(), PlatformError> {
+            if self.deny_removal.load(Ordering::Acquire) {
+                Err(PlatformError::Denied)
+            } else {
+                self.entries.remove(key)
+            }
+        }
+    }
     let fixture = Simulator::start();
     let dir = tempfile::tempdir().unwrap();
-    let vault = Arc::new(FixtureVault::default());
+    let vault = Arc::new(Vault::default());
     let service = AccountService {
         store: Arc::new(Store::open_profile(dir.path()).unwrap()),
         credentials: vault.clone(),
@@ -2094,7 +2117,25 @@ async fn replacing_a_pat_with_the_cli_retires_only_that_owners_secret() {
     stopped.cancel();
     assert!(!service.execute(command(), &stopped).await.succeeded);
     assert!(vault.read(&key).unwrap().is_some());
-    assert!(service.execute(command(), &cancel).await.succeeded);
+    vault.deny_removal.store(true, Ordering::Release);
+    let linked = service.execute(command(), &cancel).await;
+    assert!(linked.succeeded);
+    assert_eq!(linked.message, Some(RETIRED_PAT_NOTICE));
+    assert!(vault.read(&key).unwrap().is_some());
+    drop(service);
+    vault.deny_removal.store(false, Ordering::Release);
+    let restarted = AccountService {
+        store: Arc::new(Store::open_profile(dir.path()).unwrap()),
+        credentials: vault.clone(),
+        github: GitHubClient::loopback(fixture.address).unwrap(),
+        fixture: true,
+    };
+    assert!(
+        restarted
+            .execute(AccountCommand::Load, &cancel)
+            .await
+            .succeeded
+    );
     assert!(vault.read(&key).unwrap().is_none());
     assert!(vault.read(&other_key).unwrap().is_some());
 }

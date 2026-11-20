@@ -436,6 +436,9 @@ fn failure(error: &ReaderError, claim: &ReadClaim) -> ReadFailure {
     }
     match error {
         ReaderError::Cancelled => ReadFailure::Cancelled,
+        ReaderError::GitHubCli(error) if crate::accounts::cli_temporarily_unavailable(*error) => {
+            ReadFailure::Transient
+        }
         ReaderError::ScopeChanged
         | ReaderError::CredentialUnavailable
         | ReaderError::GitHubCli(_)

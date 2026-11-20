@@ -327,7 +327,12 @@ fn migrate(connection: &mut Connection, path: &Path) -> Result<Option<PathBuf>> 
                    DEFAULT 0 CHECK(new_kind IN (0,1,2));
                  UPDATE github_access_profiles SET new_kind=credential_kind;
                  ALTER TABLE github_access_profiles DROP COLUMN credential_kind;
-                 ALTER TABLE github_access_profiles RENAME COLUMN new_kind TO credential_kind;",
+                 ALTER TABLE github_access_profiles RENAME COLUMN new_kind TO credential_kind;
+                 CREATE TABLE retired_github_pat_refs (
+                   credential_ref TEXT PRIMARY KEY CHECK(length(credential_ref)=32),
+                   account_id INTEGER NOT NULL REFERENCES accounts(id),
+                   owner_scope TEXT NOT NULL COLLATE NOCASE
+                 ) WITHOUT ROWID, STRICT;",
             )?;
             tx.pragma_update(None, "user_version", 19)?;
         }

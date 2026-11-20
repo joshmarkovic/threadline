@@ -662,6 +662,9 @@ fn preflight_failure(error: &ReaderError, now: i64, server: Option<i64>) -> Writ
             | AccessKind::ResponseTooLarge => Failure::InvalidResponse,
             _ => Failure::Transient,
         },
+        ReaderError::GitHubCli(error) if crate::accounts::cli_temporarily_unavailable(*error) => {
+            Failure::Transient
+        }
         ReaderError::CredentialUnavailable
         | ReaderError::GitHubCli(_)
         | ReaderError::ProtectedStore(_) => Failure::Unauthorized,

@@ -26,6 +26,8 @@ use threadline_storage::{
 use zeroize::Zeroize;
 
 pub(crate) const FIXTURE_PAT: &str = "threadline-test-fixture";
+const RETIRED_PAT_NOTICE: &str =
+    "Threadline will retry removing a superseded personal access token from protected storage.";
 
 #[cfg(feature = "e2e")]
 mod fixture_auth;
@@ -165,6 +167,7 @@ pub(crate) enum AccountInputIssue {
 enum Problem {
     Cli(CliError),
     CliAccountChanged,
+    CliUnlinked,
     GitHub(AccessError),
     GitHubCheck(AccessError, Reachability, AccessIssueScope),
     Storage(threadline_storage::Error),
@@ -184,6 +187,10 @@ enum Connection {
         login: String,
         user_id: std::num::NonZeroU64,
     },
+}
+
+pub(crate) fn cli_temporarily_unavailable(error: CliError) -> bool {
+    matches!(error, CliError::Unavailable | CliError::Timeout)
 }
 
 struct RepositoryCheck<'a> {
@@ -304,7 +311,9 @@ impl AccountService {
         check_cancel(cancel)?;
         if self.fixture {
             #[cfg(test)]
-            if login.eq_ignore_ascii_case("fixture-user") {
+            if login.eq_ignore_ascii_case("fixture-user")
+                || login.eq_ignore_ascii_case("alice_corp")
+            {
                 return Ok(SecretToken::fixture());
             }
             return Err(Problem::Cli(CliError::SignedOut));
@@ -420,7 +429,12 @@ impl AccountService {
         cancel: &Cancellation,
     ) -> Result<(Option<&'static str>, Reachability), Problem> {
         match command {
-            AccountCommand::Load => Ok((None, Reachability::NotAttempted)),
+            AccountCommand::Load => Ok((
+                self.clean_retired_pats(None)
+                    .err()
+                    .map(|_| RETIRED_PAT_NOTICE),
+                Reachability::NotAttempted,
+            )),
             #[cfg(feature = "e2e")]
             AccountCommand::LoadFixture => self.seed_fixture_access(cancel).await,
             AccountCommand::Connect {
@@ -503,7 +517,7 @@ impl AccountService {
             AccountCommand::SignOut(account) => {
                 self.require_active(account)?;
                 let profiles = self.store.sign_out_github_account(account, now_ms())?;
-                let mut failure = None;
+                let mut failure = self.clean_retired_pats(Some(account)).err();
                 for profile in profiles {
                     if let Err(error) = self.remove_saved_credential(&profile) {
                         failure = Some(error);
@@ -584,12 +598,7 @@ impl AccountService {
                 &user.login,
                 session.owner().as_str(),
                 renew,
-                |old| {
-                    self.credentials
-                        .remove(&credential_ref(old)?)
-                        .map_err(Problem::Credential)
-                },
-            )??,
+            )?,
             Connection::Pat(pat) => {
                 let profile = self.store.reserve_access_profile_credential(
                     account,
@@ -615,21 +624,32 @@ impl AccountService {
                 profile
             }
         };
+        let cleanup_pending =
+            kind == CredentialKind::GitHubCli && self.clean_retired_pats(Some(account)).is_err();
         self.store.activate_local_profile(account)?;
-        self.check_session(
-            &profile,
-            kind,
-            &session,
-            RepositoryChecks::One {
-                target: Some(RepositoryCheck {
-                    route: &route,
-                    prior: known,
-                }),
-                select: false,
+        let (notice, reachability) = self
+            .check_session(
+                &profile,
+                kind,
+                &session,
+                RepositoryChecks::One {
+                    target: Some(RepositoryCheck {
+                        route: &route,
+                        prior: known,
+                    }),
+                    select: false,
+                },
+                cancel,
+            )
+            .await?;
+        Ok((
+            if cleanup_pending {
+                Some(RETIRED_PAT_NOTICE)
+            } else {
+                notice
             },
-            cancel,
-        )
-        .await
+            reachability,
+        ))
     }
 
     async fn refresh(
@@ -649,6 +669,9 @@ impl AccountService {
             .github_access_profile(previous.account, &previous.owner_scope)?
             .ok_or(Problem::InactiveProfile)?;
         if current.access == AccessState::SignedOut {
+            if current.kind == CredentialKind::GitHubCli {
+                return Err(Problem::CliUnlinked);
+            }
             return Err(Problem::NoSavedCredential);
         }
         let profile = self.store.begin_access_check(&current)?;
@@ -681,10 +704,16 @@ impl AccountService {
                 | Problem::Credential(_)
                 | Problem::CliAccountChanged),
             ) => {
+                let access = if matches!(error, Problem::Cli(cause) if cli_temporarily_unavailable(cause))
+                {
+                    AccessState::TransportUnavailable
+                } else {
+                    AccessState::CredentialUnavailable
+                };
                 self.store.record_access_result(
                     &profile,
                     kind,
-                    AccessState::CredentialUnavailable,
+                    access,
                     DiscoveryState::Unchecked,
                     now_ms(),
                 )?;
@@ -1072,6 +1101,15 @@ impl AccountService {
             .map(|repo| (repo.id, RepositoryApiId::new(repo.provider_id))))
     }
 
+    fn clean_retired_pats(&self, account: Option<AccountId>) -> Result<(), Problem> {
+        self.store
+            .clean_retired_github_pats(account, |user, owner, key| {
+                let reference = CredentialRef::github_profile(user.get(), owner, key)?;
+                self.credentials.remove(&reference)
+            })??;
+        Ok(())
+    }
+
     fn remove_saved_credential(&self, profile: &AccessProfile) -> Result<(), Problem> {
         if profile.kind == CredentialKind::GitHubCli {
             return Ok(());
@@ -1175,6 +1213,7 @@ fn problem_reply(view: AccountView, error: Problem) -> AccountReply {
     };
     let message = match error {
         Problem::Cli(error) => error.message(),
+        Problem::CliUnlinked => "Sign in with GitHub again to reconnect this account.",
         Problem::CliAccountChanged => {
             "The GitHub CLI account changed. Choose the account again in Settings."
         }
