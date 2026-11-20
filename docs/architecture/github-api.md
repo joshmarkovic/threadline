@@ -1,5 +1,13 @@
 # GitHub access and permissions
 
+## Sign in with GitHub CLI
+
+**Sign in with GitHub** opens the official GitHub CLI browser login for github.com. **Use signed-in GitHub CLI account** checks the current GitHub CLI identity. Both actions show the username and requested repository before you choose **Connect account**. On a desktop without a terminal, you can run `gh auth login --hostname github.com --web` in a terminal, then choose **Use signed-in GitHub CLI account**. Windows Threadline uses the Windows CLI. [GitHub CLI browser login](https://cli.github.com/manual/gh_auth_login)
+
+Threadline records the chosen CLI login and GitHub user ID. For API access it asks the CLI for that named account’s credential and verifies the numeric GitHub identity. Signing out in Threadline disconnects the workspace. Use GitHub CLI to manage its own signed-in accounts. An organization can require an active single sign-on session or approval for the GitHub CLI OAuth app before private repositories appear. [GitHub CLI account management](https://cli.github.com/manual/gh_auth)
+
+## Repository access
+
 Threadline binds each session to the numeric user ID returned by GitHub and the resource owner selected for that credential. Private repository verification checks the owner, repository name, private flag and any previously known numeric repository ID. The production client sends its credential to `https://api.github.com` in an authorization header. It rejects redirects and uses a five-second connection timeout and a 15-second request timeout. REST requests identify the application and pin API version `2026-03-10`. [GitHub REST API versions](https://docs.github.com/en/rest/about-the-rest-api/api-versions)
 
 | Sprint 03 request | Evidence and fine-grained personal access token requirements |

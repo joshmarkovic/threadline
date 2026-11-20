@@ -1,7 +1,7 @@
 function Select-FixtureReplacement([IntPtr]$Window, [long]$LocalAccount) {
     if ($LocalAccount -le 0) { throw 'Missing original fixture account identity.' }
-    Wait-For 'the owned Replace token action for the original repository owner' {
-        Invoke-OwnedFixtureControl $Window "account-renew-$LocalAccount-fixture-org" $null 'Replace token'
+    Wait-For 'the owned Reconnect action for the original repository owner' {
+        Invoke-OwnedFixtureControl $Window "account-renew-$LocalAccount-fixture-org" $null 'Reconnect'
     }
     $null = Wait-Account 'the original owner credential replacement form' {
         param($account)

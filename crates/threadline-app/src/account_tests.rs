@@ -11,6 +11,9 @@ use std::{
 
 use super::*;
 
+#[cfg(feature = "e2e")]
+#[path = "account_tests/cli_form.rs"]
+mod cli_form;
 #[path = "account_tests/issue_downloads.rs"]
 mod issue_downloads;
 
@@ -2611,6 +2614,7 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
         .unwrap();
     };
     let requests_before_setup = simulator.requests.load(Ordering::SeqCst);
+    click("account-use-pat", cx);
     click("account-repository", cx);
     set_route("owner@invalid.example/private", cx);
     click_setup("account-org-sso", cx);
@@ -2711,6 +2715,7 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
     })
     .unwrap();
     wait_receipt("fixture_replacement_active", cx);
+    click("account-use-pat", cx);
     set_route("fixture-org", cx);
     click("account-token", cx);
     enter_token(cx);
@@ -2762,6 +2767,7 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
         read_account().is_some_and(|account| account["discovery"] == "RestrictedBySso")
     });
     click("account-add", cx);
+    click("account-use-pat", cx);
     click("account-repository", cx);
     set_route("fixture-user/personal", cx);
     click("account-token", cx);
@@ -2795,6 +2801,7 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
         before_refresh + 2
     );
     click("account-add", cx);
+    click("account-use-pat", cx);
     click("account-token", cx);
     enter_token(cx);
     let before_sign_out = simulator.requests.load(Ordering::SeqCst);

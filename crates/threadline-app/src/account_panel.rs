@@ -15,7 +15,7 @@ use threadline_core::{
 };
 use threadline_storage::{
     AccountId,
-    access::{AccessProfile, AccessState, DiscoveryState, RepositoryView},
+    access::{AccessProfile, AccessState, CredentialKind, DiscoveryState, RepositoryView},
 };
 
 use crate::{
@@ -26,7 +26,10 @@ use crate::{
     palette::Palette,
 };
 
+mod browser;
 mod pages;
+#[cfg(all(test, feature = "e2e"))]
+pub(crate) use browser::CliFixture;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AccountPanelPage {
@@ -78,6 +81,8 @@ pub(crate) struct AccountPanel {
     onboarding: Option<OnboardingStep>,
     focus_sign_in: bool,
     credential_form_open: bool,
+    use_pat: bool,
+    browser: browser::BrowserSignIn,
     route: Entity<InputState>,
     route_observation: Subscription,
     repository_error: Option<&'static str>,
@@ -94,6 +99,7 @@ pub(crate) struct AccountPanel {
     loaded: bool,
     message: Option<&'static str>,
     github_error: Option<AccessError>,
+    cli_reply: bool,
     issue_scope: Option<AccessIssueScope>,
     home_refresh_status: Option<String>,
     reachability: Reachability,
@@ -138,6 +144,8 @@ impl AccountPanel {
             onboarding: None,
             focus_sign_in: false,
             credential_form_open: false,
+            use_pat: false,
+            browser: browser::BrowserSignIn::default(),
             route,
             route_observation,
             repository_error: None,
@@ -154,6 +162,7 @@ impl AccountPanel {
             loaded: false,
             message: None,
             github_error: None,
+            cli_reply: false,
             issue_scope: None,
             home_refresh_status: None,
             reachability: Reachability::NotAttempted,
@@ -292,6 +301,8 @@ impl AccountPanel {
     }
 
     pub(crate) fn clear_token(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.reset_browser();
+        self.use_pat = false;
         self.credential_form_open = false;
         self.renew = None;
         self.clear_token_input(window, cx);
@@ -353,8 +364,7 @@ impl AccountPanel {
             discovery: profile.map(|profile| format!("{:?}", profile.discovery)),
             reachability: format!("{:?}", self.reachability),
             authorization_available: self
-                .github_error
-                .as_ref()
+                .authorization_error()
                 .is_some_and(|error| error.authorization_url().is_some()),
             fixture_route_focused: panel_open && self.route.focus_handle(cx).is_focused(window),
             fixture_token_focused: panel_open && self.token.focus_handle(cx).is_focused(window),
@@ -393,8 +403,29 @@ impl AccountPanel {
         if self.busy {
             return;
         }
-        let replacing = matches!(&command, AccountCommand::Connect { renew: Some(_), .. });
-        let connecting = matches!(&command, AccountCommand::Connect { .. });
+        let renewing = match &command {
+            AccountCommand::Connect { renew, .. }
+            | AccountCommand::ConnectGitHubCli { renew, .. } => Some(renew.is_some()),
+            _ => None,
+        };
+        let connecting = renewing.is_some();
+        let replacing = renewing == Some(true);
+        let browser_connect = matches!(&command, AccountCommand::ConnectGitHubCli { .. });
+        self.cli_reply = match &command {
+            AccountCommand::ConnectGitHubCli { .. } => true,
+            AccountCommand::Refresh { profile, .. } | AccountCommand::Select { profile, .. } => {
+                profile.kind == CredentialKind::GitHubCli
+            }
+            AccountCommand::RefreshAll(account) => self
+                .view
+                .profiles
+                .iter()
+                .any(|p| p.account == *account && p.kind == CredentialKind::GitHubCli),
+            _ => false,
+        };
+        if !browser_connect {
+            self.reset_browser();
+        }
         let refresh_account = match &command {
             AccountCommand::RefreshAll(account) => Some(*account),
             _ => None,
@@ -423,6 +454,13 @@ impl AccountPanel {
                 panel.loaded = true;
                 let cancelled = panel.cancel.is_cancelled();
                 panel.cancel = Cancellation::new();
+                if browser_connect {
+                    panel.browser.phase = browser::Phase::Idle;
+                    if cancelled {
+                        panel.reload_local_profile(cx);
+                        return;
+                    }
+                }
                 match result {
                     Ok(AccountReply {
                         view,
@@ -447,13 +485,12 @@ impl AccountPanel {
                                 issue_scope,
                                 Some(AccessIssueScope::Repository | AccessIssueScope::Discovery)
                             );
-                        if connecting && panel.view.active.is_some() {
+                        if connecting && credential_accepted && panel.view.active.is_some() {
                             if panel.page == AccountPanelPage::Onboarding {
                                 panel.onboarding = Some(OnboardingStep::Repository);
                             }
-                            if credential_accepted {
-                                panel.credential_form_open = false;
-                            }
+                            panel.credential_form_open = false;
+                            panel.use_pat = false;
                         }
                         if replacing
                             && let Some(renew) = panel.renew.take()
@@ -605,7 +642,7 @@ impl AccountPanel {
             .as_ref()
             .is_some_and(|profile| !profile.owner_scope.eq_ignore_ascii_case(route.owner()))
         {
-            return Err("Enter a repository owned by the account whose token you are replacing.");
+            return Err("Enter a repository owned by the account you are reconnecting.");
         }
         let credential_entry = self.credential_form_open
             || (self.page == AccountPanelPage::Onboarding
@@ -697,7 +734,7 @@ impl AccountPanel {
                     "account-repository",
                     Input::new(&self.route)
                         .small()
-                        .disabled(self.busy)
+                        .disabled(self.busy || self.browser.in_progress())
                         .accessibility_id("account-repository")
                         .aria_label("GitHub repository"),
                 ),
@@ -726,7 +763,11 @@ impl AccountPanel {
             .flex()
             .flex_col()
             .gap_3()
-            .child(self.repository_field(palette))
+            .child(self.repository_field(palette));
+        if !self.use_pat {
+            return form.child(self.browser_controls(palette, cx));
+        }
+        let form = form
             .child(
                 div()
                     .flex()
@@ -826,6 +867,23 @@ impl AccountPanel {
                         )
                     }),
             );
+        let form = form.child(
+            div().flex().child(
+                Button::new("account-use-browser")
+                    .accessibility_id("account-use-browser")
+                    .label("Use browser sign-in")
+                    .small()
+                    .disabled(self.busy)
+                    .on_click(cx.listener(|panel, _, window, cx| {
+                        panel.clear_token_input(window, cx);
+                        panel.use_pat = false;
+                        panel.message = None;
+                        panel.github_error = None;
+                        panel.focus_form(window, cx);
+                        cx.notify();
+                    })),
+            ),
+        );
         #[cfg(feature = "e2e")]
         let form = form.when(
             self.service.fixture
@@ -875,7 +933,7 @@ impl AccountPanel {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.clear_token_input(window, cx);
+        self.clear_token(window, cx);
         self.renew = replacement;
         self.credential_form_open = true;
         self.focus_sign_in = true;
@@ -1013,7 +1071,7 @@ impl AccountPanel {
                                     "account-renew-{}-{}",
                                     profile.account.0, profile.owner_scope
                                 ))
-                                .label("Replace token")
+                                .label("Reconnect")
                                 .small()
                                 .disabled(self.busy)
                                 .on_click(cx.listener(
@@ -1136,6 +1194,7 @@ impl AccountPanel {
 impl Drop for AccountPanel {
     fn drop(&mut self) {
         self.cancel.cancel();
+        self.browser.cancel.cancel();
     }
 }
 
@@ -1197,8 +1256,8 @@ fn access_label(state: AccessState) -> &'static str {
         AccessState::Unchecked => "Not checked yet",
         AccessState::Readable => "Read access verified",
         AccessState::SignedOut => "Signed out",
-        AccessState::CredentialUnavailable => "Protected token unavailable",
-        AccessState::Unauthorized => "Token expired or revoked",
+        AccessState::CredentialUnavailable => "Sign-in unavailable",
+        AccessState::Unauthorized => "Sign-in expired or revoked",
         AccessState::SsoRequired => "SSO authorization required",
         AccessState::ApprovalPending => "Organization approval pending",
         AccessState::InsufficientPermission => "Insufficient permission",
@@ -1212,8 +1271,8 @@ fn access_label(state: AccessState) -> &'static str {
 fn sign_in_label(state: AccessState) -> &'static str {
     match state {
         AccessState::SignedOut => "Signed out",
-        AccessState::Unauthorized => "Saved token rejected by GitHub",
-        AccessState::CredentialUnavailable => "Saved token unavailable",
+        AccessState::Unauthorized => "Sign-in rejected by GitHub",
+        AccessState::CredentialUnavailable => "Sign-in unavailable",
         _ => "Signed in",
     }
 }

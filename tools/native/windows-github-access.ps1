@@ -121,6 +121,7 @@ function Open-FixtureHome([IntPtr]$Window) {
 }
 
 function Enter-FixtureAccountForm([IntPtr]$Window, [switch]$LoopbackTokenAction) {
+    Click-AccountControl $Window 'account-use-pat' -ExpectedName 'Use a personal access token'
     if ($LoopbackTokenAction) {
         $port = [regex]::Match($script:AccessAddress, '^127\.0\.0\.1:([1-9][0-9]{0,4})$')
         if (!$script:UseOwnedUiAutomation -or !$port.Success -or [int]$port.Groups[1].Value -gt 65535 -or

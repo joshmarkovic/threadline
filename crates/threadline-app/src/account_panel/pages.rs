@@ -118,7 +118,7 @@ impl AccountPanel {
                 .into_any_element();
         }
         let form_title = if self.renew.is_some() {
-            "Replace a personal access token"
+            "Reconnect this GitHub account"
         } else {
             "Add a GitHub account"
         };
@@ -243,8 +243,16 @@ impl AccountPanel {
             .children(rows)
     }
 
+    pub(super) fn authorization_error(&self) -> Option<&AccessError> {
+        self.github_error
+            .as_ref()
+            .filter(|error| !self.cli_reply || error.sso_action.is_some())
+    }
+
     fn reply(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let text = if self.busy {
+        let text = if self.browser.in_progress() {
+            None
+        } else if self.busy {
             Some("Checking GitHub…".into())
         } else if let Some(error) = self.github_error.as_ref() {
             let label = match self.issue_scope {
@@ -263,9 +271,16 @@ impl AccountPanel {
             .flex_col()
             .gap_2()
             .children(text.map(|text| status("account-status", text)))
+            .when(self.cli_reply && self.github_error.as_ref().is_some_and(|error| matches!(
+                error.kind, threadline_core::github::AccessKind::SsoRequired
+                | threadline_core::github::AccessKind::ApprovalPending
+                | threadline_core::github::AccessKind::MissingOrInaccessible
+                | threadline_core::github::AccessKind::PermissionDenied
+            )), |group| group.child(div().text_sm().child(
+                "For an organization repository, check that this account has access, complete organization single sign-on, and request GitHub CLI approval if required.",
+            )))
             .children(
-                self.github_error
-                    .as_ref()
+                self.authorization_error()
                     .and_then(AccessError::authorization_url)
                     .map(|url| {
                         Button::new("account-open-authorization")
@@ -409,7 +424,10 @@ fn section(title: &'static str, palette: Palette) -> gpui_kit::Div {
         .child(div().text_lg().child(title))
 }
 
-fn status(id: &'static str, text: impl Into<gpui_kit::SharedString>) -> impl IntoElement {
+pub(super) fn status(
+    id: &'static str,
+    text: impl Into<gpui_kit::SharedString>,
+) -> impl IntoElement {
     let text = text.into();
     div()
         .id(id)

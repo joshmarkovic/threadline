@@ -4,23 +4,23 @@ Threadline is a native desktop client for GitHub issues and pull requests. It ke
 
 ## Install the Windows preview
 
-On Windows 11 x64, download and run the installer. Setup closes and opens Threadline. Downloads and automatic updates work without a GitHub account or personal access token (PAT). [Download Threadline for Windows (build 23)](https://github.com/joshmarkovic/threadline/releases/download/v0.1.0-local.23/Threadline-Setup-23.exe)
+On Windows 11 x64, download and run the installer. Setup closes and opens Threadline. Downloads and automatic updates work without a GitHub account or personal access token (PAT). [Download Threadline for Windows (build 24)](https://github.com/joshmarkovic/threadline/releases/download/v0.1.0-local.24/Threadline-Setup-24.exe)
 
 To download and open the same installer from PowerShell, paste this block.
 
 ```powershell
 & {
-    $setup = Join-Path $env:TEMP 'Threadline-Setup-23.exe'
-    Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/joshmarkovic/threadline/releases/download/v0.1.0-local.23/Threadline-Setup-23.exe' -OutFile $setup -ErrorAction Stop
+    $setup = Join-Path $env:TEMP 'Threadline-Setup-24.exe'
+    Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/joshmarkovic/threadline/releases/download/v0.1.0-local.24/Threadline-Setup-24.exe' -OutFile $setup -ErrorAction Stop
     Start-Process -FilePath $setup
 }
 ```
 
-**Upgrading an older installation?** If you have build 20 or earlier, or build 21 still asks you to set up release access, close Threadline and run the build 23 installer once. Setup preserves your workspace and settings.
+**Upgrading an older installation?** If you have build 20 or earlier, or build 21 still asks you to set up release access, close Threadline and run the build 24 installer once. Setup preserves your workspace and settings.
 
 After setup, open **Threadline Installer Test** from Start. It checks for a newer preview, verifies the manifest signature and checks the installer against it. Threadline then saves your workspace, installs the update quietly, and reopens. If you start working during the download, choose **Restart to update** when convenient or let it install the next time you open the app. **Work offline** and **Pause background refresh** also pause update checks.
 
-For unattended deployment, download the installer and run `Start-Process .\Threadline-Setup-23.exe -ArgumentList '/S' -Wait` from its folder in PowerShell. A standalone silent install exits when setup finishes. Open the app from Start when you're ready.
+For unattended deployment, download the installer and run `Start-Process .\Threadline-Setup-24.exe -ArgumentList '/S' -Wait` from its folder in PowerShell. A standalone silent install exits when setup finishes. Open the app from Start when you're ready.
 
 ## Install from source
 
@@ -41,16 +41,23 @@ From an existing checkout, use `cargo run --locked -p threadline-app` to build a
 
 ## Open your workspace
 
-On the Welcome screen, choose your display time zone and continue to GitHub. For New York, choose **New York (Eastern Time)**. To connect your workspace, enter a repository as `owner/name`, paste your GitHub personal access token, and choose **Check access**. A fine-grained token needs access to each private repository you want to monitor and the permissions for features you use, such as posting comments or reviews. Select the repositories to monitor, then choose **Continue to Home**. Windows Credential Manager protects the workspace token. [Account setup and endpoint permissions](docs/architecture/github-api.md)
+On the Welcome screen, choose your display time zone and continue to GitHub. For New York, choose **New York (Eastern Time)**.
+
+1. Enter a repository as `owner/name`, such as `octocat/hello-world`.
+2. Choose **Sign in with GitHub** and follow the GitHub CLI prompts to sign in through your browser. If you're already signed in to GitHub CLI on this device, choose **Use signed-in GitHub CLI account** to use that account.
+3. Check that Threadline shows the expected GitHub username and repository. Choose **Connect account**, select the repositories to monitor, then choose **Continue to Home**.
+
+Browser sign-in requires the official GitHub CLI on the device running Threadline. To install it on Windows, run `winget install --id GitHub.cli --exact` in PowerShell, then reopen Threadline. Windows and WSL have separate CLI sign-ins. You can also choose **Use a personal access token**, paste a fine-grained token, and choose **Check access**. [GitHub CLI installation](https://cli.github.com/) · [Account setup and permissions](docs/architecture/github-api.md)
 
 On **Home**, choose **Refresh all** to update the repository list and refresh monitored repositories. Open **Settings → Synchronization** to review sync status or change how Threadline refreshes in the background.
 
 ### Connect organization repositories
 
 1. On the Welcome screen, or under **Settings → GitHub account → Add account**, enter an organization repository you can access, such as `example-org/project`.
-2. Choose **Sign in with organization SSO** and complete your company's sign-in in the browser.
-3. If you need a token, choose **Create read-only token**. On GitHub, confirm the organization is the **Resource owner** and select the repositories you want to see. If GitHub shows **Pending**, an organization administrator must approve the token before it can access private repositories. [GitHub token permissions and approval](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
-4. Paste the organization-authorized token into Threadline and choose **Check access**. Select the repositories you want to monitor.
+2. Choose **Sign in with GitHub** with the account you use for work. Complete your organization's single sign-on when GitHub prompts. If your organization restricts OAuth apps, request access for **GitHub CLI** through the organization’s usual process.
+3. Confirm the username in Threadline, then choose **Connect account**. Once access is approved, choose **Refresh all** on Home.
+
+To use a token for specific repositories, choose **Use a personal access token**. Choose **Sign in with organization SSO** if required, then **Create read-only token**. On GitHub, select the organization as the **Resource owner** and choose the repositories. After approval, paste the token into Threadline and choose **Check access**. [GitHub token permissions and approval](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
 
 ### Local data and updates
 
