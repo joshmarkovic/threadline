@@ -46,6 +46,14 @@ fn git_hub_cli_shows_the_chosen_account_and_discards_abandoned_sign_ins(cx: &mut
         id: NonZeroU64::new(41).unwrap(),
         login: "test-user".into(),
     };
+    let enter_route = |route: &'static str, cx: &mut TestAppContext| {
+        cx.update_window(window, |_, window, cx| {
+            panel.update(cx, |panel, cx| panel.focus_form(window, cx));
+            window.press("secondary-a", cx);
+            window.input(route, cx);
+        })
+        .unwrap();
+    };
     let next_attempt = |attempts: &mut tokio::sync::mpsc::UnboundedReceiver<_>,
                         cx: &mut TestAppContext| {
         let mut result = None;
@@ -57,13 +65,36 @@ fn git_hub_cli_shows_the_chosen_account_and_discards_abandoned_sign_ins(cx: &mut
     };
     click("account-add", cx);
     click("github-browser-sign-in", cx);
-    assert!(visible("account-repository-error", cx));
-    assert!(attempts.try_recv().is_err());
+    let (interactive, empty_route) = next_attempt(&mut attempts, cx);
+    assert!(interactive);
+    empty_route.send(Ok(user())).ok().unwrap();
+    wait_form(cx, |cx| visible("github-confirm-account", cx));
     cx.update_window(window, |_, window, cx| {
-        panel.update(cx, |panel, cx| panel.focus_form(window, cx));
-        window.input("fixture-org/private", cx);
+        window.render_frame(cx);
+        assert_eq!(
+            window.find("github-sign-in-status").label(),
+            Some("Signed in as @test-user. Enter a repository to connect.")
+        );
     })
     .unwrap();
+    click("github-confirm-account", cx);
+    assert!(visible("account-repository-error", cx));
+    assert!(store.active_github_account().unwrap().is_none());
+    enter_route("fixture-org/private", cx);
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(
+            window.find("github-sign-in-status").label(),
+            Some("Connect @test-user to fixture-org/private?")
+        );
+    })
+    .unwrap();
+    click("github-cancel-sign-in", cx);
+    enter_route("owner-only", cx);
+    click("github-browser-sign-in", cx);
+    assert!(visible("account-repository-error", cx));
+    assert!(attempts.try_recv().is_err());
+    enter_route("fixture-org/private", cx);
 
     click("github-browser-sign-in", cx);
     let (interactive, delayed) = next_attempt(&mut attempts, cx);

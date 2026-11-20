@@ -43,9 +43,9 @@ From an existing checkout, use `cargo run --locked -p threadline-app` to build a
 
 On the Welcome screen, choose your display time zone and continue to GitHub. For New York, choose **New York (Eastern Time)**.
 
-1. Enter a repository as `owner/name`, such as `octocat/hello-world`.
-2. Choose **Sign in with GitHub** and follow the GitHub CLI prompts to sign in through your browser. If you're already signed in to GitHub CLI on this device, choose **Use signed-in GitHub CLI account** to use that account.
-3. Check that Threadline shows the expected GitHub username and repository. Choose **Connect account**, select the repositories to monitor, then choose **Continue to Home**.
+1. Choose **Sign in with GitHub** and follow the GitHub CLI prompts to sign in through your browser. If you're already signed in to GitHub CLI on this device, choose **Use signed-in GitHub CLI account**.
+2. When Threadline shows your username, enter a repository as `owner/name`, such as `octocat/hello-world`. You can also enter the repository before signing in.
+3. Check the username and repository, then choose **Connect account**. Select the repositories to monitor and choose **Continue to Home**. The permissions granted to GitHub CLI can cover more repositories than the one you enter in Threadline.
 
 Browser sign-in requires the official GitHub CLI on the device running Threadline. To install it on Windows, run `winget install --id GitHub.cli --exact` in PowerShell, then reopen Threadline. Windows and WSL have separate CLI sign-ins. You can also choose **Use a personal access token**, paste a fine-grained token, and choose **Check access**. [GitHub CLI installation](https://cli.github.com/) · [Account setup and permissions](docs/architecture/github-api.md)
 

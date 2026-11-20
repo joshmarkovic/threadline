@@ -12,7 +12,7 @@ pub(super) enum Phase {
     LookingUp,
     Confirm {
         user: GitHubUser,
-        repository: String,
+        repository: Option<String>,
     },
     Verifying,
     Failed(CliError),
@@ -27,6 +27,16 @@ pub(super) struct BrowserSignIn {
 impl BrowserSignIn {
     pub(super) fn in_progress(&self) -> bool {
         !matches!(self.phase, Phase::Idle | Phase::Failed(_))
+    }
+
+    pub(super) fn needs_repository(&self) -> bool {
+        matches!(
+            self.phase,
+            Phase::Confirm {
+                repository: None,
+                ..
+            }
+        )
     }
 }
 
@@ -54,8 +64,11 @@ impl AccountPanel {
         if self.busy || self.view.offline || self.browser.in_progress() {
             return;
         }
-        let repository = self.route.read(cx).value().to_string();
-        if let Err(error) = self.validated_repository(&repository) {
+        let raw = self.route.read(cx).value();
+        let repository = (!raw.trim().is_empty()).then(|| raw.trim().to_owned());
+        if let Some(repository) = &repository
+            && let Err(error) = self.validated_repository(repository)
+        {
             self.show_repository_problem(error, window, cx);
             return;
         }
@@ -100,7 +113,10 @@ impl AccountPanel {
             }
             let _ = panel.update(cx, |panel, cx| {
                 panel.browser.phase = match result {
-                    Ok(user) => Phase::Confirm { user, repository },
+                    Ok(user) => {
+                        panel.focus_sign_in = repository.is_none();
+                        Phase::Confirm { user, repository }
+                    }
                     Err(error) => Phase::Failed(error),
                 };
                 cx.notify();
@@ -117,8 +133,14 @@ impl AccountPanel {
         let Phase::Confirm { user, repository } = &self.browser.phase else {
             return;
         };
+        let field = self.route.read(cx).value();
+        let repository = repository.as_deref().unwrap_or_else(|| field.trim());
+        if let Err(error) = self.validated_repository(repository) {
+            self.show_repository_problem(error, window, cx);
+            return;
+        }
         let command = AccountCommand::ConnectGitHubCli {
-            repository: repository.clone(),
+            repository: repository.to_owned(),
             login: user.login.clone(),
             user_id: user.id,
             renew: self.renew.clone(),
@@ -223,7 +245,16 @@ impl AccountPanel {
                     .child(self.sign_in_choices(cx))
             }
             Phase::Confirm { user, repository } => {
-                let question = format!("Connect @{} to {}?", user.login, repository);
+                let field = self.route.read(cx).value();
+                let route = repository.as_deref().unwrap_or_else(|| field.trim());
+                let question = if self.validated_repository(route).is_ok() {
+                    format!("Connect @{} to {}?", user.login, route)
+                } else {
+                    format!(
+                        "Signed in as @{}. Enter a repository to connect.",
+                        user.login
+                    )
+                };
                 let confirm = Button::new("github-confirm-account")
                     .small()
                     .primary()
@@ -234,7 +265,7 @@ impl AccountPanel {
                     );
                 section.child(super::pages::status("github-sign-in-status", question))
                     .child(div().text_sm().text_color(palette.muted).child(
-                        "Threadline will use this GitHub CLI account for repository access. Your organization may require single sign-on or approval for GitHub CLI.",
+                        "GitHub CLI permissions can include other repositories. Your organization may require single sign-on or approval for GitHub CLI.",
                     ))
                     .child(actions.child(confirm).child(cancel))
             }

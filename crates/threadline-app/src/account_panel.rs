@@ -658,7 +658,8 @@ impl AccountPanel {
         if prior.is_some() {
             self.repository_error = self.validated_repository(&route.read(cx).value()).err();
         }
-        if self.repository_error != prior || self.service.fixture {
+        if self.repository_error != prior || self.browser.needs_repository() || self.service.fixture
+        {
             cx.notify();
         }
     }
@@ -718,23 +719,28 @@ impl AccountPanel {
     }
 
     fn repository_field(&self, palette: Palette) -> impl IntoElement {
+        let hint = if !self.use_pat
+            && (self.credential_form_open || self.onboarding == Some(OnboardingStep::GitHub))
+        {
+            "Enter owner/repository, for example octocat/hello-world. You can sign in first."
+        } else {
+            "Use owner/repository, for example octocat/hello-world."
+        };
         div()
             .flex()
             .flex_col()
             .gap_1()
             .child(div().text_sm().child("Repository"))
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(palette.muted)
-                    .child("Use owner/repository, for example octocat/hello-world."),
-            )
+            .child(div().text_xs().text_color(palette.muted).child(hint))
             .child(
                 self.control(
                     "account-repository",
                     Input::new(&self.route)
                         .small()
-                        .disabled(self.busy || self.browser.in_progress())
+                        .disabled(
+                            self.busy
+                                || (self.browser.in_progress() && !self.browser.needs_repository()),
+                        )
                         .accessibility_id("account-repository")
                         .aria_label("GitHub repository"),
                 ),
