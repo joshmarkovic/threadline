@@ -179,6 +179,26 @@ fn ui_008_synchronization_opens_from_settings_and_returns_to_home(cx: &mut TestA
         window.render_frame(cx);
         assert!(window.find("settings-synchronization").visible());
         assert!(window.try_find("sync-work-offline").is_none());
+        window.click("settings-synchronization", cx);
+    })
+    .unwrap();
+    step(cx, &mut |cx| {
+        cx.update_window(window, |_, window, cx| {
+            window.simulate_next_frame(cx);
+            window.render_frame(cx);
+            window.try_find("sync-work-offline").is_some()
+        })
+        .unwrap()
+    });
+    cx.update_window(window, |_, window, cx| {
+        // A section row leaves the synchronization page and shows that section.
+        window.click("settings-nav-display", cx);
+        window.render_frame(cx);
+        assert!(window.try_find("sync-work-offline").is_none());
+        assert!(window.find("display-timezone-save").visible());
+        window.click("settings-nav-account", cx);
+        window.render_frame(cx);
+        assert!(window.find("account-offline").visible());
         window.click("account-offline", cx);
     })
     .unwrap();

@@ -3,6 +3,7 @@ mod accounts;
 mod activity_delivery;
 #[cfg(feature = "e2e")]
 mod activity_fixture;
+mod brand;
 mod display_time;
 mod fixtures;
 #[cfg(feature = "e2e")]
@@ -17,6 +18,7 @@ mod reader;
 mod reader_workspace;
 mod sync_panel;
 mod sync_worker;
+mod ui;
 mod updates;
 mod workspace;
 
@@ -245,6 +247,7 @@ pub fn run(options: Options, started: Instant) -> Result<(), Box<dyn std::error:
             clock.install(cx);
             cx.set_quit_mode(QuitMode::LastWindowClosed);
             gpui_kit::init(cx);
+            palette::install_theme(cx);
             #[cfg(feature = "e2e")]
             mark_startup(observation::StartupStage::ComponentsInitialized);
             bind_shortcuts(cx);

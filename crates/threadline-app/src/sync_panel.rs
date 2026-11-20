@@ -6,7 +6,7 @@ use gpui_kit::{
     ParentElement, Render, Role, StatefulInteractiveElement, Styled, Window,
     component::{
         Disableable, Selectable, Sizable,
-        button::Button,
+        button::{Button, ButtonVariants},
         input::{Input, InputState},
     },
     div, px,
@@ -17,6 +17,7 @@ use threadline_storage::{
 };
 
 use crate::palette::Palette;
+use crate::ui::{card, row, toggle};
 
 pub(crate) struct SettingsChanged {
     pub(crate) previous: SyncControls,
@@ -280,29 +281,33 @@ impl Render for SyncPanel {
             (
                 "sync-work-offline",
                 "Work offline",
+                "Stop all contact with GitHub. Cached work stays available.",
                 Control::Offline,
                 controls.work_offline,
             ),
             (
                 "sync-pause-background",
                 "Pause background refresh",
+                "Refresh only when you ask. This also pauses app update checks.",
                 Control::PauseReads,
                 controls.pause_background,
             ),
             (
                 "sync-pause-outbox",
                 "Pause queued actions",
+                "Hold comments, reviews and merges in the Outbox until you resume.",
                 Control::PauseWrites,
                 controls.pause_queued_actions,
             ),
             (
                 "sync-quiet-notifications",
                 "Quiet notifications",
+                "Keep new activity in the app without desktop notifications.",
                 Control::Quiet,
                 controls.notification_quiet,
             ),
         ];
-        let fields = [
+        let hours = [
             ("sync-start", "Work starts (HH:MM)", &self.start),
             ("sync-end", "Work ends (HH:MM)", &self.end),
             (
@@ -310,6 +315,8 @@ impl Render for SyncPanel {
                 "Work schedule time zone override",
                 &self.timezone,
             ),
+        ];
+        let intervals = [
             (
                 "sync-work-interval",
                 "Work-hours interval in seconds",
@@ -326,145 +333,131 @@ impl Render for SyncPanel {
                 &self.visible,
             ),
         ];
-        div()
-            .id("sync-settings-panel")
-            .role(Role::Group)
-            .aria_label("Synchronization settings")
-            .flex_1()
-            .min_h_0()
-            .overflow_y_scroll()
-            .flex()
-            .flex_col()
-            .gap_4()
-            .p_4()
-            .bg(palette.panel)
-            .child(div().text_lg().child("Synchronization"))
-            .child(
-                div().flex().flex_wrap().gap_2().children(
-                    dials
-                        .into_iter()
-                        .map(|(id, label, target, active)| {
-                            let toggle = button(
-                                id,
-                                format!("{label} · {}", if active { "On" } else { "Off" }),
-                            )
-                            .selected(active)
+        let field = |(id, label, field): (&'static str, &'static str, &Entity<InputState>)| {
+            div()
+                .w(px(231.))
+                .flex()
+                .flex_col()
+                .gap_1()
+                .child(div().text_xs().text_color(palette.muted).child(label))
+                .child(
+                    self.observed_control(
+                        id,
+                        !unavailable,
+                        Input::new(field)
+                            .small()
                             .disabled(unavailable)
-                            .on_click(cx.listener(
-                                move |panel, _, window, cx| panel.toggle(target, window, cx),
-                            ));
-                            self.observed_control(id, !unavailable, toggle)
-                        })
-                        .collect::<Vec<_>>(),
-                ),
-            )
-            .child(div().text_sm().child("Workdays"))
-            .child(
-                div().flex().flex_wrap().gap_2().children(
-                    [
-                        "Monday",
-                        "Tuesday",
-                        "Wednesday",
-                        "Thursday",
-                        "Friday",
-                        "Saturday",
-                        "Sunday",
-                    ]
-                    .into_iter()
-                    .enumerate()
-                    .map(|(index, label)| {
-                        let id = format!("sync-day-{index}");
-                        let toggle = button(id.clone(), label)
-                            .selected(self.weekdays & (1 << index) != 0)
-                            .disabled(unavailable)
-                            .on_click(cx.listener(move |panel, _, _, cx| {
-                                panel.weekdays ^= 1 << index;
-                                cx.notify();
-                            }));
-                        self.observed_control(&id, !unavailable, toggle)
-                    })
-                    .collect::<Vec<_>>(),
-                ),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_wrap()
-                    .gap_3()
-                    .children(fields.into_iter().map(|(id, label, field)| {
-                        div()
-                            .w(px(231.))
-                            .flex()
-                            .flex_col()
-                            .gap_1()
-                            .child(div().text_xs().child(label))
-                            .child(
-                                self.observed_control(
-                                    id,
-                                    !unavailable,
-                                    Input::new(field)
-                                        .small()
-                                        .disabled(unavailable)
-                                        .accessibility_id(id)
-                                        .aria_label(label),
-                                ),
-                            )
-                    })),
-            )
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(palette.muted)
-                    .child(format!("Default time zone · {}", zone.name())),
-            )
-            .child(
-                div()
-                    .flex()
-                    .gap_2()
-                    .child(
-                        self.observed_control(
-                            "sync-save-schedule",
-                            !unavailable,
-                            button("sync-save-schedule", "Save schedule")
-                                .disabled(unavailable)
-                                .on_click(cx.listener(|panel, _, window, cx| {
-                                    panel.save_schedule(window, cx)
-                                })),
-                        ),
-                    )
-                    .child(
-                        self.observed_control(
-                            "sync-check-now",
-                            !unavailable && !controls.work_offline,
-                            button("sync-check-now", "Check now")
-                                .disabled(unavailable || controls.work_offline)
-                                .on_click(
-                                    cx.listener(|panel, _, window, cx| panel.check_now(window, cx)),
-                                ),
-                        ),
-                    )
-                    .child(
-                        button("sync-refresh-status", "Refresh status")
-                            .disabled(self.busy)
-                            .on_click(
-                                cx.listener(|panel, _, window, cx| panel.refresh(window, cx)),
-                            ),
+                            .accessibility_id(id)
+                            .aria_label(label),
                     ),
+                )
+        };
+        let mut pauses = card(
+            "Synchronization",
+            "Control when Threadline talks to GitHub.",
+            palette,
+        );
+        for (id, label, detail, target, active) in dials {
+            let dial = toggle(
+                id,
+                format!("{label} · {}", if active { "On" } else { "Off" }),
+                active,
+                palette,
             )
-            .children(self.message.map(|message| {
-                div()
-                    .id("sync-message")
-                    .role(Role::Status)
-                    .text_sm()
-                    .child(message)
-            }))
+            .disabled(unavailable)
+            .on_click(cx.listener(move |panel, _, window, cx| panel.toggle(target, window, cx)));
+            pauses = pauses.child(row(
+                label,
+                detail,
+                self.observed_control(id, !unavailable, dial),
+                palette,
+            ));
+        }
+        let schedule = card(
+            "Work schedule",
+            "Threadline refreshes more often during your working hours.",
+            palette,
+        )
+        .child(
+            div().flex().flex_wrap().gap_1().children(
+                [
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday",
+                    "Friday",
+                    "Saturday",
+                    "Sunday",
+                ]
+                .into_iter()
+                .enumerate()
+                .map(|(index, label)| {
+                    let id = format!("sync-day-{index}");
+                    let day = button(id.clone(), label)
+                        .selected(self.weekdays & (1 << index) != 0)
+                        .disabled(unavailable)
+                        .on_click(cx.listener(move |panel, _, _, cx| {
+                            panel.weekdays ^= 1 << index;
+                            cx.notify();
+                        }));
+                    self.observed_control(&id, !unavailable, day)
+                })
+                .collect::<Vec<_>>(),
+            ),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_wrap()
+                .gap_3()
+                .children(hours.into_iter().map(field)),
+        )
+        .child(
+            div()
+                .text_xs()
+                .text_color(palette.muted)
+                .child(format!("Default time zone · {}", zone.name())),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_wrap()
+                .gap_3()
+                .pt_3()
+                .border_t_1()
+                .border_color(palette.border)
+                .children(intervals.into_iter().map(field)),
+        )
+        .child(
+            div().flex().child(
+                self.observed_control(
+                    "sync-save-schedule",
+                    !unavailable,
+                    button("sync-save-schedule", "Save schedule")
+                        .primary()
+                        .disabled(unavailable)
+                        .on_click(
+                            cx.listener(|panel, _, window, cx| panel.save_schedule(window, cx)),
+                        ),
+                ),
+            ),
+        )
+        .children(self.message.map(|message| {
+            div()
+                .id("sync-message")
+                .role(Role::Status)
+                .text_sm()
+                .child(message)
+        }));
+        let status = card("Status", "", palette)
             .children(self.details.as_ref().map(|details| {
                 div()
                     .id("sync-pending-status")
                     .role(Role::Status)
                     .flex()
                     .flex_col()
-                    .gap_2()
+                    .gap_1()
+                    .text_sm()
                     .child(format!("Pending reads · {}", details.pending))
                     .child(format!(
                         "Last successful sync · {}",
@@ -483,6 +476,40 @@ impl Render for SyncPanel {
                         )
                     }))
             }))
+            .child(
+                div()
+                    .flex()
+                    .gap_2()
+                    .child(
+                        self.observed_control(
+                            "sync-check-now",
+                            !unavailable && !controls.work_offline,
+                            button("sync-check-now", "Check now")
+                                .disabled(unavailable || controls.work_offline)
+                                .on_click(
+                                    cx.listener(|panel, _, window, cx| panel.check_now(window, cx)),
+                                ),
+                        ),
+                    )
+                    .child(
+                        button("sync-refresh-status", "Refresh status")
+                            .disabled(self.busy)
+                            .on_click(
+                                cx.listener(|panel, _, window, cx| panel.refresh(window, cx)),
+                            ),
+                    ),
+            );
+        div()
+            .id("sync-settings-panel")
+            .role(Role::Group)
+            .aria_label("Synchronization settings")
+            .w_full()
+            .flex()
+            .flex_col()
+            .gap_4()
+            .child(pauses)
+            .child(schedule)
+            .child(status)
     }
 }
 

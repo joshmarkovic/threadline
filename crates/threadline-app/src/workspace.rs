@@ -996,6 +996,37 @@ impl Workspace {
         }
     }
 
+    /// What Home is monitoring and the latest refresh result, for the status bar.
+    fn home_summary(&self, cx: &App) -> Option<(String, Option<String>)> {
+        if self.route != WorkspaceRoute::Home || self.feasibility_fixture {
+            return None;
+        }
+        let panel = self.accounts.as_ref()?.read(cx);
+        let account = panel.local_reader_state().0;
+        let selected = account
+            .visible_repositories()
+            .filter(|repo| repo.selected)
+            .count();
+        let total = account.visible_repositories().count();
+        let mut summary = match (selected, total) {
+            (0, 0) => "No repositories discovered yet. Refresh all to check GitHub.".to_owned(),
+            (0, _) => format!("No repositories monitored. Choose from {total} in Settings."),
+            _ => format!("Monitoring {selected} of {total} repositories"),
+        };
+        if let Some(checked) = account
+            .profiles
+            .iter()
+            .filter(|profile| Some(profile.account) == account.active)
+            .filter_map(|profile| profile.checked_at_ms)
+            .max()
+        {
+            let time =
+                crate::display_time::DisplayClock::current(cx).label(Some(checked), "unknown");
+            summary.push_str(&format!(" · Last GitHub check {time}"));
+        }
+        Some((summary, panel.home_refresh_status().map(str::to_owned)))
+    }
+
     fn toolbar(&self, palette: Palette, ordinary: bool, cx: &mut Context<Self>) -> AnyElement {
         if ordinary {
             let loaded = self
@@ -1004,11 +1035,19 @@ impl Workspace {
                 .is_some_and(|panel| panel.read(cx).loaded());
             let show_navigation = loaded && self.route != WorkspaceRoute::Onboarding;
             let on_home = self.route == WorkspaceRoute::Home;
-            let mut navigation = div().flex().items_center().gap_2().child(
+            let mut navigation = div().flex().items_center().gap_1().child(
                 div()
-                    .text_lg()
-                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
-                    .child("Threadline"),
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .mr_4()
+                    .child(crate::brand::mark(px(22.)))
+                    .child(
+                        div()
+                            .text_base()
+                            .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+                            .child("Threadline"),
+                    ),
             );
             if show_navigation {
                 for (id, label, destination) in [
@@ -1035,13 +1074,14 @@ impl Workspace {
                     );
                 }
             }
-            let mut actions = div().flex().items_center().gap_3();
+            let mut actions = div().flex().items_center().gap_1();
             if show_navigation && on_home {
                 let busy = self
                     .accounts
                     .as_ref()
                     .is_some_and(|panel| panel.read(cx).home_refresh_busy());
                 let refresh = button("home-refresh-all", "Refresh all")
+                    .icon(gpui_kit::component::IconName::RefreshCw)
                     .accessibility_id("home-refresh-all")
                     .disabled(busy)
                     .on_click(cx.listener(|workspace, _, window, cx| {
@@ -1065,8 +1105,8 @@ impl Workspace {
                 .flex()
                 .items_center()
                 .justify_between()
-                .px_4()
-                .h(px(54.))
+                .px_3()
+                .h(px(46.))
                 .flex_shrink_0()
                 .border_b_1()
                 .border_color(palette.border)
@@ -1605,13 +1645,27 @@ impl gpui_kit::Render for Workspace {
                 .size_full()
                 .track_focus(&self.shell_focus)
                 .flex()
+                .flex_col()
                 .items_center()
                 .justify_center()
+                .gap_3()
                 .bg(palette.canvas)
                 .text_color(palette.ink)
                 .role(Role::Status)
-                .aria_label("Preparing to restart Threadline")
-                .child("Preparing to restart Threadline…");
+                .aria_label("Updating Threadline")
+                .child(crate::brand::mark(px(56.)))
+                .child(
+                    div()
+                        .text_lg()
+                        .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+                        .child("Updating Threadline…"),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(palette.muted)
+                        .child("Your workspace is saved. Threadline reopens in a moment."),
+                );
         }
         let cached_reader = self
             .reader
@@ -1619,6 +1673,10 @@ impl gpui_kit::Render for Workspace {
             .filter(|reader| reader.read(cx).has_account())
             .cloned();
         let cached = cached_reader.is_some();
+        if let Some(reader) = &cached_reader {
+            let summary = self.home_summary(cx);
+            reader.update(cx, |reader, _| reader.set_home_summary(summary));
+        }
         let compact = window.viewport_size().width.as_f32() < COMPACT_REVIEW_WIDTH;
         #[cfg(feature = "e2e")]
         if let Some(observer) = &self.observer {
@@ -1753,69 +1811,6 @@ impl gpui_kit::Render for Workspace {
             .when(self.route == WorkspaceRoute::Home, |content| {
                 content.children(self.updates.clone())
             })
-            .when(
-                self.route == WorkspaceRoute::Home && cached && !self.feasibility_fixture,
-                |content| {
-                    let Some(panel) = &self.accounts else {
-                        return content;
-                    };
-                    let panel = panel.read(cx);
-                    let account = panel.local_reader_state().0;
-                    let selected = account
-                        .visible_repositories()
-                        .filter(|repo| repo.selected)
-                        .count();
-                    let total = account.visible_repositories().count();
-                    let mut summary = match (selected, total) {
-                        (0, 0) => "No repositories discovered yet. Refresh all to check GitHub."
-                            .to_owned(),
-                        (0, _) => {
-                            format!("No repositories monitored. Choose from {total} in Settings.")
-                        }
-                        _ => format!("Monitoring {selected} of {total} repositories"),
-                    };
-                    if let Some(checked) = account
-                        .profiles
-                        .iter()
-                        .filter(|profile| Some(profile.account) == account.active)
-                        .filter_map(|profile| profile.checked_at_ms)
-                        .max()
-                    {
-                        let time = crate::display_time::DisplayClock::current(cx)
-                            .label(Some(checked), "unknown");
-                        summary.push_str(&format!(" · Last GitHub check {time}"));
-                    }
-                    let mut strip = div()
-                        .flex()
-                        .flex_wrap()
-                        .items_center()
-                        .gap_x_3()
-                        .px_4()
-                        .py_1()
-                        .child(
-                            div()
-                                .id("home-repository-summary")
-                                .test_support()
-                                .accessibility_id("home-repository-summary")
-                                .role(Role::Label)
-                                .aria_value(summary.clone())
-                                .child(summary),
-                        );
-                    if let Some(message) = panel.home_refresh_status() {
-                        let status = message.to_owned();
-                        strip = strip.child(
-                            div()
-                                .id("home-refresh-status")
-                                .test_support()
-                                .accessibility_id("home-refresh-status")
-                                .role(Role::Status)
-                                .aria_label(status.clone())
-                                .child(status),
-                        );
-                    }
-                    content.child(strip)
-                },
-            )
             .when(self.route != WorkspaceRoute::Home, |content| {
                 content.child(div().flex_1().min_h_0().children(self.accounts.clone()))
             })
@@ -1852,13 +1847,26 @@ impl gpui_kit::Render for Workspace {
                             .items_center()
                             .justify_center()
                             .gap_3()
-                            .child(div().text_lg().child(if loading {
-                                "Opening local profile…"
-                            } else {
-                                "No cached workspace yet"
+                            .child(crate::brand::mark(px(48.)))
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+                                    .child(if loading {
+                                        "Opening local profile…"
+                                    } else {
+                                        "No cached workspace yet"
+                                    }),
+                            )
+                            .children((!loading).then(|| {
+                                div()
+                                    .text_sm()
+                                    .text_color(palette.muted)
+                                    .child("Connect a GitHub account in Settings to get started.")
                             }))
                             .children((!loading && self.accounts.is_some()).then(|| {
                                 button("reader-connect-account", "Open Settings")
+                                    .primary()
                                     .accessibility_id("reader-connect-account")
                                     .on_click(cx.listener(|this, _, window, cx| {
                                         this.set_accounts_open(true, window, cx)

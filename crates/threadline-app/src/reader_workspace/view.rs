@@ -1,12 +1,13 @@
 use super::{remote::RemoteFamily, *};
 use crate::palette::Palette;
+use crate::ui::{nav, nav_heading};
 use gpui_kit::base::TestTextExt;
 use gpui_kit::{
     AnyElement, App, ClickEvent, Div, InteractiveElement, IntoElement, ParentElement, Render, Role,
     StatefulInteractiveElement, Styled, TestSupportExt,
     component::{
         Disableable, Selectable, Sizable,
-        button::Button,
+        button::{Button, ButtonVariants},
         input::{Input, Textarea},
     },
     div,
@@ -409,34 +410,34 @@ impl ReaderWorkspace {
         });
     }
 
-    pub(crate) fn connection_label(&self) -> (&'static str, gpui_kit::Hsla) {
+    pub(crate) fn connection_label(&self, palette: Palette) -> (&'static str, gpui_kit::Hsla) {
         use threadline_core::connectivity::ConnectionStatus;
         if self.offline {
-            return ("Working offline", rgb(0xb93442).into());
+            return ("Working offline", palette.warn);
         }
         if let Some(connection) = self.shared_connection() {
             return match connection.status {
-                ConnectionStatus::Checking => ("Checking GitHub", rgb(0x8b785b).into()),
-                ConnectionStatus::Stale => ("Connection status stale", rgb(0x8b785b).into()),
-                ConnectionStatus::Reachable => ("GitHub reachable", rgb(0x28804a).into()),
-                ConnectionStatus::Unreachable => ("Cannot reach GitHub", rgb(0xb93442).into()),
-                ConnectionStatus::Offline => ("Working offline", rgb(0xb93442).into()),
+                ConnectionStatus::Checking => ("Checking GitHub", palette.warn),
+                ConnectionStatus::Stale => ("Connection status stale", palette.warn),
+                ConnectionStatus::Reachable => ("GitHub reachable", palette.good),
+                ConnectionStatus::Unreachable => ("Cannot reach GitHub", palette.bad),
+                ConnectionStatus::Offline => ("Working offline", palette.warn),
             };
         }
         if self.network_pending > 0 && self.reachability == Reachability::NotAttempted {
-            return ("Checking GitHub", rgb(0x8b785b).into());
+            return ("Checking GitHub", palette.warn);
         }
         if self.reachability == Reachability::NoResponse {
-            return ("Cannot reach GitHub", rgb(0xb93442).into());
+            return ("Cannot reach GitHub", palette.bad);
         }
         if self.reachability == Reachability::ReceivedResponse
             && self
                 .contact
                 .is_some_and(|time| now_ms().saturating_sub(time) < 300_000)
         {
-            return ("GitHub reachable", rgb(0x28804a).into());
+            return ("GitHub reachable", palette.good);
         }
-        ("Connection status stale", rgb(0x8b785b).into())
+        ("Connection status stale", palette.warn)
     }
 
     fn sidebar(&self, palette: Palette, cx: &mut Context<Self>) -> impl IntoElement {
@@ -463,16 +464,27 @@ impl ReaderWorkspace {
                 }),
             ]
         });
-        let overview = div()
-            .flex()
-            .flex_col()
-            .gap_1()
+        let browsing = self.surface == Surface::Browse;
+        let review_view = browsing && self.filter.reviewer.is_some();
+        let assigned_view = browsing && !review_view && self.filter.assignee.is_some();
+        let pinned_view = browsing && self.filter.pinned_only;
+        let recent_view = browsing && self.filter.recent_only;
+        let plain_view = browsing && !(review_view || assigned_view || pinned_view || recent_view);
+        let group = |title: &'static str| {
+            div()
+                .flex()
+                .flex_col()
+                .gap_0p5()
+                .child(nav_heading(title, palette))
+        };
+        let inbox = group("Inbox")
             .child(rail(
                 zone,
                 "reader-review",
                 "Review requested",
                 &count_scope,
                 review,
+                review_view,
                 cx.listener(|this, _, window, cx| {
                     this.filter = BrowseFilter {
                         reviewer: Some(this.login.clone()),
@@ -487,6 +499,7 @@ impl ReaderWorkspace {
                 "Assigned to me",
                 &count_scope,
                 assign,
+                assigned_view,
                 cx.listener(|this, _, window, cx| {
                     this.filter = BrowseFilter {
                         assignee: Some(this.login.clone()),
@@ -503,10 +516,109 @@ impl ReaderWorkspace {
                     "Outbox",
                     "active account",
                     outbox,
+                    self.surface == Surface::Outbox,
                     cx.listener(|this, _, window, cx| this.show_outbox(false, window, cx)),
                 ),
                 false,
             ));
+        let repositories = group("Repositories")
+            .child(
+                self.observed_control(
+                    "reader-browse",
+                    nav("reader-browse", "Selected repositories")
+                        .selected(plain_view && self.scope == ReaderScope::Selected)
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.filter = BrowseFilter::default();
+                            this.set_scope(ReaderScope::Selected, window, cx);
+                        })),
+                    false,
+                ),
+            )
+            .children(
+                self.repositories
+                    .iter()
+                    .filter(|repo| repo.selected)
+                    .map(|repo| {
+                        let id = repo.id;
+                        let name = format!("reader-repository-{}", id.0);
+                        let button = nav(name.clone(), format!("{}/{}", repo.owner, repo.name))
+                            .selected(plain_view && self.scope == ReaderScope::Repository(id))
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.set_scope(ReaderScope::Repository(id), window, cx)
+                            }));
+                        self.observed_control(name, button, false)
+                    })
+                    .collect::<Vec<_>>(),
+            );
+        let views = group("Views")
+            .child(
+                nav("reader-pinned", "Pinned")
+                    .selected(pinned_view)
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.filter = BrowseFilter {
+                            pinned_only: true,
+                            ..Default::default()
+                        };
+                        this.browse(false, window, cx);
+                    })),
+            )
+            .child(
+                nav("reader-recent", "Recent")
+                    .selected(recent_view)
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.filter = BrowseFilter {
+                            recent_only: true,
+                            ..Default::default()
+                        };
+                        this.browse(false, window, cx);
+                    })),
+            )
+            .children(
+                self.saved
+                    .iter()
+                    .enumerate()
+                    .map(|(index, (name, filter))| {
+                        let filter = filter.clone();
+                        nav(format!("reader-saved-{index}"), name.clone()).on_click(cx.listener(
+                            move |this, _, window, cx| {
+                                this.filter = filter.clone();
+                                this.browse(false, window, cx);
+                            },
+                        ))
+                    })
+                    .collect::<Vec<_>>(),
+            );
+        let workspace = group("Workspace")
+            .child(
+                self.observed_control(
+                    "reader-activity",
+                    nav("reader-activity", "Activity")
+                        .selected(matches!(
+                            self.surface,
+                            Surface::Activity | Surface::NotificationSettings
+                        ))
+                        .on_click(
+                            cx.listener(|this, _, window, cx| {
+                                this.show_activity(false, window, cx)
+                            }),
+                        ),
+                    false,
+                ),
+            )
+            .child(
+                self.observed_control(
+                    "reader-history",
+                    nav("reader-history", "History")
+                        .selected(self.surface == Surface::History)
+                        .on_click(cx.listener(|this, _, window, cx| this.show_history(window, cx))),
+                    false,
+                ),
+            )
+            .child(
+                nav("reader-storage", "Storage usage")
+                    .selected(self.surface == Surface::Storage)
+                    .on_click(cx.listener(|this, _, window, cx| this.show_cache(window, cx))),
+            );
         div()
             .id("reader-navigation")
             .role(Role::Group)
@@ -517,89 +629,16 @@ impl ReaderWorkspace {
             .overflow_y_scroll()
             .flex()
             .flex_col()
-            .gap_3()
-            .p_3()
+            .gap_4()
+            .px_2()
+            .py_3()
             .border_r_1()
             .border_color(palette.border)
-            .bg(palette.panel)
-            .child(overview)
-            .child(self.observed_control(
-                "reader-browse",
-                control("reader-browse", "Selected repositories").on_click(cx.listener(
-                    |this, _, window, cx| {
-                        this.filter = BrowseFilter::default();
-                        this.set_scope(ReaderScope::Selected, window, cx);
-                    },
-                )),
-                false,
-            ))
-            .children(
-                self.repositories
-                    .iter()
-                    .filter(|repo| repo.selected)
-                    .map(|repo| {
-                        let id = repo.id;
-                        let name = format!("reader-repository-{}", id.0);
-                        let button = control(name.clone(), format!("{}/{}", repo.owner, repo.name))
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                this.set_scope(ReaderScope::Repository(id), window, cx)
-                            }));
-                        self.observed_control(name, button, false)
-                    })
-                    .collect::<Vec<_>>(),
-            )
-            .child(control("reader-pinned", "Pinned").on_click(cx.listener(
-                |this, _, window, cx| {
-                    this.filter = BrowseFilter {
-                        pinned_only: true,
-                        ..Default::default()
-                    };
-                    this.browse(false, window, cx);
-                },
-            )))
-            .child(control("reader-recent", "Recent").on_click(cx.listener(
-                |this, _, window, cx| {
-                    this.filter = BrowseFilter {
-                        recent_only: true,
-                        ..Default::default()
-                    };
-                    this.browse(false, window, cx);
-                },
-            )))
-            .children(
-                self.saved
-                    .iter()
-                    .enumerate()
-                    .map(|(index, (name, filter))| {
-                        let filter = filter.clone();
-                        control(format!("reader-saved-{index}"), name.clone()).on_click(
-                            cx.listener(move |this, _, window, cx| {
-                                this.filter = filter.clone();
-                                this.browse(false, window, cx);
-                            }),
-                        )
-                    })
-                    .collect::<Vec<_>>(),
-            )
-            .child(self.observed_control(
-                "reader-activity",
-                control("reader-activity", "Activity").on_click(
-                    cx.listener(|this, _, window, cx| this.show_activity(false, window, cx)),
-                ),
-                false,
-            ))
-            .child(
-                self.observed_control(
-                    "reader-history",
-                    control("reader-history", "History")
-                        .on_click(cx.listener(|this, _, window, cx| this.show_history(window, cx))),
-                    false,
-                ),
-            )
-            .child(
-                control("reader-storage", "Storage usage")
-                    .on_click(cx.listener(|this, _, window, cx| this.show_cache(window, cx))),
-            )
+            .bg(palette.surface)
+            .child(inbox)
+            .child(repositories)
+            .child(views)
+            .child(workspace)
     }
 
     fn browse_view(&self, palette: Palette, cx: &mut Context<Self>) -> impl IntoElement {
@@ -698,15 +737,21 @@ impl ReaderWorkspace {
                             true,
                         ),
                     )
-                    .child(self.observed_control(
-                        "reader-search-submit",
-                        control("reader-search-submit", "Search downloaded").on_click(
-                            cx.listener(|this, _, window, cx| this.local_search(window, cx)),
-                        ),
-                        false,
-                    ))
                     .child(
-                        control("reader-search-github", "Search GitHub")
+                        self.observed_control(
+                            "reader-search-submit",
+                            control("reader-search-submit", "Search downloaded")
+                                .primary()
+                                .on_click(
+                                    cx.listener(|this, _, window, cx| {
+                                        this.local_search(window, cx)
+                                    }),
+                                ),
+                            false,
+                        ),
+                    )
+                    .child(
+                        quiet("reader-search-github", "Search GitHub")
                             .disabled(!self.can_fetch())
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.search_github(false, window, cx)
@@ -714,7 +759,7 @@ impl ReaderWorkspace {
                     )
                     .child({
                         let enabled = self.can_fetch();
-                        let button = control("reader-fetch-repository", "Download repository page")
+                        let button = quiet("reader-fetch-repository", "Download repository page")
                             .disabled(!enabled)
                             .on_click(
                                 cx.listener(|this, _, window, cx| this.load_repository(window, cx)),
@@ -725,12 +770,14 @@ impl ReaderWorkspace {
                             button.into_any_element()
                         }
                     })
-                    .child(control("reader-filters", "Filters").on_click(cx.listener(
-                        |this, _, _, cx| {
-                            this.filters_open = !this.filters_open;
-                            cx.notify();
-                        },
-                    ))),
+                    .child(
+                        quiet("reader-filters", "Filters")
+                            .selected(self.filters_open)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.filters_open = !this.filters_open;
+                                cx.notify();
+                            })),
+                    ),
             )
             .child(
                 div()
@@ -909,36 +956,79 @@ impl ReaderWorkspace {
             .items_center()
             .justify_between()
             .gap_2()
-            .border_b_1()
-            .border_color(palette.border)
+            .rounded_md()
+            .hover(|row| row.bg(palette.surface))
             .child(
                 div()
                     .min_w_0()
+                    .flex_1()
                     .flex()
                     .flex_col()
                     .items_start()
-                    .child(self.observed_control(
-                        format!("reader-result-{index}"),
-                        control(format!("reader-result-{index}"), label).on_click(cx.listener(
-                            move |this, _, window, cx| {
-                                #[cfg(feature = "e2e")]
-                                this.performance.start(performance::Action::Open(item.0));
-                                this.open(item, anchor.clone(), OpenTab::CurrentPane, window, cx)
-                            },
-                        )),
-                        false,
-                    ))
-                    .children(
-                        snippet.map(|text| div().text_xs().text_color(palette.muted).child(text)),
-                    ),
+                    .child(
+                        self.observed_control(
+                            format!("reader-result-{index}"),
+                            Button::new(format!("reader-result-{index}"))
+                                .ghost()
+                                .small()
+                                .max_w_full()
+                                .accessibility_id(format!("reader-result-{index}"))
+                                .accessibility_label(label.clone())
+                                .tooltip(label)
+                                .child(
+                                    div()
+                                        .flex()
+                                        .items_center()
+                                        .gap_2()
+                                        .overflow_hidden()
+                                        .child(kind_tag(row.kind, palette))
+                                        .child(
+                                            div().flex_shrink_0().text_color(palette.muted).child(
+                                                format!(
+                                                    "{}/{} #{}",
+                                                    row.owner, row.name, row.number
+                                                ),
+                                            ),
+                                        )
+                                        .child(
+                                            div()
+                                                .min_w_0()
+                                                .whitespace_nowrap()
+                                                .text_ellipsis()
+                                                .child(title.to_owned()),
+                                        ),
+                                )
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    #[cfg(feature = "e2e")]
+                                    this.performance.start(performance::Action::Open(item.0));
+                                    this.open(
+                                        item,
+                                        anchor.clone(),
+                                        OpenTab::CurrentPane,
+                                        window,
+                                        cx,
+                                    )
+                                })),
+                            false,
+                        ),
+                    )
+                    .children(snippet.map(|text| {
+                        div()
+                            .px_2()
+                            .pb_1()
+                            .text_xs()
+                            .text_color(palette.muted)
+                            .child(text)
+                    })),
             )
             .child(
                 div()
                     .flex()
                     .flex_shrink_0()
+                    .text_color(palette.muted)
                     .child(self.observed_control(
                         format!("reader-beside-{index}"),
-                        control(format!("reader-beside-{index}"), "Open beside").on_click(
+                        quiet(format!("reader-beside-{index}"), "Open beside").on_click(
                             cx.listener(move |this, _, window, cx| {
                                 this.open(item, beside_anchor.clone(), OpenTab::Beside, window, cx)
                             }),
@@ -946,7 +1036,7 @@ impl ReaderWorkspace {
                         false,
                     ))
                     .child(
-                        control(
+                        quiet(
                             format!("reader-pin-{index}"),
                             if row.pinned { "Unpin" } else { "Pin" },
                         )
@@ -977,7 +1067,11 @@ impl ReaderWorkspace {
             .gap_1()
             .flex_shrink_0()
             .p_1()
-            .bg(palette.surface)
+            .bg(if focused {
+                palette.accent_bg
+            } else {
+                palette.surface
+            })
             .children(
                 pane.tabs
                     .iter()
@@ -1009,7 +1103,7 @@ impl ReaderWorkspace {
                         } else {
                             label.clone()
                         };
-                        let button = control(name.clone(), label)
+                        let button = quiet(name.clone(), label)
                             .w(tab_width)
                             .flex_shrink_0()
                             .selected(selected)
@@ -1058,7 +1152,7 @@ impl ReaderWorkspace {
             .flex_grow(1.)
             .border_1()
             .border_color(if focused {
-                palette.accent
+                palette.accent.opacity(0.55)
             } else {
                 palette.border
             })
@@ -1540,149 +1634,213 @@ pub(crate) fn bind_shortcuts(cx: &mut App) {
 impl ReaderWorkspace {
     fn workspace_connection(&self, palette: Palette, cx: &mut Context<Self>) -> AnyElement {
         let zone = crate::display_time::DisplayClock::current(cx);
-        let (connection, color) = self.connection_label();
+        let (connection, color) = self.connection_label(palette);
         let snapshot = self.shared_connection();
-        let connection_details = format!(
-            "{connection}. Last check {}. Last successful contact {}.",
-            time_label(
-                zone,
-                snapshot.map_or(self.checked, |state| state.last_checked_ms)
-            ),
-            time_label(
-                zone,
-                snapshot.map_or(self.contact, |state| state.last_contact_ms)
-            ),
+        let checked = time_label(
+            zone,
+            snapshot.map_or(self.checked, |state| state.last_checked_ms),
         );
+        let contact = time_label(
+            zone,
+            snapshot.map_or(self.contact, |state| state.last_contact_ms),
+        );
+        let connection_details =
+            format!("{connection}. Last check {checked}. Last successful contact {contact}.");
+        let muted = |text: gpui_kit::SharedString| {
+            div().flex_shrink_0().text_color(palette.muted).child(text)
+        };
 
         div()
             .id("reader-connection")
             .test_support()
             .role(Role::Status)
-            .aria_label(connection_details.clone())
-            .p_2()
+            .aria_label(connection_details)
+            .min_h(px(32.))
+            .px_3()
+            .py_0p5()
             .flex()
+            .flex_wrap()
             .items_center()
-            .gap_2()
+            .gap_x_3()
             .flex_shrink_0()
+            .border_t_1()
+            .border_color(palette.border)
             .bg(palette.surface)
-            .child(div().size(px(9.)).rounded_full().bg(color))
-            .child(div().text_sm().child(connection))
+            .text_xs()
             .child(
                 div()
-                    .text_xs()
-                    .text_color(palette.muted)
-                    .child(connection_details),
+                    .flex()
+                    .items_center()
+                    .gap_1p5()
+                    .flex_shrink_0()
+                    .child(div().size(px(8.)).rounded_full().bg(color))
+                    .child(connection),
             )
+            .child(muted(format!("Last check {checked}").into()))
             .children(
                 (self.access == AccessState::SignedOut)
-                    .then(|| div().text_sm().child("Signed out · local profile")),
+                    .then(|| muted("Signed out · local profile".into())),
             )
-            .children(
-                self.connection_reason()
-                    .map(|reason| div().text_xs().text_color(palette.muted).child(reason)),
-            )
+            .children(self.connection_reason().map(|reason| muted(reason.into())))
+            .children(self.home_summary.as_ref().map(|(summary, status)| {
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_x_3()
+                    .text_color(palette.muted)
+                    .child(
+                        div()
+                            .id("home-repository-summary")
+                            .test_support()
+                            .accessibility_id("home-repository-summary")
+                            .role(Role::Label)
+                            .aria_value(summary.clone())
+                            .child(summary.clone()),
+                    )
+                    .children(status.as_ref().map(|status| {
+                        div()
+                            .id("home-refresh-status")
+                            .test_support()
+                            .accessibility_id("home-refresh-status")
+                            .role(Role::Status)
+                            .aria_label(status.clone())
+                            .text_color(palette.ink)
+                            .child(status.clone())
+                    }))
+            }))
+            .child(div().flex_1())
             .child(
-                control("reader-check-now", "Check now")
+                quiet("reader-check-now", "Check now")
+                    .xsmall()
                     .disabled(self.offline || self.access == AccessState::SignedOut)
                     .on_click(|_, window, cx| {
                         window.dispatch_action(Box::new(crate::workspace::CheckAccountAccess), cx)
                     }),
             )
             .child(
-                control(
+                quiet(
                     "reader-connection-outbox",
                     self.counts.map_or_else(
                         || "Outbox".into(),
                         |counts| format!("Outbox · {} pending", counts.outbox),
                     ),
                 )
+                .xsmall()
                 .on_click(cx.listener(|this, _, window, cx| this.show_outbox(false, window, cx))),
             )
             .into_any_element()
     }
 
     fn workspace_commands(&self, palette: Palette, cx: &mut Context<Self>) -> AnyElement {
+        let layout = |id: &'static str, label: &'static str, action: LayoutAction| {
+            let button = quiet(id, label)
+                .xsmall()
+                .disabled(self.layout_busy)
+                .on_click(
+                    cx.listener(move |this, _, window, cx| this.edit_layout(action, window, cx)),
+                );
+            if self.layout_busy {
+                button.into_any_element()
+            } else {
+                self.observed_control(id, button, false)
+            }
+        };
+        let divider = || {
+            div()
+                .w(px(1.))
+                .h(px(16.))
+                .mx_1()
+                .flex_shrink_0()
+                .bg(palette.border)
+        };
+        let maximize = self.observed_control(
+            "reader-maximize-pane",
+            quiet(
+                "reader-maximize-pane",
+                if self.maximized {
+                    "Restore panes"
+                } else {
+                    "Maximize pane"
+                },
+            )
+            .xsmall()
+            .on_click(cx.listener(|this, _, window, cx| {
+                this.maximized = !this.maximized;
+                this.save_layout(this.layout.clone(), window, cx);
+            })),
+            false,
+        );
         div()
             .flex_shrink_0()
             .flex()
             .flex_wrap()
-            .gap_1()
-            .p_2()
+            .items_center()
+            .gap_0p5()
+            .px_2()
+            .py_1()
+            .border_b_1()
+            .border_color(palette.border)
             .bg(palette.surface)
             .child(
-                control("reader-back", "Back")
+                quiet("reader-back", "Back")
+                    .xsmall()
                     .disabled(self.back.is_empty() || self.layout_busy)
                     .on_click(
                         cx.listener(|this, _, window, cx| this.navigate_history(false, window, cx)),
                     ),
             )
             .child(
-                control("reader-forward", "Forward")
+                quiet("reader-forward", "Forward")
+                    .xsmall()
                     .disabled(self.forward.is_empty() || self.layout_busy)
                     .on_click(
                         cx.listener(|this, _, window, cx| this.navigate_history(true, window, cx)),
                     ),
             )
-            .children(
-                [
-                    ("reader-split", "Split pane", LayoutAction::Split),
-                    ("reader-focus-pane", "Switch pane", LayoutAction::Focus),
-                    ("reader-close-tab", "Close tab", LayoutAction::CloseTab),
-                    ("reader-close-pane", "Close pane", LayoutAction::ClosePane),
-                    ("reader-move-tab", "Move tab", LayoutAction::MoveTab),
-                    ("reader-reorder-tab", "Tab left", LayoutAction::Reorder),
-                    (
-                        "reader-narrow-pane",
-                        "Narrow pane",
-                        LayoutAction::Resize(-0.06),
-                    ),
-                    (
-                        "reader-widen-pane",
-                        "Widen pane",
-                        LayoutAction::Resize(0.06),
-                    ),
-                ]
-                .into_iter()
-                .map(|(id, label, action)| {
-                    let button =
-                        control(id, label)
-                            .disabled(self.layout_busy)
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                this.edit_layout(action, window, cx)
-                            }));
-                    if self.layout_busy {
-                        button.into_any_element()
-                    } else {
-                        self.observed_control(id, button, false)
-                    }
-                })
-                .collect::<Vec<_>>(),
-            )
+            .child(divider())
+            .child(layout("reader-split", "Split pane", LayoutAction::Split))
+            .child(layout(
+                "reader-focus-pane",
+                "Switch pane",
+                LayoutAction::Focus,
+            ))
+            .child(maximize)
+            .child(layout(
+                "reader-narrow-pane",
+                "Narrow pane",
+                LayoutAction::Resize(-0.06),
+            ))
+            .child(layout(
+                "reader-widen-pane",
+                "Widen pane",
+                LayoutAction::Resize(0.06),
+            ))
+            .child(layout(
+                "reader-close-pane",
+                "Close pane",
+                LayoutAction::ClosePane,
+            ))
+            .child(divider())
+            .child(layout(
+                "reader-close-tab",
+                "Close tab",
+                LayoutAction::CloseTab,
+            ))
             .child(
-                control("reader-reopen-tab", "Reopen tab")
+                quiet("reader-reopen-tab", "Reopen tab")
+                    .xsmall()
                     .on_click(cx.listener(|this, _, window, cx| this.reopen(window, cx))),
             )
+            .child(layout("reader-move-tab", "Move tab", LayoutAction::MoveTab))
+            .child(layout(
+                "reader-reorder-tab",
+                "Tab left",
+                LayoutAction::Reorder,
+            ))
             .child(
-                self.observed_control(
-                    "reader-maximize-pane",
-                    control(
-                        "reader-maximize-pane",
-                        if self.maximized {
-                            "Restore panes"
-                        } else {
-                            "Maximize pane"
-                        },
-                    )
+                quiet("reader-duplicate-tab", "Duplicate view beside")
+                    .xsmall()
                     .on_click(cx.listener(|this, _, window, cx| {
-                        this.maximized = !this.maximized;
-                        this.save_layout(this.layout.clone(), window, cx);
-                    })),
-                    false,
-                ),
-            )
-            .child(
-                control("reader-duplicate-tab", "Duplicate view beside").on_click(cx.listener(
-                    |this, _, window, cx| {
                         if let Some(tab) = this
                             .layout
                             .panes
@@ -1691,8 +1849,7 @@ impl ReaderWorkspace {
                         {
                             this.open(tab.item, None, OpenTab::DuplicateBeside, window, cx);
                         }
-                    },
-                )),
+                    })),
             )
             .into_any_element()
     }
@@ -1855,12 +2012,14 @@ impl Render for ReaderWorkspace {
                     this.edit(tab, DraftKind::Comment, window, cx);
                 }
             }))
-            .child(self.workspace_connection(palette, cx))
             .children(self.remote_error.as_ref().map(|error| {
                 div()
                     .id("reader-network-status")
                     .role(Role::Status)
+                    .px_3()
+                    .py_1()
                     .text_sm()
+                    .bg(palette.accent_bg)
                     .child(error.clone())
             }))
             .children(self.status.map(|status| {
@@ -1869,8 +2028,10 @@ impl Render for ReaderWorkspace {
                     .accessibility_id("reader-status")
                     .role(Role::Status)
                     .aria_label(status)
-                    .p_2()
+                    .px_3()
+                    .py_1()
                     .text_sm()
+                    .bg(palette.accent_bg)
                     .child(status)
             }))
             .child(self.workspace_content(
@@ -1879,6 +2040,7 @@ impl Render for ReaderWorkspace {
                 palette,
                 cx,
             ))
+            .child(self.workspace_connection(palette, cx))
     }
 }
 
@@ -1895,6 +2057,14 @@ pub(super) fn control(
         .accessibility_id(id)
 }
 
+/// A borderless control for toolbars and secondary actions on a row.
+pub(super) fn quiet(
+    id: impl Into<gpui_kit::SharedString>,
+    label: impl Into<gpui_kit::SharedString>,
+) -> Button {
+    control(id, label).ghost()
+}
+
 pub(super) const BADGE_BACKGROUND: u32 = 0x173e70;
 pub(super) const BADGE_FOREGROUND: u32 = 0xffffff;
 
@@ -1904,6 +2074,7 @@ fn rail(
     label: &'static str,
     scope: &str,
     count: Option<KnownCount>,
+    selected: bool,
     listener: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
     let description = match count {
@@ -1927,8 +2098,10 @@ fn rail(
         (digits, diameter)
     });
     let button = Button::new(id)
+        .ghost()
         .small()
         .w_full()
+        .selected(selected)
         .when_some(badge.as_ref(), |button, (_, diameter)| {
             // Small buttons clip children to their content box inside the border.
             button.min_h(px(*diameter + 4.))
@@ -1978,6 +2151,26 @@ fn kind_label(kind: ItemKind) -> &'static str {
         ItemKind::PullRequest => "Pull request",
         ItemKind::Unknown => "Item",
     }
+}
+
+/// A small fixed-width marker that tells issues and pull requests apart in a list.
+fn kind_tag(kind: ItemKind, palette: Palette) -> Div {
+    let (text, color) = match kind {
+        ItemKind::Issue => ("Issue", palette.good),
+        ItemKind::PullRequest => ("PR", palette.accent),
+        ItemKind::Unknown => ("Item", palette.muted),
+    };
+    div()
+        .w(px(40.))
+        .flex_shrink_0()
+        .flex()
+        .justify_center()
+        .rounded_sm()
+        .border_1()
+        .border_color(color.opacity(0.45))
+        .text_xs()
+        .text_color(color)
+        .child(text)
 }
 
 pub(super) fn item_metadata(
