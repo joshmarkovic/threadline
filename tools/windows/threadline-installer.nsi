@@ -2,8 +2,8 @@ Unicode true
 RequestExecutionLevel user
 CRCCheck force
 SetCompressor /SOLID lzma
-ShowInstDetails show
-ShowUninstDetails show
+ShowInstDetails hide
+ShowUninstDetails hide
 
 !include LogicLib.nsh
 !include WinVer.nsh
@@ -78,6 +78,12 @@ ShowUninstDetails show
 Name "${Product} ${PACKAGE_VERSION}"
 OutFile "${INSTALLER_OUTPUT}"
 InstallDir "$LOCALAPPDATA\Programs\${Product}"
+!ifndef APP_ICON
+  !error "Supply the application icon."
+!endif
+Icon "${APP_ICON}"
+UninstallIcon "${APP_ICON}"
+BrandingText "Threadline"
 
 Page instfiles
 UninstPage uninstConfirm
@@ -388,6 +394,8 @@ Section "Install Threadline" SEC_INSTALL
   Delete "$INSTDIR\${Stage}\previous-uninstaller.exe"
   Delete "$INSTDIR\${Stage}\owner.ini"
   RMDir "$INSTDIR\${Stage}"
+  # Ask the shell to reload icons so an existing taskbar or Start entry shows the current one.
+  System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
   DetailPrint "Installed ${Product} ${PACKAGE_VERSION} to $INSTDIR."
   Call FinishSuccessfulInstall
   SetErrorLevel 0

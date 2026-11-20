@@ -139,8 +139,11 @@ if [[ $schema != null && $schema -ge 14 ]]; then
     notification_hash="\"$notification_sha\""
     compile_defines+=(-DREGISTER_ACTIVITY=1 "-DACTIVITY_HELPER=$staging/Threadline.NotificationRegistration.exe")
 fi
+app_icon=$recipe_dir/../../crates/threadline-app/assets/threadline.ico
+[[ -f $app_icon && -r $app_icon ]] || fail 'The application icon is missing from the source tree.'
 "$makensis_path" -V3 -WX -INPUTCHARSET UTF8 \
     "${compile_defines[@]}" "-DPACKAGE_VERSION=$version" "-DPACKAGE_BUILD=$build" \
+    "-DAPP_ICON=$app_icon" \
     "-DPAYLOAD_FILE=$staging/threadline.exe" "-DPAYLOAD_SHA256=$app_hash" \
     "-DINSTALLER_OUTPUT=$staging/threadline-package.exe" "$recipe_dir/threadline-installer.nsi"
 
