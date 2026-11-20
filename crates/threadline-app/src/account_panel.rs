@@ -455,8 +455,9 @@ impl AccountPanel {
                 let cancelled = panel.cancel.is_cancelled();
                 panel.cancel = Cancellation::new();
                 if browser_connect {
+                    let still_on_form = matches!(panel.browser.phase, browser::Phase::Verifying);
                     panel.browser.phase = browser::Phase::Idle;
-                    if cancelled {
+                    if cancelled || !still_on_form {
                         panel.reload_local_profile(cx);
                         return;
                     }

@@ -136,4 +136,37 @@ fn git_hub_cli_shows_the_chosen_account_and_discards_abandoned_sign_ins(cx: &mut
     assert!(!visible("github-confirm-account", cx));
     assert!(visible("account-use-pat", cx));
     assert!(store.active_github_account().unwrap().is_none());
+
+    click("github-use-cli", cx);
+    let (_, accepted) = next_attempt(&mut attempts, cx);
+    accepted
+        .send(Ok(GitHubUser {
+            id: NonZeroU64::new(101).unwrap(),
+            login: "fixture-user".into(),
+        }))
+        .ok()
+        .unwrap();
+    wait_form(cx, |cx| visible("github-confirm-account", cx));
+    simulator.probe.hold.store(true, Ordering::Release);
+    click("github-confirm-account", cx);
+    assert!(!visible("github-cancel-sign-in", cx));
+    cx.update_window(window, |_, window, cx| {
+        window.render_frame(cx);
+        assert_eq!(
+            window.find("github-sign-in-status").label(),
+            Some("Checking repository access…")
+        );
+        panel.update(cx, |panel, cx| panel.clear_token(window, cx));
+    })
+    .unwrap();
+    simulator.probe.hold.store(false, Ordering::Release);
+    wait_form(cx, |cx| {
+        cx.read(|cx| panel.read(cx).local_reader_state().0.active.is_some())
+    });
+    let account = store.active_github_account().unwrap().unwrap();
+    assert_eq!(
+        cx.read(|cx| panel.read(cx).local_reader_state().0.active),
+        Some(account)
+    );
+    assert!(!visible("github-confirm-account", cx));
 }

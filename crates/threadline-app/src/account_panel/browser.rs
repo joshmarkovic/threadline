@@ -54,9 +54,6 @@ impl AccountPanel {
     pub(super) fn reset_browser(&mut self) {
         self.browser.cancel.cancel();
         self.browser.cancel = Cancellation::new();
-        if matches!(self.browser.phase, Phase::Verifying) {
-            self.cancel.cancel();
-        }
         self.browser.phase = Phase::Idle;
     }
 
@@ -269,13 +266,16 @@ impl AccountPanel {
                     ))
                     .child(actions.child(confirm).child(cancel))
             }
+            Phase::Verifying => section.child(super::pages::status(
+                "github-sign-in-status",
+                "Checking repository access…",
+            )),
             phase => {
                 let message = match phase {
                     Phase::SigningIn => {
                         "Follow the GitHub CLI prompts to finish signing in through your browser."
                     }
-                    Phase::LookingUp => "Checking the account signed in to GitHub CLI…",
-                    _ => "Checking GitHub repository access…",
+                    _ => "Checking the account signed in to GitHub CLI…",
                 };
                 section
                     .child(super::pages::status("github-sign-in-status", message))
