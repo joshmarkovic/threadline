@@ -7,27 +7,43 @@ using Microsoft.Win32;
 
 internal sealed class NotificationRegistration
 {
-    private readonly string display, identity, app, link, serverKey, senderKey, classKey, classText, scratch;
+    private readonly string display, formerDisplay, identity, app, link, formerLink;
+    private readonly string serverKey, senderKey, classKey, classText, scratch;
     private readonly Guid activator;
+    private const string SnapshotFormat = "Threadline notification registration 2";
     private const string SnapshotName = "threadline-notification.snapshot";
     private const string OldLink = "threadline-notification.previous.lnk";
+    private const string OldFormerLink = "threadline-notification.former.lnk";
     private const string NextLink = "threadline-notification.new.lnk";
 
     private NotificationRegistration(bool local)
     {
-        display = local ? "Threadline Installer Test" : "Threadline";
+        // The preview keeps the folder it was first installed in. Only the name people see changed,
+        // so setup replaces a shortcut and sender name that still carry the former one.
+        string folder = local ? "Threadline Installer Test" : "Threadline";
+        display = local ? "Threadline Preview" : "Threadline";
+        formerDisplay = local ? "Threadline Installer Test" : null;
         identity = local ? "Threadline.InstallTest" : "Threadline.Desktop";
         activator = new Guid(local ? "df3bb9a2-0794-44a6-b130-a35197093afe" : "5a20cea8-a5d8-4b5e-9be3-4121ba0aa753");
         classText = activator.ToString("B");
-        classKey = @"Software\Classes\CLSID\" + classText;
-        serverKey = classKey + @"\LocalServer32";
-        senderKey = @"Software\Classes\AppUserModelId\" + identity;
+        string classes = @"Software\Classes\";
         string data = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         string programs = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
+#if THREADLINE_HELPER_TEST
+        // The migration test points the helper at scratch folders and a scratch registry key.
+        data = Environment.GetEnvironmentVariable("THREADLINE_HELPER_TEST_DATA");
+        programs = Environment.GetEnvironmentVariable("THREADLINE_HELPER_TEST_PROGRAMS");
+        classes = Environment.GetEnvironmentVariable("THREADLINE_HELPER_TEST_KEY") + @"\";
+        if (data == null || programs == null || classes.Length < 2) throw new IOException("The helper test locations are missing.");
+#endif
+        classKey = classes + @"CLSID\" + classText;
+        serverKey = classKey + @"\LocalServer32";
+        senderKey = classes + @"AppUserModelId\" + identity;
         if (!Path.IsPathRooted(data) || !Directory.Exists(programs))
             throw new IOException("The current user's application or Start menu directory is unavailable.");
-        app = Path.Combine(data, "Programs", display, "threadline.exe");
+        app = Path.Combine(data, "Programs", folder, "threadline.exe");
         link = Path.Combine(programs, display + ".lnk");
+        formerLink = formerDisplay == null ? null : Path.Combine(programs, formerDisplay + ".lnk");
         scratch = AppDomain.CurrentDomain.BaseDirectory;
     }
 
@@ -67,7 +83,12 @@ internal sealed class NotificationRegistration
         catch (SystemException error)
         { Console.Error.WriteLine("The Windows registration helper failed (HRESULT 0x{0:X8}).", error.HResult); return 27; }
     }
-    private string Read(string keyName, string name, string expected)
+    private bool Accepts(string value, string expected, string former)
+    {
+        return String.Equals(value, expected, StringComparison.OrdinalIgnoreCase) ||
+            (former != null && String.Equals(value, former, StringComparison.OrdinalIgnoreCase));
+    }
+    private string Read(string keyName, string name, string expected, string former)
     {
         using (RegistryKey key = Registry.CurrentUser.OpenSubKey(keyName))
         {
@@ -75,15 +96,18 @@ internal sealed class NotificationRegistration
             object raw = key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
             if (raw == null) return null;
             string value = raw as string;
-            if (value == null || key.GetValueKind(name) != RegistryValueKind.String ||
-                !String.Equals(value, expected, StringComparison.OrdinalIgnoreCase))
+            if (value == null || key.GetValueKind(name) != RegistryValueKind.String || !Accepts(value, expected, former))
                 throw new InvalidOperationException();
             return value;
         }
     }
     private string[] Values()
     {
-        return new[] { Read(serverKey, "", Command), Read(senderKey, "CustomActivator", classText), Read(senderKey, "DisplayName", display) };
+        return new[]
+        {
+            Read(serverKey, "", Command, null), Read(senderKey, "CustomActivator", classText, null),
+            Read(senderKey, "DisplayName", display, formerDisplay)
+        };
     }
     private static void Write(string keyName, string name, string value)
     {
@@ -109,41 +133,46 @@ internal sealed class NotificationRegistration
         Write(senderKey, "DisplayName", values[2]);
         RemoveEmpty(serverKey); RemoveEmpty(classKey); RemoveEmpty(senderKey);
     }
-    private void CheckLink()
+    private bool HasFormerLink { get { return formerLink != null && File.Exists(formerLink); } }
+    private void CheckOne(string path)
     {
-        if (File.Exists(link) && ((File.GetAttributes(link) & FileAttributes.ReparsePoint) != 0 ||
-            !ThreadlineToastShortcut.TargetsExecutable(link, app))) throw new InvalidOperationException();
+        if (path != null && File.Exists(path) && ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0 ||
+            !ThreadlineToastShortcut.TargetsExecutable(path, app))) throw new InvalidOperationException();
     }
+    private void CheckLink() { CheckOne(link); CheckOne(formerLink); }
     private string At(string name) { return Path.Combine(scratch, name); }
     private void Prepare()
     {
         CheckLink();
         string[] values = Values();
         if (File.Exists(link)) File.Copy(link, At(OldLink), false);
+        if (HasFormerLink) File.Copy(formerLink, At(OldFormerLink), false);
         using (var file = new FileStream(At(SnapshotName), FileMode.CreateNew, FileAccess.Write, FileShare.None))
         using (var writer = new BinaryWriter(file))
         {
-            writer.Write("Threadline notification registration 1");
-            writer.Write(identity); writer.Write(File.Exists(link));
+            writer.Write(SnapshotFormat);
+            writer.Write(identity); writer.Write(File.Exists(link)); writer.Write(HasFormerLink);
             foreach (string value in values) { writer.Write(value != null); if (value != null) writer.Write(value); }
             file.Flush(true);
         }
     }
-    private string[] Snapshot(out bool hadLink)
+    private string[] Snapshot(out bool hadLink, out bool hadFormerLink)
     {
         string[] expected = { Command, classText, display };
         var file = new FileInfo(At(SnapshotName));
         if (!file.Exists || file.Length > 131072 || (file.Attributes & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException();
         using (var reader = new BinaryReader(file.OpenRead()))
         {
-            if (reader.ReadString() != "Threadline notification registration 1" || reader.ReadString() != identity) throw new InvalidDataException();
+            if (reader.ReadString() != SnapshotFormat || reader.ReadString() != identity) throw new InvalidDataException();
             hadLink = reader.ReadBoolean();
+            hadFormerLink = reader.ReadBoolean();
+            if (hadFormerLink && formerLink == null) throw new InvalidDataException();
             string[] values = new string[3];
             for (int i = 0; i < values.Length; i++)
                 if (reader.ReadBoolean())
                 {
                     values[i] = reader.ReadString();
-                    if (!String.Equals(values[i], expected[i], StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException();
+                    if (!Accepts(values[i], expected[i], i == 2 ? formerDisplay : null)) throw new InvalidDataException();
                 }
             if (reader.BaseStream.Position != reader.BaseStream.Length) throw new InvalidDataException();
             return values;
@@ -151,8 +180,8 @@ internal sealed class NotificationRegistration
     }
     private void Apply()
     {
-        bool hadLink;
-        Snapshot(out hadLink); CheckLink(); Values();
+        bool hadLink, hadFormerLink;
+        Snapshot(out hadLink, out hadFormerLink); CheckLink(); Values();
         if (!File.Exists(app)) throw new IOException("The staged replacement executable is unavailable.");
         string staged = At(NextLink);
         ThreadlineToastShortcut.CreateOwnedLinkWithActivator(staged, app, identity, activator);
@@ -160,12 +189,17 @@ internal sealed class NotificationRegistration
         File.Copy(staged, link, true);
         SetValues(new[] { Command, classText, display });
         ThreadlineToastShortcut.NotifyPublishedLink(link, hadLink);
+        if (HasFormerLink)
+        {
+            File.Delete(formerLink);
+            ThreadlineToastShortcut.NotifyRemovedLink(formerLink);
+        }
     }
     private void Restore()
     {
         if (!File.Exists(At(SnapshotName))) return;
-        bool hadLink;
-        string[] values = Snapshot(out hadLink);
+        bool hadLink, hadFormerLink;
+        string[] values = Snapshot(out hadLink, out hadFormerLink);
         CheckLink(); Values();
         bool existed = File.Exists(link);
         if (hadLink)
@@ -173,20 +207,27 @@ internal sealed class NotificationRegistration
             if (!ThreadlineToastShortcut.TargetsExecutable(At(OldLink), app)) throw new InvalidDataException();
             File.Copy(At(OldLink), link, true);
         }
-        else if (File.Exists(link)) File.Delete(link);
+        else if (existed) File.Delete(link);
+        if (hadFormerLink && !File.Exists(formerLink))
+        {
+            if (!ThreadlineToastShortcut.TargetsExecutable(At(OldFormerLink), app)) throw new InvalidDataException();
+            File.Copy(At(OldFormerLink), formerLink, false);
+            ThreadlineToastShortcut.NotifyPublishedLink(formerLink, false);
+        }
         SetValues(values);
         if (hadLink) ThreadlineToastShortcut.NotifyPublishedLink(link, existed);
         else if (existed) ThreadlineToastShortcut.NotifyRemovedLink(link);
     }
     private void Remove()
     {
-        bool hadLink;
-        Snapshot(out hadLink); CheckLink(); Values();
+        bool hadLink, hadFormerLink;
+        Snapshot(out hadLink, out hadFormerLink); CheckLink(); Values();
         SetValues(new string[3]);
-        if (File.Exists(link))
-        {
-            File.Delete(link);
-            ThreadlineToastShortcut.NotifyRemovedLink(link);
-        }
+        foreach (string path in new[] { link, formerLink })
+            if (path != null && File.Exists(path))
+            {
+                File.Delete(path);
+                ThreadlineToastShortcut.NotifyRemovedLink(path);
+            }
     }
 }

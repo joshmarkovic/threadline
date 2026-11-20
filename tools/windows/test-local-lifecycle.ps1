@@ -19,7 +19,7 @@ if (![Environment]::Is64BitProcess -or $env:PROCESSOR_ARCHITECTURE -cne 'AMD64')
 $install = Join-Path $env:LOCALAPPDATA 'Programs\Threadline Installer Test'
 $exe = Join-Path $install 'threadline.exe'
 $uninstall = Join-Path $install 'Uninstall.exe'
-$shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'Threadline Installer Test.lnk'
+$shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'Threadline Preview.lnk'
 $registration = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Threadline.InstallTest'
 $history = 'HKCU:\Software\Threadline.InstallTest'
 $fixtureDatabase = Join-Path $env:LOCALAPPDATA 'Threadline\Data\threadline.sqlite3'
@@ -62,7 +62,7 @@ function Assert-ProfileUnchanged {
 
 function Assert-Installed($Package) {
     $entry = Get-ItemProperty -LiteralPath $registration
-    if ($entry.InstallLocation -ine $install -or $entry.DisplayName -cne 'Threadline Installer Test' -or
+    if ($entry.InstallLocation -ine $install -or $entry.DisplayName -cne 'Threadline Preview' -or
         $entry.DisplayVersion -cne $Package.version -or $entry.InstalledBuild -ne $Package.build -or
         $entry.UninstallString -ine ('"' + $uninstall + '"') -or
         (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -ine $Package.app -or

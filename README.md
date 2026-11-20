@@ -18,7 +18,7 @@ To download and open the same installer from PowerShell, paste this block.
 
 **Upgrading an older installation?** If you have build 20 or earlier, or build 21 still asks you to set up release access, close Threadline and run the build 25 installer once. Setup preserves your workspace and settings.
 
-After setup, open **Threadline Installer Test** from Start. Threadline looks for a newer preview when it starts and every four hours while it stays open. It verifies the manifest signature and checks the installer against it. Threadline then saves your workspace, installs the update quietly, and reopens. If you are working when the download finishes, Threadline waits until you step away. To install sooner, choose **Restart to update**. **Settings → Updates** shows the installed version and lets you check on demand. **Work offline** and **Pause background refresh** also pause update checks.
+After setup, open **Threadline Preview** from Start. Threadline looks for a newer preview when it starts and every four hours while it stays open. It verifies the manifest signature and checks the installer against it. Threadline then saves your workspace, installs the update quietly, and reopens. If you are working when the download finishes, Threadline waits until you step away. To install sooner, choose **Restart to update**. **Settings → Updates** shows the installed version and lets you check on demand. **Work offline** and **Pause background refresh** also pause update checks.
 
 For unattended deployment, download the installer and run `Start-Process .\Threadline-Setup-25.exe -ArgumentList '/S' -Wait` from its folder in PowerShell. A standalone silent install exits when setup finishes. Open the app from Start when you're ready.
 

@@ -33,7 +33,7 @@ if ($watchedBranch) { $marker = 'threadline-s11-watched-branch-v1' }
 if ($groupedReview) { $marker = 'threadline-s11-grouped-review-v1' }
 $fixtureTitle = 'Threadline'
 $fixtureBody = if ($groupedReview) { '2 new activity updates' } elseif ($watchedBranch) { '3 new activity updates' } else { '37 new activity updates' }
-$fixtureAppDisplayName = 'Threadline Installer Test'
+$fixtureAppDisplayName = 'Threadline Preview'
 $fixtureActionLabel = 'Open'
 $fixtureSenderGuard = {
     param($Card, $Root, [int]$Owner)
@@ -151,7 +151,7 @@ function Test-CallbackResult($State) {
 try {
     if (![Environment]::Is64BitProcess -or !$([Environment]::UserInteractive)) { Stop-Blocked 'An interactive 64-bit Windows session is required.' }
     $registration = Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Threadline.InstallTest'
-    $link = Join-Path ([Environment]::GetFolderPath('Programs')) 'Threadline Installer Test.lnk'
+    $link = Join-Path ([Environment]::GetFolderPath('Programs')) 'Threadline Preview.lnk'
     $localServer = Get-Item -LiteralPath ("HKCU:\Software\Classes\CLSID\$clsid\LocalServer32")
     if ($CallbackProbe) {
         $mergedServer = Get-Item -LiteralPath ("Registry::HKEY_CLASSES_ROOT\CLSID\$clsid\LocalServer32")
