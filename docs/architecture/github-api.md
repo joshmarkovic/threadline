@@ -6,6 +6,8 @@
 
 Threadline records the chosen CLI login and GitHub user ID. For API access it asks the CLI for that named account’s credential and verifies the numeric GitHub identity. The repository entered in Threadline selects an owner for discovery. GitHub CLI's authorization can cover additional repositories. Signing out in Threadline disconnects the workspace. Use GitHub CLI to manage its own signed-in accounts. An organization can require an active single sign-on session or approval for the GitHub CLI OAuth app before private repositories appear. [GitHub CLI account management](https://cli.github.com/manual/gh_auth)
 
+On Linux, install GitHub CLI in `/usr/bin`, `/usr/local/bin`, or `/opt/gh/bin`. On macOS, Threadline checks `/opt/homebrew/bin`, `/usr/local/bin`, and `/opt/local/bin`. The executable and the directories leading to it, including symlink targets, must be owned by root or the current user and writable only by their owner. [GitHub CLI installation](https://cli.github.com/)
+
 ## Repository access
 
 Threadline binds each session to the numeric user ID returned by GitHub and the resource owner selected for that credential. Private repository verification checks the owner, repository name, private flag and any previously known numeric repository ID. The production client sends its credential to `https://api.github.com` in an authorization header. It rejects redirects and uses a five-second connection timeout and a 15-second request timeout. REST requests identify the application and pin API version `2026-03-10`. [GitHub REST API versions](https://docs.github.com/en/rest/about-the-rest-api/api-versions)
