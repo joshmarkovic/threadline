@@ -2433,7 +2433,7 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
         std::fs::read_to_string(profile.path().join("Config/display-timezone")).unwrap(),
         "America/New_York\n"
     );
-    let click_setup = |id: &str, cx: &mut gpui_kit::TestAppContext| {
+    let click_setup = |id: &'static str, cx: &mut gpui_kit::TestAppContext| {
         cx.update_window(window, |_, window, cx| {
             window.render_frame(cx);
             window.click(id, cx);
