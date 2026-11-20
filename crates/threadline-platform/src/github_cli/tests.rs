@@ -203,6 +203,23 @@ fn console_child() {
 
 #[cfg(windows)]
 #[tokio::test]
+#[ignore = "requires an installed, signed GitHub CLI"]
+async fn installed_cli_version() {
+    let cli = GitHubCli::discover().expect("locate and verify official GitHub CLI");
+    let result = cli
+        .capture(
+            &["--version"],
+            4096,
+            CliError::Unavailable,
+            &CancellationToken::new(),
+        )
+        .await
+        .expect("read CLI version");
+    assert!(result.starts_with(b"gh version "));
+}
+
+#[cfg(windows)]
+#[tokio::test]
 async fn native_console_has_interactive_handles() {
     // Start only this test binary. The child's console must work even when the parent has redirected input/output.
     let executable = std::env::current_exe().unwrap();
