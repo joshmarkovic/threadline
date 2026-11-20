@@ -9,6 +9,7 @@ use gpui_kit::{
     Window, div, prelude::FluentBuilder, px,
 };
 use threadline_core::{
+    domain::RepositoryName,
     github::{AccessError, Reachability},
     sync::Cancellation,
 };
@@ -517,7 +518,7 @@ impl AccountPanel {
             return;
         }
         let repository = self.route.read(cx).value();
-        if let Some(error) = self.repository_problem(&repository) {
+        if let Err(error) = self.validated_repository(&repository) {
             self.show_repository_problem(error, window, cx);
             return;
         }
@@ -540,13 +541,14 @@ impl AccountPanel {
             return;
         }
         let requested = self.route.read(cx).value();
-        if let Some(error) = self.repository_problem(&requested) {
-            self.show_repository_problem(error, window, cx);
-            return;
-        }
-        let Some(profile) =
-            parse_repository(&requested).and_then(|route| self.profile(route.owner()).cloned())
-        else {
+        let route = match self.validated_repository(&requested) {
+            Ok(route) => route,
+            Err(error) => {
+                self.show_repository_problem(error, window, cx);
+                return;
+            }
+        };
+        let Some(profile) = self.profile(route.owner()).cloned() else {
             return;
         };
         self.repository_error = None;
@@ -572,30 +574,28 @@ impl AccountPanel {
         cx.notify();
     }
 
-    fn repository_problem(&self, raw: &str) -> Option<&'static str> {
-        let Some(route) = parse_repository(raw) else {
-            return Some(REPOSITORY_FORMAT);
-        };
+    fn validated_repository(&self, raw: &str) -> Result<RepositoryName, &'static str> {
+        let route = parse_repository(raw).ok_or(REPOSITORY_FORMAT)?;
         if self
             .renew
             .as_ref()
             .is_some_and(|profile| !profile.owner_scope.eq_ignore_ascii_case(route.owner()))
         {
-            return Some("Enter a repository owned by the account whose token you are replacing.");
+            return Err("Enter a repository owned by the account whose token you are replacing.");
         }
         let credential_entry = self.credential_form_open
             || (self.page == AccountPanelPage::Onboarding
                 && self.onboarding == Some(OnboardingStep::GitHub));
         if !credential_entry && self.profile(route.owner()).is_none() {
-            return Some("Add an account for this repository owner in Settings to check access.");
+            return Err("Add an account for this repository owner in Settings to check access.");
         }
-        None
+        Ok(route)
     }
 
     fn route_changed(&mut self, route: Entity<InputState>, cx: &mut Context<Self>) {
         let prior = self.repository_error;
         if prior.is_some() {
-            self.repository_error = self.repository_problem(&route.read(cx).value());
+            self.repository_error = self.validated_repository(&route.read(cx).value()).err();
         }
         if self.repository_error != prior || self.service.fixture {
             cx.notify();
@@ -613,10 +613,26 @@ impl AccountPanel {
         self.view
             .profiles
             .iter()
-            .find(|profile| Some(profile.account) == self.view.active)
+            .filter(|profile| Some(profile.account) == self.view.active)
+            .min_by_key(|profile| match profile.access {
+                AccessState::Readable => 0,
+                AccessState::SignedOut => 2,
+                _ => 1,
+            })
     }
 
     pub(crate) fn refresh(&mut self, window: Option<&mut Window>, cx: &mut Context<Self>) {
+        if self
+            .view
+            .profiles
+            .iter()
+            .filter(|p| Some(p.account) == self.view.active && p.access != AccessState::SignedOut)
+            .count()
+            > 1
+        {
+            self.refresh_all(window, cx);
+            return;
+        }
         let Some(profile) = self.current_profile().cloned() else {
             return;
         };
@@ -707,6 +723,47 @@ impl AccountPanel {
             .child(
                 div()
                     .flex()
+                    .flex_col()
+                    .gap_1()
+                    .child(
+                        div().text_xs().text_color(palette.muted).child(
+                            "For organization repositories, sign in with SSO if required, then use a token authorized for that organization.",
+                        ),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_wrap()
+                            .gap_2()
+                            .child(
+                                Button::new("account-org-sso")
+                                    .accessibility_id("account-org-sso")
+                                    .label("Sign in with organization SSO")
+                                    .small()
+                                    .disabled(self.busy || self.view.offline)
+                                    .on_click(cx.listener(|panel, _, window, cx| {
+                                        panel.open_setup_page(window, cx, |owner| {
+                                            format!("https://github.com/orgs/{owner}/sso")
+                                        });
+                                    })),
+                            )
+                            .child(
+                                Button::new("account-create-read-token")
+                                    .accessibility_id("account-create-read-token")
+                                    .label("Create read-only token")
+                                    .small()
+                                    .disabled(self.busy || self.view.offline)
+                                    .on_click(cx.listener(|panel, _, window, cx| {
+                                        panel.open_setup_page(window, cx, |owner| {
+                                            format!("https://github.com/settings/personal-access-tokens/new?target_name={owner}&name=Threadline&issues=read&pull_requests=read")
+                                        });
+                                    })),
+                            ),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
                     .gap_2()
                     .items_center()
                     .child(
@@ -774,6 +831,18 @@ impl AccountPanel {
             },
         );
         form
+    }
+
+    fn open_setup_page(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        url: fn(&str) -> String,
+    ) {
+        match self.validated_repository(&self.route.read(cx).value()) {
+            Ok(route) => cx.open_url(&url(route.owner())),
+            Err(error) => self.show_repository_problem(error, window, cx),
+        }
     }
 
     fn start_credential_form(

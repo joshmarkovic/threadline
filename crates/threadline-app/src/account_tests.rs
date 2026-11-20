@@ -267,6 +267,7 @@ fn respond(
     }) {
         reply
     } else {
+        let personal = r#"{"id":178,"node_id":"synthetic-personal","name":"personal","owner":{"login":"fixture-user"},"private":true,"permissions":{"pull":true,"push":false,"admin":false}}"#;
         match target.as_str() {
         "/user" if probe.rejected.load(Ordering::Acquire) =>
             ("401 Unauthorized", String::new(), r#"{"message":"Bad fixture credentials"}"#.into()),
@@ -277,6 +278,7 @@ fn respond(
         "/repos/fixture-org/private" if reader.is_some_and(|(_, _, phase)| phase.load(Ordering::Relaxed) == 7) =>
             ("403 Forbidden", String::new(), r#"{"message":"Fixture repository denied"}"#.into()),
         "/repos/fixture-org/private" => ("200 OK",String::new(),repo.to_owned()),
+        "/repos/fixture-user/personal" => ("200 OK",String::new(),personal.to_owned()),
         "/repos/fixture-org/missing" => not_found(),
         "/repos/fixture-org/retired" if inventory_phase > 0 => {
             inventory.retired_checks.fetch_add(1, Ordering::Release);
@@ -309,7 +311,7 @@ fn respond(
             };
             ("200 OK", header, format!("[{repo},{new}]"))
         }
-        target if target.starts_with("/user/repos?") => ("200 OK",if sso {"X-GitHub-SSO: partial-results; organizations=9\r\n".into()} else {String::new()},format!("[{repo}]")),
+        target if target.starts_with("/user/repos?") => ("200 OK",if sso {"X-GitHub-SSO: partial-results; organizations=9\r\n".into()} else {String::new()},format!("[{repo},{personal}]")),
         _ => panic!("unexpected local fixture route"),
     }
     };
@@ -2431,6 +2433,35 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
         std::fs::read_to_string(profile.path().join("Config/display-timezone")).unwrap(),
         "America/New_York\n"
     );
+    let click_setup = |id: &str, cx: &mut gpui_kit::TestAppContext| {
+        cx.update_window(window, |_, window, cx| {
+            window.render_frame(cx);
+            window.click(id, cx);
+        })
+        .unwrap();
+    };
+    let requests_before_setup = simulator.requests.load(Ordering::SeqCst);
+    click("account-repository", cx);
+    set_route("owner@invalid.example/private", cx);
+    click_setup("account-org-sso", cx);
+    assert_eq!(cx.opened_url(), None);
+    set_route("fixture-org/private", cx);
+    click_setup("account-org-sso", cx);
+    assert_eq!(
+        cx.opened_url().as_deref(),
+        Some("https://github.com/orgs/fixture-org/sso")
+    );
+    click_setup("account-create-read-token", cx);
+    assert_eq!(
+        cx.opened_url().as_deref(),
+        Some(
+            "https://github.com/settings/personal-access-tokens/new?target_name=fixture-org&name=Threadline&issues=read&pull_requests=read"
+        )
+    );
+    assert_eq!(
+        simulator.requests.load(Ordering::SeqCst),
+        requests_before_setup
+    );
     // Exercise real focus transfer in both directions using the receipt geometry.
     click("account-token", cx);
     wait_receipt("fixture_token_focused", cx);
@@ -2560,6 +2591,39 @@ fn account_form_enters_masked_fixture_credential_and_verifies_the_user(
             .unwrap();
         read_account().is_some_and(|account| account["discovery"] == "RestrictedBySso")
     });
+    click("account-add", cx);
+    click("account-repository", cx);
+    set_route("fixture-user/personal", cx);
+    click("account-token", cx);
+    enter_token(cx);
+    click("account-connect", cx);
+    wait_form(cx, |cx| {
+        cx.update_window(window, |_, window, cx| window.render_frame(cx))
+            .unwrap();
+        read_account().is_some_and(|account| {
+            account["profile_access"] == "Readable"
+                && account["repository_count"] == 2
+                && account["busy"] == false
+        })
+    });
+    assert_eq!(store.github_access_profiles().unwrap().len(), 2);
+    let before_refresh = simulator.user_requests.load(Ordering::SeqCst);
+    simulator.sso.store(false, Ordering::Relaxed);
+    click("account-refresh", cx);
+    wait_form(cx, |cx| {
+        cx.update_window(window, |_, window, cx| window.render_frame(cx))
+            .unwrap();
+        store
+            .github_access_profiles()
+            .unwrap()
+            .iter()
+            .all(|profile| profile.discovery == DiscoveryState::Complete)
+            && read_account().is_some_and(|account| account["busy"] == false)
+    });
+    assert_eq!(
+        simulator.user_requests.load(Ordering::SeqCst),
+        before_refresh + 2
+    );
     click("account-add", cx);
     click("account-token", cx);
     enter_token(cx);
